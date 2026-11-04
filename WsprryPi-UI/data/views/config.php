@@ -878,7 +878,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                             <label for="gpio_manual_ppm" class="form-label">Fallback PPM</label>
                                             <input type="number" class="form-control" id="gpio_manual_ppm" min="-200" max="200" step="0.000001" inputmode="decimal" aria-describedby="gpio-manual-ppm-hint gpio-manual-ppm-error" required />
                                             <div id="gpio-manual-ppm-hint" class="form-text mt-2">
-                                                Used only when the system clock estimate is disabled or unavailable. Positive means fast; negative means slow.
+                                                Used when the selected estimate is disabled or unavailable. Positive means fast; negative means slow.
                                             </div>
                                             <div id="gpio-manual-ppm-error" class="form-text text-danger mt-2" aria-live="polite" hidden></div>
                                         </div>
@@ -902,6 +902,20 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                         </div>
                                     </div>
                                 </section>
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="use_direct_pps_calibration" aria-describedby="direct-pps-hint direct-pps-error" />
+                                    <label class="form-check-label" for="use_direct_pps_calibration">Direct PPS calibration (Pi 5 / RP1)</label>
+                                </div>
+                                <div id="direct-pps-error" class="form-text text-danger mt-2" aria-live="polite" hidden></div>
+                                <div id="direct-pps-status" class="form-text mt-2" role="status" aria-live="polite"></div>
+                                <div id="direct-pps-hint" class="form-text mt-2">
+                                    Measure the RF clock against an existing GPS PPS input on GPIO17 (pps0).
+                                    Enable only with a verified reference whose edge error is at most 1 microsecond.
+                                    Chrony must select that local PPS reference without combined sources.
+                                    Overrides the system clock estimate for RP1; other backends retain their own calibration.
+                                    Allow at least 30 seconds to settle. Loss or expiry selects Fallback PPM.
+                                    The Operations frequency correction panel shows acquisition status and the selected source.
+                                </div>
                                 </div>
 
                                 <div class="transmitter-backend-fields" id="si5351-backend-panel" role="group" aria-labelledby="si5351-output-heading" hidden>

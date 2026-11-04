@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/raspberrypi/linux",
+  "revision": "4103a989a46196239b830bd07693277e42b8f992",
+  "upstream": "include/uapi/misc/rp1_pio_if.h",
+  "files": {
+    "GPL-2.0": "8780e78a1a737e127f25a65f6d95269bffd36158dc261114de7859b490bfc5aa",
+    "Linux-syscall-note": "8e378ab93586eb55135d3bc119cce787f7324f48394777d00c34fa3d0be3303f",
+    "rp1_pio_if.h": "4ae0ef10abe3617c2ab2cef50864be0bd1ce7e7d4c852704a7e87d5d44e32224"
+  }
+}

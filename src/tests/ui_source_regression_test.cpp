@@ -1207,7 +1207,8 @@ int main()
         "update checker must log parsed display branch, raw branch/SHA, branch lookup URL/status/result, selected target branch, fallback state, and target HEAD for debugging");
     require(
         ui_source.find("const si5351Active = selectedTransmitBackend() !== \"gpio\";") != std::string::npos &&
-            ui_source.find("const estimateEnabled = $(\"#use_system_clock_frequency_estimate\").is(\":checked\");") != std::string::npos &&
+            ui_source.find("const estimateEnabled = $(\"#use_system_clock_frequency_estimate\").is(\":checked\") ||") != std::string::npos &&
+            ui_source.find("(isRp1GpioPlatform() && $(\"#use_direct_pps_calibration\").is(\":checked\"))") != std::string::npos &&
             ui_source.find("$residual.prop(\"disabled\", si5351Active || !estimateEnabled);") != std::string::npos &&
             ui_source.find("let use_system_clock_frequency_estimate = parseBool($(\"#use_system_clock_frequency_estimate\").is(\":checked\"));") != std::string::npos &&
             ui_source.find("let gpio_frequency_residual_ppm = Number($(\"#gpio_frequency_residual_ppm\").val());") != std::string::npos &&
@@ -1402,7 +1403,9 @@ int main()
             config_view_source.find("id=\"gpio_frequency_residual_ppm\"") != std::string::npos &&
             config_view_source.find("id=\"gpio_manual_ppm\"") != std::string::npos &&
             config_view_source.find(">Fallback PPM</label>") != std::string::npos &&
-            config_view_source.find("Used only when the system clock estimate is disabled or unavailable.") != std::string::npos,
+            config_view_source.find("Used when the selected estimate is disabled or unavailable.") != std::string::npos &&
+            config_view_source.find("id=\"use_direct_pps_calibration\"") != std::string::npos &&
+            config_view_source.find("id=\"direct-pps-status\"") != std::string::npos,
         "Configuration view must place familiar backend-specific frequency calibration sections in both transmitter panels");
     require(
         operation_view_source.find("id=\"gpio_frequency_correction_panel\"") != std::string::npos &&

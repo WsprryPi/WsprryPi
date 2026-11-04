@@ -1693,7 +1693,8 @@ bool validate_config_candidate(
     }
 
     const bool frequencies_ok = set_frequencies(candidate);
-    if (candidate.transmit &&
+    if ((candidate.transmit || (candidate.gpio_use_direct_pps_calibration &&
+             candidate.transmit_backend == TransmitBackendKind::RP1_GPCLK)) &&
         !frequencies_ok &&
         !trim_copy_string(candidate.frequencies).empty())
     {
@@ -2339,6 +2340,14 @@ bool set_frequencies(ArgParserConfig &target)
                 continue;
             }
             entry.dial_frequency_hz = freq;
+            if (target.gpio_use_direct_pps_calibration &&
+                target.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+                entry.selector_gpio == 17) {
+                llog.logS(ERROR, "GPIO17 is reserved for the existing direct PPS input.");
+                target.wspr_dial_freq_set.clear();
+                target.wspr_frequency_entries.clear();
+                return false;
+            }
             entry.allow_band_gpio_fallback =
                 entry.selector_gpio == kSelectorGpioUnset;
             if (token_looks_numeric_frequency(entry.token))
@@ -2896,6 +2905,7 @@ bool parse_command_line(int argc, char *argv[])
         case 'n': // Use system-clock frequency estimate
         {
             config.gpio_use_system_clock_frequency_estimate = true;
+            config.gpio_use_direct_pps_calibration = false;
             resolve_backend_specific_config(config);
             break;
         }
@@ -2962,6 +2972,7 @@ bool parse_command_line(int argc, char *argv[])
         case 1022:
         {
             config.gpio_use_system_clock_frequency_estimate = false;
+            config.gpio_use_direct_pps_calibration = false;
             resolve_backend_specific_config(config);
             break;
         }
@@ -3594,6 +3605,7 @@ bool parse_command_line(int argc, char *argv[])
 
                 config.gpio_manual_ppm = ppm;
                 config.gpio_use_system_clock_frequency_estimate = false;
+                config.gpio_use_direct_pps_calibration = false;
                 resolve_backend_specific_config(config);
             }
             catch (const std::exception &)

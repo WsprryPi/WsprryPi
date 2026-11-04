@@ -289,6 +289,7 @@ struct ArgParserConfig
     int gpio_power_level; ///< GPIO backend power level (0-7).
     int rp1_gpio_drive_ma; ///< RP1 GPIO pad drive selection in mA.
     bool gpio_use_system_clock_frequency_estimate; ///< Enable the GPIO system-clock estimate.
+    bool gpio_use_direct_pps_calibration = false; ///< Explicit RP1/PPS RF clock measurement.
     double gpio_frequency_residual_ppm; ///< RF residual added to a usable provider estimate.
     double gpio_manual_ppm; ///< Fixed GPIO correction and final configured fallback.
     double si5351_ppm; ///< Persisted Si5351 reference-oscillator correction.
@@ -472,6 +473,7 @@ struct ArgParserConfig
         gpio_power_level = other.gpio_power_level;
         rp1_gpio_drive_ma = other.rp1_gpio_drive_ma;
         gpio_use_system_clock_frequency_estimate = other.gpio_use_system_clock_frequency_estimate;
+        gpio_use_direct_pps_calibration = other.gpio_use_direct_pps_calibration;
         gpio_frequency_residual_ppm = other.gpio_frequency_residual_ppm;
         gpio_manual_ppm = other.gpio_manual_ppm;
         si5351_ppm = other.si5351_ppm;

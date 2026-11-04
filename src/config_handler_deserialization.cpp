@@ -585,6 +585,9 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
         gpio.contains("Use System Clock Frequency Estimate")
             ? gpio.at("Use System Clock Frequency Estimate").get<bool>()
             : true;
+    if (gpio.contains("Use Direct PPS Calibration") && !gpio.at("Use Direct PPS Calibration").is_boolean())
+        throw std::runtime_error("GPIO.Use Direct PPS Calibration must be a boolean.");
+    target.gpio_use_direct_pps_calibration = gpio.value("Use Direct PPS Calibration", false);
     target.gpio_frequency_residual_ppm = parse_gpio_ppm_value(
         gpio.value("Frequency Residual PPM", 0.0),
         "GPIO.Frequency Residual PPM");
@@ -833,10 +836,23 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
     target.allow_non_amateur_frequency =
         experimental.value("Allow Non-Amateur Frequency", false);
 
+    const auto validate_pps_pin = [&] {
+        if (!target.gpio_use_direct_pps_calibration ||
+            target.transmit_backend != TransmitBackendKind::RP1_GPCLK) return;
+        bool conflict = (target.use_led && target.led_pin == 17) ||
+            (target.use_amp && target.amp_pin == 17) ||
+            (target.use_shutdown && target.shutdown_pin == 17);
+        for (const auto& band : target.band_gpio)
+            conflict = conflict || (band.enabled && band.gpio == 17);
+        if (conflict) throw std::runtime_error(
+            "GPIO17 is reserved for the existing direct PPS input; remove conflicting Pi I/O assignments.");
+    };
+
     // Missing Band GPIO data is allowed; explicit disabled defaults stay in place.
     const auto band_gpio_section_it = source.find("Band GPIO");
     if (band_gpio_section_it == source.end() || !band_gpio_section_it->is_object())
     {
+        validate_pps_pin();
         return;
     }
 
@@ -865,6 +881,7 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
             band_config.active_high = band_config_it->at("Active High").get<bool>();
         }
     }
+    validate_pps_pin();
 }
 
 } // namespace config_handler_deserialization

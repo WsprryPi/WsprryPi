@@ -1,0 +1,788 @@
+{
+  "date": "2026-11-04",
+  "pi_base_revision": "21d54a3bd201b96522ed318be763e75d89ea7256",
+  "candidate_binary_sha256": "6d0ae6316cfe1db47d7133bf6591ee2e54dc2831d268a14dbed0f9472535b3c7",
+  "runtime_source_hashes": {
+    "WsprryPi-UI/data/index.css": "8aea1483136ee94c6611f44bb903d97484d0bcc25b407c5ada7a86ed25035de8",
+    "WsprryPi-UI/data/index.js": "4018c54e4b5087488c6df872447c6d59899689ab15fd5f001d559ecd733c2690",
+    "WsprryPi-UI/data/site.js": "472c41a53881bb2a32b0ae85702b6c2c3db6b3fdc8734d0efb4dcebe387d5fd7",
+    "WsprryPi-UI/data/views/config.php": "09e0ca9ac2ec7efa9c1cf3fb0d74327b57f80f2cc393fde7d530a36556323a67",
+    "WsprryPi-UI/package.json": "c9942b8a139292b99e8157f9ea77e2bc262fd125d335a77f803ac0dce771b701",
+    "config/wsprrypi.ini": "e4ee787fa0f2e565a8b3d4495e648738d0eb30e56fe225656a065d1e70397bbf",
+    "src/arg_parser.cpp": "3cf398c7e375b85da081f782c8c9664cb0de917909d3227e1cb54fb9162554d7",
+    "src/config_handler.cpp": "6436d6e75165941cee0997ce608d741ad00f0d8b1ff4d4457f93cc5f3d44c5db",
+    "src/config_handler_deserialization.cpp": "2dd2df4ae6aac5d88081f7b40d18ab6eaf6653ea288478a43d30e28595699499",
+    "src/config_handler_serialization.cpp": "e575124eb51a5a70a197c351896612a414df347f359b80a02f11b3863ad1558f",
+    "src/config_types.hpp": "b26b80a992a8bcb662d0aedda36b4f01a08733dbc817c6fdebcca71c92501f47",
+    "src/rp1_pps_calibration.cpp": "c19b8d4b0aedf57502d7bad204d90fbad51c44c49d63a86f834657eb47dffb13",
+    "src/rp1_pps_calibration.hpp": "2a6e6cad8c64cec652a3923cd16d27fc217c540afc512f233d902ccac2680b41",
+    "src/scheduling.cpp": "ba13362f07012a662b229587d4f19533ddd84f9c4c3787f40e83b8f27a2d46a1",
+    "src/scheduling_config.cpp": "97194b4eac78beef220e9574afc9ec84d33c9827955d6809332e4788e98df4db",
+    "src/system_clock_frequency_estimate.cpp": "4645efbea47fbedf6f960824fda03e67f0fd2ff9543a40072668708c242c91c9",
+    "src/vendor/rp1_pio/PROVENANCE.json": "ef12ea4b1029f91d9b181d97a8f38898742a5c3430c0f9a1ce91a880931bbeae",
+    "src/vendor/rp1_pio/rp1_pio_if.h": "4ae0ef10abe3617c2ab2cef50864be0bd1ce7e7d4c852704a7e87d5d44e32224",
+    "src/wtp_endpoint/runtime.cpp": "91b7af6cc284ca949056f97c51ad054a13dba7840138a0aa77e41e1c02e4a482"
+  },
+  "host": "wspr5",
+  "platform": "Raspberry Pi 5 Model B Rev 1.0",
+  "kernel": "6.18.34+rpt-rpi-2712",
+  "receiver": "SDRplay RSP1B 2404058C60",
+  "gpsdo": "Leo Bodnar LBE-1421 0673ED0FA107",
+  "pps": "existing GPIO17, pps0 pps@11.-1; operator-qualified reference",
+  "combiner_attenuation_db_each_path": 60,
+  "drive_ma": 2,
+  "sample_rate_hz": 250000,
+  "fit_duration_s": 6,
+  "reference_separation_hz": 500,
+  "allowance_basis": {
+    "line_hz_each": 0.05,
+    "receiver_sample_scale_ppm": 100,
+    "gpsdo_ppb": 10,
+    "qualification": "conditional engineering allowances, not traceable expanded uncertainty"
+  },
+  "successful_cases": 30,
+  "successful_commanded_rf_s": 240,
+  "stopped_attempts": 2,
+  "stopped_attempt_command_budget_s": 16,
+  "cumulative_commanded_rf_s": 256,
+  "maximum_job_s": 8,
+  "restoration_verified": true,
+  "app_settings_service_gpsdo_route_restored_and_receiver_closed": true,
+  "all_case_accuracy_trim_closure_window_immutability_output_off_checks_passed": true,
+  "cases": [
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -1.9127675173342171,
+      "two_second_window_errors_ppm": [
+        -1.861916633277237,
+        -1.9128660887094808,
+        -1.9602143097283307
+      ],
+      "conditional_allowance_ppm": 0.020832528967382365,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 77.11167527353288,
+      "snr_db": [
+        84.7303482057316,
+        95.6364528264356
+      ],
+      "capture_sha256": "d36abfcd9111305b55ecb95805eb0fb12d143c38cf417bac7008275e06cb4481",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -2.0781573499272326,
+      "two_second_window_errors_ppm": [
+        -2.037846809708889,
+        -2.083981337026947,
+        -2.130358075167671
+      ],
+      "conditional_allowance_ppm": 0.015541336662354705,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.07896640881187,
+      "snr_db": [
+        70.8566511708627,
+        94.48980704656718
+      ],
+      "capture_sha256": "e90518d9218ecc346268d686cd4a6c27dad8435db3d79fa1a6198061f8e4f9fb",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -1.6869391726485468,
+      "two_second_window_errors_ppm": [
+        -1.63133899322888,
+        -1.6858990546219867,
+        -1.7330967755235123
+      ],
+      "conditional_allowance_ppm": 0.031476719462132846,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.76293095784206,
+      "snr_db": [
+        92.02069733219913,
+        96.36895365845896
+      ],
+      "capture_sha256": "d8caaae93096f48efc3938c9e599c1fbac002b064c02faec4d9a7a2c535ad2b5",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -2.43271244430782,
+      "two_second_window_errors_ppm": [
+        -2.3838911224319004,
+        -2.4306841213709194,
+        -2.4707048510172585
+      ],
+      "conditional_allowance_ppm": 0.020884529179473917,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.37768544630192,
+      "snr_db": [
+        83.04574617677326,
+        95.53427343409436
+      ],
+      "capture_sha256": "72e10d485d285b095dd9ab4d90a37df607c0a15282e43587f370acc600be7b27",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -2.519029106643516,
+      "two_second_window_errors_ppm": [
+        -2.4701078357993764,
+        -2.514876551596681,
+        -2.5525795466184578
+      ],
+      "conditional_allowance_ppm": 0.01558542868761566,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.7177621106168,
+      "snr_db": [
+        71.33338417032414,
+        95.06971314001673
+      ],
+      "capture_sha256": "cc86dbe06a9ffcef52cb00bc2df0271ef8258975e9282971ef05945d0a934c2d",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -2.259986020938002,
+      "two_second_window_errors_ppm": [
+        -2.2140670285130293,
+        -2.2583495398978837,
+        -2.3040687459635043
+      ],
+      "conditional_allowance_ppm": 0.031534030450477125,
+      "selected_component_ppm": 3.15,
+      "additional_ppm": 3.15,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.34831828087789,
+      "snr_db": [
+        93.15475177693324,
+        96.29087733807529
+      ],
+      "capture_sha256": "e7fb16c98a56958b60c876654ed2baa28f9483cb9ded8115cf4e3a207dafe441",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -0.04644518714199185,
+      "two_second_window_errors_ppm": [
+        -0.029169425900315918,
+        -0.04651341441037526,
+        -0.06447674607494217
+      ],
+      "conditional_allowance_ppm": 0.020645876204817504,
+      "selected_component_ppm": 0.481500000037677,
+      "additional_ppm": 0.481500000037677,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.45003979540354,
+      "snr_db": [
+        87.66384679314024,
+        95.4061914922236
+      ],
+      "capture_sha256": "3552bdf0b6da8416e48d7a828d9ed7e9b1d58da485ed8129341c15f985c07499",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": 0.012696068832274405,
+      "two_second_window_errors_ppm": [
+        0.023288456255580063,
+        0.012677521122060924,
+        0.002909096480064367
+      ],
+      "conditional_allowance_ppm": 0.015332228321091147,
+      "selected_component_ppm": 0.40250000005150355,
+      "additional_ppm": 0.40250000005150355,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.96852651375514,
+      "snr_db": [
+        75.33863282398204,
+        93.81307117648595
+      ],
+      "capture_sha256": "91fc8b60527f64c5a1c9730204496edc00b02f90d8b4ed0a6d96cc34c5679244",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -0.04985623642772818,
+      "two_second_window_errors_ppm": [
+        -0.004252935646550581,
+        -0.04779264012102163,
+        -0.09092815170933094
+      ],
+      "conditional_allowance_ppm": 0.03131299316059847,
+      "selected_component_ppm": 0.6644999999691095,
+      "additional_ppm": 0.6644999999691095,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.26011997704522,
+      "snr_db": [
+        93.93843667204997,
+        95.03156250721986
+      ],
+      "capture_sha256": "3cd15e01c7af3f6801b85be82c636687bd43430a9c397de4479c707affb83308",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": 0.018013772694019735,
+      "two_second_window_errors_ppm": [
+        0.029040110329535924,
+        0.018862890002625542,
+        0.00616600340784859
+      ],
+      "conditional_allowance_ppm": 0.020639429599785344,
+      "selected_component_ppm": 0.4134999999624469,
+      "additional_ppm": 0.4134999999624469,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.97243872586408,
+      "snr_db": [
+        89.22054597416303,
+        96.64902518829084
+      ],
+      "capture_sha256": "34c231f967b22bd19ed231a666c934c54f4858d866c2fe594af58532983ce4fc",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -0.03556938305273118,
+      "two_second_window_errors_ppm": [
+        -0.022033250867483596,
+        -0.03554321114700355,
+        -0.0530075838795708
+      ],
+      "conditional_allowance_ppm": 0.015337055397199621,
+      "selected_component_ppm": 0.4195000000147999,
+      "additional_ppm": 0.4195000000147999,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.39871208031934,
+      "snr_db": [
+        81.92112435384666,
+        95.36994986769139
+      ],
+      "capture_sha256": "284a11c5f83562e1f3e2d005f92dcba2255ea9c5793fc0b84c4e018b51a756ec",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": 0.013613688066487245,
+      "two_second_window_errors_ppm": [
+        0.02269696189379977,
+        0.013664334758865778,
+        0.00383139738840003
+      ],
+      "conditional_allowance_ppm": 0.031306645469979875,
+      "selected_component_ppm": 0.3904999999467975,
+      "additional_ppm": 0.3904999999467975,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.0229221280186,
+      "snr_db": [
+        94.173201524333,
+        96.395610523521
+      ],
+      "capture_sha256": "0f34699a290ea8c46a4cf3fcf5e27b33a4b9adea307e28bdfacc586e6e47eabe",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -0.5145341833571481,
+      "two_second_window_errors_ppm": [
+        -0.4984735066303291,
+        -0.5140834905114614,
+        -0.5319896340771852
+      ],
+      "conditional_allowance_ppm": 0.020692690253417977,
+      "selected_component_ppm": 0.2355000000006271,
+      "additional_ppm": 0.7355000000006271,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 79.92094444428402,
+      "snr_db": [
+        90.5840122947599,
+        95.6573663997409
+      ],
+      "capture_sha256": "77cc7dfb76aa8e73d76fc76b6746288db21b3f091b2b0bacfaaef07bef933c8b",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -0.475743356542675,
+      "two_second_window_errors_ppm": [
+        -0.47000747424526484,
+        -0.4755743964337024,
+        -0.48067793646108187
+      ],
+      "conditional_allowance_ppm": 0.015381077636462322,
+      "selected_component_ppm": 0.19550000002168133,
+      "additional_ppm": 0.6955000000216813,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 78.51081689581473,
+      "snr_db": [
+        77.38058249458015,
+        94.54954430875003
+      ],
+      "capture_sha256": "c388c87e3c444f89fe4a0222ef583e6a449af4fe4a05115f55c1cc2753759a6c",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 20,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -0.5669720225960363,
+      "two_second_window_errors_ppm": [
+        -0.5554222522967258,
+        -0.566866015912887,
+        -0.5756427027035657
+      ],
+      "conditional_allowance_ppm": 0.031364710427488944,
+      "selected_component_ppm": 0.30850000004546985,
+      "additional_ppm": 0.8085000000454698,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 79.35456016301322,
+      "snr_db": [
+        94.56781577761953,
+        96.48798468606267
+      ],
+      "capture_sha256": "c0add816cf1170a19cc0855666e0860eccddd1eb1b7d0ee7765b469ba0269c9d",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -2.2070857831582207,
+      "two_second_window_errors_ppm": [
+        -2.1997423957938165,
+        -2.2082504378746464,
+        -2.2162570573770117
+      ],
+      "conditional_allowance_ppm": 0.020861964031465684,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 77.84847517872531,
+      "snr_db": [
+        89.01591840705098,
+        95.76758190852865
+      ],
+      "capture_sha256": "5d18fe25d9d6529f18c3869cb8fa44b374537117d068016db26ce705f0672cf1",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -2.2041574153104144,
+      "two_second_window_errors_ppm": [
+        -2.1977633183057597,
+        -2.2038334748813635,
+        -2.2113686993729114
+      ],
+      "conditional_allowance_ppm": 0.015553938054893742,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 80.01110234063559,
+      "snr_db": [
+        88.24415103538578,
+        95.6559795394662
+      ],
+      "capture_sha256": "2b899a89e3765a2ca457633f37fd7fed3b682269302ce48182a8f47ac7a1274f",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -2.2086738040533302,
+      "two_second_window_errors_ppm": [
+        -2.197245495939085,
+        -2.2072737925100157,
+        -2.2220394163125805
+      ],
+      "conditional_allowance_ppm": 0.03152889866435427,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 80.40102309319259,
+      "snr_db": [
+        94.69017072994777,
+        95.57305388230391
+      ],
+      "capture_sha256": "fa31241d57c6611f1e4173ba1969986d4f2793926dd6a1d92e10316ab16979fd",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -2.210736647457033,
+      "two_second_window_errors_ppm": [
+        -2.20555935516335,
+        -2.2117120524529366,
+        -2.2172085543021853
+      ],
+      "conditional_allowance_ppm": 0.02086232915805507,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 77.99097260906997,
+      "snr_db": [
+        88.41177133926683,
+        96.01602598744576
+      ],
+      "capture_sha256": "f0420fc859a0373d50db89ee718a50f64dedfafb0ec6a9b51bccfd6b63fc5ca6",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -2.211332182757175,
+      "two_second_window_errors_ppm": [
+        -2.206393621801564,
+        -2.212369356126964,
+        -2.2177216315760613
+      ],
+      "conditional_allowance_ppm": 0.015554655610560858,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.61987475256558,
+      "snr_db": [
+        88.79475173971588,
+        96.47031189161711
+      ],
+      "capture_sha256": "d1343674b4b9098a5bb3e0b5b92605652339033b4ce299fdcae49337c7803a59",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "host-snapshot",
+      "repeat": 2,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -2.2123597339645484,
+      "two_second_window_errors_ppm": [
+        -2.2032298115929194,
+        -2.211522328513637,
+        -2.218223159976904
+      ],
+      "conditional_allowance_ppm": 0.03152926729789062,
+      "selected_component_ppm": 2.415,
+      "additional_ppm": 2.415,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.83724791634432,
+      "snr_db": [
+        95.2404556956761,
+        96.35720970114862
+      ],
+      "capture_sha256": "b6f5311c2da3dd08f52ff47a16d9aeed9f02659ed8b00aacfd563834fea5ff7a",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -0.011267259437612639,
+      "two_second_window_errors_ppm": [
+        0.00030950582058469916,
+        -0.01209316143134056,
+        -0.016975804828619753
+      ],
+      "conditional_allowance_ppm": 0.020642358025089864,
+      "selected_component_ppm": 0.12649999997473316,
+      "additional_ppm": 0.12649999997473316,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.82035383737937,
+      "snr_db": [
+        96.13333836984685,
+        96.55937113036296
+      ],
+      "capture_sha256": "549d49cf45b1e8440e960350b422a2d0bbc77747a57278599feb077964707b20",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -0.00958122913893405,
+      "two_second_window_errors_ppm": [
+        -0.004032525391039398,
+        -0.009703709641867895,
+        -0.011745134579921773
+      ],
+      "conditional_allowance_ppm": 0.015334456295938548,
+      "selected_component_ppm": 0.11350000000933136,
+      "additional_ppm": 0.11350000000933136,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.44641471979006,
+      "snr_db": [
+        92.89930914188756,
+        96.53378382699483
+      ],
+      "capture_sha256": "7d4ac3e2c6295291afdcd6b046ee36dca8ba361fbe778cc2e62c1b3b42978692",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -0.01742283192390024,
+      "two_second_window_errors_ppm": [
+        -0.00371137740993833,
+        -0.016433389163982785,
+        -0.03255347872047597
+      ],
+      "conditional_allowance_ppm": 0.03130974946338063,
+      "selected_component_ppm": 0.16949999997985543,
+      "additional_ppm": 0.16949999997985543,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.1037547398571,
+      "snr_db": [
+        95.34350407917907,
+        96.40437299641741
+      ],
+      "capture_sha256": "7ee2234daadf5681ee09ede3a6d1595a8bf795eb13aae0c9a061a589bc998ba7",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": 0.019509072920946485,
+      "two_second_window_errors_ppm": [
+        0.02895997923506172,
+        0.019815818949146084,
+        0.005466735809668294
+      ],
+      "conditional_allowance_ppm": 0.020639280053314352,
+      "selected_component_ppm": 0.11049999998315485,
+      "additional_ppm": 0.11049999998315485,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 77.46948567073802,
+      "snr_db": [
+        95.15053841816346,
+        96.40335896348999
+      ],
+      "capture_sha256": "65e901a5eca4fca00037ed4b39e27df89caa63996ff137f401ffbbe184ffd3b8",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": 0.025412407086929628,
+      "two_second_window_errors_ppm": [
+        0.03164935994262097,
+        0.026103570218066086,
+        0.018133932144194363
+      ],
+      "conditional_allowance_ppm": 0.015330956547385963,
+      "selected_component_ppm": 0.11650000003550787,
+      "additional_ppm": 0.11650000003550787,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 78.17475778048109,
+      "snr_db": [
+        92.21937685499387,
+        96.68812178685425
+      ],
+      "capture_sha256": "2a045051c16c1b3f57e7ec528a59c8b5dd71a6130137613abe6438d18343fcea",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps",
+      "repeat": 2,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -0.00471270044927453,
+      "two_second_window_errors_ppm": [
+        0.009981255791925256,
+        -0.004517495761496634,
+        -0.0187811446204104
+      ],
+      "conditional_allowance_ppm": 0.031308478310421724,
+      "selected_component_ppm": 0.12150000000512051,
+      "additional_ppm": 0.12150000000512051,
+      "residual_ppm": 0.0,
+      "on_off_contrast_db": 79.10887892425544,
+      "snr_db": [
+        96.47124247711636,
+        96.53380002490931
+      ],
+      "capture_sha256": "56552dea28620dce6d7f8314df3e5e73503924e5b67645940523801477bd1286",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 14097100,
+      "reference_hz": 14097600,
+      "error_ppm": -0.4960900059316445,
+      "two_second_window_errors_ppm": [
+        -0.4878977866587183,
+        -0.49544417315694494,
+        -0.5033522691149863
+      ],
+      "conditional_allowance_ppm": 0.02069084563278948,
+      "selected_component_ppm": 0.06749999997803258,
+      "additional_ppm": 0.5674999999780326,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 78.348789703048,
+      "snr_db": [
+        89.02604966770295,
+        96.22083620922581
+      ],
+      "capture_sha256": "e6144cdb2f60c7d6ee1b933e8dfd0a5f332fc373cc3e6838035ad59ce9fb9b44",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 28126100,
+      "reference_hz": 28126600,
+      "error_ppm": -0.49277128788975805,
+      "two_second_window_errors_ppm": [
+        -0.4897891099665714,
+        -0.49245794130838716,
+        -0.4982447374915231
+      ],
+      "conditional_allowance_ppm": 0.015382780616904278,
+      "selected_component_ppm": 0.05450000001263078,
+      "additional_ppm": 0.5545000000126308,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 79.36906070497103,
+      "snr_db": [
+        80.8525411593631,
+        94.8949738144033
+      ],
+      "capture_sha256": "8398c9c6da6afa1aa1b22c194b92d527800db54c3d352dae9b5a29cb21aad72f",
+      "immutable_committed_status_samples": 8
+    },
+    {
+      "route_gpio": 4,
+      "policy": "pps-trim",
+      "repeat": 1,
+      "frequency_hz": 7040100,
+      "reference_hz": 7040600,
+      "error_ppm": -0.5189810414971842,
+      "two_second_window_errors_ppm": [
+        -0.5066268121379524,
+        -0.5197808479790244,
+        -0.5316596703748826
+      ],
+      "conditional_allowance_ppm": 0.03135991080147827,
+      "selected_component_ppm": 0.1055000000135422,
+      "additional_ppm": 0.6055000000135422,
+      "residual_ppm": 0.5,
+      "on_off_contrast_db": 78.66976180105215,
+      "snr_db": [
+        95.34765546930538,
+        96.72130161820189
+      ],
+      "capture_sha256": "09cc18a33c3e8c3c7ae0df17893427bc30427f649641e1a1a0a3a7e098cc276c",
+      "immutable_committed_status_samples": 8
+    }
+  ],
+  "post_rf_presentation_changes": [
+    {
+      "path": "src/arg_parser_reporting.cpp",
+      "rf_source_sha256": "cb6ceb56d3c4d5c5a8a4b2dbe160a682234c177e6004828d829521ed24f34847",
+      "final_source_sha256": "c9f0827f0d6a1d7e682ad02d5f163556d219fa2bd96cb3ef1a53c5220935eb0f",
+      "change": "CLI wording only; source selection semantics unchanged; native build/render checked"
+    },
+    {
+      "path": "WsprryPi-UI/data/site.js",
+      "rf_source_sha256": "472c41a53881bb2a32b0ae85702b6c2c3db6b3fdc8734d0efb4dcebe387d5fd7",
+      "final_source_sha256": "6dc88159c85fd2c34d716dd1bfe4d4e0d22be80d52e7caeb441b7a7a40e0c297",
+      "change": "avoid replacing identical live-status text on polling; control producer unchanged; final UI/browser tests and desktop/mobile review passed"
+    }
+  ]
+}

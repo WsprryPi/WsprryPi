@@ -769,10 +769,15 @@ int main(int argc, char *argv[])
             data["Calibration"]["PPM"] = text;
             data["GPIO"]["Manual PPM"] = text;
             data["GPIO"]["Frequency Residual PPM"] = text;
+            data["GPIO"]["Use Direct PPS Calibration"] = "true";
             iniFile.setData(data);
             PreparedConfigCandidate candidate;
             prepare_ini_config_candidate("/tmp/calibration_roundtrip.ini", candidate);
             require(candidate.valid, "calibration INI candidate must parse: " + candidate.error_reason);
+            require(candidate.normalized_config.gpio_use_direct_pps_calibration,
+                    "direct PPS opt-in must survive INI parsing on inactive backends");
+            ArgParserConfig copied(candidate.normalized_config);
+            require(copied.gpio_use_direct_pps_calibration, "direct PPS opt-in must survive config copy");
             require(candidate.normalized_config.si5351_ppm == value &&
                     candidate.normalized_config.gpio_manual_ppm == value &&
                     candidate.normalized_config.gpio_frequency_residual_ppm == value,
@@ -780,6 +785,28 @@ int main(int argc, char *argv[])
             auto serialized = nlohmann::json::object();
             config_handler_serialization::serialize_runtime_config_to_json(
                 candidate.normalized_config, serialized);
+            require(serialized["GPIO"]["Use Direct PPS Calibration"].get<bool>(),
+                    "direct PPS opt-in must survive JSON serialization");
+            for (const auto& invalid : {nlohmann::json("true"), nlohmann::json(1), nlohmann::json(nullptr)}) {
+                auto malformed = serialized;
+                malformed["GPIO"]["Use Direct PPS Calibration"] = invalid;
+                bool refused = false;
+                try { ArgParserConfig target; config_handler_deserialization::deserialize_json_to_runtime_config(malformed, target); }
+                catch (const std::exception&) { refused = true; }
+                require(refused, "direct PPS JSON opt-in requires a boolean before candidate acceptance");
+            }
+            auto conflicted = serialized;
+            conflicted["Operation"]["Transmit Backend"] = "rp1-gpclk";
+            conflicted["Operation"]["Use LED"] = true;
+            conflicted["Operation"]["LED Pin"] = 17;
+            for (bool include_bands : {false, true}) {
+                if (!include_bands) conflicted.erase("Band GPIO");
+                else conflicted["Band GPIO"] = nlohmann::json::object();
+                bool refused = false;
+                try { ArgParserConfig target; config_handler_deserialization::deserialize_json_to_runtime_config(conflicted, target); }
+                catch (const std::exception& error) { refused = std::string(error.what()).find("GPIO17") != std::string::npos; }
+                require(refused, "PPS GPIO conflicts are refused with or without a Band GPIO section");
+            }
             require(serialized["Calibration"]["PPM"].get<double>() == value &&
                     serialized["GPIO"]["Manual PPM"].get<double>() == value &&
                     serialized["GPIO"]["Frequency Residual PPM"].get<double>() == value,
@@ -3041,6 +3068,8 @@ int main(int argc, char *argv[])
         require(
             help_output.find("--use-system-clock-frequency-estimate") != std::string::npos &&
                 help_output.find("--no-system-clock-frequency-estimate") != std::string::npos &&
+                help_output.find("Disable host and direct PPS estimates") != std::string::npos &&
+                help_output.find("override direct PPS for this invocation") != std::string::npos &&
                 help_output.find("--gpio-manual-ppm") != std::string::npos &&
                 help_output.find("--gpio-frequency-residual-ppm") != std::string::npos &&
                 help_output.find("--si5351-ppm") != std::string::npos &&

@@ -621,6 +621,7 @@ void init_default_config()
     config.gpio_power_level = 7;
     config.rp1_gpio_drive_ma = kDefaultRp1GpioDriveMa;
     config.gpio_use_system_clock_frequency_estimate = true;
+    config.gpio_use_direct_pps_calibration = false;
     config.gpio_frequency_residual_ppm = 0.0;
     config.gpio_manual_ppm = 0.0;
     config.si5351_ppm = 0.0;
@@ -709,7 +710,8 @@ void resolve_backend_specific_config(ArgParserConfig &config) noexcept
     config.power_level = config.transmit_backend == TransmitBackendKind::RP1_GPCLK
         ? config.rp1_gpio_drive_ma
         : config.gpio_power_level;
-    config.use_system_clock_frequency_estimate = config.gpio_use_system_clock_frequency_estimate;
+    config.use_system_clock_frequency_estimate = config.gpio_use_system_clock_frequency_estimate ||
+        (config.transmit_backend == TransmitBackendKind::RP1_GPCLK && config.gpio_use_direct_pps_calibration);
     config.ppm = config.gpio_manual_ppm;
 }
 
@@ -1112,6 +1114,7 @@ namespace
                  key == "Power Level" ||
                  key == "RP1 Drive mA" ||
                  key == "Use System Clock Frequency Estimate" ||
+                 key == "Use Direct PPS Calibration" ||
                  key == "Frequency Residual PPM" ||
                  key == "Manual PPM")) ||
                (section == "WSPR" &&
@@ -1260,6 +1263,7 @@ namespace
             {"Power Level", 7},
             {"RP1 Drive mA", kDefaultRp1GpioDriveMa},
             {"Use System Clock Frequency Estimate", true},
+            {"Use Direct PPS Calibration", false},
             {"Frequency Residual PPM", 0.0},
             {"Manual PPM", 0.0}};
 
@@ -1339,6 +1343,7 @@ namespace
         target.gpio_power_level = source.gpio_power_level;
         target.rp1_gpio_drive_ma = source.rp1_gpio_drive_ma;
         target.gpio_use_system_clock_frequency_estimate = source.gpio_use_system_clock_frequency_estimate;
+        target.gpio_use_direct_pps_calibration = source.gpio_use_direct_pps_calibration;
         target.gpio_frequency_residual_ppm = source.gpio_frequency_residual_ppm;
         target.gpio_manual_ppm = source.gpio_manual_ppm;
         target.si5351_ppm = source.si5351_ppm;
@@ -1826,6 +1831,7 @@ build_persistent_ini_data(const nlohmann::json &source)
                   key == "Power Level" ||
                   key == "RP1 Drive mA" ||
                   key == "Use System Clock Frequency Estimate" ||
+                  key == "Use Direct PPS Calibration" ||
                   key == "Frequency Residual PPM" ||
                   key == "Manual PPM")) ||
                 (section_name == "Calibration" &&
