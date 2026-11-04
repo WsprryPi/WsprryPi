@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the production transport selector without compiling hardware code."""
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 
@@ -9,7 +10,13 @@ with tempfile.TemporaryDirectory() as directory:
     fixture = Path(directory) / "Makefile"
     fixture.write_text(f"comma := ,\nBACKENDS ?= si5351\ninclude {rules}\nall:\n\t@echo selected=$(SI5351_TRANSPORT_SOURCE) key=$(SI5351_TRANSPORT_KEY) libs=$(SI5351_TRANSPORT_LIBS)\n")
     def run(ok, *args):
-        result = subprocess.run(["make", "-f", str(fixture), *args], capture_output=True, text=True)
+        environment = os.environ.copy()
+        # Each matrix case selects its own profile. Do not inherit CI's native
+        # transport or an invoking make's command-line overrides/jobserver.
+        for key in ("SI5351_TRANSPORT", "HOST_OS", "BACKENDS", "ANCILLARY_GPIO",
+                    "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKEOVERRIDES"):
+            environment.pop(key, None)
+        result = subprocess.run(["make", "-f", str(fixture), *args], capture_output=True, text=True, env=environment)
         assert (result.returncode == 0) == ok, result.stdout + result.stderr
         return result.stdout
     linux = run(True, "HOST_OS=Linux")
