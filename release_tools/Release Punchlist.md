@@ -16,8 +16,9 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    including desktop and mobile workflows. Record findings and the validation
    required for any resulting changes. This is a new review; prior Beta review
    acceptance remains bound to its recorded implementation.
-2. ✅ **Direct PPS frequency calibration.** RP1 and standard GPIO/mailbox
-   backend work are complete.
+2. ✅ **Direct PPS frequency calibration.** RP1 direct capture is complete.
+   Pi 1–4 use the existing Chrony host-frequency estimate; optional GPS/PPS
+   improves that estimate at the OS level, without application PPS capture.
    Optional Pi 5/RP1 input-only
    GPIO17 capture replaces the host-rate proxy, with bounded qualification,
    per-job correction, residual adjustment, and manual fallback. Thirty
