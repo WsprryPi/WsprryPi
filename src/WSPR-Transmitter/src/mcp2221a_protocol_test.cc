@@ -15,12 +15,17 @@ public:
     bool open(const std::string& selected) override { ++opens; return !selected.empty() && open_ok; }
     bool close() override { ++closes; return close_ok; }
     std::ptrdiff_t exchange(const Report& request, Report& response, Deadline deadline) override {
-        expect(deadline > std::chrono::steady_clock::now(), "deadline supplied");
+        expect(deadline > now(), "deadline supplied");
+        clock += exchange_latency;
         sent.push_back(request);
         if (replies.empty()) throw std::runtime_error("unscripted request");
         const auto reply = replies.front(); replies.pop_front(); response = reply.value; return reply.length;
     }
     std::string diagnostic() const override { return "injected HID failure"; }
+    Deadline now() const override { return clock; }
+    void waitPoll() override { clock += std::chrono::milliseconds(1); }
+    Deadline clock{std::chrono::seconds(1)};
+    std::chrono::milliseconds exchange_latency{0};
     void reply(std::uint8_t command, std::uint8_t state = 0, std::uint8_t count = 0) {
         Report result{}; result[0] = command; result[8] = state; result[9] = count; result[11] = count;
         replies.push_back({result});
@@ -156,6 +161,8 @@ void failures() {
         channel->reply(0x90);
         for (int poll=0; poll<100; ++poll) channel->reply(0x10,0x41);
         std::uint8_t bytes[2]={3,255}; expect(transport.write(bytes,2)==-1,"busy poll count bounded");
+        expect(channel->sent.size()==103 && channel->replies.empty(),
+            "poll count, not host scheduling, exhausts the scripted busy replies");
         const auto primary=transport.diagnostic();
         channel->reply(0x10,0x41); channel->reply(0x10); channel->replies.back().value[2]=0x10;
         channel->reply(0x10,stop_timeout ? 0x62 : 0);
@@ -163,6 +170,26 @@ void failures() {
         expect(transport.diagnostic().find(primary)==0,"cancellation preserves primary failure");
         expect(channel->sent[channel->sent.size()-2][2]==0x10,"active cancel report");
         if (stop_timeout) expect(transport.diagnostic().find("0x62") != std::string::npos, "cancel reports actual STOP timeout state");
+    }
+    {
+        auto channel=std::make_shared<Fake>(); channel->startup();
+        Transport transport(selected,0x60,channel);
+        expect(transport.open(),"deadline fixture startup");
+        channel->exchange_latency=std::chrono::milliseconds(500);
+        channel->reply(0x90);
+        const std::uint8_t bytes[]={3,255};
+        expect(transport.write(bytes,2)==-1 && channel->sent.size()==3,
+            "deadline expiry refuses status exchange at the exact boundary");
+        expect(transport.state()==State::Timeout,"elapsed transfer deadline reports timeout");
+        const auto sent=channel->sent.size();
+        expect(transport.write(bytes,2)==-1 && channel->sent.size()==sent,
+            "timed out write is never replayed");
+        channel->exchange_latency=std::chrono::milliseconds(0);
+        channel->reply(0x10,0x41); channel->reply(0x10); channel->replies.back().value[2]=0x10;
+        channel->reply(0x10);
+        expect(transport.close() && channel->replies.empty(),
+            "cleanup uses a fresh deadline after the transfer deadline expires");
+        expect(!transport.open(),"deadline cleanup does not restore failed admission");
     }
     for (const auto length : {0,2,127}) {
         auto channel=std::make_shared<Fake>(); channel->startup(); Transport transport(selected,0x60,channel); expect(transport.open(),"read fixture");

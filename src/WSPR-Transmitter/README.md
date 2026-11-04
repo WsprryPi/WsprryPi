@@ -388,6 +388,9 @@ scheduled event deadlines, including I2C overhead; missed slices are skipped.
 The typed `Config::monotonic_clock_for_test` hook lets hardware-free deadline
 tests advance waits and fake I2C latency on one controlled clock. Production
 leaves it unset and uses `CLOCK_MONOTONIC`; it has no CLI, INI, or UI control.
+Scripted MCP2221A channels likewise control `Channel::now()` and `waitPoll()`
+to test poll budgets and elapsed deadlines independently. Native channels retain
+the steady clock, 1 ms polling waits, and 500 ms transaction deadline.
 These fades still switch RF fully on/off and do not produce an analog amplitude
 envelope. Spectral improvement must be measured, not inferred from the shape name.
 

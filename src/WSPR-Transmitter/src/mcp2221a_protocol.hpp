@@ -51,6 +51,10 @@ public:
     virtual std::ptrdiff_t exchange(const Report&, Report&, Deadline) = 0;
     virtual bool close() = 0;
     virtual std::string diagnostic() const = 0;
+    // The real channel uses the host monotonic clock. Scripted channels can
+    // advance polling and exchange latency together without scheduler sleeps.
+    virtual Deadline now() const { return std::chrono::steady_clock::now(); }
+    virtual void waitPoll() { std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
 };
 enum class State { Closed, Idle, Busy, Completed, Nack, Timeout, Partial, Uncertain };
 
@@ -123,7 +127,7 @@ public:
             if (response[3] != 0 || (response[2] != 0 && response[2] != 0x54)) {
                 fail(State::Partial, "MCP2221A partial or invalid read response."); return -1;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            channel_->waitPoll();
         }
         fail(State::Timeout, "MCP2221A read deadline expired."); return -1;
     }
@@ -136,7 +140,7 @@ public:
     std::string diagnostic() const override { std::lock_guard lock(mutex_); return error_; }
     State state() const { std::lock_guard lock(mutex_); return state_; }
 private:
-    static Deadline expires() { return std::chrono::steady_clock::now() + std::chrono::milliseconds(500); }
+    Deadline expires() const { return channel_->now() + std::chrono::milliseconds(500); }
     bool admit() const { return opened_ && (state_ == State::Idle || state_ == State::Completed); }
     std::ptrdiff_t invalid() {
         if (error_.empty() || admit()) fail(State::Uncertain, "Invalid or unavailable MCP2221A transaction.");
@@ -149,7 +153,7 @@ private:
         faulted_ = true; state_ = state; error_ = "mcp2221a-hid " + identity_ + ": " + message + "; output state is unconfirmed."; return false;
     }
     bool command(const Report& request, Report& response, Deadline deadline) {
-        if (std::chrono::steady_clock::now() >= deadline) return fail(State::Timeout, "MCP2221A transaction deadline expired.");
+        if (channel_->now() >= deadline) return fail(State::Timeout, "MCP2221A transaction deadline expired.");
         const auto length = channel_->exchange(request, response, deadline);
         synchronized_ = length == 64 && response[0] == request[0];
         if (!synchronized_ && (request[0] == 0x90 || request[0] == 0x91)) uncertain_transfer_ = true;
@@ -181,7 +185,7 @@ private:
                 case 0x53: case 0x54: case 0x60: case 0x61: break;
                 default: return fail(State::Uncertain, "Unknown MCP2221A engine state.");
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            channel_->waitPoll();
         }
         return fail(State::Timeout, "MCP2221A completion deadline expired.");
     }
@@ -203,7 +207,7 @@ private:
                     if (!command(request, response, deadline)) break;
                     if (response[8] == 0) { ok = true; break; }
                     if (response[8] == 0x62) break;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    channel_->waitPoll();
                 }
             }
         }
