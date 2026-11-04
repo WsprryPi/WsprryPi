@@ -77,6 +77,13 @@ run it with `python3 -B ../docs/development/wtp-reply-routing-results/rollback_t
 from `src`. The helper contains host-specific service/network operations and is
 not an ordinary test entry point. Its live commands require separate authorization.
 
+## CI review baseline
+
+The [CI baseline and coverage map](ci-review-baseline.md) records the frozen
+source inventory, execution contexts, safety obligations, timing evidence, and
+conditional simplification gates. Later phases continue on its dedicated feature
+branch and worktree; inactive-test cleanup receives no reduction credit.
+
 ## Work and cleanup
 
 The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected
