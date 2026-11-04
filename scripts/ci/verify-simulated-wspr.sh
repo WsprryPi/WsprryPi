@@ -7,6 +7,10 @@ first=/tmp/wsprrypi-wspr-trace-first.json
 final=/tmp/wsprrypi-wspr-trace.json
 syscall_trace=/tmp/wsprrypi-wspr-simulator.strace
 wall_clock_limit=10s
+lock=/tmp/wsprrypi-simulated-ci.lock
+mkdir "$lock" || { echo 'Another simulator check owns the fixed CLI trace path.' >&2; exit 1; }
+trap 'rmdir "$lock"' EXIT
+trap 'exit 130' HUP INT TERM
 
 run_with_timeout() {
     label=$1

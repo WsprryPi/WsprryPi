@@ -46,6 +46,71 @@ function chromiumBinary() {
 }
 
 
+async function networkSafetyBehavior() {
+    const ok = (v, label) => { if (!v) throw Error(label); };
+    const field = id => document.getElementById(id);
+    const tone = field("test_tone"), toneModal = field("testToneModal");
+    tone.disabled = false;
+    const shown = new Promise(resolve => toneModal.addEventListener("shown.bs.modal", resolve, {once: true}));
+    tone.click(); await shown;
+    const hidden = new Promise(resolve => toneModal.addEventListener("hidden.bs.modal", resolve, {once: true}));
+    bootstrap.Modal.getOrCreateInstance(toneModal).hide(); await hidden;
+    ok(new URL(NETWORK_SAFETY_ENDPOINT.proxyUrl, location.href).origin === location.origin && NETWORK_SAFETY_ENDPOINT.directUrl === NETWORK_SAFETY_ENDPOINT.proxyUrl, "network safety has no direct-port fallback");
+    const original = window.fetch; const calls = []; let release; let observed;
+    const entered = new Promise(resolve => { observed = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    let fail = true;
+    const state = {configured_known: true, active_known: true, configured: "enforced", active: "enforced", status: "NETWORK SAFETY ACTIVE"};
+    window.fetch = async (url, options = {}) => {
+        if (url !== NETWORK_SAFETY_ENDPOINT.proxyUrl) return original(url, options);
+        calls.push({url, method: options.method, body: options.body});
+        if (options.method === "GET") return {ok: true, json: async () => state};
+        ok(options.method === "POST" && options.cache === "no-store", "closed same-origin apply transport");
+        if (fail) { observed(); await held; return {ok: false, json: async () => ({message: "fixture apply refusal"})}; }
+        return {ok: true, json: async () => ({...state, applied: true, configured: "insecure-disabled", active: "insecure-disabled", status: "NETWORK SAFETY OFF"})};
+    };
+    const settled = async check => {
+        const deadline = performance.now() + 5000;
+        while (!check()) {
+            if (performance.now() >= deadline) throw Error("network safety render deadline");
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+    };
+    try {
+        field("networkSafetyDisabled").checked = true;
+        field("networkSafetyDisabled").dispatchEvent(new Event("change", {bubbles: true}));
+        for (const value of ["", "disable local-lan safety", "DISABLE LOCAL-LAN SAFETY "]) {
+            field("networkSafetyDisablePhrase").value = value;
+            field("networkSafetyDisablePhrase").dispatchEvent(new Event("input", {bubbles: true}));
+            ok(field("applyNetworkSafetyButton").disabled, "exact phrase required");
+            field("applyNetworkSafetyButton").dispatchEvent(new Event("click"));
+            ok(calls.length === 0, "wrong phrase cannot reach mutation even with synthetic click");
+        }
+        field("networkSafetyDisablePhrase").value = "DISABLE LOCAL-LAN SAFETY";
+        field("networkSafetyDisablePhrase").dispatchEvent(new Event("input", {bubbles: true}));
+        ok(!field("applyNetworkSafetyButton").disabled && field("networkSafetyPhraseStatus").textContent.includes("Ready to apply"), "phrase announces enabled action");
+        field("applyNetworkSafetyButton").click(); await entered;
+        for (const id of ["networkSafetyEnforced", "networkSafetyDisabled", "networkSafetyDisablePhrase", "cancelNetworkSafetyButton"])
+            ok(field(id).disabled, "pending apply locks " + id);
+        ok(calls.length === 1 && calls[0].body === JSON.stringify({mode: "insecure-disabled"}), "one exact mode-only mutation");
+        field("applyNetworkSafetyButton").click(); ok(calls.length === 1, "pending apply cannot duplicate");
+        release(); await settled(() => !field("networkSafetyDisablePhrase").disabled);
+        ok(field("networkSafetyResult").dataset.state === "danger", "apply failure is truthful");
+        ok(field("networkSafetyDisabled").checked && field("networkSafetyDisablePhrase").value === "DISABLE LOCAL-LAN SAFETY", "failure retains the operator draft");
+        ok(field("networkSafetyConfigured").textContent === "Enforced" && field("networkSafetyActive").textContent === "Enforced", "failed draft does not become configured or active");
+        fail = false; field("applyNetworkSafetyButton").click();
+        await settled(() => field("networkSafetyResult").dataset.state === "success");
+        ok(field("networkSafetyBanner").dataset.state === "off" && field("networkSafetyBanner").textContent === "NETWORK SAFETY OFF", "active override has exact conspicuous warning");
+        ok(!field("networkSafetyDisabled").checked && field("networkSafetyDisablePhrase").value === "", "successful apply clears confirmation draft");
+        field("networkSafetyDisabled").checked = true; field("networkSafetyDisabled").dispatchEvent(new Event("change", {bubbles: true}));
+        field("networkSafetyDisablePhrase").value = "discard"; field("cancelNetworkSafetyButton").click();
+        ok(!field("networkSafetyDisabled").checked && field("networkSafetyDisablePhrase").value === "", "explicit cancel clears draft without mutation");
+        ok(calls.filter(call => call.method === "POST").length === 2, "only deliberate valid applies mutate");
+        ok(field("networkSafetyPhraseStatus").getAttribute("aria-live") === "polite", "phrase feedback remains accessible");
+    } finally { window.fetch = original; }
+    return "Rendered network safety phrase, single-flight, failure preservation and active-state distinction passed";
+}
+
 async function browserTest() {
     const fail = (message) => { throw new Error(message); };
     const ok = (condition, message) => { if (!condition) fail(message); };
@@ -70,6 +135,7 @@ async function browserTest() {
     });
 
     const calls = [];
+    let deleteResponse = response({});
     let intakeResponse = response({
         status: "active",
         generation: 32,
@@ -80,17 +146,28 @@ async function browserTest() {
         request_url: "https://www.dropbox.com/request/secret-capability",
         user_message: "Private intake is operating normally."
     });
+    let readableDownload = response({});
     let uploadReportResponse = response({ workflow_state: "upload_reported_complete" });
     window.fetchWithEndpointFallback = async (endpoint, options = {}) => {
-        calls.push({ name: endpoint.name, method: options.method || "GET" });
+        const method = options.method || "GET";
+        const route = `${method} ${endpoint.proxyUrl}`;
+        const allowed = new Set(["POST /api/support-bundles", "GET /api/support-bundles/job-32", "DELETE /api/support-bundles/job-32",
+            "GET /api/support-bundles/job-32/download", "POST /api/support-bundles/job-32/finalize", "POST /api/support-bundles/job-32/encrypt",
+            "GET /api/support-bundles/job-32/encrypted", "GET /api/support-bundles/job-32/receipt", "POST /api/support-bundles/job-32/upload-reported-complete",
+            "GET /api/support-intake"]);
+        ok(allowed.has(route), "strict support route: " + route);
+        calls.push({ name: endpoint.name, method, url: endpoint.proxyUrl, body: options.body });
         if (endpoint.name === "support intake") return intakeResponse;
         if (endpoint.name === "support bundles" && options.method === "POST" &&
             endpoint.proxyUrl.endsWith("/api/support-bundles")) {
+            const payload = JSON.parse(options.body);
+            equal(Object.keys(payload).sort().join(","), "probe_i2c,support_context", "closed create request");
+            equal(typeof payload.probe_i2c, "boolean", "probe policy is an explicit boolean");
             return response({ id: "job-32", case_id: "A7K3-M9QF-X2DP" });
         }
-        if (endpoint.name === "support bundles" && options.method === "DELETE") return response({});
-        if (endpoint.name === "support bundles" && endpoint.proxyUrl.endsWith("/download")) return response({});
-        if (endpoint.name === "support bundles" && endpoint.proxyUrl.endsWith("/finalize")) {
+        if (endpoint.name === "support bundles" && options.method === "DELETE") return deleteResponse;
+        if (endpoint.name === "support bundles" && endpoint.proxyUrl.endsWith("/download")) return readableDownload;
+        if (endpoint.name === "support bundles" && options.method === "POST" && endpoint.proxyUrl === "/api/support-bundles/job-32/finalize") {
             return response({ workflow_state: "finalized" });
         }
         if (endpoint.name === "support bundles" && endpoint.proxyUrl.endsWith("/encrypt")) {
@@ -106,14 +183,15 @@ async function browserTest() {
             endpoint.proxyUrl.endsWith("/upload-reported-complete")) {
             return uploadReportResponse;
         }
-        if (endpoint.name === "support bundles") {
+        if (endpoint.name === "support bundles" && (options.method || "GET") === "GET" && endpoint.proxyUrl === "/api/support-bundles/job-32") {
             return response({ state: "succeeded", download_available: true, case_id: "A7K3-M9QF-X2DP" });
         }
-        return response({}, 500);
+        throw Error(`Unexpected support fixture request: ${options.method || "GET"} ${endpoint.proxyUrl}`);
     };
     URL.createObjectURL = () => "blob:test";
     URL.revokeObjectURL = () => {};
-    HTMLAnchorElement.prototype.click = () => {};
+    const downloadNames = [];
+    HTMLAnchorElement.prototype.click = function () { downloadNames.push(this.download); };
     let copiedText = "";
     Object.defineProperty(navigator, "clipboard", {
         configurable: true,
@@ -122,21 +200,60 @@ async function browserTest() {
 
     equal(calls.length, 0, "page load must not resolve intake");
     ok(field("supportIntakePanel").classList.contains("d-none"), "intake action starts hidden");
+    ok(!field("supportBundleProbeI2c").checked, "active I2C probing is opt-in in the actual template");
     field("createSupportBundleButton").click();
     field("supportBundleIssueNumber").value = "414";
     field("confirmCreateSupportBundleButton").click();
     await wait(() => calls.some((call) => call.name === "support bundles" && call.method === "POST"), "create call");
+    equal(JSON.parse(calls.find(call => call.url === "/api/support-bundles" && call.method === "POST").body).probe_i2c, false, "unchecked active probe is not requested");
     equal(calls.filter((call) => call.name === "support intake").length, 0,
         "collection must not resolve intake");
     await wait(() => field("downloadSupportBundleButton").dataset.available === "true", "candidate ready", 6000);
+    let releaseBlob, observedBlob;
+    const blobRequested = new Promise(resolve => { observedBlob = resolve; });
+    const heldBlob = new Promise(resolve => { releaseBlob = resolve; });
+    readableDownload = {...response({}), blob: () => { observedBlob(); return heldBlob; }};
+    field("downloadSupportBundleButton").click();
+    await blobRequested;
+    const downloadCalls = calls.filter(call => call.url.endsWith("/download")).length;
+    field("downloadSupportBundleButton").click();
+    equal(calls.filter(call => call.url.endsWith("/download")).length, downloadCalls, "pending download is single-flight");
+    ok(field("supportBundleReviewConsent").classList.contains("d-none"), "partial download cannot enable review");
+    field("finalizeSupportBundleButton").click();
+    equal(calls.filter(call => call.url.endsWith("/finalize")).length, 0, "partial bytes cannot be finalized");
+    releaseBlob(new Blob([]));
+    await wait(() => field("supportBundleStatus").textContent.includes("did not complete"), "empty Blob refusal");
+    equal(downloadNames.length, 0, "empty Blob never reaches browser download");
+    let releaseStale, observedStale;
+    const staleStarted = new Promise(resolve => { observedStale = resolve; });
+    const staleBody = new Promise(resolve => { releaseStale = resolve; });
+    readableDownload = {...response({}), blob: () => { observedStale(); return staleBody; }};
+    field("downloadSupportBundleButton").click(); await staleStarted;
+    // Model a workflow reset while an uncooperative response still owns a body promise.
+    field("deleteSupportBundleButton").dispatchEvent(new Event("click"));
+    await wait(() => field("supportBundleStatus").dataset.state === "deleted", "old job reset");
+    releaseStale(new Blob(["stale complete bytes"]));
+    await wait(() => field("supportBundleStatus").textContent.includes("did not complete"), "stale download refusal");
+    equal(downloadNames.length, 0, "old job bytes never reach browser download");
+    ok(field("supportBundleReviewConsent").classList.contains("d-none"), "stale body cannot approve a replacement workflow");
+    field("createSupportBundleButton").click();
+    field("supportBundleIssueNumber").value = "414";
+    field("confirmCreateSupportBundleButton").click();
+    await wait(() => field("downloadSupportBundleButton").dataset.available === "true", "replacement candidate ready", 6000);
+    readableDownload = {...response({}), headers: {get: () => 'attachment; filename="../../private.tar.gz"'}};
     field("downloadSupportBundleButton").click();
     await wait(() => !field("supportBundleReviewConsent").classList.contains("d-none"), "review consent");
+    equal(downloadNames.at(-1), "wsprrypi-support-bundle.tar.gz", "unsafe server filename uses exact safe fallback");
     equal(calls.filter((call) => call.name === "support intake").length, 0,
         "download must not resolve intake");
+    readableDownload = response({});
     field("supportBundleReviewed").checked = true;
     field("supportBundleReviewed").dispatchEvent(new Event("change", { bubbles: true }));
     await wait(() => field("finalizeSupportBundleButton").disabled === false, "finalize action enabled");
     field("finalizeSupportBundleButton").click();
+    equal(calls.at(-1).url, "/api/support-bundles/job-32/finalize", "review uses the exact bound finalize endpoint");
+    equal(calls.at(-1).method, "POST", "finalize is an explicit mutation");
+    equal(calls.at(-1).body, undefined, "finalize adds no alternate payload");
     await wait(() => !field("supportIntakePanel").classList.contains("d-none"), "intake action after finalization");
     equal(calls.filter((call) => call.name === "support intake").length, 0,
         "finalization must not resolve intake without explicit check");
@@ -290,6 +407,12 @@ async function browserTest() {
     intakeResponse = response({ status: "unavailable" }, 503);
     field("checkSupportIntakeButton").click();
     await wait(() => field("supportIntakeMessage").textContent.includes("could not be checked"), "503 unavailable state");
+    deleteResponse = response({}, 503);
+    field("deleteSupportBundleButton").click();
+    await wait(() => field("supportBundleStatus").dataset.state === "cleanup-pending", "cleanup failure is not deletion");
+    ok(!field("supportIntakePanel").classList.contains("d-none"), "failed cleanup retains workflow state");
+    ok(field("supportBundleStatus").textContent.includes("24 hours"), "cleanup failure states bounded retention");
+    deleteResponse = response({});
     field("deleteSupportBundleButton").click();
     await wait(() => field("supportIntakePanel").classList.contains("d-none"), "delete reset");
     equal(field("checkSupportIntakeButton").textContent, "Check private upload availability",
@@ -318,7 +441,9 @@ async function browserTest() {
         selector.dispatchEvent(new Event("change", { bubbles: true }));
         field("supportBundleProblemDescription").value = description;
         field("supportBundleContact").value = contact;
+        field("supportBundleProbeI2c").checked = true;
         field("confirmCreateSupportBundleButton").click();
+        equal(JSON.parse(calls.at(-1).body).probe_i2c, true, "explicit active-probe consent is sent");
         await wait(() => field("downloadSupportBundleButton").dataset.available === "true",
             `${kind} candidate ready`, 6000);
         field("downloadSupportBundleButton").click();
@@ -484,7 +609,7 @@ async function capture(client, outputPath, width, height, state, theme = "light"
             }
             document.getElementById(state === "reported" ? "supportGithubContinuationPanel" :
                 state === "active" ? "supportDropboxHandoffPanel" :
-                    "supportIntakePanel").scrollIntoView({ block: "center" });
+                    "supportIntakePanel").scrollIntoView({ block: "center", behavior: "instant" });
         })()`,
     });
     if (rendered.exceptionDetails) {
@@ -529,6 +654,7 @@ async function main() {
             return result.result.value === true;
         }, "Maintenance scripts and idle host firmware status");
         await dismissUiRefreshPrompt(client);
+        console.log(await client.evaluate(`(${networkSafetyBehavior.toString()})()`));
         const result = await client.send("Runtime.evaluate", {
             expression: `(${browserTest.toString()})()`, awaitPromise: true, returnByValue: true,
         });
@@ -566,7 +692,7 @@ async function main() {
 
 if (require.main === module) {
     main().catch((error) => {
-        console.error(error.stack || error.message);
+        console.error(error);
         process.exitCode = 1;
     });
 }

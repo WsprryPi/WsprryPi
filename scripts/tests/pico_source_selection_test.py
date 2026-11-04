@@ -4,7 +4,7 @@
 import argparse
 from pathlib import Path
 import shutil
-import select
+import sys
 import subprocess
 import tempfile
 
@@ -22,6 +22,8 @@ def main():
     parser.add_argument('mbedtls_source', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / 'src/tests'))
+    from network_process import wait_ready
     selected = args.pico_source.resolve()
     with tempfile.TemporaryDirectory(prefix='wsprrypi-selected-source-') as tmp:
         base = Path(tmp)
@@ -49,13 +51,29 @@ def main():
         assert str(source) in output
         run(['cmake', '--build', str(build), '--target', 'pico_tls_server', '-j4'])
         with tempfile.TemporaryFile(mode='w+') as errors:
-            process = subprocess.Popen([str(build / 'pico_tls_server'), '0', 'a', 'settings'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, text=True)
+            process = subprocess.Popen([str(build / 'pico_tls_server'), '0', 'a', 'settings'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors, bufsize=0)
+            primary = None
             try:
-                assert select.select([process.stdout], [], [], 15)[0], 'fixture readiness deadline'
-                assert process.stdout.readline().startswith('READY ')
+                wait_ready(process, timeout=15)
+            except BaseException as error:
+                primary = error
+            try:
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=2)
+            except BaseException as cleanup:
+                if primary is not None:
+                    raise BaseExceptionGroup('source-selection startup and cleanup failed', [primary, cleanup])
+                raise
             finally:
-                process.terminate()
-                process.wait(timeout=10)
+                process.stdin.close()
+                process.stdout.close()
+            if primary is not None:
+                raise primary
             errors.seek(0)
             assert marker in errors.read(), 'network fixture must execute the selected edited source'
         # Neither a missing source nor an actual compiler failure is admitted.

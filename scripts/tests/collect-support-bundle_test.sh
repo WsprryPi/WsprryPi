@@ -265,6 +265,10 @@ import pathlib
 import sys
 root = pathlib.Path(sys.argv[1])
 manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+assert set(manifest) == {"schema_version", "contract_version", "project_id", "project_version",
+                         "case_id", "created_at_utc", "collection_options", "privacy_categories",
+                         "support_context", "collection_warnings", "files"}
+assert type(manifest["schema_version"]) is int
 assert manifest["schema_version"] == 1
 assert manifest["contract_version"] == 1
 assert manifest["project_id"] == "wsprrypi"

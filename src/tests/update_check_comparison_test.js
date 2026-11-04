@@ -92,6 +92,129 @@ context.window.document = context.document;
 vm.createContext(context);
 vm.runInContext(siteSource, context);
 
+// Exercise the real parsers, cache policy, and modal identity before replacing network collaborators.
+const fetchGithubJsonUnderTest = context.fetchGithubJson;
+const findReleaseForHeadUnderTest = context.findReleaseForHead;
+const semanticUpdateUnderTest = context.buildSemanticVersionUpdateResult;
+const semanticOrder = ["1.0.0-alpha.1", "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-beta.1", "1.0.0-rc.1", "1.0.0", "1.0.1", "1.1.0", "2.0.0"];
+for (let i = 0; i < semanticOrder.length; ++i) {
+    const left = context.parseSemanticVersion(semanticOrder[i]);
+    assert(left, semanticOrder[i]);
+    assert.equal(context.compareSemanticVersions(left, context.parseSemanticVersion(semanticOrder[i] + "+build.009")), 0);
+    for (let j = 0; j < semanticOrder.length; ++j)
+        assert.equal(Math.sign(context.compareSemanticVersions(left, context.parseSemanticVersion(semanticOrder[j]))), Math.sign(i - j));
+}
+for (const invalid of ["unknown", "1.0", "v1.0.0-beta.01", "1.0.0-alpha..1"])
+    assert.equal(context.parseSemanticVersion(invalid), null, invalid);
+const releases = context.summarizeSemanticReleases(["v1.0.0", "v1.1.0-beta.1", "v1.1.0-beta.2", "v2.0.0-alpha.1", "junk"]
+    .map(tag_name => ({tag_name, html_url: "https://example.test/" + tag_name})));
+assert.equal(releases.latestStable.normalized, "1.0.0");
+assert.equal(releases.prereleasesByChannel.get("beta").normalized, "1.1.0-beta.2");
+assert.equal(releases.latestPrerelease.normalized, "2.0.0-alpha.1");
+const structuredVersion = {wspr_version: "4.0.0 (devel)", wspr_version_raw: "4.0.0", wspr_branch: "devel", wspr_commit: "a".repeat(40), wspr_branch_state: "branch"};
+assert.equal(context.parseWsprryPiVersionResponse(structuredVersion).currentSha, "a".repeat(40));
+for (const [field, value, code] of [["wspr_branch", "", "missing_branch"], ["wspr_branch_state", "bogus", "missing_branch"], ["wspr_commit", "invalid", "missing_commit"],
+    ["wspr_version_parsed", {valid: true, major: "bad", minor: 0, patch: 0}, "missing_version_data"]]) {
+    const result = context.parseWsprryPiVersionResponse({...structuredVersion, [field]: value});
+    assert.equal(result.updateCheckFailed, true); assert.equal(result.code, code);
+}
+const storage = new Map();
+context.window.localStorage = {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key)};
+const cacheVersion = {currentSha: "a".repeat(40), currentBranch: "devel", branchState: "branch", buildDirtyKnown: true, buildDirty: false};
+const goodCache = {...cacheVersion, checkedAt: Date.now(), updateAvailable: false};
+context.writeUpdateCheckCache(cacheVersion, goodCache);
+assert.equal(context.readUpdateCheckCache(cacheVersion).updateAvailable, false);
+const cacheKey = context.updateCheckCacheKey(cacheVersion);
+const serializedValidCache = JSON.parse(storage.get(cacheKey));
+context.window.location.href = "http://localhost/another-page";
+assert.equal(context.updateCheckCacheKey(cacheVersion), cacheKey, "cache identity is site-global");
+assert.notEqual(context.updateCheckCacheKey({...cacheVersion, buildDirty: true}), cacheKey);
+assert.notEqual(context.updateCheckCacheKey({...cacheVersion, buildDirtyKnown: false}), cacheKey);
+for (const bad of ["{", "null", JSON.stringify({...goodCache, schemaVersion: -1}), JSON.stringify({...serializedValidCache, checkedAt: 1}), JSON.stringify({...serializedValidCache, currentSha: "b".repeat(40)})]) {
+    storage.set(cacheKey, bad); assert.equal(context.readUpdateCheckCache(cacheVersion), null);
+}
+context.writeUpdateCheckFailureCache(cacheVersion, {code: "network"});
+assert.equal(context.readUpdateCheckFailureCache(cacheVersion).updateCheckFailed, true);
+const failureCacheKey = context.updateCheckFailureCacheKey(cacheVersion);
+const validFailureCache = JSON.parse(storage.get(failureCacheKey));
+storage.set(failureCacheKey, JSON.stringify({...validFailureCache, checkedAt: 1}));
+assert.equal(context.readUpdateCheckFailureCache(cacheVersion), null, "expired failure cache is not reused");
+storage.set(failureCacheKey, JSON.stringify(validFailureCache));
+assert.notEqual(context.updateCheckFailureCacheKey(cacheVersion), cacheKey);
+context.writeUpdateCheckCache(cacheVersion, goodCache);
+assert.equal(context.readUpdateCheckFailureCache(cacheVersion), null, "success clears failure only after valid outcome");
+const updateResult = {targetBranch: "devel", targetHeadSha: "b".repeat(40), releaseUrl: "https://example.test/release"};
+context.writeUpdateModalState(cacheVersion, updateResult, "dismissed");
+assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), false);
+assert.equal(context.shouldShowUpdateModal(cacheVersion, {...updateResult, targetHeadSha: "c".repeat(40)}), true);
+const modalKey = vm.runInContext("UPDATE_MODAL_STATE_KEY", context);
+const modalState = JSON.parse(storage.get(modalKey));
+for (const lastSeenAt of [Date.now() + 100000, 1]) {
+    storage.set(modalKey, JSON.stringify({...modalState, lastSeenAt}));
+    assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), true);
+}
+context.window.localStorage = {getItem() {throw Error("denied");}, setItem() {throw Error("denied");}, removeItem() {throw Error("denied");}};
+assert.equal(context.readUpdateCheckCache(cacheVersion), null);
+context.writeUpdateModalState(cacheVersion, updateResult, "dismissed");
+assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), false, "denied storage retains in-tab dismissal");
+context.window.localStorage = {getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key)};
+let modalHides = 0;
+const originalGetElement = context.document.getElementById;
+const originalModal = context.bootstrap.Modal.getOrCreateInstance;
+context.document.getElementById = id => id === "confirmModal" ? {dataset: {updateCheckActive: "true"}} : null;
+context.bootstrap.Modal.getOrCreateInstance = () => ({hide() {modalHides++;}});
+context.__cacheVersion = cacheVersion; context.__updateResult = updateResult;
+vm.runInContext("activeUpdateModalIdentity = updateModalIdentity(__cacheVersion, __updateResult)", context);
+context.handleUpdateCheckStorageEvent({key: modalKey, newValue: JSON.stringify({...modalState, reason: "dismissed"})});
+assert.equal(modalHides, 1);
+context.handleUpdateCheckStorageEvent({key: modalKey, newValue: JSON.stringify({...modalState, targetSha: "foreign", reason: "dismissed"})});
+assert.equal(modalHides, 1, "foreign identity cannot dismiss this update");
+context.document.getElementById = originalGetElement; context.bootstrap.Modal.getOrCreateInstance = originalModal;
+vm.runInContext("activeUpdateModalIdentity = null", context);
+console.log("Real SemVer ordering, metadata refusal, site-global success/failure caches and cross-tab modal identity passed");
+
+const dirtyInputs = [
+    [{wspr_build_dirty_state: {known: true, dirty: false}}, "version-dirty", true, false, "structured"],
+    [{wspr_build_dirty_state: {known: false, dirty: true}}, "version-dirty", false, false, "structured"],
+    [{wspr_build_dirty: true}, "clean", true, true, "structured"],
+    [{}, "4.0.0+dirty", true, true, "version_text"], [{}, "4.0.0", false, false, "unavailable"]];
+for (const [metadata, display, known, dirty, source] of dirtyInputs) {
+    const actual = context.parseBuildDirtyState(metadata, display, "", "");
+    assert.equal(actual.known, known); assert.equal(actual.dirty, dirty); assert.equal(actual.source, source);
+}
+assert.equal(context.applyDirtyBuildMetadata({...cacheVersion, buildDirty: true}, {updateAvailable: false}).versionComparisonStatus, "local_modified");
+assert.equal(context.applyDirtyBuildMetadata({...cacheVersion, buildDirty: true}, {updateAvailable: true, versionComparisonStatus: "update_available"}).updateAvailable, true);
+const contradictory = context.parseWsprryPiVersionResponse({...structuredVersion, wspr_version: "3.0.0 (wrong-branch)+bbbbbbb"});
+assert.equal(contradictory.currentBranch, "devel"); assert.equal(contradictory.currentSha, "a".repeat(40));
+assert.equal(contradictory.currentModalVersion, "4.0.0");
+assert.equal(contradictory.currentDisplayVersion, "3.0.0 (wrong-branch)+bbbbbbb");
+const legacy = context.parseWsprryPiVersionResponse({wspr_version: "3.0.0 (feature)+abcdef1"});
+assert.equal(legacy.currentBranch, "feature"); assert.equal(legacy.currentSha, "abcdef1");
+context.writeUpdateCheckCache(cacheVersion, goodCache);
+storage.set(cacheKey, JSON.stringify({...serializedValidCache, branchState: "detached"}));
+assert.equal(context.readUpdateCheckCache(cacheVersion), null, "branch-state mismatch cannot reuse cache");
+const normalVmNow = vm.runInContext("Date.now", context);
+context.__testNow = 1700000000000;
+vm.runInContext("Date.now = () => __testNow", context);
+context.writeUpdateModalState(cacheVersion, updateResult, "dismissed");
+context.__testNow += 2 * 60 * 60 * 1000 - 1;
+assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), false);
+context.__testNow++;
+assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), true, "modal unlocks at exact two-hour boundary");
+context.writeUpdateModalState(cacheVersion, updateResult, "dismissed");
+assert.equal(context.shouldShowUpdateModal(cacheVersion, {...updateResult, releaseUrl: "https://example.test/other"}), true);
+context.window.location.href = "http://localhost/different-page";
+assert.equal(context.shouldShowUpdateModal(cacheVersion, updateResult), false, "modal identity spans pages");
+context.__realNow = normalVmNow; vm.runInContext("Date.now = __realNow", context);
+storage.clear();
+const savedLocation = {...context.window.location};
+for (const [protocol, http, wsProtocol] of [["http:", "http:", "ws:"], ["https:", "https:", "wss:"]]) {
+    Object.assign(context.window.location, {protocol, hostname: "radio.test", origin: `${protocol}//radio.test`, href: `${protocol}//radio.test/wsprrypi/`});
+    assert.equal(context.buildDirectRestFallbackUrl("/config"), `${http}//radio.test:31415/config`);
+    assert.equal(context.buildDirectWebSocketFallbackUrl("/ws"), `${wsProtocol}//radio.test:31416/ws`);
+    assert.equal(context.buildWebSocketUrl("/wsprrypi/ws"), `${wsProtocol}//radio.test/wsprrypi/ws`);
+}
+Object.assign(context.window.location, savedLocation);
 const currentSha = "a8079bce00106957556c549ee827d2213483fea7";
 const targetSha = "10a9bafef7e486c389aa2026c46d1d9cd2b87b2b";
 
@@ -171,6 +294,7 @@ async function runBuildPriorityCase({
     semanticUpdateAvailable = false,
     semanticStatus = "equal",
     semanticRemoteVersion = "3.0.0",
+    buildDirtyKnown = false, buildDirty = false,
 }) {
     context.__selectedBranch = branch;
     context.__targetSha = targetHeadSha;
@@ -182,12 +306,168 @@ async function runBuildPriorityCase({
         currentSha,
         currentBranch: branch,
         branchState: "branch",
-        buildDirtyKnown: false,
-        buildDirty: false,
+        buildDirtyKnown,
+        buildDirty,
     });
 }
 
+let verificationPhase = "update behavioral matrix";
+const verificationWatchdog = setTimeout(() => {
+    console.error(`Update test deadline: phase=${verificationPhase}, budget=10000ms; awaited completion was not observed`);
+    process.exitCode = 1;
+}, 10000);
 (async () => {
+    const dirtyEqual = await runBuildPriorityCase({targetHeadSha: currentSha, compareStatus: "identical", buildDirtyKnown: true, buildDirty: true});
+    assert.equal(dirtyEqual.updateAvailable, false);
+    assert.equal(dirtyEqual.localBuildState, "dirty_build", "actual update orchestration propagates dirty state");
+    assert.equal(dirtyEqual.versionComparisonStatus, "local_modified");
+    const dirtyOlder = await runBuildPriorityCase({targetHeadSha: "b".repeat(40), compareStatus: "ahead", buildDirtyKnown: true, buildDirty: true});
+    assert.equal(dirtyOlder.updateAvailable, true, "dirty builds retain a genuine newer commit");
+    assert.equal(dirtyOlder.localBuildState, "dirty_build");
+    const footerOriginalGet = context.document.getElementById;
+    const makeFooterNode = () => {
+        const classes = new Set();
+        return {classes, title: "", href: "", attributes: {}, classList: {add: name => classes.add(name), remove: name => classes.delete(name)},
+                setAttribute(name, value) {this.attributes[name] = value;}, removeAttribute(name) {delete this.attributes[name];}};
+    };
+    const versionFooter = makeFooterNode(), linkFooter = makeFooterNode();
+    context.document.getElementById = id => id === "versionText" ? versionFooter : id === "versionUpdateLink" ? linkFooter : null;
+    for (const [status, word] of [["local_modified", "modifications"], ["local_ahead", "newer"], ["diverged", "diverged"]]) {
+        context.markWsprryPiLocalUpdateState({versionComparisonStatus: status});
+        assert(versionFooter.title.includes(word));
+        assert(linkFooter.classes.has("d-none"));
+        assert.equal(linkFooter.attributes["aria-label"], versionFooter.title);
+        assert(!versionFooter.classes.has("update-available") && !versionFooter.classes.has("update-check-failed"));
+    }
+    context.markWsprryPiUpdateFooter({updateAvailable: true, releaseUrl: "https://example.test/release", versionComparisonUsed: "commit"});
+    assert(versionFooter.classes.has("update-available") && !linkFooter.classes.has("d-none"));
+    assert.equal(linkFooter.href, "https://example.test/release");
+    context.markWsprryPiUpdateCheckFailed({code: "malformed_response"});
+    assert(versionFooter.classes.has("update-check-failed") && !versionFooter.classes.has("update-available"));
+    assert(linkFooter.attributes["aria-label"].includes("failed"));
+    context.clearWsprryPiUpdateFooter();
+    assert(!versionFooter.classes.has("update-check-failed") && linkFooter.classes.has("d-none"));
+    const failureBuild = context.buildWsprryPiUpdateResult, failureApply = context.applyWsprryPiUpdateResult, failureWrite = context.writeUpdateCheckFailureCache;
+    let failureApplied = 0, failureObserved;
+    const failureCompleted = new Promise(resolve => {failureObserved = resolve;});
+    context.__selectedBranch = "devel"; context.__targetSha = "b".repeat(40);
+    context.__semanticUpdateAvailable = false; context.__semanticStatus = "equal"; context.__semanticRemoteVersion = "4.0.0";
+    const failureGithub = context.fetchGithubJson;
+    context.fetchGithubJson = async () => ({status: "not-a-relationship"});
+    verificationPhase = "malformed comparison failure pipeline";
+    context.applyWsprryPiUpdateResult = () => {failureApplied++; failureObserved();};
+    context.writeUpdateCheckFailureCache = (...args) => {const result = failureWrite(...args); failureObserved(); return result;};
+    storage.clear();
+    context.checkForWsprryPiUpdate(structuredVersion, {bypassCache: true});
+    await failureCompleted;
+    assert.equal(failureApplied, 0, "failed orchestration never applies a successful no-update result");
+    const parsedFailureVersion = context.parseWsprryPiVersionResponse(structuredVersion);
+    assert.equal(context.readUpdateCheckCache(parsedFailureVersion), null);
+    assert.equal(context.readUpdateCheckFailureCache(parsedFailureVersion).code, "malformed_response");
+    assert(versionFooter.classes.has("update-check-failed"));
+    context.buildWsprryPiUpdateResult = failureBuild; context.applyWsprryPiUpdateResult = failureApply; context.writeUpdateCheckFailureCache = failureWrite;
+    context.fetchGithubJson = failureGithub;
+    context.document.getElementById = footerOriginalGet; storage.clear();
+    verificationPhase = "real GitHub branch and comparison matrices";
+    const savedGithub = context.fetchGithubJson;
+    let remoteStatus = "ahead", apiCalls = [];
+    context.fetchGithubJson = async url => {
+        apiCalls.push(url);
+        if (url.includes("/branches/")) return {commit: {sha: "b".repeat(40)}};
+        return {status: remoteStatus};
+    };
+    for (const sha of ["b".repeat(40), "b".repeat(7)]) {
+        apiCalls.length = 0;
+        assert.equal((await compareGithubCommitsUnderTest(sha, "b".repeat(40))).updateAvailable, false);
+        assert.equal(apiCalls.length, 0, "matching full/short SHA never calls compare");
+    }
+    for (const [status, contained] of [["ahead", true], ["identical", true], ["behind", false], ["diverged", false]]) {
+        remoteStatus = status;
+        const result = await context.isCurrentShaReachableFromBranchHead("a".repeat(40), {headSha: "b".repeat(40)});
+        assert.equal(result.contained, contained, status); assert.equal(result.uncertain, false);
+    }
+    assert.equal((await context.isCurrentShaReachableFromBranchHead("b".repeat(7), {headSha: "b".repeat(40)})).uncertain, true);
+    remoteStatus = "ahead";
+    for (const [branch, state, target] of [["main", "branch", "main"], ["feature", "branch", "feature"], ["devel", "branch", "main"], ["HEAD", "detached", "main"], ["unknown", "unknown", "main"]]) {
+        const selected = await selectGithubUpdateBranchUnderTest({currentSha: "a".repeat(40), currentBranch: branch, branchState: state});
+        assert.equal(selected.branch, target, `${branch}/${state}`);
+    }
+    remoteStatus = "behind";
+    assert.equal((await selectGithubUpdateBranchUnderTest({currentSha: "a".repeat(40), currentBranch: "devel", branchState: "branch"})).branch, "devel");
+    await assert.rejects(selectGithubUpdateBranchUnderTest({currentSha: "a".repeat(40), currentBranch: "HEAD", branchState: "detached"}), error => error.code === "detached_target_unknown");
+    context.fetchGithubJson = async () => {throw Object.assign(Error("service failed"), {status: 500});};
+    await assert.rejects(selectGithubUpdateBranchUnderTest({currentSha, currentBranch: "feature", branchState: "branch"}), error => error.status === 500);
+    assert.equal((await context.isCurrentShaReachableFromBranchHead(currentSha, {headSha: targetSha})).contained, false);
+    context.fetchGithubJson = async () => ({});
+    await assert.rejects(context.lookupGithubBranch("feature"), error => error.code === "malformed_response");
+    for (const bad of [{}, {status: "not-a-relationship"}]) {
+        context.fetchGithubJson = async () => bad;
+        await assert.rejects(compareGithubCommitsUnderTest(currentSha, targetSha), error => error.code === "malformed_response");
+    }
+    const lookupOriginal = context.lookupGithubBranch;
+    context.lookupGithubBranch = async () => {throw Object.assign(Error("not a branch"), {status: 404});};
+    let tagCalls = 0;
+    context.fetchGithubJson = async url => {
+        tagCalls++;
+        if (url.includes("/git/ref/tags/")) return {object: {type: "tag", url: "https://example.test/tag-object"}};
+        return {object: {type: "commit", sha: targetSha}};
+    };
+    const memo = vm.runInContext("new Map()", context);
+    assert.equal(await context.resolveReleaseTargetSha("v4.0.0", memo), targetSha);
+    assert.equal(await context.resolveReleaseTargetSha("v4.0.0", memo), targetSha);
+    assert.equal(tagCalls, 2, "annotated tag dereference is memoized per scan");
+    assert.equal(await context.resolveReleaseTargetSha(targetSha), targetSha);
+    assert.equal(tagCalls, 2, "full SHA resolution does not hit transport");
+    const releasesOriginal = context.fetchGithubReleases;
+    context.fetchGithubReleases = async () => [
+        {target_commitish: "v4.0.0", html_url: "https://example.test/release", name: "Candidate release"}
+    ];
+    assert.deepEqual(JSON.parse(JSON.stringify(await findReleaseForHeadUnderTest(targetSha))), {
+        releaseUrl: "https://example.test/release", releaseTitle: "Candidate release"
+    });
+    assert.equal(await findReleaseForHeadUnderTest("c".repeat(40)), null);
+    context.fetchGithubReleases = releasesOriginal;
+    context.lookupGithubBranch = lookupOriginal; context.fetchGithubJson = savedGithub;
+    const savedReleaseFetch = context.fetchGithubReleases;
+    context.fetchGithubReleases = async () => ["v1.0.0", "v1.1.0-beta.2", "v2.0.0-alpha.1"].map(tag_name =>
+        ({tag_name, target_commitish: "d".repeat(40), html_url: "https://example.test/" + tag_name}));
+    for (const [version, selected, available] of [["1.0.0", "1.0.0", false], ["1.1.0-beta.1", "1.1.0-beta.2", true],
+        ["1.1.0-rc.1", null, false], ["0.9.0-beta.1", "1.0.0", true]]) {
+        const result = await semanticUpdateUnderTest({...cacheVersion, currentModalVersion: version});
+        if (selected !== null) assert.equal(result.remoteVersionSelected, selected, version);
+        assert.equal(result.updateAvailable, available, version);
+    }
+    assert.equal((await semanticUpdateUnderTest({...cacheVersion, currentModalVersion: "1.0.0+dirty"})).useCommitFallback, true);
+    assert.equal((await semanticUpdateUnderTest({...cacheVersion, currentModalVersion: "9.0.0"})).versionComparisonStatus, "local_ahead");
+    assert.equal((await semanticUpdateUnderTest({...cacheVersion, currentModalVersion: "not-a-version"})).useCommitFallback, true);
+    context.fetchGithubReleases = async () => { throw {code: "network"}; };
+    assert.equal((await semanticUpdateUnderTest({...cacheVersion, currentModalVersion: "1.0.0"})).useCommitFallback, true);
+    context.fetchGithubReleases = savedReleaseFetch;
+    let built = 0, applied = 0;
+    const normalBuild = context.buildWsprryPiUpdateResult, normalApply = context.applyWsprryPiUpdateResult;
+    context.buildWsprryPiUpdateResult = async () => { built++; return goodCache; };
+    context.applyWsprryPiUpdateResult = () => { applied++; };
+    storage.clear();
+    context.setUpdateCheckDisabled(true);
+    context.checkForWsprryPiUpdate(structuredVersion, {bypassCache: true});
+    assert.equal(built, 0, "Never check returns before starting update work");
+    assert.equal(applied, 0, "Never check cannot apply or prompt an update");
+    context.setUpdateCheckDisabled(false);
+    context.checkForWsprryPiUpdate(structuredVersion, {bypassCache: true});
+    assert.equal(built, 1, "enabled positive control reaches the observed build boundary");
+    await Promise.resolve();
+    assert.equal(applied, 1, "enabled positive control applies its completed result");
+    context.buildWsprryPiUpdateResult = normalBuild; context.applyWsprryPiUpdateResult = normalApply;
+    storage.clear();
+    for (const [mode, code] of [["network", "network"], ["rate", "rate_limited"], ["json", "malformed_response"]]) {
+        context.fetch = async () => {
+            if (mode === "network") throw Error("offline");
+            return {ok: mode === "json", status: 403,
+                    headers: {get: key => key === "x-ratelimit-remaining" ? "0" : null},
+                    json: async () => {throw Error("invalid JSON");}};
+        };
+        await assert.rejects(fetchGithubJsonUnderTest("https://example.test/api"), error => error.code === code);
+    }
     assert.strictEqual(context.branchAllowsCommitUpdate("main"), false);
     assert.strictEqual(context.branchAllowsCommitUpdate("gpio_for_amp"), true);
 
@@ -570,6 +850,7 @@ async function runBuildPriorityCase({
         versionComparisonUsed: "commit",
     }));
     const commitModalText = bodyEl.children.map((child) => child.textContent || "").join("");
+    assert.ok(commitModalText.includes(versionInfo.currentModalVersion), "branch summary names the installed local build");
     assert.ok(commitModalText.includes("gpio_for_amp+30a9baf"));
     assert.ok(commitModalText.includes("Review the update channel given to you for this pre-release version."));
     assert.strictEqual(labelEl.textContent, "Newer branch build available");
@@ -589,9 +870,11 @@ async function runBuildPriorityCase({
         targetHeadSha: "40a9bafef7e486c389aa2026c46d1d9cd2b87b2b",
         releaseTitle: "WsprryPi 3.0.1",
         remoteVersionSelected: "3.0.1",
+        localVersionParsed: "3.0.0",
         versionComparisonUsed: "semver",
     }));
     const taggedModalText = bodyEl.children.map((child) => child.textContent || "").join("");
+    assert.ok(taggedModalText.includes("3.0.0 is behind release 3.0.1."));
     assert.strictEqual(labelEl.textContent, "Update available");
     assert.ok(taggedModalText.includes("A release is available for this update: "));
     assert.strictEqual(
@@ -613,4 +896,4 @@ async function runBuildPriorityCase({
 })().catch((error) => {
     console.error(error);
     process.exit(1);
-});
+}).finally(() => clearTimeout(verificationWatchdog));

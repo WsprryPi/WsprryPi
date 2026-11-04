@@ -43,7 +43,7 @@ async function captureConflictScreenshot(client, outputPath, tabId, selector) {
             }
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
     await client.send("Runtime.evaluate", { expression: "window.scrollTo(0, 0)" });
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
@@ -95,7 +95,7 @@ async function captureRp1DriveScreenshot(client, outputPath, theme) {
             document.scrollingElement.scrollTop = Math.max(0, target.offsetTop - 300);
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
         captureBeyondViewport: false,
@@ -175,7 +175,7 @@ async function captureSi5351LayoutScreenshot(client, outputPath, theme, missing 
             window.scrollTo(0, Math.max(0, window.scrollY + busPanel.getBoundingClientRect().top - 130));
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
         captureBeyondViewport: false,
@@ -243,7 +243,7 @@ async function captureRouteRequiredRp1Screenshot(client, outputPath, theme, remo
             window.scrollTo(0, Math.max(0, outputPanel.offsetTop - 100));
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
         captureBeyondViewport: false,
@@ -268,7 +268,7 @@ async function captureRouteProgressModalScreenshot(client, outputPath, theme) {
             document.getElementById("rp1-route-progress-retry").textContent = "Checking again in 5 s";
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
         captureBeyondViewport: false,
@@ -277,7 +277,7 @@ async function captureRouteProgressModalScreenshot(client, outputPath, theme) {
     await client.send("Runtime.evaluate", {
         expression: `bootstrap.Modal.getOrCreateInstance(document.getElementById("rp1-route-progress-modal")).hide()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await client.settleRendering();
 }
 
 async function captureBandPreferencesScreenshot(client, outputPath) {
@@ -305,12 +305,234 @@ async function captureBandPreferencesScreenshot(client, outputPath) {
             document.querySelectorAll(".toast.show").forEach((toast) => toast.classList.remove("show"));
         })()`,
     });
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", {
         format: "png",
         captureBeyondViewport: false,
     });
     fs.writeFileSync(outputPath, screenshot.data, "base64");
+}
+
+async function sourceContractBehavior() {
+    const canonical = value => Array.isArray(value) ? ["array", value.map(canonical)] :
+        value !== null && typeof value === "object" ? ["object", Object.keys(value).sort().map(key => [key, canonical(value[key])])] : [typeof value, value];
+    const equal = (actual, expected, label) => { if (JSON.stringify(canonical(actual)) !== JSON.stringify(canonical(expected))) throw Error(`${label}: ${JSON.stringify(actual)} != ${JSON.stringify(expected)}`); };
+    const ok = (value, label) => { if (!value) throw Error(label); };
+    const field = id => { const node = document.getElementById(id); if (!node) throw Error(`missing ${id}`); return node; };
+    equal(field("qrss_message").type, "text", "numeric CW messages remain text");
+    for (const node of document.querySelectorAll(".band-gpio-enabled, .band-gpio-active-high"))
+        ok(!node.defaultChecked, "Band GPIO template defaults are inactive");
+    for (const [id, min, step, initial] of [["dot_length", "0.000000001", "any", "3"], ["fsk_offset", "1", "1", "5"],
+        ["tx_repeat_every", "1", null, "10"], ["cw_intra_element_gap", "0.000000001", "any", "1"],
+        ["cw_inter_character_gap", "0.000000001", "any", "3"], ["cw_inter_word_gap", "0.000000001", "any", "7"],
+        ["dfcw_intra_element_gap", "0.000000001", "any", "0.333333"], ["dfcw_inter_character_gap", "0.000000001", "any", "1"],
+        ["dfcw_inter_word_gap", "0.000000001", "any", "3"]]) {
+        equal(field(id).min, min, id + " lower bound"); if (step !== null) equal(field(id).step, step, id + " granularity");
+        equal(field(id).defaultValue, initial, id + " template default");
+        equal(field(id).getAttribute("max"), null, id + " has no UI-only maximum");
+    }
+    ok(!document.querySelector("#wsprform #test_tone, #wsprform #testToneModal"), "tone workflow is outside configuration form");
+    const reference = field("si5351_reference_source"), capacitance = field("si5351_crystal_load_capacitance");
+    equal([...capacitance.options].map(option => option.value), ["6", "8", "10"], "bounded crystal load choices");
+    reference.value = "crystal";
+    for (const value of ["6", "8", "10"]) {
+        capacitance.value = value; syncSi5351ReferenceControls();
+        const payload = buildConfigPayload();
+        equal(payload.Si5351["Reference Source"], "crystal", "crystal source serialized");
+        equal(payload.Si5351["Crystal Load Capacitance"], Number(value), "all supported crystal loads serialized");
+    }
+    reference.value = "external_tcxo"; syncSi5351ReferenceControls();
+    ok(capacitance.disabled, "TCXO selection disables crystal-only control");
+    equal(field("ppm").min, "-200", "PPM lower bound"); equal(field("ppm").max, "200", "PPM upper bound");
+    equal(field("dbm").tagName, "SELECT", "fixed power choices");
+    ok([...field("dbm").options].some(option => option.value === "60"), "60 dBm choice retained");
+    for (const [value, hz] of [["14096900", 14096900], ["14.0969MHz", 14096900], ["14096.9kHz", 14096900], ["0.0140969GHz", 14096900], ["14096900Hz", 14096900]])
+        equal(parseFrequencyWithOptionalUnits(value), hz, "unit-aware frequency " + value);
+    for (const value of ["14.0969", "14096900junk", "-12MHz", "1.1Hz", "NaN", "Infinity", "1,2", "0", "1e6"])
+        ok(Number.isNaN(parseFrequencyWithOptionalUnits(value)), "reject malformed CW frequency " + value);
+    for (const value of ["20m", "60m:legacy", "60M:WRC15", "1.25m", "70cm", "14MHz@4H", "20m@20L"])
+        ok(validateWsprFrequencyToken(value), "accept canonical WSPR token " + value);
+    for (const value of ["20m-15", "-14MHz", "20m@@4", "20m@junk", "20m@4Q", "14097000junk"])
+        ok(!validateWsprFrequencyToken(value), "reject malformed WSPR token " + value);
+    equal(splitWsprFrequencyTokens("2200m, 630m 20m@4H"), ["2200m", "630m", "20m@4H"], "comma and space tokenization");
+    ok(!validateWsprFrequencyToken("22m"), "removed alias rejected");
+    applyCommittedConfigMode("FSKCW", {skipAutosave: true});
+    for (const [id, invalid, validate] of [["qrss_message", "", validateCwMessage], ["dot_length", "0", validateCwDotSeconds],
+        ["fsk_offset", "1.5", validateCwShiftHz], ["tx_repeat_every", "0", validateCwRepeatMinutes]]) {
+        const previous = field(id).value; field(id).value = invalid;
+        ok(!validate() && field(id).validity.customError, "observable refusal for " + id); field(id).value = previous; validate();
+    }
+    for (const id of ["cw_intra_element_gap", "cw_inter_character_gap", "cw_inter_word_gap", "dfcw_intra_element_gap", "dfcw_inter_character_gap", "dfcw_inter_word_gap"]) {
+        const previous = field(id).value; field(id).value = "0";
+        ok(!validatePositiveCwField(id, "Invalid spacing"), "zero spacing rejected: " + id); field(id).value = previous;
+    }
+    const saved = {get: getJsonWithEndpointFallback, ajax: ajaxWithEndpointFallback, dialog: showModeChangeGuardModal, refresh: getTxState, socket: ws};
+    const calls = []; let pendingPatch; let confirmation; let loaded = false;
+    Object.defineProperty(navigator, "onLine", {configurable: true, get: () => true});
+    let config = {Operation: {Mode: "QRSS", Transmit: false}, CW: {Message: "73"}, GPIO: {}, WSPR: {Callsign: "AA0NT", Gridsquare: "EM18"}};
+    try {
+        getJsonWithEndpointFallback = endpoint => {
+            if (endpoint !== SETTINGS_ENDPOINT) return $.Deferred().reject({status: 503});
+            return $.Deferred().resolve(config, "success", {getResponseHeader: () => null});
+        };
+        ajaxWithEndpointFallback = (endpoint, options = {}) => {
+            if (options.type !== "PATCH") return $.Deferred().reject({status: 503});
+            calls.push({endpoint: endpoint.name, payload: JSON.parse(options.data)});
+            pendingPatch = $.Deferred(); return pendingPatch;
+        };
+        populateConfig(() => { loaded = true; });
+        ok(loaded, "production config loader completed");
+        equal(field("qrss_frequency").value, "14096900", "missing CW frequency default");
+        ok(field("use_system_clock_frequency_estimate").checked, "missing clock estimation defaults true");
+        equal(["cw_intra_element_gap", "cw_inter_character_gap", "cw_inter_word_gap", "dfcw_intra_element_gap", "dfcw_inter_character_gap", "dfcw_inter_word_gap"].map(id => Number(field(id).value)),
+            [1, 3, 7, 0.333333, 1, 3], "independent spacing defaults");
+        config = {...config, GPIO: {"Manual PPM": 0, "Frequency Residual PPM": 2.5, "Use System Clock Frequency Estimate": false},
+            CW: {...config.CW, "Base Frequency": 14098000, "Intra Element Gap": 1.25, "Inter Character Gap": 3.25, "Inter Word Gap": 7.25,
+                "DFCW Intra Element Gap": 0.45, "DFCW Inter Character Gap": 1.45, "DFCW Inter Word Gap": 3.45}};
+        loaded = false; populateConfig(() => {loaded = true;}); ok(loaded, "custom config loaded");
+        equal(field("qrss_frequency").value, "14098000", "custom frequency preserved");
+        const gapIds = ["cw_intra_element_gap", "cw_inter_character_gap", "cw_inter_word_gap", "dfcw_intra_element_gap", "dfcw_inter_character_gap", "dfcw_inter_word_gap"];
+        equal(gapIds.map(id => Number(field(id).value)), [1.25, 3.25, 7.25, 0.45, 1.45, 3.45], "all custom spacing values preserved");
+        $("#qrss_frequency").val("14.0969MHz");
+        const payload = buildConfigPayload();
+        equal(payload.CW["Base Frequency"], 14096900, "CW payload uses the unit-aware frequency parser");
+        equal(["Intra Element Gap", "Inter Character Gap", "Inter Word Gap", "DFCW Intra Element Gap", "DFCW Inter Character Gap", "DFCW Inter Word Gap"].map(key => payload.CW[key]),
+            [1.25, 3.25, 7.25, 0.45, 1.45, 3.45], "all canonical spacing keys serialized independently");
+        equal(field("gpio_manual_ppm").value, "0", "explicit zero manual correction preserved");
+        ok(!field("use_system_clock_frequency_estimate").checked, "explicit false estimation preserved");
+        suspendConfigAutosave(true);
+        for (const [header, rowClass] of [["band-gpio-enabled-all", ".band-gpio-enabled"], ["band-gpio-active-high-all", ".band-gpio-active-high"]]) {
+            field(header).checked = true; field(header).dispatchEvent(new Event("change", {bubbles: true}));
+            ok([...document.querySelectorAll(rowClass)].every(node => node.checked), "actual bulk checkbox handler " + header);
+            const first = document.querySelector(rowClass); first.checked = false; first.dispatchEvent(new Event("change", {bubbles: true}));
+            ok(field(header).indeterminate, "mixed row state updates header " + header);
+            field(header).checked = false; field(header).dispatchEvent(new Event("change", {bubbles: true}));
+        }
+        equal(calls.length, 0, "loading and suspended bulk edits do not persist");
+        showModeChangeGuardModal = options => { confirmation = options; };
+        currentConfigModeSelection = "QRSS"; currentRuntimeStatus = {txState: "idle"};
+        currentRuntimeConfigStatus.transmitEnabled = true;
+        requestConfigModeChange("WSPR"); ok(confirmation, "mode switch requires confirmation");
+        confirmation.onCancel(); equal(calls.length, 0, "cancelled mode change sends nothing");
+        currentRuntimeConfigStatus.transmitEnabled = true; requestConfigModeChange("WSPR"); confirmation.onConfirm();
+        equal(calls.map(call => call.payload), [{Operation: {Mode: "WSPR", Transmit: false}}], "confirmed disable/mode is one canonical mutation");
+        const before = calls.length; pendingPersistedMode = "WSPR";
+        const transientTransmit = document.createElement("input");
+        transientTransmit.id = "transmit"; transientTransmit.type = "checkbox"; transientTransmit.checked = true;
+        document.body.append(transientTransmit);
+        configAutosaveInFlight = true;
+        try {
+            patchTransmitControl(); equal(calls.length, before, "unacknowledged mode cannot enable transmit");
+            ok(!transientTransmit.checked && document.getElementById("backendStatus").textContent.includes("Wait for the mode change"), "pending-mode refusal is the observed reason");
+        } finally { transientTransmit.remove(); configAutosaveInFlight = false; }
+        pendingPatch.reject({status: 503}, "error"); pendingPersistedMode = ""; clearPendingModeChange();
+        currentConfigModeSelection = "QRSS"; currentRuntimeConfigStatus.transmitEnabled = true;
+        requestConfigModeChange("WSPR"); confirmation.onConfirm();
+        let refreshed = 0; getTxState = () => { refreshed++; };
+        config = {...config, Operation: {Mode: "WSPR", Transmit: false}};
+        pendingPatch.resolve({}, "success", {getResponseHeader: () => null});
+        equal(refreshed, 1, "successful combined mode save refreshes runtime exactly once");
+        equal(currentConfigModeSelection, "WSPR", "confirmed readback commits the requested mode");
+        equal(pendingPersistedMode, "", "acknowledged mode no longer blocks transmission");
+        calls.length = 0; requestTestToneTransmitDisable();
+        equal(calls.map(call => call.payload), [{Operation: {Transmit: false}}], "idle tone prerequisite only disables transmission");
+        pendingPatch.resolve({}); pendingTestToneStopDisableAction = null;
+        calls.length = 0;
+        showTestToneBlockedModal("enabled"); confirmation.onCancel(); equal(calls.length, 0, "tone prerequisite Cancel has no side effect");
+        showTestToneBlockedModal("enabled"); confirmation.onConfirm();
+        equal(calls.map(call => call.payload), [{Operation: {Transmit: false}}], "tone prerequisite confirm never starts tone");
+        pendingPatch.resolve({}); pendingTestToneStopDisableAction = null;
+        const sent = []; ws = {readyState: WebSocket.OPEN, send: text => sent.push(JSON.parse(text))};
+        disableScheduledTransmissionsForTestTone("active");
+        equal(sent, [{command: "stop", persist_transmit: true}], "active tone prerequisite sends only an explicit persistent stop");
+        handleTestToneStopDisableResponse({status: "ok", stop_performed: true, transmit_disabled: true});
+        equal(sent.length, 1, "successful prerequisite stop does not start tone");
+    } finally {
+        getJsonWithEndpointFallback = saved.get; ajaxWithEndpointFallback = saved.ajax; showModeChangeGuardModal = saved.dialog; getTxState = saved.refresh; ws = saved.socket;
+        pendingPersistedMode = ""; clearPendingModeChange(); suspendConfigAutosave(true);
+    }
+    const originalTransport = {ajax: $.ajax, fetch: window.fetch};
+    const endpoint = createEndpointDefinition("test transport", "/__proxy", "http://fixture.invalid/__direct");
+    const requests = [];
+    try {
+        for (const primaryFails of [false, true]) {
+            requests.length = 0;
+            $.ajax = options => {
+                requests.push(options.url);
+                const result = $.Deferred();
+                return primaryFails && options.url === endpoint.proxyUrl ? result.reject({status: 503}, "error") : result.resolve({ok: true});
+            };
+            await new Promise((resolve, reject) => saved.ajax(endpoint, {type: "GET"}).done(resolve).fail(reject));
+            equal(requests, primaryFails ? [endpoint.proxyUrl, endpoint.directUrl] : [endpoint.proxyUrl], "actual AJAX proxy-first ordering");
+            requests.length = 0;
+            window.fetch = async url => { requests.push(url); return {ok: !(primaryFails && url === endpoint.proxyUrl), status: 503}; };
+            const result = await fetchWithEndpointFallback(endpoint, {method: "GET"});
+            ok(result.ok, "fallback result remains visible");
+            equal(requests, primaryFails ? [endpoint.proxyUrl, endpoint.directUrl] : [endpoint.proxyUrl], "actual Fetch proxy-first ordering");
+        }
+        requests.length = 0;
+        $.ajax = options => { requests.push(options.url); return $.Deferred().reject({status: 0}, "abort"); };
+        const aborted = await new Promise(resolve => saved.ajax(endpoint, {type: "GET"}).fail((_xhr, status) => resolve(status)));
+        equal(aborted, "abort", "caller cancellation remains cancellation");
+        equal(requests, [endpoint.proxyUrl], "cancelled AJAX cannot trigger fallback");
+    } finally { $.ajax = originalTransport.ajax; window.fetch = originalTransport.fetch; }
+    const tabs = field("configTabs"), tabKey = getPersistedTabStorageKey(tabs), urlParam = getPersistedTabUrlParamKey(tabs);
+    const originalNavigation = getNavigationType, originalUrl = location.href, previousStorage = localStorage.getItem(tabKey);
+    const triggers = [...tabs.querySelectorAll('[data-bs-toggle="tab"]')];
+    const selector = node => node.getAttribute("data-bs-target");
+    const selectTab = async trigger => {
+        if (trigger.classList.contains("active")) return;
+        const shown = new Promise(resolve => trigger.addEventListener("shown.bs.tab", resolve, {once: true}));
+        bootstrap.Tab.getOrCreateInstance(trigger).show(); await shown;
+    };
+    try {
+        equal(getPersistedTabRestoreScope(tabs), "reload", "template tab restoration scope");
+        const clean = new URL(location.href); clean.searchParams.delete(urlParam); history.replaceState(null, "", clean);
+        getNavigationType = () => "reload";
+        await selectTab(triggers[0]); localStorage.setItem(tabKey, selector(triggers[1]));
+        const restored = new Promise(resolve => triggers[1].addEventListener("shown.bs.tab", resolve, {once: true}));
+        restorePersistedTabState(tabs); await restored;
+        ok(triggers[1].classList.contains("active"), "reload restores saved tab through actual Bootstrap");
+        clean.searchParams.delete(urlParam); history.replaceState(null, "", clean);
+        getNavigationType = () => "navigate"; restorePersistedTabState(tabs);
+        equal(localStorage.getItem(tabKey), null, "ordinary navigation retires stored tab");
+        getNavigationType = () => "reload"; localStorage.setItem(tabKey, "#not-a-tab"); restorePersistedTabState(tabs);
+        equal(localStorage.getItem(tabKey), null, "invalid stored selector is retired");
+        const explicit = new URL(location.href); explicit.searchParams.set(urlParam, selector(triggers[0])); history.replaceState(null, "", explicit);
+        localStorage.setItem(tabKey, selector(triggers[1]));
+        const urlShown = new Promise(resolve => triggers[0].addEventListener("shown.bs.tab", resolve, {once: true}));
+        restorePersistedTabState(tabs); await urlShown;
+        ok(triggers[0].classList.contains("active"), "explicit URL tab precedes stored tab");
+    } finally {
+        getNavigationType = originalNavigation; history.replaceState(null, "", originalUrl);
+        if (previousStorage === null) localStorage.removeItem(tabKey); else localStorage.setItem(tabKey, previousStorage);
+        await selectTab(triggers[0]);
+    }
+    const detailModal = field("confirmModal");
+    const detailShown = new Promise(resolve => detailModal.addEventListener("shown.bs.modal", resolve, {once: true}));
+    openSetupDetailsDialog("first line\n<diagnostic second line>"); await detailShown;
+    equal(field("confirmModalBody").textContent, "first line\n<diagnostic second line>", "diagnostic details preserve newlines and safe text");
+    ok(!field("confirmModalBody").querySelector("diagnostic"), "diagnostics are not HTML");
+    ok(["pre-wrap", "pre-line", "break-spaces"].includes(getComputedStyle(field("confirmModalBody")).whiteSpace), "diagnostic line breaks remain visible");
+    const detailHidden = new Promise(resolve => detailModal.addEventListener("hidden.bs.modal", resolve, {once: true}));
+    bootstrap.Modal.getOrCreateInstance(detailModal).hide(); await detailHidden;
+    const originalLog = console.log, logs = [];
+    console.log = (...args) => logs.push(args.map(String).join(" "));
+    try {
+        debugConsole("log", {field: "value"}, [1, 2]); const cycle = {}; cycle.self = cycle; debugConsole("log", cycle);
+        ok(logs.some(line => line.includes('{"field":"value"}') && line.includes('[1,2]')), "objects and arrays are serialized for diagnostics");
+        ok(logs.some(line => line.includes("[object Object]")), "cyclic diagnostics retain a safe fallback");
+    } finally { console.log = originalLog; }
+    const message = document.createElement("div");
+    renderCwRuntimeMessage(message, "A  B", 2);
+    equal(message.textContent, "A  B", "runtime CW preserves literal spaces");
+    equal(message.querySelectorAll(".is-active").length, 1, "one active message character");
+    equal(message.querySelector(".is-active").textContent, " ", "active spacing character is retained");
+    const footer = document.querySelector("details.footer-meta");
+    ok(footer, "About disclosure exists"); footer.open = true;
+    document.body.dispatchEvent(new MouseEvent("click", {bubbles: true})); ok(!footer.open, "outside click closes About");
+    footer.open = true; document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true})); ok(!footer.open, "Escape closes About");
+    return "real parsers, initial controls, defaults/custom settings, bulk handlers, guarded mutations and disclosure passed";
 }
 
 async function browserTest() {
@@ -1041,6 +1263,8 @@ async function main() {
             });
             return result.result.value.ready;
         }, "GPIO configuration scripts and idle host firmware status");
+
+        console.log(await client.evaluate(`(${sourceContractBehavior.toString()})()`));
 
         const result = await client.send("Runtime.evaluate", {
             expression: `(${browserTest.toString()})()`,

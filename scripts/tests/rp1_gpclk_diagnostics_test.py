@@ -7,38 +7,72 @@ runtime = (root / "src/scheduling.cpp").read_text()
 websocket = (root / "src/web_socket_commands.cpp").read_text()
 admin_probe = (root / "src/WSPR-Transmitter/src/rp1_gpclk_admin_probe.cpp").read_text()
 
-for command in ("status -m rp1-gpclk-dkms", "-k \"$RP1_KERNEL\" -F",
-                "rp1_gpclk_runtime_provider_inspect",
-                "rp1_gpclk_loaded_modules"):
-    assert command in collector, command
-for command in ("overlay-sha256.txt", "rp1_gpclk_module_state",
-                "rp1_gpclk_boot_route"):
-    assert command not in collector, command
-for evidence in ("/dev/rp1-gpclk",
-                 "/var/lib/rp1-gpclk-dkms/route-transactions",
-                 "/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json",
-                 "/usr/src/linux-headers-$RP1_KERNEL"):
-    assert evidence in collector, evidence
-for evidence in ("Provider provisioning and package identity: external to WsprryPi",
-                 "DKMS registration and kernel-specific module identity",
-                 "WsprryPi ownership record: bounded identity whitelist",
-                 "read-only inspect operation",
-                 "Persisted route", "Active route and operation readiness",
-                 "Qualification: not established"):
-    assert evidence in collector, evidence
-for guard in ("safe_root_owned_regular_file", '"$owner" == "0"',
-              "! -L", "run_bounded_absolute_cmd", "--kill-after=5s 30s",
-              "runtime provider absent, inaccessible, or unsafe",
-              "Neither RP1 GPCLK module is loaded",
-              "/proc/modules absent or inaccessible"):
-    assert guard in collector, guard
-for module in ("rp1_gpclk_dkms", "rp1_route_controller"):
-    for field in ("filename", "version", "vermagic"):
-        assert f"rp1_gpclk_modinfo_{module}_{field}" in collector
-for prohibited in ("sudo ", " modprobe ", " insmod ", " rmmod ",
-                   '"$RP1_RUNTIME_PROVIDER" ensure',
-                   '"$RP1_RUNTIME_PROVIDER" plan'):
-    assert prohibited not in collector, prohibited
+# Execute the collector's actual RP1 dispatch block with a recording command boundary.
+import os
+import shlex
+import subprocess
+import tempfile
+
+def shell_function(name):
+    start = collector.index(name + '() {')
+    return collector[start:collector.index('\n}\n', start) + 3]
+
+with tempfile.TemporaryDirectory(prefix='rp1-diagnostic-dispatch-') as raw:
+    work = Path(raw)
+    provider = work / 'provider.py'; provider.write_text('# fixture\n'); provider.chmod(0o644)
+    # A real root-owned regular file exercises ownership checks without chown/sudo.
+    # run_cmd only records arguments; neither this file nor a provider is executed.
+    safe_provider = Path('/usr/bin/true').resolve()
+    assert safe_provider.stat().st_uid == 0 and safe_provider.is_file()
+    qualification = safe_provider
+    record = work / 'ownership.json'; record.write_text('{}')
+    block_start = collector.index('RP1_KERNEL="$(uname -r')
+    block = collector[block_start:collector.index('\nif command -v dpkg', block_start)]
+    functions = '\n'.join(shell_function(name) for name in
+                          ('run_optional_absolute_cmd', 'run_bounded_absolute_cmd', 'safe_root_owned_regular_file'))
+    prelude = r'''
+set -eu
+run_cmd() {
+  local name="$1"; shift
+  printf '%s\0' "$@" > "${OUT_DIR}/commands/${name}.argv"
+  : > "${OUT_DIR}/commands/${name}.txt"
+}
+collect_rp1_record_summary() { run_cmd rp1_gpclk_ownership_identity "$RP1_PYTHON" -I - "$RP1_INSTALLATION_RECORD"; }
+ini_value() { printf '4'; }
+'''
+    def run_case(name, unsafe=False, unavailable=False, untrusted=False):
+        out = work / name; (out/'commands').mkdir(parents=True); (out/'hardware/rp1-gpclk').mkdir(parents=True)
+        provider.chmod(0o666 if unsafe else 0o644)
+        env = dict(os.environ, OUT_DIR=str(out), RP1_DKMS='/usr/bin/true', RP1_MODINFO='/usr/bin/true',
+                   RP1_PYTHON='/usr/bin/python3', RP1_TIMEOUT=str(work/'absent') if unavailable else '/usr/bin/timeout',
+                   RP1_RUNTIME_PROVIDER=str(provider if unsafe or untrusted else safe_provider), RP1_QUALIFICATION=str(qualification),
+                   RP1_INSTALLATION_RECORD=str(record), INSTALLED_INI=str(work/'config.ini'))
+        subprocess.run(['bash', '-c', prelude + functions + block], check=True, env=env, timeout=10)
+        calls = {p.stem: p.read_bytes().rstrip(b'\0').decode().split('\0') for p in (out/'commands').glob('*.argv')}
+        assert calls['rp1_gpclk_dkms'] == ['/usr/bin/true', 'status', '-m', 'rp1-gpclk-dkms']
+        kernel = os.uname().release
+        for module in ('rp1_gpclk_dkms', 'rp1_route_controller'):
+            for field in ('filename', 'version', 'vermagic'):
+                assert calls[f'rp1_gpclk_modinfo_{module}_{field}'] == ['/usr/bin/true', '-k', kernel, '-F', field, module]
+        if not unsafe and not untrusted and not unavailable:
+            assert calls['rp1_gpclk_runtime_provider_inspect'] == ['/usr/bin/timeout', '--signal=TERM', '--kill-after=5s', '30s', '/usr/bin/python3', str(safe_provider), 'inspect']
+        else:
+            assert 'rp1_gpclk_runtime_provider_inspect' not in calls
+            assert (out/'commands/rp1_gpclk_runtime_provider_inspect.txt').stat().st_size > 0
+        expected = {'rp1_gpclk_dkms', 'rp1_gpclk_loaded_modules', 'rp1_gpclk_ownership_identity',
+                    'rp1_gpclk_device_state', 'rp1_gpclk_route_socket', 'rp1_gpclk_route_journals'}
+        expected |= {f'rp1_gpclk_modinfo_{module}_{field}' for module in ('rp1_gpclk_dkms', 'rp1_route_controller') for field in ('filename', 'version', 'vermagic')}
+        if not unavailable: expected.add('rp1_gpclk_qualification_evidence')
+        if not unsafe and not untrusted and not unavailable: expected.add('rp1_gpclk_runtime_provider_inspect')
+        assert set(calls) == expected, set(calls) ^ expected
+        assert all(not any(word in ('sudo', 'modprobe', 'insmod', 'rmmod', 'ensure', 'plan') for word in args) for args in calls.values())
+        assert 'Qualification: not established' in (out/'hardware/rp1-gpclk/evidence-summary.txt').read_text()
+    run_case('safe')
+    run_case('unsafe', unsafe=True)
+    run_case('unbounded', unavailable=True)
+    if os.geteuid() != 0: run_case('untrusted-owner', untrusted=True)
+
+# Retained static policy for hardware-facing production sources: passive diagnostics only.
 for identity in ("source_commit=", "module=rp1-gpclk-dkms/",
                  "package=unreleased", "development-candidate"):
     assert identity not in collector and identity not in runtime, identity

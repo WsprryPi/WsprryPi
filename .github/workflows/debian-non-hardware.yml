@@ -438,7 +438,7 @@ jobs:
           make support-bundle-maintainer-processing-test SUDO=
           make support-bundle-retention-audit-test SUDO=
           make support-bundle-retention-deletion-test SUDO=
-          make support-bundle-contract-reconciliation-test SUDO=
+          make support-bundle-collector-contract-test SUDO=
           make support-bundle-age-dependency-test installer-dependency-test \
             rp1-gpclk-dkms-installer-test SUDO=
           make support-bundle-intake-validation-test SUDO=

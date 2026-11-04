@@ -190,14 +190,26 @@ int main(int argc, char **argv) {
     const auto receipt_result = write_support_bundle_receipt(root, receipt);
     assert(receipt_result.written());
     const auto receipt_json = nlohmann::json::parse(read_all(receipt_result.path));
-    assert(receipt_json.size() == 14);
+    const auto expected_receipt = nlohmann::json{
+        {"schema_version", 1}, {"project_id", "wsprrypi"}, {"case_id", receipt.case_id},
+        {"artifact_id", receipt.artifact_id}, {"created_at_utc", receipt.created_at_utc},
+        {"archive_filename", receipt.archive_filename}, {"archive_size", receipt.archive_size},
+        {"archive_sha256", receipt.archive_sha256}, {"encrypted_filename", receipt.encrypted_filename},
+        {"encrypted_size", receipt.encrypted_size}, {"encrypted_sha256", receipt.encrypted_sha256},
+        {"bundle_encryption_key_id", receipt.bundle_encryption_key_id}, {"issue_url", *receipt.issue_url},
+        {"upload_state", "encrypted_artifact_downloaded"}};
+    assert(receipt_json == expected_receipt);
+    for (const auto* field : {"schema_version", "archive_size", "encrypted_size"})
+        assert(receipt_json[field].is_number_unsigned() || receipt_json[field].is_number_integer());
     assert(receipt_json["schema_version"] == 1);
     assert(receipt_json["case_id"] == receipt.case_id);
     assert(receipt_json["issue_url"] == *receipt.issue_url);
     assert(!receipt_json.contains("contact"));
     assert(!receipt_json.contains("problem_description"));
+    const auto immutable_receipt = read_all(receipt_result.path);
     assert(write_support_bundle_receipt(root, receipt).failure ==
            SupportBundleReceiptFailure::output_collision);
+    assert(read_all(receipt_result.path) == immutable_receipt);
     receipt.archive_filename = "../plaintext.tar.gz";
     assert(write_support_bundle_receipt(root, receipt).failure ==
            SupportBundleReceiptFailure::invalid_receipt);

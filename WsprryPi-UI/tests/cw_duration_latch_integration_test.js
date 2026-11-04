@@ -601,8 +601,19 @@ async function browserTest() {
     clock.tick(800);
     equal(patches.length, 1, "the next edit after already-applied recovery must save normally");
 
+    // Paired-plan refusal must offer the original multiline diagnostics without losing the draft.
+    reset(); syncConfigAutosaveBaseline(); patchMode = "pending";
+    setValue("qrss_message", "T"); clock.tick(800);
+    pendingPatch.reject({status: 400, responseJSON: {plan_status: "PairedTransmissionUnavailable", message: "first reason\nsecond reason"}}, "error");
+    includes(field("configSaveStatus").textContent, "Paired planning requires", "paired refusal stays concise");
+    const more = field("configSaveStatusDetail").querySelector("button");
+    equal(more.textContent, "More", "paired refusal exposes details"); more.click();
+    equal(dialogs.at(-1).preserveLineBreaks, true, "paired refusal requests multiline rendering");
+    includes(dialogs.at(-1).message, "first reason\nsecond reason", "original backend diagnostic survives");
+    equal(field("qrss_message").value, "T", "paired refusal preserves the draft");
+
     return {
-        scenarios: 16,
+        scenarios: 17,
         assertions: "passed",
         finalPatchCount: patches.length,
         finalDialogCount: dialogs.length,
@@ -654,10 +665,10 @@ async function main() {
             throw new Error(detail || result.exceptionDetails.text || "Browser test failed");
         }
         assert.deepEqual(result.result.value, {
-            scenarios: 16,
+            scenarios: 17,
             assertions: "passed",
             finalPatchCount: 1,
-            finalDialogCount: 0,
+            finalDialogCount: 1,
         });
 
         for (const viewport of [

@@ -6,7 +6,6 @@ import re
 import shutil
 import subprocess
 import tempfile
-import time
 
 ROOT = Path(__file__).resolve().parents[2]
 source = (ROOT/'src/Makefile').read_text()
@@ -22,6 +21,8 @@ with tempfile.TemporaryDirectory(prefix='phase115-make-deps-') as temp:
     root = Path(temp)
     (root/'probe.cpp').write_text('#include "shape.hpp"\nint main() { return sizeof(Shape); }\n')
     (root/'shape.hpp').write_text('struct Shape { char data[8]; };\n')
+    unchanged = (root/'probe.cpp').stat().st_mtime_ns - 3_600_000_000_000
+    os.utime(root/'probe.cpp', ns=(unchanged, unchanged))
     makefile = '''Q := @
 PROFILE ?= one
 OBJ_DIR_DEBUG := build/debug/$(PROFILE)
@@ -45,10 +46,13 @@ all: $(CPP_DEBUG_OBJECTS) $(CPP_OBJECTS)
     for profile in ('one','two'):
         assert make(profile).count('Compiling') == 2
         assert 'Compiling' not in make(profile)
-    time.sleep(1.05)
     (root/'shape.hpp').write_text('struct Shape { char data[16]; };\n')
+    # Make the prerequisite newer by construction, without sleeping or dating it in the future.
+    for obj in root.glob('build/*/*/probe.o'):
+        stamp = (root/'shape.hpp').stat().st_mtime_ns - 2_000_000_000
+        os.utime(obj, ns=(stamp, stamp))
     for profile in ('one','two'):
-        assert make(profile).count('Compiling') == 2
+        assert make(profile).count('Compiling') == 2, 'changed header must rebuild both production object profiles'
         for mode in ('debug','release'):
             obj=root/'build'/mode/profile/'probe.o'
             subprocess.run([compiler,str(obj),'-o',str(root/'probe')],check=True)
@@ -80,6 +84,10 @@ with tempfile.TemporaryDirectory(prefix='rp1-make-clock-deps-') as temp:
                 path.write_text('// Hardware-free Make-rule fixture.\n')
     header = root/'WSPR-Transmitter/src/rp1_gpclk_planner.hpp'
     header.write_text('inline constexpr int parent_hz = 200000000;\n')
+    unchanged = header.stat().st_mtime_ns - 3_600_000_000_000
+    for prerequisite in root.rglob('*'):
+        if prerequisite.is_file() and prerequisite != header:
+            os.utime(prerequisite, ns=(unchanged, unchanged))
     (root/'Makefile').write_text('''Q := @
 BIN_DIR := build/bin
 RP1_GPCLK_PLANNER_TEST_OUT := planner
@@ -100,8 +108,10 @@ all: build/bin/planner build/bin/adapter
     make_executables()
     assert before == [path.stat().st_mtime_ns for path in binaries]
     for parent, expected_exit in ((50000000, 7), (200000000, 0)):
-        time.sleep(1.05)
         header.write_text(f'inline constexpr int parent_hz = {parent};\n')
+        stamp = header.stat().st_mtime_ns - 2_000_000_000
+        for binary in binaries:
+            os.utime(binary, ns=(stamp, stamp))
         make_executables()
         for binary in binaries:
             assert subprocess.run([str(binary)]).returncode == expected_exit, binary

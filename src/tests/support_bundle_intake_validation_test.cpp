@@ -325,6 +325,17 @@ void test_signature_boundary() {
 
 void test_strict_manifest_and_policy() {
     auto fixture = make_fixture();
+    const auto valid = valid_manifest();
+    for (const auto& field : {"schema_version", "project_id", "generation", "published_at", "expires_at",
+                              "minimum_upload_version", "minimum_client_protocol", "request_url", "release_url",
+                              "status", "user_message", "bundle_encryption_key_id"}) {
+        auto missing = valid; missing.erase(field);
+        const auto absent = validate_support_bundle_intake(request_for(fixture, missing.dump()));
+        assert(!absent.valid()); assert_no_manifest_disclosure(absent);
+        auto wrong_type = valid; wrong_type[field] = json::array();
+        const auto wrong = validate_support_bundle_intake(request_for(fixture, wrong_type.dump()));
+        assert(!wrong.valid()); assert_no_manifest_disclosure(wrong);
+    }
     auto manifest = valid_manifest();
     manifest["project_id"] = "other";
     expect(fixture, manifest, SupportBundleIntakeFailure::wrong_project);

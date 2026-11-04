@@ -60,13 +60,17 @@ os.write(1, b'DONE\\n')
 
     def test_startup_partial_line_deadline_and_closed_stdout(self):
         for script, error in [
-            ("import os, time; os.write(1, b'READY'); time.sleep(5)", 'deadline'),
-            ("import os, time; os.close(1); time.sleep(5)", 'closed stdout'),
+            ("import os, sys; os.write(1, b'READY'); os.write(2, b'gate\\n'); sys.stdin.buffer.readline()", 'deadline'),
+            ("import os, sys; os.close(1); os.write(2, b'gate\\n'); sys.stdin.buffer.readline()", 'closed stdout'),
         ]:
             child = subprocess.Popen([sys.executable, '-u', '-c', script],
-                                     stdout=subprocess.PIPE, bufsize=0)
-            started = time.monotonic()
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
             try:
+                with selectors.DefaultSelector() as selector:
+                    selector.register(child.stderr, selectors.EVENT_READ)
+                    self.assertTrue(selector.select(5), 'child never established the intended pipe fault')
+                    self.assertEqual(os.read(child.stderr.fileno(), 16), b'gate\n')
+                started = time.monotonic()
                 with self.assertRaisesRegex(RuntimeError, error):
                     wait_ready(child, timeout=.2)
                 self.assertLess(time.monotonic() - started, 2)
@@ -74,7 +78,16 @@ os.write(1, b'DONE\\n')
                 if child.poll() is None:
                     child.kill()
                 child.wait(timeout=2)
-                child.stdout.close()
+                child.stdin.close(); child.stdout.close(); child.stderr.close()
+
+    def test_malformed_complete_readiness_is_not_admitted(self):
+        for line in ('READY_NOT_READY', 'READY ', 'READY 0', 'READY 65536', 'READY 12 trailing'):
+            child = subprocess.Popen([sys.executable, '-u', '-c', f'print({line!r})'], stdout=subprocess.PIPE, bufsize=0)
+            try:
+                with self.assertRaisesRegex(RuntimeError, 'did not start'):
+                    wait_ready(child, timeout=2)
+            finally:
+                child.wait(timeout=2); child.stdout.close()
 
     def test_fragmented_and_coalesced_lines(self):
         read_fd, write_fd = os.pipe()

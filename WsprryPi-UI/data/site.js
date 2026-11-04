@@ -5089,8 +5089,8 @@ async function isCurrentShaReachableFromBranchHead(currentSha, branchInfo) {
             `${UPDATE_CHECK_API_BASE}/compare/${encodeURIComponent(currentSha)}...${encodeURIComponent(branchInfo.headSha)}`
         );
         const status = typeof data?.status === "string" ? data.status : "";
-        if (!status) {
-            const error = new Error("GitHub compare response did not include a status");
+        if (!["ahead", "behind", "identical", "diverged"].includes(status)) {
+            const error = new Error("GitHub compare response did not include a supported relationship");
             error.code = "malformed_response";
             throw error;
         }
@@ -5279,8 +5279,8 @@ async function compareGithubCommits(currentSha, headSha) {
             `${UPDATE_CHECK_API_BASE}/compare/${encodeURIComponent(currentSha)}...${encodeURIComponent(headSha)}`
         );
         const status = typeof data?.status === "string" ? data.status : "";
-        if (!status) {
-            const error = new Error("GitHub compare response did not include a status");
+        if (!["ahead", "behind", "identical", "diverged"].includes(status)) {
+            const error = new Error("GitHub compare response did not include a supported relationship");
             error.code = "malformed_response";
             throw error;
         }

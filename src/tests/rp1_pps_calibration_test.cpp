@@ -83,6 +83,19 @@ struct Queue {
     bool fail = false;
     bool closed = false;
     Clock::time_point completed_at{};
+    std::chrono::milliseconds watchdog{10000};
+
+    template<class Predicate>
+    void wait(std::unique_lock<std::mutex>& lock, Predicate ready, const char* phase) {
+        const auto started = Clock::now();
+        if (changed.wait_until(lock, started + watchdog, ready)) return;
+        std::ostringstream message;
+        message << "PPS phase " << phase << " deadline: elapsed_ms="
+                << std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count()
+                << ", budget_ms=" << watchdog.count() << ", calls=" << calls
+                << ", pending_samples=" << samples.size() << ", fail=" << fail << ", closed=" << closed;
+        throw std::runtime_error(message.str());
+    }
     std::atomic<unsigned> destroyed{0};
 
     void close() {
@@ -99,9 +112,9 @@ struct FakeCapture : Rp1PpsCapture {
         std::unique_lock lock(queue->mutex);
         ++queue->calls;
         queue->changed.notify_all();
-        queue->changed.wait(lock, [&] {
+        queue->wait(lock, [&] {
             return queue->closed || queue->fail || !queue->samples.empty();
-        });
+        }, "measurement completion");
         if (queue->closed) throw std::runtime_error("test capture closed");
         if (queue->fail) {
             queue->fail = false;
@@ -120,7 +133,7 @@ struct CaptureSession {
         std::cerr << "PPS worker phase: initial capture request\n";
         calibration.snapshot(true);
         std::unique_lock lock(queue->mutex);
-        queue->changed.wait(lock, [&] { return queue->calls >= 1; });
+        queue->wait(lock, [&] { return queue->calls >= 1; }, "initial capture request");
     }
     ~CaptureSession() {
         // Also unblock measure() during assertion-failure stack unwinding.
@@ -130,15 +143,14 @@ struct CaptureSession {
     SystemClockFrequencyEstimate advance(const char* phase,
                                          std::initializer_list<double> samples,
                                          bool fail = false) {
-        // CI's job timeout remains the deadlock watchdog, not a state assertion.
-        // Emit the pending phase before blocking so a stalled handshake is named.
+        // The monotonic stage watchdog bounds an omitted worker acknowledgment.
         std::cerr << "PPS worker phase: " << phase << '\n';
         std::unique_lock lock(queue->mutex);
         const auto target = queue->calls + samples.size() + unsigned(fail);
         queue->samples.insert(queue->samples.end(), samples);
         queue->fail = fail;
         queue->changed.notify_all();
-        queue->changed.wait(lock, [&] { return queue->calls >= target; });
+        queue->wait(lock, [&] { return queue->calls >= target; }, phase);
         require(queue->calls == target, "capture advanced past the requested boundary");
         // Explicit sample time keeps freshness assertions independent of host
         // scheduling. Expiry itself is exercised with explicit time below.
@@ -147,6 +159,20 @@ struct CaptureSession {
         return calibration.snapshot(true, now);
     }
 };
+void omitted_measurement_is_bounded() {
+    auto queue = std::make_shared<Queue>();
+    queue->watchdog = std::chrono::milliseconds(0);
+    FakeCapture capture(queue);
+    try { capture.measure(std::atomic<bool>{false}); require(false, "missing measurement must fail"); }
+    catch (const std::runtime_error& error) {
+        const std::string message = error.what();
+        require(message.find("measurement completion deadline") != std::string::npos &&
+                message.find("calls=1, pending_samples=0") != std::string::npos,
+                "omitted completion reports the actual stalled stage and state");
+    }
+    queue->close();
+    require(queue->closed && queue->samples.empty(), "fault cleanup closes the queue without invented samples");
+}
 template<class Predicate>
 void expect_phase(const char* phase, const SystemClockFrequencyEstimate& s, Predicate p) {
     if (p(s)) return;
@@ -213,6 +239,7 @@ void worker_and_selection() {
 
 int main() {
     try {
+        omitted_measurement_is_bounded();
         instruction_model();
         PPMProviderSnapshot reference;
         const auto now = Clock::now();

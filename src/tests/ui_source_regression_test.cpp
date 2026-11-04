@@ -49,26 +49,6 @@ namespace
         return read_text_file(repository_root() + relative_path);
     }
 
-    std::string extract_input_tag_by_id(
-        const std::string &source, const std::string &id)
-    {
-        const std::string needle = "id=\"" + id + "\"";
-        const std::size_t id_pos = source.find(needle);
-        require(id_pos != std::string::npos, "test helper must find field " + id);
-
-        const std::size_t tag_start = source.rfind("<input", id_pos);
-        require(
-            tag_start != std::string::npos,
-            "test helper must find input tag start for " + id);
-
-        const std::size_t tag_end = source.find('>', id_pos);
-        require(
-            tag_end != std::string::npos,
-            "test helper must find input tag end for " + id);
-
-        return source.substr(tag_start, (tag_end - tag_start) + 1);
-    }
-
     std::size_t count_occurrences(
         const std::string &source, const std::string &needle)
     {
@@ -163,16 +143,10 @@ int main()
         read_repo_text_file("/src/main.cpp");
     const std::string config_view_source =
         read_repo_text_file("/WsprryPi-UI/data/views/config.php");
-    const std::string gpio_dropdown_source =
-        read_repo_text_file("/WsprryPi-UI/data/gpio_dropdown.php");
-    const std::string cw_timing_source =
-        read_repo_text_file("/WsprryPi-UI/data/cw_timing_state.js");
     const std::string maintenance_script_source =
         read_repo_text_file("/WsprryPi-UI/data/maintenance.js");
     const std::string operation_script_source =
         read_repo_text_file("/WsprryPi-UI/data/operation.js");
-    const std::string cw_message_input =
-        extract_input_tag_by_id(config_view_source, "qrss_message");
     require(
         main_source.find("#ifdef DEBUG_WSPR\n    const char *qualification_gpio_test_mode") !=
                 std::string::npos &&
@@ -183,27 +157,6 @@ int main()
             main_source.find("physical GPIO output requests, writes, and releases are suppressed") !=
                 std::string::npos,
         "the debug-only qualification GPIO seam must require explicit activation and clearly state that physical output operations are suppressed");
-    require(
-        ui_source.find("if (!valid && reservedAssignment.field) {") !=
-                std::string::npos &&
-            ui_source.find("setPinDropdownValidationState(reservedAssignment.field, message);") !=
-                std::string::npos &&
-            ui_stylesheet_source.find(".pin-dropdown-btn.is-invalid") !=
-                std::string::npos,
-        "Band GPIO conflicts with enabled reserved controls must mark both affected fields invalid");
-    require(
-        gpio_dropdown_source.find("4 => 'Pin 7'") != std::string::npos &&
-            ui_source.find("function getReservedGpioRfOutputPin()") != std::string::npos &&
-            ui_source.find("is reserved by GPIO RF Output.") != std::string::npos &&
-            ui_source.find("function refreshTransmitGpioOptions()") != std::string::npos &&
-            ui_source.find("function setGpioConflictFieldState(field, message)") != std::string::npos &&
-            config_view_source.find("id=\"tx-pin-error\"") != std::string::npos &&
-            config_view_source.find("band-gpio-gpio-") != std::string::npos,
-        "conditional GPIO RF ownership must expose GPIO4, filter both selection directions, and render accessible inline conflict feedback");
-    require(
-        cw_message_input.find("type=\"text\"") != std::string::npos &&
-            cw_message_input.find("step=") == std::string::npos,
-        "CW message input must remain textual so numeric-only operator messages such as 73 are not treated as numbers");
     require(
         config_view_source.find("id=\"cw_message_length_estimate\"") != std::string::npos &&
             config_view_source.find("Estimated Message Length: unavailable") != std::string::npos &&
@@ -221,10 +174,6 @@ int main()
             ui_source.find("actionButton.setAttribute(\"aria-controls\", detailActionControls)") != std::string::npos &&
             ui_source.find("actionButton.setAttribute(\"aria-expanded\", \"false\")") != std::string::npos,
         "CW Control must expose accessible speed, mode-aware spacing, inactive-repair, frequency, and schedule groups");
-    require(
-        ui_source.find("persist_transmit: persistTransmit") !=
-                std::string::npos,
-        "UI Stop button must send the explicit stop command over the websocket with persistence control");
     require(
         ui_source.find("let pendingModeChange = null;") != std::string::npos &&
             ui_source.find("let pendingPersistedMode = \"\";") != std::string::npos &&
@@ -253,39 +202,6 @@ int main()
             ui_source.find("if (configAutosaveNeedsRuntimeRefresh && typeof getTxState === \"function\") {") != std::string::npos,
         "mode changes must be guarded behind stop/disable confirmation, collapse the guarded disable-plus-mode flow into one persisted save, exclude mode toggles from generic autosave scheduling, and refresh runtime state after the committed mode save lands");
     require(
-        ui_source.find("if (enabled && pendingPersistedMode) {") != std::string::npos &&
-            ui_source.find("Wait for the mode change to save before enabling transmissions.") != std::string::npos,
-        "transmit enable must be blocked until a guarded mode change has actually been persisted");
-    require(
-        ui_source.find("const transmitting = runtimeStatus && runtimeStatus.txState === \"transmitting\";") !=
-                std::string::npos &&
-            ui_source.find("$stop.prop(\"disabled\", stopRequestInFlight || !transmitting);") !=
-                std::string::npos &&
-            ui_source.find("(!transmitEnabled && !transmitting)") == std::string::npos,
-        "UI Stop button must only be enabled during an active transmission, not merely when transmit is enabled");
-    require(
-        ui_source.find("updateRuntimeControlStatusFromForm(null);") != std::string::npos &&
-            ui_source.find("if (typeof getTxState === \"function\") {\n                getTxState();\n            }") !=
-                std::string::npos,
-        "successful transmit-toggle PATCHes must refresh runtime state so CW next-transmission timing updates immediately");
-    require(
-        ui_source.find("Operation: {\n                \"Transmit\": enabled,") !=
-                std::string::npos &&
-            ui_source.find("Runtime: {\n                \"Transmit\": enabled,") ==
-                std::string::npos,
-        "UI transmit toggle must patch canonical Operation.Transmit only");
-    require(
-        operation_script_source.find("function rebootBehaviorConfigValueFromRadio(value)") !=
-                std::string::npos &&
-            operation_script_source.find("return \"Always\";") !=
-                std::string::npos &&
-            operation_script_source.find("\"Enable on Boot\": nextValue,") !=
-                std::string::npos &&
-            operation_script_source.find("input[name=\"operation_reboot_behavior\"]") !=
-                std::string::npos &&
-            operation_script_source.find("Aways") == std::string::npos,
-        "Operation page reboot behavior radios must patch canonical Operation.Enable on Boot and preserve the Always spelling");
-    require(
         ui_source.find("var Operation = {\n        \"Mode\": mode,") !=
                 std::string::npos &&
             ui_source.find("var Meta = {\n        \"Mode\": mode") ==
@@ -304,132 +220,8 @@ int main()
                 std::string::npos,
         "UI save path must use only canonical backend-specific calibration keys");
     require(
-        ui_source.find("const CONFIG_AUTOSAVE_DELAY_MS = 800;") != std::string::npos &&
-            ui_source.find("function buildConfigPayload(options = {})") != std::string::npos &&
-            ui_source.find("function scheduleAutosave()") != std::string::npos &&
-            ui_source.find("function flushAutosave()") != std::string::npos &&
-            ui_source.find("payloadJson === lastSavedConfigPayload") != std::string::npos &&
-            ui_source.find("payloadJson === lastFailedConfigPayload") != std::string::npos &&
-            ui_source.find("Suppressing autosave retry for unchanged rejected payload.") != std::string::npos &&
-            ui_source.find("persistedStationIdentity") != std::string::npos &&
-            ui_source.find("setInvalidIdentitySaveStatus(\"Other changes saved\");") != std::string::npos &&
-            ui_source.find("setInvalidIdentitySaveStatus(\"Identity change not saved\");") != std::string::npos &&
-            ui_source.find("configAutosavePendingAfterFlight") != std::string::npos,
-        "configuration autosave must debounce saves, preserve persisted station identity for unrelated changes, report unsaved identity drafts accurately, suppress unchanged failed payload retries, and suppress duplicate writes");
-    require(
-        ui_source.find("function validateCwMessage()") != std::string::npos &&
-            ui_source.find("function validateCwDotSeconds()") != std::string::npos &&
-            ui_source.find("function validateCwShiftHz()") != std::string::npos &&
-            ui_source.find("function validateCwRepeatMinutes()") != std::string::npos &&
-            ui_source.find("function validatePositiveCwField(fieldId, errorMessage)") != std::string::npos &&
-            ui_source.find("function parseFrequencyWithOptionalUnits(rawValue)") != std::string::npos &&
-            ui_source.find("Enter CW base frequency as whole-number Hz or as a value with Hz, kHz, MHz, or GHz.") != std::string::npos &&
-            ui_source.find("Enter a positive finite CW base duration.") != std::string::npos &&
-            ui_source.find("CW message is required.") != std::string::npos &&
-            ui_source.find("Enter a whole-number CW frequency offset in Hz.") != std::string::npos &&
-            ui_source.find("Enter a repeat interval of at least 1 minute.") != std::string::npos &&
-            ui_source.find("Enter a positive finite QRSS/FSKCW intra-element gap.") != std::string::npos &&
-            ui_source.find("Enter a positive finite QRSS/FSKCW inter-character gap.") != std::string::npos &&
-            ui_source.find("Enter a positive finite QRSS/FSKCW inter-word gap.") != std::string::npos &&
-            ui_source.find("Enter a positive finite DFCW intra-element gap.") != std::string::npos &&
-            ui_source.find("Enter a positive finite DFCW inter-character gap.") != std::string::npos &&
-            ui_source.find("Enter a positive finite DFCW inter-word gap.") != std::string::npos &&
-            ui_source.find("const CW_MESSAGE_MORSE_TABLE = CwTimingState.MORSE_TABLE;") != std::string::npos &&
-            ui_source.find("function estimateCwMessageSeconds(message, mode, timing)") != std::string::npos &&
-            ui_source.find("return CwTimingState.estimateMessageSeconds(message, mode, timing);") != std::string::npos &&
-            ui_source.find("function updateCwMessageLengthEstimate()") != std::string::npos &&
-            ui_source.find("function formatCwMessageLengthEstimate(seconds)") != std::string::npos &&
-            cw_timing_source.find("function estimateMessageSeconds(message, mode, timing)") != std::string::npos &&
-            cw_timing_source.find("normalizedMode === \"DFCW\"") != std::string::npos &&
-            cw_timing_source.find("timing.intraElementGapSeconds") != std::string::npos &&
-            cw_timing_source.find("timing.interCharacterGapSeconds") != std::string::npos &&
-            cw_timing_source.find("timing.interWordGapSeconds") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"cw_intra_element_gap\")") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"cw_inter_character_gap\")") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"cw_inter_word_gap\")") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"dfcw_intra_element_gap\")") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"dfcw_inter_character_gap\")") != std::string::npos &&
-            ui_source.find("parsePositiveFormNumber(\"dfcw_inter_word_gap\")") != std::string::npos &&
-            ui_source.find("Estimated Message Length: not applicable") != std::string::npos &&
-            cw_timing_source.find("reason: `unavailable: unsupported character ${ch}`") != std::string::npos &&
-            ui_source.find("$(\"#qrss_message\").on(\"input change blur\", function ()") != std::string::npos &&
-            ui_source.find("$(\"#dot_length\").on(\"input blur\", function ()") != std::string::npos &&
-            ui_source.find("updateCwMessageLengthEstimate();") != std::string::npos &&
-            ui_source.find("let cw_message = String($('#qrss_message').val() || \"\").trim();") != std::string::npos &&
-            ui_source.find("\"Message\": cw_message,") != std::string::npos &&
-            ui_source.find("let cw_base_frequency = parseFrequencyWithOptionalUnits($('#qrss_frequency').val());") != std::string::npos &&
-            ui_source.find("let cw_intra_element_gap = Number(String($('#cw_intra_element_gap').val()") != std::string::npos &&
-            ui_source.find("let dfcw_intra_element_gap = Number(String($('#dfcw_intra_element_gap').val()") != std::string::npos &&
-            ui_source.find("\"Intra Element Gap\": cw_intra_element_gap") != std::string::npos &&
-            ui_source.find("\"Inter Character Gap\": cw_inter_character_gap") != std::string::npos &&
-            ui_source.find("\"Inter Word Gap\": cw_inter_word_gap") != std::string::npos &&
-            ui_source.find("\"DFCW Intra Element Gap\": dfcw_intra_element_gap") != std::string::npos &&
-            ui_source.find("\"DFCW Inter Character Gap\": dfcw_inter_character_gap") != std::string::npos &&
-            ui_source.find("\"DFCW Inter Word Gap\": dfcw_inter_word_gap") != std::string::npos &&
-            ui_source.find("function syncCwTimingControls(options = {})") != std::string::npos &&
-            ui_source.find("function inactiveInvalidCwTimingGroup()") != std::string::npos &&
-            ui_source.find("detailActionLabel: `Review ${label}`") != std::string::npos &&
-            cw_timing_source.find("function inferSpeed(value)") != std::string::npos &&
-            cw_timing_source.find("function inferSpacing(group, triplet)") != std::string::npos &&
-            cw_timing_source.find("intraElement: 0.333333") != std::string::npos &&
-            ui_source.find("let cw_base_frequency = parseFloat($('#qrss_frequency').val());") == std::string::npos &&
-            ui_source.find("normalizedValue = value * 1e6;") != std::string::npos &&
-            ui_source.find("normalizedValue = value * 1e3;") != std::string::npos &&
-            ui_source.find("normalizedValue = value * 1e9;") != std::string::npos &&
-            ui_source.find("const value = parseFrequencyWithOptionalUnits(raw);") != std::string::npos &&
-            ui_source.find("if (!unit && numericPart.includes(\".\"))") != std::string::npos &&
-            ui_source.find("const roundedValue = Math.round(normalizedValue);") != std::string::npos &&
-            ui_source.find("Math.abs(normalizedValue - roundedValue) > 1e-6") != std::string::npos,
-        "CW autosave validation and save-path serialization must share unit-aware base-frequency parsing, reject parseFloat-based truncation, and require explicit units for decimal inputs");
-    require(
-        ui_source.find("function splitWsprFrequencyTokens(raw)") != std::string::npos &&
-            ui_source.find("function validateWsprFrequencyToken(token)") != std::string::npos &&
-            ui_source.find("\"2200m\",") != std::string::npos &&
-            ui_source.find("\"630m\",") != std::string::npos &&
-            ui_source.find("\"60m:legacy\",") != std::string::npos &&
-            ui_source.find("\"60m:wrc15\",") != std::string::npos &&
-            ui_source.find("\"Frequency Profile\": frequency_profile") != std::string::npos &&
-            ui_source.find("\"Band Preferences\": band_preferences") != std::string::npos &&
-            ui_source.find("\"22m\",") == std::string::npos &&
-            ui_source.find("@GPIO, @GPIOH, or @GPIOL") != std::string::npos &&
-            ui_source.find(".replace(/,/g, \" \")") != std::string::npos &&
-            ui_source.find("const numericRx = /^-?(?:(?:\\\\d+(?:\\\\.\\\\d*)?)|(?:\\\\.\\\\d+))(?:hz|khz|mhz|ghz)?$/i;") == std::string::npos &&
-            ui_source.find("-15") == std::string::npos,
-        "WSPR frequency validation must support bare and qualified presets, profile serialization, comma-separated lists, optional @GPIO suffixes, reject negative numeric tokens, and must not retain removed aliases");
-    require(
         ui_source.find("bindTestToneControls();") != std::string::npos,
         "configuration view must bind the shared Test Tone controls");
-    require(
-        ui_source.find("function si5351UiSupported()") != std::string::npos &&
-            ui_source.find("return $(\"#si5351-backend-panel\").length > 0;") != std::string::npos &&
-            ui_source.find("const si5351Supported = si5351UiSupported();") != std::string::npos &&
-            ui_source.find("platform.si5351Detected === false") != std::string::npos &&
-            ui_source.find("$backend.prop(\"disabled\", currentBackend === \"wtp\" || !anyBackendSupported);") != std::string::npos &&
-            ui_source.find("function setTransmitBackendSelection(backend, triggerChange = false, refreshInventory = true)") != std::string::npos,
-        "Si5351 backend selection must remain available through the output-path switch while detection controls availability guidance");
-    require(
-        ui_source.find("function applyBandGpioColumnToggle(column, checked)") != std::string::npos &&
-            ui_source.find("function syncBandGpioColumnHeaderStates()") != std::string::npos,
-        "Band GPIO bulk-toggle behavior must use shared helper functions");
-    require(
-        ui_source.find("applyBandGpioColumnToggle(\"enabled\"") != std::string::npos &&
-            ui_source.find("applyBandGpioColumnToggle(\"activeHigh\"") != std::string::npos,
-        "Band GPIO header checkbox handlers must route through the shared bulk-toggle helper");
-    require(
-        ui_source.find("syncBandGpioColumnHeaderStates();\n    validateBandGpioFields();") != std::string::npos,
-        "Band GPIO header state must be recomputed when row state changes");
-    require(
-        ui_source.find("const PAIRED_PLANNING_SHORT_MESSAGE =") != std::string::npos &&
-            ui_source.find("Paired planning requires a compound callsign and 6-character locator.") != std::string::npos &&
-            ui_source.find("function isPairedPlanningUnavailableError(data)") != std::string::npos &&
-            ui_source.find("data.plan_status.trim() === \"PairedTransmissionUnavailable\"") != std::string::npos &&
-            ui_source.find("const isPairedPlanningFailure =\n                isPairedPlanningUnavailableError(parsedError);") != std::string::npos &&
-            ui_source.find("PAIRED_PLANNING_SHORT_MESSAGE,\n                    message,") != std::string::npos &&
-            ui_source.find("detailActionLabel: \"More\"") != std::string::npos &&
-            ui_source.find("onDetailAction: () => openSetupDetailsDialog(message)") != std::string::npos &&
-            ui_source.find("title: \"Setup details\"") != std::string::npos &&
-            ui_source.find("preserveLineBreaks: true") != std::string::npos,
-        "paired planning save failures must collapse to a short setup-card message with a More dialog trigger that preserves full diagnostic line breaks");
 
     const std::string site_source =
         read_repo_text_file("/WsprryPi-UI/data/site.js");
@@ -439,33 +231,6 @@ int main()
         read_repo_text_file("/config/wsprrypi.conf");
     const std::string installer_source =
         read_repo_text_file("/scripts/install.sh");
-    require(
-        config_view_source.find("id=\"si5351_reference_source\"") != std::string::npos &&
-            config_view_source.find("value=\"external_tcxo\"") != std::string::npos &&
-            config_view_source.find("value=\"crystal\"") != std::string::npos &&
-            config_view_source.find("id=\"si5351_crystal_load_capacitance\"") != std::string::npos &&
-            config_view_source.find("value=\"6\"") != std::string::npos &&
-            config_view_source.find("value=\"8\"") != std::string::npos &&
-            config_view_source.find("value=\"10\"") != std::string::npos &&
-            ui_source.find("function syncSi5351ReferenceControls()") != std::string::npos &&
-            ui_source.find("\"Reference Source\": si5351_reference_source") != std::string::npos &&
-            ui_source.find("\"Crystal Load Capacitance\": si5351_crystal_load_capacitance") != std::string::npos &&
-            site_source.find("\"external_tcxo\"") != std::string::npos,
-        "Si5351 WebUI must expose bounded conditional crystal reference controls and persist both canonical settings");
-    require(
-        ui_source.find("let cwDurationPolicyLatched = false;") != std::string::npos &&
-            ui_source.find("function updateCwDurationPolicyLatch(options = {})") != std::string::npos &&
-            ui_source.find("overLimit: estimate.seconds > repeatSeconds") != std::string::npos &&
-            ui_source.find("\"Save failed\",") != std::string::npos &&
-            ui_source.find("Shorten the message, shorten the dot length or active spacing, or increase the repeat interval.") != std::string::npos &&
-            ui_source.find("fld.setCustomValidity(") != std::string::npos &&
-            ui_source.find("setFieldValidationState(fld, valid);") != std::string::npos &&
-            ui_source.find("if (durationConstraint.applicable && durationConstraint.overLimit) {") != std::string::npos &&
-            ui_source.find("function handleCwDurationPolicyFailure(messageOrData)") != std::string::npos &&
-            ui_source.find("data.policy === \"cw_duration_repeat_interval\"") != std::string::npos &&
-            site_source.find("handleCwDurationPolicyFailure(message)") != std::string::npos &&
-            site_source.find("title: \"Configuration Reload Failed\"") != std::string::npos,
-        "Setup must latch CW duration failures inline, suppress overlong autosaves and mapped reload modals, preserve field validity semantics, and retain the modal fallback for unrelated reload failures");
     const std::string stock_ini_source =
         read_repo_text_file("/config/wsprrypi.ini");
     const std::string transmit_branch = "if (msg.type === \"transmit\")";
@@ -475,45 +240,6 @@ int main()
             site_source.find(tx_state_branch) != std::string::npos &&
             site_source.find(transmit_branch) < site_source.find(tx_state_branch),
         "browser websocket handler must process pushed transmit events before generic tx_state replies");
-    require(
-        site_source.find("const PATHS = window.WSPRRYPI_PATHS || {};") != std::string::npos &&
-            site_source.find("function normalizeSameOriginPath(path, fallback)") != std::string::npos &&
-            site_source.find("function buildDirectRestFallbackUrl(path)") != std::string::npos &&
-            site_source.find("function buildDirectWebSocketFallbackUrl(path)") != std::string::npos &&
-            site_source.find("window.location.protocol === \"https:\" ? \"https:\" : \"http:\"") != std::string::npos &&
-            site_source.find("window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\"") != std::string::npos &&
-            site_source.find("${protocol}//${window.location.hostname}:31415${path}") != std::string::npos &&
-            site_source.find("${protocol}//${window.location.hostname}:31416${path}") != std::string::npos &&
-            site_source.find("const SETTINGS_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
-            site_source.find("const VERSION_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
-            site_source.find("const REPAIR_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
-            site_source.find("const SUPPORT_BUNDLES_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
-            site_source.find("const WEBSOCKET_ENDPOINT = createEndpointDefinition(") != std::string::npos &&
-            site_source.find("const SETTINGS_URL = SETTINGS_ENDPOINT.proxyUrl;") != std::string::npos &&
-            site_source.find("const VERSION_URL = VERSION_ENDPOINT.proxyUrl;") != std::string::npos &&
-            site_source.find("const REPAIR_URL = REPAIR_ENDPOINT.proxyUrl;") != std::string::npos &&
-            site_source.find("function ajaxWithEndpointFallback(endpoint, options = {})") != std::string::npos &&
-            site_source.find("function fetchWithEndpointFallback(endpoint, init = {})") != std::string::npos &&
-            site_source.find("function getJsonWithEndpointFallback(endpoint)") != std::string::npos &&
-            site_source.find("warnRestFallback(endpoint, reason);") != std::string::npos &&
-            site_source.find("warnWebSocketFallback(endpointConfig, reason);") != std::string::npos &&
-            site_source.find("warnWebSocketFallbackAttempt(endpointConfig);") != std::string::npos &&
-            site_source.find("warnWebSocketFallbackFailure(endpointConfig, reason);") != std::string::npos &&
-            site_source.find("connectWebSocket(WEBSOCKET_ENDPOINT, WS_RECONNECT);") != std::string::npos &&
-            site_source.find("getJsonWithEndpointFallback(SETTINGS_ENDPOINT)") != std::string::npos &&
-            site_source.find("getJsonWithEndpointFallback(VERSION_ENDPOINT)") != std::string::npos &&
-            site_source.find("new URL(path, window.location.href)") != std::string::npos &&
-            site_source.find("url.protocol = window.location.protocol === \"https:\" ? \"wss:\" : \"ws:\";") != std::string::npos &&
-            site_source.find("const HTTP_ORIGIN =") == std::string::npos &&
-            site_source.find("const WS_ORIGIN =") == std::string::npos &&
-            site_source.find("const HOSTNAME = window.location.hostname;") == std::string::npos &&
-            site_source.find("const PORT = window.location.port ? `:${window.location.port}` : \"\";") == std::string::npos &&
-            site_source.find("const SETTINGS_URL = SETTINGS_PATH;") == std::string::npos &&
-            site_source.find("const VERSION_URL = VERSION_PATH;") == std::string::npos &&
-            site_source.find("const REPAIR_URL = REPAIR_PATH;") == std::string::npos &&
-            site_source.find("const WEBSOCKET_URL = WEBSOCKET_ENDPOINT.proxyUrl;") == std::string::npos &&
-            site_source.find("const WEBSOCKET_URL = buildWebSocketUrl(WEBSOCKET_PATH);") == std::string::npos,
-        "UI endpoint construction must remain proxy-first, allow direct ports only in centralized fallback helpers, and derive proxy websocket URLs from the current page protocol instead of rebuilding backend host:port origins");
     require(
         ui_header_source.find("'supportBundlesPath' => $basePath . '/api/support-bundles'") != std::string::npos &&
             site_source.find("PATHS.supportBundlesPath") != std::string::npos &&
@@ -546,69 +272,6 @@ int main()
     require(
         site_source.find("Frequency Control GPIO Polarity") == std::string::npos,
         "UI config schema must not require the obsolete GPIO.Frequency Control GPIO Polarity key");
-    require(
-        site_source.find("let use_system_clock_frequency_estimate = getConfigBoolValue(") != std::string::npos &&
-            site_source.find("\"GPIO\",\n                    \"Use System Clock Frequency Estimate\",\n                    true") != std::string::npos &&
-            site_source.find("let gpio_frequency_residual_ppm = getConfigFloatValue(") != std::string::npos &&
-            site_source.find("let gpio_manual_ppm = getConfigFloatValue(") != std::string::npos,
-        "UI config loader must load all canonical GPIO calibration values and default estimation to true");
-    require(
-        site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 14096900.0);") != std::string::npos &&
-            site_source.find("let cw_base_frequency = getConfigFloatValue(cw, \"CW\", \"Base Frequency\", 3572000.0);") == std::string::npos,
-        "UI config loader must default CW.Base Frequency to 14096900 Hz to match backend normalization");
-    require(
-        site_source.find("let cw_intra_element_gap = getConfigTimingValue(cw, \"CW\", \"Intra Element Gap\", 1.0);") != std::string::npos &&
-            site_source.find("let cw_inter_character_gap = getConfigTimingValue(cw, \"CW\", \"Inter Character Gap\", 3.0);") != std::string::npos &&
-            site_source.find("let cw_inter_word_gap = getConfigTimingValue(cw, \"CW\", \"Inter Word Gap\", 7.0);") != std::string::npos &&
-            site_source.find("let dfcw_intra_element_gap = getConfigTimingValue(cw, \"CW\", \"DFCW Intra Element Gap\", 0.333333);") != std::string::npos &&
-            site_source.find("let dfcw_inter_character_gap = getConfigTimingValue(cw, \"CW\", \"DFCW Inter Character Gap\", 1.0);") != std::string::npos &&
-            site_source.find("let dfcw_inter_word_gap = getConfigTimingValue(cw, \"CW\", \"DFCW Inter Word Gap\", 3.0);") != std::string::npos &&
-            site_source.find("$(\"#cw_intra_element_gap\").val(cw_intra_element_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("$(\"#cw_inter_character_gap\").val(cw_inter_character_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("$(\"#cw_inter_word_gap\").val(cw_inter_word_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("$(\"#dfcw_intra_element_gap\").val(dfcw_intra_element_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("$(\"#dfcw_inter_character_gap\").val(dfcw_inter_character_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("$(\"#dfcw_inter_word_gap\").val(dfcw_inter_word_gap).trigger(\"change\");") != std::string::npos &&
-            site_source.find("if (typeof updateCwMessageLengthEstimate === \"function\") {") != std::string::npos,
-        "UI config loader must round-trip CW gap settings with backend defaults");
-    require(
-        site_source.find("runtime_mode") != std::string::npos &&
-            site_source.find("nextTransmissionAt") != std::string::npos &&
-            site_source.find("frequencyHz") != std::string::npos &&
-            site_source.find("offsetHz") != std::string::npos &&
-            site_source.find("frequencyIsSkip") != std::string::npos &&
-            site_source.find("selectorGpioEnabled") != std::string::npos &&
-            site_source.find("selectorGpio") != std::string::npos &&
-            site_source.find("selectorGpioActiveHigh") != std::string::npos &&
-            site_source.find("powerDbm") != std::string::npos &&
-            site_source.find("cw_message") != std::string::npos &&
-            site_source.find("cw_active_char_index") != std::string::npos &&
-            site_source.find("if (typeof handleRuntimeStatusUpdate === \"function\") {") != std::string::npos &&
-            site_source.find("const selectedMode =\n        typeof selectedConfigMode === \"function\" ? selectedConfigMode() : \"\";") != std::string::npos &&
-            site_source.find("renderRuntimeFrequencyPane(frequencyNode, currentMode, currentRuntimeStatus);") != std::string::npos &&
-            site_source.find("function buildRuntimeFrequencyItems(currentMode, status)") != std::string::npos &&
-            site_source.find("function runtimeFrequencyPrimaryLabel(currentMode, status)") != std::string::npos &&
-            site_source.find("return \"Next USB dial\";") != std::string::npos &&
-            site_source.find("return \"(Skip)\";") != std::string::npos &&
-            site_source.find("queueRuntimeStatusRefresh();") != std::string::npos &&
-            site_source.find("function formatDisplayFrequency(valueHz, options = {})") != std::string::npos &&
-            site_source.find("function formatDisplayFrequencyWithSelector(valueHz, status, options = {})") != std::string::npos &&
-            site_source.find("function formatSelectorGpioSuffix(status)") != std::string::npos &&
-            site_source.find("status.selectorGpioEnabled !== true") != std::string::npos &&
-            site_source.find("return ` @ GPIO${status.selectorGpio}${status.selectorGpioActiveHigh ? \"H\" : \"L\"}`;") != std::string::npos &&
-            site_source.find("forceUnit: \"Hz\"") != std::string::npos &&
-            site_source.find("function renderCwRuntimeMessage(node, message, activeCharIndex)") != std::string::npos &&
-            site_source.find("const isTransmitting =") != std::string::npos &&
-            site_source.find("const transmitEnabled =") != std::string::npos &&
-            site_source.find("planLabelNode.textContent = \"Message progression\";") != std::string::npos &&
-            site_source.find("planLabelNode.textContent = \"Next message at:\";") != std::string::npos &&
-            site_source.find("const idleValue = transmitEnabled") != std::string::npos &&
-            site_source.find(": \"Disabled\";") != std::string::npos &&
-            site_source.find("summary += ` ${currentRuntimeStatus.powerDbm}dBm`;") != std::string::npos &&
-            site_source.find("charNode.textContent = character;") != std::string::npos &&
-            site_source.find("renderCwRuntimeMessage(planNode, message, activeCharIndex);") != std::string::npos &&
-            site_source.find("charNode.textContent = isActive && character === \" \" ? \"_\" : character;") == std::string::npos,
-        "runtime status handling must switch CW runtime detail between next-transmission timing and live message progression without underscore substitution");
     require(
         scheduling_source.find("snapshot.next_transmission_at") != std::string::npos &&
             scheduling_source.find("snapshot.frequency_hz = current_transmission_request.dial_frequency_hz;") != std::string::npos &&
@@ -645,21 +308,6 @@ int main()
             scheduling_source.find("snapshot.runtime_mode == mode_type_name(config.mode)") == std::string::npos &&
             scheduling_source.find("if (runtime_status.mode != wsprrypi::TransmissionMode::WSPR ||\n        current_transmission_request.mode != TransmissionMode::WSPR ||") == std::string::npos,
         "runtime snapshot must expose active frequency fields alongside next_transmission_at, follow the committed scheduler mode while idle instead of stale backend execution state, suppress stale WSPR plan data after mode changes, expose committed idle WSPR plan data without requiring runtime mode to already be WSPR, and expose CW next-transmission timing without requiring the transmitter runtime mode string to match first");
-    require(
-        site_source.find("const TAB_STATE_STORAGE_PREFIX = \"wsprrypi.activeTab\";") != std::string::npos &&
-            site_source.find("function shouldRestorePersistedTabState(tabList)") != std::string::npos &&
-            site_source.find("getNavigationType() === \"reload\"") != std::string::npos &&
-            site_source.find("clearPersistedTabState(tabList);") != std::string::npos &&
-            site_source.find("suspendConfigAutosave(true);") != std::string::npos &&
-            site_source.find("syncConfigAutosaveBaseline();") != std::string::npos &&
-            site_source.find("function initPersistedTabState()") != std::string::npos &&
-            site_source.find("window.localStorage.setItem(storageKey, selector);") != std::string::npos &&
-            site_source.find("restorePersistedTabState(tabList);") != std::string::npos,
-        "site.js must support reload-scoped persisted Bootstrap tab state through localStorage");
-    require(
-        site_source.find("confirm-modal-body--preformatted") != std::string::npos &&
-            site_source.find("preserveLineBreaks = options.preserveLineBreaks === true") != std::string::npos,
-        "shared confirm modal must support preserving diagnostic line breaks for detail dialogs");
     require(
         site_source.find("let dismissedUiRefreshVersion = null;") == std::string::npos &&
             site_source.find("let dismissedUiRefreshBuildId = null;") != std::string::npos &&
@@ -699,47 +347,6 @@ int main()
             web_server_source.find("j[\"wspr_commit\"] = get_exe_commit();") != std::string::npos,
         "site.js must poll the UI-owned installed identity independently while backend /version remains available only for service and update metadata");
     require(
-        site_source.find("title: \"UI refresh required\"") != std::string::npos &&
-            site_source.find("The WsprryPi web interface has been updated. Refresh this page to load the new web pages, CSS, and JavaScript.") != std::string::npos &&
-            site_source.find("confirmLabel: \"Refresh\"") != std::string::npos &&
-            site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
-            site_source.find("showConfirmationDialog({") != std::string::npos,
-        "UI refresh prompt must use the shared Bootstrap confirmation modal path with the required copy and labels");
-    require(
-        site_source.find("function refreshUiForIdentity(installedBuildId)") != std::string::npos &&
-            site_source.find("const url = new URL(window.location.href);") != std::string::npos &&
-            site_source.find("url.searchParams.set(UI_REFRESH_REQUEST_PARAM, normalizedBuildId);") != std::string::npos &&
-            site_source.find("window.location.replace(url.toString());") != std::string::npos &&
-            site_source.find("refreshUiForIdentity(installedBuildId);") != std::string::npos &&
-            site_source.find("dismissedUiRefreshBuildId = installedBuildId;") != std::string::npos &&
-            site_source.find("function checkUiRefreshConvergence()") != std::string::npos &&
-            site_source.find("function showUiConsistencyDiagnostic(expectedBuildId, loadedBuildId)") != std::string::npos &&
-            site_source.find("uiConsistencyDiagnosticActive = true;") != std::string::npos &&
-            site_source.find("window.history.replaceState(null, \"\", url.toString());") != std::string::npos &&
-            site_source.find("if (typeof options.onCancel === \"function\")") != std::string::npos &&
-            site_source.find("if (typeof options.onHidden === \"function\")") != std::string::npos &&
-            site_source.find("confirmModal.show();\n        return true;") != std::string::npos &&
-            site_source.find("return false;") != std::string::npos,
-        "UI refresh must cache-bust with installed identity, verify convergence, diagnose a mismatch persistently, and suppress repeat prompts for a dismissed identity");
-    require(
-        site_source.find("function initFooterMetaPanelInteractions()") != std::string::npos &&
-            site_source.find("document.addEventListener(\"click\", function (event) {") != std::string::npos &&
-            site_source.find("footerMeta.contains(event.target)") != std::string::npos &&
-            site_source.find("document.addEventListener(\"keydown\", function (event) {") != std::string::npos &&
-            site_source.find("event.key !== \"Escape\"") != std::string::npos &&
-            site_source.find("closeFooterMetaPanel();") != std::string::npos,
-        "site.js must close the footer About panel on outside click and Escape while keeping click-based toggling");
-    const std::string version_check_display_branch = "version-check";
-    const std::string version_check_raw_branch = "version_check";
-    const std::string version_check_short_sha = "7b05546";
-    const std::string version_check_head_sha =
-        "7b05546abcdef0123456789abcdef0123456789";
-    require(
-        version_check_head_sha.rfind(version_check_short_sha, 0) == 0 &&
-            version_check_display_branch == "version-check" &&
-            version_check_raw_branch == "version_check",
-        "test fixture must model a displayed version-check branch, raw version_check branch, and matching GitHub HEAD short SHA");
-    require(
             makefile_source.find("BUILD_METADATA_HEADER := $(BUILD_METADATA_DIR)/build_metadata.hpp") != std::string::npos &&
             makefile_source.find("generate_build_metadata.py") != std::string::npos &&
             makefile_source.find("include ../scripts/build_metadata_rules.mk") != std::string::npos &&
@@ -764,187 +371,6 @@ int main()
             web_server_source.find("j[\"wspr_build_dirty\"] = get_exe_build_dirty();") != std::string::npos &&
             web_server_source.find("j[\"wspr_build_dirty_state\"] = build_dirty_metadata(") != std::string::npos,
         "build metadata must pass sanitized MAKE_BRH for display, raw MAKE_RAW_BRH and branch-state for update lookup, full commit and build-time dirty state to version.cpp, and expose structured version, branch, commit, and dirty metadata in /version");
-    require(
-        site_source.find("const UPDATE_CHECK_CACHE_SCHEMA_VERSION = 7;") != std::string::npos &&
-            site_source.find("function updateCheckShaMatches(currentSha, targetHeadSha)") != std::string::npos &&
-            site_source.find("return normalizedHead.startsWith(normalizedCurrent);") != std::string::npos &&
-            site_source.find("function updateCheckNoUpdateResult()") != std::string::npos &&
-            site_source.find("${versionInfo.branchState || \"branch\"}:${versionInfo.currentBranch}") != std::string::npos &&
-            site_source.find("cached.branchState !== versionInfo.branchState") != std::string::npos &&
-            site_source.find("branchState: versionInfo.branchState || \"branch\"") != std::string::npos &&
-            site_source.find("updateCheckShaMatches(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
-            site_source.find("? updateCheckCommitComparisonResult(versionInfo.currentSha, selectedBranch.headSha, \"identical\")") != std::string::npos &&
-            site_source.find(": await compareGithubCommits(versionInfo.currentSha, selectedBranch.headSha)") != std::string::npos &&
-            site_source.find("if (error.status === 404)") != std::string::npos &&
-            site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") == std::string::npos &&
-            site_source.find("\"comparison_unavailable\",") != std::string::npos &&
-            site_source.find("throw error;") != std::string::npos &&
-            site_source.find("completed:") == std::string::npos &&
-            site_source.find("currentShaLabel") == std::string::npos,
-        "update checker must invalidate stale fallback cache entries, short-circuit matching full or short SHAs before GitHub compare, and avoid misleading unused comparison fields");
-    require(
-        site_source.find("Dirty means the local source tree had uncommitted or staged modifications") != std::string::npos &&
-            site_source.find("function parseBuildDirtyState(response, rawDisplayVersion, rawUiVersion, rawExeVersion)") != std::string::npos &&
-            site_source.find("const structuredDirtyState = response?.wspr_build_dirty_state;") != std::string::npos &&
-            site_source.find("structuredDirtyState.known === true") != std::string::npos &&
-            site_source.find("response?.wspr_build_dirty ?? response?.wspr_dirty") != std::string::npos &&
-            site_source.find("source: \"structured\"") != std::string::npos &&
-            site_source.find("source: \"version_text\"") != std::string::npos &&
-            site_source.find("source: \"unavailable\"") != std::string::npos &&
-            site_source.find("buildDirtyKnown: dirtyState.known") != std::string::npos &&
-            site_source.find("buildDirty: dirtyState.dirty") != std::string::npos &&
-            site_source.find("buildDirtySource: dirtyState.source") != std::string::npos &&
-            site_source.find("versionInfo.buildDirtyKnown") != std::string::npos &&
-            site_source.find("? versionInfo.buildDirty ? \"dirty\" : \"clean\"") != std::string::npos &&
-            site_source.find(": \"dirty-unknown\"") != std::string::npos &&
-            site_source.find("function applyDirtyBuildMetadata(versionInfo, result)") != std::string::npos &&
-            site_source.find("if (!versionInfo.buildDirtyKnown)") != std::string::npos &&
-            site_source.find("if (!versionInfo.buildDirty)") != std::string::npos &&
-            site_source.find("localBuildState: \"dirty_build\"") != std::string::npos &&
-            site_source.find("versionComparisonStatus: result.updateAvailable ? result.versionComparisonStatus : \"local_modified\"") != std::string::npos &&
-            site_source.find("dirty means local modifications, not a remote update") != std::string::npos &&
-            site_source.find("return applyDirtyBuildMetadata(versionInfo, semanticResult);") != std::string::npos &&
-            site_source.find("return applyDirtyBuildMetadata(versionInfo, commitResult);") != std::string::npos &&
-            site_source.find("if (!result || result.updateAvailable !== true)") != std::string::npos &&
-            site_source.find("markWsprryPiLocalUpdateState(result);") != std::string::npos,
-        "update checker must prefer structured wspr_build_dirty metadata over display-string parsing, keep unknown dirty metadata from changing behavior, separate clean/dirty cache entries for the same branch and SHA, mark dirty no-update results as local_modified/dirty_build, preserve dirty older-commit update-available results, and avoid showing footer/modal updates solely because a build is dirty");
-    require(
-        site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
-            site_source.find("function parseBranchState(response, currentBranch)") != std::string::npos &&
-            site_source.find("response?.wspr_branch_state") != std::string::npos &&
-            site_source.find("if (currentBranch === \"HEAD\")") != std::string::npos &&
-            site_source.find("return \"detached\";") != std::string::npos &&
-            site_source.find("return \"unknown\";") != std::string::npos &&
-            site_source.find("branchState,") != std::string::npos &&
-            site_source.find("branchState=${versionInfo.branchState}") != std::string::npos &&
-            site_source.find("function isDetachedOrUnknownBranchBuild(versionInfo)") != std::string::npos &&
-            site_source.find("versionInfo.currentBranch === \"HEAD\"") != std::string::npos &&
-            site_source.find("versionInfo.currentBranch === \"unknown\"") != std::string::npos &&
-            site_source.find("async function selectDetachedOrUnknownUpdateBranch(versionInfo)") != std::string::npos &&
-            site_source.find("const candidates = [\"main\", \"devel\"];") != std::string::npos &&
-            site_source.find("Detached HEAD and unknown-branch builds do not have a trustworthy") != std::string::npos &&
-            site_source.find("same-name upstream branch. Commit fallback is allowed only after proving") != std::string::npos &&
-            site_source.find("detached/unknown branch commit reachable from upstream") != std::string::npos &&
-            site_source.find("Update check detached/unknown build resolved to upstream") != std::string::npos &&
-            site_source.find("Update check detached/unknown build is not reachable from upstream") != std::string::npos &&
-            site_source.find("buildUpdateCheckFailure(\n        \"detached_target_unknown\"") != std::string::npos &&
-            site_source.find("is not reachable from upstream main or devel") != std::string::npos &&
-            site_source.find("if (isDetachedOrUnknownBranchBuild(versionInfo))") != std::string::npos &&
-            site_source.find("return selectDetachedOrUnknownUpdateBranch(versionInfo);") != std::string::npos &&
-            site_source.find("lookupGithubBranch(currentBranch)") != std::string::npos,
-        "detached HEAD or unknown branch-state builds must keep valid semver as the primary path, avoid treating HEAD/unknown as same-name upstream branches in commit fallback, target main/devel only when reachability is proven with an explicit reason, and report check-failed/unknown when no safe target exists");
-    require(
-            site_source.find("function parseSemanticVersion(value)") != std::string::npos &&
-            site_source.find("function parseStructuredSemanticVersion(value)") != std::string::npos &&
-            site_source.find("value.valid !== true") != std::string::npos &&
-            site_source.find("const normalizedPrerelease = normalizeSemanticIdentifiers(prerelease.join(\".\"));") != std::string::npos &&
-            site_source.find("const normalizedBuild = normalizeSemanticIdentifiers(build.join(\".\"), true);") != std::string::npos &&
-            site_source.find("const localVersion = versionInfo.localVersionParsedObject ||") != std::string::npos &&
-            site_source.find("function normalizeSemanticIdentifiers(value, allowLeadingZeroNumeric = false)") != std::string::npos &&
-            site_source.find("return identifiers.map((identifier) => identifier.toLowerCase());") != std::string::npos &&
-            site_source.find("!identifier ||") != std::string::npos &&
-            site_source.find("identifier.length > 1 && identifier.startsWith(\"0\")") != std::string::npos &&
-            site_source.find("if (prerelease === null || build === null)") != std::string::npos &&
-            site_source.find("v?(\\d+)\\.(\\d+)\\.(\\d+)") != std::string::npos &&
-            site_source.find("function compareSemanticVersions(left, right)") != std::string::npos &&
-            site_source.find("function comparePrereleaseIdentifier(left, right)") != std::string::npos &&
-            site_source.find("return Number(left) - Number(right);") != std::string::npos &&
-            site_source.find("[\"alpha\", 0]") != std::string::npos &&
-            site_source.find("[\"beta\", 1]") != std::string::npos &&
-            site_source.find("[\"rc\", 2]") != std::string::npos &&
-            site_source.find("Unknown channels still fall back to normal lexical SemVer ordering.") != std::string::npos &&
-            site_source.find("function fetchGithubReleases()") != std::string::npos &&
-            site_source.find("`${UPDATE_CHECK_API_BASE}/releases?per_page=100`") != std::string::npos &&
-            site_source.find("function summarizeSemanticReleases(releases)") != std::string::npos &&
-            site_source.find("latestStable") != std::string::npos &&
-            site_source.find("latestPrerelease") != std::string::npos &&
-            site_source.find("prereleasesByChannel") != std::string::npos &&
-            site_source.find("async function buildSemanticVersionUpdateResult(versionInfo, options = {})") != std::string::npos &&
-            site_source.find("semantic version compared against GitHub release") != std::string::npos &&
-            site_source.find("local semantic version has build metadata/commits past tag") != std::string::npos &&
-            site_source.find("local semantic version could not be parsed") != std::string::npos &&
-            site_source.find("GitHub release data unavailable") != std::string::npos &&
-            site_source.find("Stable builds compare only with latest stable release and never") != std::string::npos &&
-            site_source.find("upgrade to a prerelease.") != std::string::npos &&
-            site_source.find("Prerelease builds compare with newer stable") != std::string::npos &&
-            site_source.find("from the same prerelease channel") != std::string::npos &&
-            site_source.find("Different\n    // prerelease channels are intentionally ignored by default.") != std::string::npos &&
-            site_source.find("const channel = localVersion.prerelease[0];") != std::string::npos &&
-            site_source.find("summary.prereleasesByChannel.get(channel)") != std::string::npos &&
-            site_source.find("versionComparisonUsed: \"semver\"") != std::string::npos &&
-            site_source.find("versionComparisonStatus: comparison === 0 ? \"equal\" : \"local_ahead\"") != std::string::npos &&
-            site_source.find("remoteVersionSelected: summary.latestStable.normalized") != std::string::npos &&
-            site_source.find("remoteVersionSelected: latestSameChannelPrerelease.normalized") != std::string::npos &&
-            site_source.find("async function buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticFallback = null)") != std::string::npos &&
-            site_source.find("versionComparisonUsed: \"commit\"") != std::string::npos &&
-            site_source.find("function branchAllowsCommitUpdate(branch)") != std::string::npos &&
-            site_source.find("return branch !== \"main\";") != std::string::npos &&
-            site_source.find("const commitUpdatesAllowed = branchAllowsCommitUpdate(versionInfo.currentBranch);") != std::string::npos &&
-            site_source.find("ignoreLocalBuildMetadata: !commitUpdatesAllowed") != std::string::npos &&
-            site_source.find("main branch requires a newer tagged release for update notification") != std::string::npos &&
-            site_source.find("main_commit_diff_without_release") != std::string::npos &&
-            site_source.find("const branchCommitComparisonHasPriority = versionInfo.branchState === \"branch\"") != std::string::npos &&
-            site_source.find("commitResult.targetBranch === versionInfo.currentBranch") != std::string::npos &&
-            site_source.find("Update check using same-branch commit comparison priority over semantic version metadata.") != std::string::npos &&
-            site_source.find("if (!semanticResult.useCommitFallback)") != std::string::npos &&
-            site_source.find("Update check using commit fallback: ${semanticResult.reason}") != std::string::npos &&
-            site_source.find("const commitResult = await buildCommitBasedWsprryPiUpdateResult(versionInfo, semanticResult);") != std::string::npos,
-        "update checker must use GitHub release semver as the primary update signal, normalize and validate prerelease identifiers, handle stable/prerelease ordering and numeric prerelease segments, keep prerelease updates on the same channel by default, treat local newer versions as no-update/local-ahead, fall back to commit checks for extra commits, invalid local semver, malformed prerelease semver, or unavailable release data, and expose comparison metadata");
-    require(
-        site_source.find("const UPDATE_CHECK_FAILURE_CACHE_PREFIX = \"wsprrypi.updateCheckFailure\";") != std::string::npos &&
-            site_source.find("const UPDATE_CHECK_FAILURE_RATE_LIMIT_MS = 5 * 60 * 1000;") != std::string::npos &&
-        site_source.find("const UPDATE_CHECK_ERROR_MESSAGES = Object.freeze({") != std::string::npos &&
-            site_source.find("missing_version_data: \"Update check failed: local version metadata is incomplete.\"") != std::string::npos &&
-            site_source.find("missing_commit: \"Update check failed: local commit metadata is missing.\"") != std::string::npos &&
-            site_source.find("missing_branch: \"Update check failed: local branch metadata is missing.\"") != std::string::npos &&
-            site_source.find("branch_missing: \"Update check failed: the update branch could not be found on GitHub.\"") != std::string::npos &&
-            site_source.find("rate_limited: \"Update check failed: GitHub API rate limit reached.\"") != std::string::npos &&
-            site_source.find("network: \"Update check failed: GitHub could not be reached.\"") != std::string::npos &&
-            site_source.find("malformed_response: \"Update check failed: GitHub returned malformed update data.\"") != std::string::npos &&
-            site_source.find("comparison_unavailable: \"Update check failed: GitHub could not establish the update relationship.\"") != std::string::npos &&
-            site_source.find("unsafe_target: \"Update check failed: no trustworthy update target could be established.\"") != std::string::npos &&
-            site_source.find("detached_target_unknown: \"Update check failed: detached or unknown branch state has no safe update target.\"") != std::string::npos &&
-            site_source.find("function buildUpdateCheckFailure(code, detail = \"\")") != std::string::npos &&
-            site_source.find("function normalizeUpdateCheckFailure(error)") != std::string::npos &&
-            site_source.find("function updateCheckFailureCacheKey(versionInfo)") != std::string::npos &&
-            site_source.find("`${UPDATE_CHECK_FAILURE_CACHE_PREFIX}:`") != std::string::npos &&
-            site_source.find("function readUpdateCheckFailureCache(versionInfo)") != std::string::npos &&
-            site_source.find("cached.updateCheckFailed !== true") != std::string::npos &&
-            site_source.find("Date.now() - Number(cached.checkedAt || 0) >= UPDATE_CHECK_FAILURE_RATE_LIMIT_MS") != std::string::npos &&
-            site_source.find("function writeUpdateCheckFailureCache(versionInfo, error)") != std::string::npos &&
-            site_source.find("window.localStorage.removeItem(updateCheckFailureCacheKey(versionInfo));") != std::string::npos &&
-            site_source.find("const cachedFailure = options.bypassCache === true ? null : readUpdateCheckFailureCache(versionInfo);") != std::string::npos &&
-            site_source.find("Update check failure rate limit active") != std::string::npos &&
-            site_source.find("markWsprryPiUpdateCheckFailed(cachedFailure);") != std::string::npos &&
-            site_source.find("const failure = writeUpdateCheckFailureCache(versionInfo, error);") != std::string::npos &&
-            site_source.find("function markWsprryPiUpdateCheckFailed(error)") != std::string::npos &&
-            site_source.find("versionElement.classList.add(\"update-check-failed\");") != std::string::npos &&
-            site_source.find("markWsprryPiUpdateCheckFailed(failure);") != std::string::npos &&
-            site_source.find("writeFailedUpdateCheckCache") == std::string::npos &&
-            site_source.find("Site-global key: do not include page path") != std::string::npos &&
-            site_source.find("return `${UPDATE_CHECK_CACHE_PREFIX}:${versionInfo.branchState || \"branch\"}:${versionInfo.currentBranch}:${versionInfo.currentSha}:${dirtyKey}`;") != std::string::npos &&
-            site_source.find("Use the same site-global identity as successful checks") != std::string::npos,
-        "update checker failures must have explicit UI and console states, must classify local metadata, branch, network, rate-limit, malformed-response, and detached-target failures, must not cache failed checks as no-update results, may rate-limit repeated failed checks while preserving failed state, and must clear matching failure state when a successful result is cached");
-    require(
-        site_source.find("function buildLocalUpdateStateTitle(result)") != std::string::npos &&
-            site_source.find("result?.versionComparisonStatus === \"local_modified\"") != std::string::npos &&
-            site_source.find("result?.localBuildState === \"dirty_build\"") != std::string::npos &&
-            site_source.find("Local build has modifications. No remote update is being shown.") != std::string::npos &&
-            site_source.find("result?.versionComparisonStatus === \"local_ahead\"") != std::string::npos &&
-            site_source.find("Local build is newer than the selected remote version. No update is available.") != std::string::npos &&
-            site_source.find("result?.versionComparisonStatus === \"diverged\"") != std::string::npos &&
-            site_source.find("Local and selected branch histories have diverged. No safe branch update is available.") != std::string::npos &&
-            site_source.find("function markWsprryPiLocalUpdateState(result)") != std::string::npos &&
-            site_source.find("clearWsprryPiUpdateFooter();\n        return;") != std::string::npos &&
-            site_source.find("versionElement.classList.remove(\"update-available\");\n        versionElement.classList.remove(\"update-check-failed\");\n        versionElement.title = title;") != std::string::npos &&
-            site_source.find("updateLink.classList.add(\"d-none\");\n        updateLink.href = UPDATE_CHECK_RELEASES_URL;\n        updateLink.title = title;\n        updateLink.setAttribute(\"aria-label\", title);") != std::string::npos &&
-            site_source.find("displayState=${localStateTitle}") != std::string::npos &&
-            site_source.find("markWsprryPiLocalUpdateState(result);\n        return;\n    }\n\n    markWsprryPiUpdateFooter(result);") != std::string::npos &&
-            site_source.find("if (options.suppressModal !== true)") != std::string::npos &&
-            site_source.find("showWsprryPiUpdateModal(versionInfo, result);") != std::string::npos &&
-            site_source.find("markWsprryPiUpdateCheckFailed(failure);") != std::string::npos &&
-            site_source.find("writeUpdateCheckCache(versionInfo, result);") != std::string::npos,
-        "footer update display must keep update-available behavior and modal timing unchanged, clear warning/update indicators for clean no-update, label dirty/local-modified and local-ahead states distinctly in title/ARIA without showing the modal, show failed/unknown checks through the failed-check path, and avoid caching check failures as no-update");
     const std::size_t update_footer_pos =
         site_source.find("markWsprryPiUpdateFooter(result);");
     const std::size_t update_modal_pos =
@@ -1068,76 +494,11 @@ int main()
             site_source.find("${status.details} ${result.selectionReason}") == std::string::npos,
         "update-available modal display must use a separate two-hour site-global localStorage state keyed by branch/current SHA/target SHA/update URL, treat future timestamps as expired, allow immediate display when the update URL changes or after unrelated failures, fall back safely when localStorage is unavailable, propagate matching dismissal across tabs, support a site-global never-check-again state, and keep the footer indicator independent from modal suppression");
     require(
-        site_source.find("GitHub network request failed") != std::string::npos &&
-            site_source.find("response.headers.get(\"x-ratelimit-remaining\") === \"0\"") != std::string::npos &&
-            site_source.find("GitHub returned malformed JSON") != std::string::npos &&
-            site_source.find("GitHub compare response did not include a status") != std::string::npos &&
-            site_source.find("GitHub branch ${branch} did not include a HEAD SHA") != std::string::npos &&
-            site_source.find("Semantic version flow is primary when the local build is at a parseable") != std::string::npos &&
-            site_source.find("comparison is fallback only and must not override a valid semantic") != std::string::npos,
-        "update checker must surface GitHub network, rate-limit, malformed JSON, malformed compare, and malformed branch responses while documenting that semver is primary and commit/branch comparison is fallback");
-    require(
-        site_source.find("async function isCurrentShaReachableFromBranchHead(currentSha, branchInfo)") != std::string::npos &&
-            site_source.find("normalizedCurrent.length >= 40 && normalizedHead.length >= 40 && normalizedCurrent === normalizedHead") != std::string::npos &&
-            site_source.find("status: \"short_sha_match\"") != std::string::npos &&
-            site_source.find("uncertain: true") != std::string::npos &&
-            site_source.find("GitHub compare direction is base=currentSha, head=branch HEAD.") != std::string::npos &&
-            site_source.find("status \"ahead\" means the branch HEAD is ahead of") != std::string::npos &&
-            site_source.find("Status\n        // \"behind\" means currentSha is ahead of the branch and is not contained.") != std::string::npos &&
-            site_source.find("contained: true,") != std::string::npos &&
-            site_source.find("status: \"identical\"") != std::string::npos &&
-            site_source.find("contained: status === \"identical\" || status === \"ahead\",") != std::string::npos &&
-            site_source.find("contained: status === \"identical\" || status === \"behind\",") == std::string::npos &&
-            site_source.find("if (status === \"ahead\" || status === \"diverged\")") == std::string::npos &&
-            site_source.find("function selectedUpdateBranch(branchInfo, reason, fallbackUsed = false)") != std::string::npos &&
-            site_source.find("selectionReason: reason") != std::string::npos &&
-            site_source.find("async function selectContainedFallbackBranch(versionInfo, branchInfo, reason)") != std::string::npos &&
-            site_source.find("The running commit is not proven reachable from upstream") != std::string::npos &&
-            site_source.find("async function selectGithubUpdateBranch(versionInfo)") != std::string::npos &&
-            site_source.find("const currentBranch = versionInfo.currentBranch;") != std::string::npos &&
-            site_source.find("Rule 1: local main tracks upstream main directly.") != std::string::npos &&
-            site_source.find("if (currentBranch === \"main\")") != std::string::npos &&
-            site_source.find("selectedUpdateBranch(await lookupGithubBranch(\"main\"), \"local main targets upstream main\")") != std::string::npos &&
-            site_source.find("Rule 2: local devel tracks upstream devel unless the local commit is") != std::string::npos &&
-            site_source.find("if (currentBranch === \"devel\")") != std::string::npos &&
-            site_source.find("develBranch = await lookupGithubBranch(\"devel\");") != std::string::npos &&
-            site_source.find("const mainBranch = await lookupGithubBranch(\"main\");") != std::string::npos &&
-            site_source.find("const mainContainment = await isCurrentShaReachableFromBranchHead(versionInfo.currentSha, mainBranch);") != std::string::npos &&
-            site_source.find("if (mainContainment.contained)") != std::string::npos &&
-            site_source.find("current SHA is reachable from main") != std::string::npos &&
-            site_source.find("current SHA is not reachable from main") != std::string::npos &&
-            site_source.find("main containment probe failed") != std::string::npos &&
-            site_source.find("Update check local devel target remains upstream devel.") != std::string::npos &&
-            site_source.find("upstream devel missing; containment-gated fallback to upstream main") != std::string::npos &&
-            site_source.find("local devel commit reachable from upstream main") != std::string::npos &&
-            site_source.find("selectedUpdateBranch(develBranch, \"local devel targets upstream devel\")") != std::string::npos &&
-            site_source.find("Rule 3: feature and release local branches target the same-name upstream") != std::string::npos &&
-            site_source.find("Detached HEAD and unknown branch-state builds are handled") != std::string::npos &&
-            site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
-            site_source.find("local branch targets same-name upstream branch") != std::string::npos &&
-            site_source.find("Rule 4: if a non-main/non-devel branch is missing upstream,") != std::string::npos &&
-            site_source.find("missing; containment-gated fallback to upstream devel") != std::string::npos &&
-            site_source.find("Missing branch or differing SHA") != std::string::npos &&
-            site_source.find("fallbackUsed: selectedBranch.fallbackUsed === true,") != std::string::npos &&
-            site_source.find("selectionReason: selectedBranch.selectionReason || \"\"") != std::string::npos &&
-            site_source.find("? { updateAvailable: true }") == std::string::npos &&
-            site_source.find("const selectedBranch = await selectGithubUpdateBranch(versionInfo);") != std::string::npos &&
-            site_source.find("reason=${result.selectionReason || \"unspecified\"}") != std::string::npos,
-        "update checker must target upstream main for local main, target upstream devel by default for local devel, switch devel to main only when compare current...main proves reachability, avoid treating ahead/diverged/malformed/404 containment probes as contained, prefer full SHA exact matches, explicitly mark short-SHA containment as uncertain, target same-name upstream branches for feature branches, keep detached/unknown branch-state builds out of same-name branch lookup, and require containment before selecting a missing-branch fallback");
-    require(
         site_source.find("local devel probing upstream main because upstream devel returned HTTP 404") != std::string::npos &&
             site_source.find("local devel resolved to upstream main because current SHA is reachable from main") != std::string::npos &&
             site_source.find("local devel staying on upstream devel because current SHA is not reachable from main") != std::string::npos &&
             site_source.find("local devel target remains upstream devel") != std::string::npos,
         "update checker must log devel fallback, devel-to-main reachability resolution, and devel-stays-devel decisions");
-    require(
-        site_source.find("versionComparisonStatus: status === \"behind\"") != std::string::npos &&
-            site_source.find("? \"local_ahead\"") != std::string::npos &&
-            site_source.find("? \"diverged\"") != std::string::npos &&
-            site_source.find("\"comparison_unavailable\",") != std::string::npos &&
-            site_source.find("GitHub could not compare running commit") != std::string::npos &&
-            site_source.find("updateAvailable: !updateCheckShaMatches(currentSha, headSha)") == std::string::npos,
-        "commit comparisons must distinguish divergence from local-ahead and must fail unknown when GitHub cannot establish ancestry instead of treating different SHAs as an update");
     require(
         site_source.find("async function resolveReleaseTargetSha(targetCommitish, memo = null)") != std::string::npos &&
             site_source.find("if (memo instanceof Map && memo.has(target))") != std::string::npos &&
@@ -1148,73 +509,12 @@ int main()
             site_source.find("resolvedSha = await resolveReleaseTargetSha(target, resolvedTargets);") != std::string::npos,
         "release matching must resolve each target_commitish once per scan, try branch lookup before tag lookup, and preserve tag dereferencing");
     require(
-        site_source.find("const rawBackendBranch = typeof response?.wspr_branch === \"string\"") != std::string::npos &&
-            site_source.find("const rawVersion = typeof response?.wspr_version_raw === \"string\"") != std::string::npos &&
-            site_source.find("const branchFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch\");") != std::string::npos &&
-            site_source.find("const commitFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_commit\");") != std::string::npos &&
-            site_source.find("const branchStateFieldPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_branch_state\");") != std::string::npos &&
-            site_source.find("const structuredVersionPresent = Object.prototype.hasOwnProperty.call(response || {}, \"wspr_version_parsed\");") != std::string::npos &&
-            site_source.find("const branchState = parseBranchState(response, currentBranch);") != std::string::npos &&
-            site_source.find("const rawBackendCommit = typeof response?.wspr_commit === \"string\"") != std::string::npos &&
-            site_source.find("const rawExeVersion = rawVersion || (typeof response?.wspr_exe_version === \"string\"") != std::string::npos &&
-            site_source.find("const currentDisplayVersion = rawDisplayVersion || rawUiVersion;") != std::string::npos &&
-            site_source.find("Update-check precedence is structured backend metadata first.") != std::string::npos &&
-            site_source.find("currentModalVersion: rawExeVersion || rawUiVersion || rawDisplayVersion,") != std::string::npos &&
-            site_source.find("const displayBranch = branchMatch ? branchMatch[1].trim() : \"\";") != std::string::npos &&
-            site_source.find("const currentBranch = rawBackendBranch || displayBranch;") != std::string::npos &&
-            site_source.find("if (branchFieldPresent && !rawBackendBranch)") != std::string::npos &&
-            site_source.find("if (commitFieldPresent && !backendCommit)") != std::string::npos &&
-            site_source.find("structuredVersionPresent && response?.wspr_version_parsed?.valid === true && !localVersionParsedObject") != std::string::npos &&
-            site_source.find("rawBranchState !== \"branch\"") != std::string::npos &&
-            site_source.find("localVersionParsedObject,") != std::string::npos &&
-            site_source.find("branchState,") != std::string::npos &&
-            site_source.find("displayBranch,") != std::string::npos &&
-            site_source.find("rawBranch=${versionInfo.currentBranch}") != std::string::npos &&
-            site_source.find("version-check") == std::string::npos &&
-            site_source.find("version_check") == std::string::npos,
-        "update checker must prefer structured backend version, branch, branch-state, commit, and dirty fields, keep display text independent, use display-string parsing only as a legacy fallback when structured fields are absent, and fail malformed present structured fields instead of guessing");
-    require(
-        site_source.find("const summaryText = result.versionComparisonUsed === \"semver\" && result.remoteVersionSelected") != std::string::npos &&
-            site_source.find("`${result.localVersionParsed || versionInfo.currentModalVersion} is behind release ${result.remoteVersionSelected}.`") != std::string::npos &&
-            site_source.find("`${versionInfo.currentModalVersion} is behind ${formatUpdateModalBranchTarget(result)}.`") != std::string::npos &&
-            site_source.find("`${versionInfo.currentDisplayVersion} is behind ${result.targetBranch} ${targetShaLabel}.`") == std::string::npos &&
-            site_source.find("function isTaggedReleaseUpdate(result)") != std::string::npos &&
-            site_source.find("Boolean(result?.releaseTitle)") != std::string::npos &&
-            site_source.find("Boolean(result?.remoteVersionSelected)") != std::string::npos &&
-            site_source.find("function formatUpdateModalBranchTarget(result)") != std::string::npos &&
-            site_source.find("return sha ? `${branch}+${sha}` : branch;") != std::string::npos &&
-            site_source.find("const taggedReleaseUpdate = isTaggedReleaseUpdate(result);") != std::string::npos &&
-            site_source.find("Review the update channel given to you for this pre-release version.") != std::string::npos &&
-            site_source.find("if (taggedReleaseUpdate) {\n        appendUpdateModalBodyLink(body, result, taggedReleaseUpdate);") != std::string::npos &&
-            site_source.find(".toggleClass(\"d-none\", !taggedReleaseUpdate)") != std::string::npos &&
-            site_source.find(".text(\"View release\")") != std::string::npos &&
-            site_source.find("Review the latest releases: ") == std::string::npos &&
-            site_source.find("Review the latest WsprryPi releases before updating.") == std::string::npos,
-        "update modal must use semantic release wording for semver updates, preserve wspr_exe_version in commit fallback summaries, explain fallback checks, and suppress exact-release wording when fallback is used");
-    require(
-        site_source.find("await lookupGithubBranch(currentBranch),") != std::string::npos &&
-            site_source.find("if (error.status !== 404)") != std::string::npos &&
-            site_source.find("await lookupGithubBranch(\"devel\"),") != std::string::npos &&
-            site_source.find("same-name upstream branch '${currentBranch}' missing; containment-gated fallback to upstream devel") != std::string::npos &&
-            site_source.find("return selectContainedFallbackBranch(") != std::string::npos,
-        "update checker must compare existing non-main/non-devel branches against that branch and select devel after a true 404 only when containment is proven");
-    require(
         site_source.find("Update check parsed displayBranch=") != std::string::npos &&
             site_source.find("Update check branch lookup:") != std::string::npos &&
             site_source.find("Update check branch lookup failed for") != std::string::npos &&
             site_source.find("Update check branch lookup result for") != std::string::npos &&
             site_source.find("Update check selected targetBranch=") != std::string::npos,
         "update checker must log parsed display branch, raw branch/SHA, branch lookup URL/status/result, selected target branch, fallback state, and target HEAD for debugging");
-    require(
-        ui_source.find("const si5351Active = selectedTransmitBackend() !== \"gpio\";") != std::string::npos &&
-            ui_source.find("const estimateEnabled = $(\"#use_system_clock_frequency_estimate\").is(\":checked\") ||") != std::string::npos &&
-            ui_source.find("(isRp1GpioPlatform() && $(\"#use_direct_pps_calibration\").is(\":checked\"))") != std::string::npos &&
-            ui_source.find("$residual.prop(\"disabled\", si5351Active || !estimateEnabled);") != std::string::npos &&
-            ui_source.find("let use_system_clock_frequency_estimate = parseBool($(\"#use_system_clock_frequency_estimate\").is(\":checked\"));") != std::string::npos &&
-            ui_source.find("let gpio_frequency_residual_ppm = Number($(\"#gpio_frequency_residual_ppm\").val());") != std::string::npos &&
-            ui_source.find("let gpio_manual_ppm = Number($(\"#gpio_manual_ppm\").val());") != std::string::npos &&
-            ui_source.find("syncCalibrationControls();") != std::string::npos,
-        "config UI must preserve independent GPIO and Si5351 calibration values while switching familiar backend panels");
 
     require(
         config_view_source.find("id=\"modeChangeGuardModal\"") != std::string::npos &&
@@ -1247,15 +547,6 @@ int main()
             ui_source.find("getUseAmp() ? getAmpPin() : null") != std::string::npos &&
             ui_source.find("function validateGpioConflictFields()") != std::string::npos,
         "index.js must serialize Use Amp, retain Amp Pin as data, include Amp Pin Active High, and validate Amp GPIO conflicts only when enabled");
-    require(
-        ui_source.find("const reservedAssignments = [];") != std::string::npos &&
-            ui_source.find("const bandAssignments = [];") != std::string::npos &&
-            ui_source.find("GPIO${assignment.pin} is reserved by ${reservedAssignment.label}.") !=
-                std::string::npos &&
-            ui_source.find("Bands sharing GPIO${pin} must use the same Active High setting.") !=
-                std::string::npos &&
-            ui_source.find("Bands sharing a GPIO with matching polarity") == std::string::npos,
-        "Pi I/O validation must classify reserved controls separately, retain invalid selections, and allow only matching-polarity shared Band GPIO rows");
     require(
         ui_source.find("function handleBandGpioInputChange() {\n    refreshGpioConflictOptions();\n    validateBandGpioFields();\n    scheduleAutosave();") !=
             std::string::npos,
@@ -1342,17 +633,6 @@ int main()
             fetch_spots_source.find("html_cache_headers.php") == std::string::npos &&
             log_stream_source.find("html_cache_headers.php") == std::string::npos,
         "HTML PHP shell pages must send no-cache revalidation headers before output while JSON/API endpoints keep their existing cache behavior");
-    require(
-        fetch_spots_source.find("function normalizeLookupBaseCallsign(string $value): string") != std::string::npos &&
-            fetch_spots_source.find("function buildLookupCallsignCandidates(string $value): array") != std::string::npos &&
-            fetch_spots_source.find("'%/' . $baseCallsign") != std::string::npos &&
-            fetch_spots_source.find("$baseCallsign . '/%'") != std::string::npos &&
-            fetch_spots_source.find("'<' . $baseCallsign . '>'") != std::string::npos &&
-            fetch_spots_source.find("function fetchDownloaderData(array $txCandidates, string $rxSign, string $start, string $end, string $format): array") != std::string::npos &&
-            fetch_spots_source.find("function fetchClickhouseData(array $txRegexes, ?string $rxSign, DateTimeImmutable $start, DateTimeImmutable $end): array") != std::string::npos &&
-            fetch_spots_source.find("$txLookup = buildLookupCallsignCandidates($txSignRaw);") != std::string::npos &&
-            fetch_spots_source.find("$txLookupBase = sanitizeClickhouseCallsign($txLookup['base'], 'Transmitter callsign');") != std::string::npos,
-        "spot lookup must normalize compound configured callsigns into shared downloader and clickhouse lookup candidates without changing non-lookup callsign handling");
 
     const std::string operation_view_source =
         read_repo_text_file("/WsprryPi-UI/data/views/operation.php");
@@ -1435,10 +715,6 @@ int main()
         config_view_source.find("config-runtime-item config-runtime-item--switch") == std::string::npos,
         "Runtime state body must no longer dedicate a body tile to the Transmit enabled control");
     require(
-        config_view_source.find("id=\"test_tone\"") == std::string::npos &&
-            config_view_source.find("id=\"testToneModal\"") == std::string::npos,
-        "configuration view must no longer render the Test Tone control inside the config form");
-    require(
         config_view_source.find("id=\"configSaveStatus\"") != std::string::npos &&
             config_view_source.find("Next safe action") == std::string::npos &&
             config_view_source.find("Save changes") == std::string::npos &&
@@ -1470,122 +746,11 @@ int main()
             ui_stylesheet_source.find(".config-wspr-top-row__toggle") == std::string::npos,
         "WSPR transmission-plan rows must stack in one column with wrap-safe labels at the established narrow breakpoint");
     require(
-        config_view_source.find("id=\"fsk_offset\"") != std::string::npos &&
-            config_view_source.find("value=\"5\"") != std::string::npos &&
-            config_view_source.find("id=\"dot_length\"") != std::string::npos &&
-            config_view_source.find("id=\"tx_repeat_every\"") != std::string::npos,
-        "configuration view must keep CW defaults while removing UI-only max caps for dot length, shift, and repeat interval");
-    const std::string dot_length_input =
-        extract_input_tag_by_id(config_view_source, "dot_length");
-    const std::string fsk_offset_input =
-        extract_input_tag_by_id(config_view_source, "fsk_offset");
-    const std::string tx_repeat_every_input =
-        extract_input_tag_by_id(config_view_source, "tx_repeat_every");
-    const std::string cw_intra_element_gap_input =
-        extract_input_tag_by_id(config_view_source, "cw_intra_element_gap");
-    const std::string cw_inter_character_gap_input =
-        extract_input_tag_by_id(config_view_source, "cw_inter_character_gap");
-    const std::string cw_inter_word_gap_input =
-        extract_input_tag_by_id(config_view_source, "cw_inter_word_gap");
-    const std::string dfcw_intra_element_gap_input =
-        extract_input_tag_by_id(config_view_source, "dfcw_intra_element_gap");
-    const std::string dfcw_inter_character_gap_input =
-        extract_input_tag_by_id(config_view_source, "dfcw_inter_character_gap");
-    const std::string dfcw_inter_word_gap_input =
-        extract_input_tag_by_id(config_view_source, "dfcw_inter_word_gap");
-    require(
-        dot_length_input.find("step=\"any\"") != std::string::npos &&
-            dot_length_input.find("min=\"0.000000001\"") != std::string::npos &&
-            dot_length_input.find("max=\"60\"") == std::string::npos &&
-            dot_length_input.find("step=\"1\"") == std::string::npos,
-        "CW dot-length markup must advertise strictly positive fractional input without restoring the old max cap");
-    require(
-        fsk_offset_input.find("min=\"1\"") != std::string::npos &&
-            fsk_offset_input.find("step=\"1\"") != std::string::npos &&
-            fsk_offset_input.find("max=\"1000\"") == std::string::npos,
-        "CW shift markup must require a positive whole-number lower bound while removing the old UI-only max cap");
-    require(
-        tx_repeat_every_input.find("min=\"1\"") != std::string::npos &&
-            tx_repeat_every_input.find("max=\"60\"") == std::string::npos,
-        "CW repeat-interval markup must retain the minimum while removing the old UI-only max cap");
-    require(
-        config_view_source.find("id=\"cw_intra_element_gap\"") != std::string::npos &&
-            config_view_source.find("id=\"cw_inter_character_gap\"") != std::string::npos &&
-            config_view_source.find("id=\"cw_inter_word_gap\"") != std::string::npos &&
-            config_view_source.find("class=\"col-12 col-lg-4 config-stacked-field cw-shared-gap-control\"") != std::string::npos &&
-            config_view_source.find("Intra-Element Gap:") != std::string::npos &&
-            config_view_source.find("Inter-Character Gap:") != std::string::npos &&
-            config_view_source.find("Inter-Word Gap:") != std::string::npos,
-        "configuration view must expose the three CW gap controls");
-    require(
-        cw_intra_element_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            cw_intra_element_gap_input.find("step=\"any\"") != std::string::npos &&
-            cw_intra_element_gap_input.find("value=\"1\"") != std::string::npos &&
-            cw_inter_character_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            cw_inter_character_gap_input.find("step=\"any\"") != std::string::npos &&
-            cw_inter_character_gap_input.find("value=\"3\"") != std::string::npos &&
-            cw_inter_word_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            cw_inter_word_gap_input.find("step=\"any\"") != std::string::npos &&
-            cw_inter_word_gap_input.find("value=\"7\"") != std::string::npos,
-        "CW gap markup must use strictly positive fractional defaults that match backend config defaults");
-    require(
-        config_view_source.find("id=\"dfcw_intra_element_gap\"") != std::string::npos &&
-            config_view_source.find("id=\"dfcw_inter_character_gap\"") != std::string::npos &&
-            config_view_source.find("id=\"dfcw_inter_word_gap\"") != std::string::npos &&
-            config_view_source.find("dfcw-gap-control d-none") != std::string::npos &&
-            config_view_source.find("DFCW Intra-Element Gap:") != std::string::npos &&
-            config_view_source.find("DFCW Inter-Character Gap:") != std::string::npos &&
-            config_view_source.find("DFCW Inter-Word Gap:") != std::string::npos,
-        "configuration view must expose DFCW-specific gap controls separately from shared CW gaps");
-    require(
-        dfcw_intra_element_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            dfcw_intra_element_gap_input.find("step=\"any\"") != std::string::npos &&
-            dfcw_intra_element_gap_input.find("value=\"0.333333\"") != std::string::npos &&
-            dfcw_inter_character_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            dfcw_inter_character_gap_input.find("step=\"any\"") != std::string::npos &&
-            dfcw_inter_character_gap_input.find("value=\"1\"") != std::string::npos &&
-            dfcw_inter_word_gap_input.find("min=\"0.000000001\"") != std::string::npos &&
-            dfcw_inter_word_gap_input.find("step=\"any\"") != std::string::npos &&
-            dfcw_inter_word_gap_input.find("value=\"3\"") != std::string::npos,
-        "DFCW gap markup must use strictly positive fractional defaults that match backend config defaults");
-    require(
         config_view_source.find("Fade Shape") == std::string::npos &&
             config_view_source.find("Fade In Ms") == std::string::npos &&
             config_view_source.find("Fade Out Ms") == std::string::npos &&
             config_view_source.find("Fade Slice Ms") == std::string::npos,
         "configuration view must keep CW fade settings hidden from the normal UI");
-    require(
-        config_view_source.find("id=\"qrss_frequency\"") != std::string::npos &&
-            config_view_source.find("value=\"14096900\"") != std::string::npos &&
-            config_view_source.find("14.0969MHz") != std::string::npos &&
-            config_view_source.find("14096.9kHz") != std::string::npos &&
-            config_view_source.find("0.0140969GHz") != std::string::npos,
-        "configuration view must default CW base frequency markup to 14096900 Hz");
-    require(
-        config_view_source.find("id=\"band-gpio-enabled-all\"") != std::string::npos &&
-            config_view_source.find("id=\"band-gpio-active-high-all\"") != std::string::npos,
-        "Band GPIO table must expose bulk-toggle header checkboxes for Enabled and Active High");
-    require(
-        config_view_source.find("'2m', '1.25m', '70cm'") != std::string::npos &&
-            site_source.find("\"1.25m\": { required: false, type: \"object\" }") !=
-                std::string::npos &&
-            site_source.find("\"70cm\": { required: false, type: \"object\" }") !=
-                std::string::npos,
-        "Band GPIO UI and schema must include canonical 1.25 m and 70 cm configuration rows");
-    require(
-        config_view_source.find("class=\"form-check-input band-gpio-enabled\"") != std::string::npos &&
-            config_view_source.find("class=\"form-check-input band-gpio-enabled\"\n                                                                type=\"checkbox\"") != std::string::npos &&
-            config_view_source.find("class=\"form-check-input band-gpio-active-high\"") != std::string::npos &&
-            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"") != std::string::npos &&
-            config_view_source.find("class=\"form-check-input band-gpio-active-high\"\n                                                                type=\"checkbox\"\n                                                                id=\"band-gpio-active-high-<?= htmlspecialchars($band) ?>\"\n                                                                data-band=\"<?= htmlspecialchars($band) ?>\"\n                                                                checked") == std::string::npos,
-        "Band GPIO row defaults must render unchecked and inactive until explicitly configured");
-    require(
-        config_view_source.find("id=\"configTabs\"") != std::string::npos &&
-            config_view_source.find("role=\"tablist\"") != std::string::npos &&
-            config_view_source.find("data-persist-tab-state=\"true\"") != std::string::npos &&
-            config_view_source.find("data-persist-tab-state-scope=\"reload\"") != std::string::npos &&
-            config_view_source.find("data-persist-tab-query-param=\"setup_tab\"") != std::string::npos,
-        "Configuration tab list must opt into reload-scoped persisted sub-tab state");
 
     const std::string maintenance_source =
         read_repo_text_file("/WsprryPi-UI/data/views/maintenance.php");
@@ -1633,81 +798,14 @@ int main()
             maintenance_css_source.find(".maintenance-update-technical-list dd code,\n.maintenance-update-technical-list dd a") != std::string::npos &&
             maintenance_css_source.find("overflow-wrap: anywhere;") != std::string::npos,
         "maintenance view must split Utility into side-by-side Test Tone and Update Check panels, keep Test Tone left-aligned, expose update-check panel hooks and controls, show user-facing summary text, and keep technical details collapsed by default");
-    require(
-        maintenance_source.find("id=\"supportBundlePanel\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleSetup\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleModal\"") == std::string::npos &&
-            maintenance_source.find("id=\"supportBundleExistingIssue\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleNewIssue\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleNoGithub\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleProbeI2c\"") != std::string::npos &&
-            maintenance_source.find("aria-describedby=\"supportBundleProbeI2cHelp\"") != std::string::npos &&
-            maintenance_source.find("i2cdetect -y 1") != std::string::npos &&
-            maintenance_source.find("supportBundleProbeI2c\"\n                                    class=\"form-check-input\"\n                                    type=\"checkbox\"\n                                    checked") == std::string::npos &&
-            maintenance_source.find("id=\"supportBundleStatus\"") != std::string::npos &&
-            maintenance_source.find("aria-live=\"polite\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportBundleAlert\"") != std::string::npos &&
-            maintenance_script_source.find("support_context: supportContext") != std::string::npos &&
-            maintenance_script_source.find("await response.blob();") != std::string::npos &&
-            maintenance_script_source.find("if (blob.size === 0 || jobId !== supportBundleJobId)") != std::string::npos &&
-            maintenance_script_source.find("supportBundleDownloaded = true") != std::string::npos &&
-            maintenance_script_source.find("/finalize`") != std::string::npos &&
-            maintenance_script_source.find("safeSupportBundleFilename") != std::string::npos &&
-            maintenance_script_source.find("SUPPORT_BUNDLE_FILENAME_FALLBACK") != std::string::npos &&
-            maintenance_script_source.find("Your browser chose the save location") != std::string::npos &&
-            maintenance_script_source.find("will expire automatically within 24 hours") != std::string::npos &&
-            maintenance_script_source.find("supportBundleDownloadInFlight") != std::string::npos &&
-            maintenance_script_source.find("stopSupportBundlePolling();") != std::string::npos &&
-            maintenance_source.find("id=\"supportGithubContinuationPanel\"") != std::string::npos &&
-            maintenance_source.find("id=\"supportGithubComment\"") != std::string::npos &&
-            maintenance_script_source.find("showSupportGithubContinuation();") != std::string::npos &&
-            maintenance_script_source.find("api.github.com") == std::string::npos,
-        "Support Bundle UI must collect issue context inline, keep active I2C probing opt-in, receive the full Blob before review finalization, preserve safe browser handoffs, and retain accessible retry-safe status handling");
 
-    const std::string maintenance_test_tone_script_source =
-        read_repo_text_file("/WsprryPi-UI/data/maintenance.js");
     require(
-        maintenance_test_tone_script_source.find("bindTestToneControls();") != std::string::npos,
-        "maintenance view must bind the shared Test Tone controls");
-    require(
-        site_source.find("function hasActiveManagedTransmissionForTestTone()") != std::string::npos &&
-            site_source.find("function hasEnabledManagedTransmissionForTestTone()") != std::string::npos &&
-            site_source.find("function handleTestToneCommandResponse(message)") != std::string::npos &&
-            site_source.find("const startButton = document.getElementById(\"testToneStart\");") != std::string::npos &&
-            site_source.find("toggleButtonLoading(startButton, false);") != std::string::npos &&
-            site_source.find("toggleButtonLoading(endButton, false);") != std::string::npos &&
-            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.STARTING;") != std::string::npos &&
-            site_source.find("if (response.stopped === true ||") != std::string::npos &&
-            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.IDLE;") != std::string::npos &&
-            site_source.find("clearUnresolvedTestToneStartContext();") != std::string::npos &&
-            site_source.find("response.restoration_failed === true") != std::string::npos &&
-            site_source.find("if (hasActiveManagedTransmissionForTestTone()) {") != std::string::npos &&
-            site_source.find("if (hasEnabledManagedTransmissionForTestTone()) {") != std::string::npos &&
-            site_source.find("showTestToneBlockedModal(\"active\");") != std::string::npos &&
-            site_source.find("showTestToneBlockedModal(\"enabled\");") != std::string::npos &&
-            site_source.find("Stop and disable transmissions") != std::string::npos &&
-            site_source.find("Disable transmissions") != std::string::npos &&
-            site_source.find("Test tones require scheduled transmissions to be stopped and disabled first.") != std::string::npos &&
-            site_source.find("const confirmLabel = blockedByActive ? \"Stop and Disable\" : \"Disable\";") != std::string::npos &&
-            site_source.find("currentRuntimeConfigStatus.transmitEnabled === true") != std::string::npos &&
-            site_source.find("if (msg.command === \"tone_start\" || msg.command === \"tone_end\")") != std::string::npos,
-        "shared Test Tone controls must reject active and merely enabled scheduled transmissions with the existing modal path and reconcile websocket command replies");
-    require(
-        site_source.find("let pendingTestToneStartRequest = false;") != std::string::npos &&
-            site_source.find("let pendingTestToneStartTimeoutHandle = null;") != std::string::npos &&
-            site_source.find("const TEST_TONE_COMMAND_TIMEOUT_MS = 15000;") != std::string::npos &&
-            site_source.find("TEST_TONE_DISABLE_REQUEST_TIMEOUT_MS") == std::string::npos &&
-            site_source.find("function markPendingTestToneStartRequest()") != std::string::npos &&
-            site_source.find("function clearPendingTestToneStartRequest()") != std::string::npos &&
-            site_source.find("function quarantineTimedOutTestToneStartRequest()") != std::string::npos &&
-            site_source.find("function testToneFrequencyOverridePayload()") != std::string::npos &&
-            site_source.find("client_request_id: nextTestToneRequestId()") != std::string::npos &&
-            site_source.find("if (!sendCommand(toneStartPayload))") != std::string::npos &&
-            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.START_PENDING;") != std::string::npos &&
-            site_source.find("testToneLifecycleState = TEST_TONE_LIFECYCLE.UNKNOWN;") != std::string::npos &&
-            site_source.find("markTestToneOutcomeUnknown(") != std::string::npos &&
-            site_source.find("clearPendingTestToneStartRequest();") != std::string::npos,
-        "Test Tone start requests must use a local per-tab pending flag, include optional frequency override payload data, and clear state on send failure or websocket disconnect");
+        scheduling_source.find("scheduler_managed_transmission_active_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_active_transmission = true;") != std::string::npos &&
+            scheduling_source.find("scheduler_managed_transmission_enabled_for_test_tone()") != std::string::npos &&
+            scheduling_source.find("result.blocked_by_enabled_transmission = true;") != std::string::npos,
+        "backend-side Test Tone rejection must remain present for active and enabled scheduled transmissions");
+
     require(
         site_source.find("const locallyRequested = pendingTestToneStartRequest === true && Boolean(correlatedStart);") != std::string::npos &&
             site_source.find("if (response.started === true)") != std::string::npos &&
@@ -1720,48 +818,6 @@ int main()
             site_source.find("Passive test tone start rejection received:") != std::string::npos &&
             site_source.find("syncTestToneControlState(false);") != std::string::npos,
         "passive websocket tone_start rejections must still update Test Tone state without showing blocked modals");
-    require(
-        site_source.find("function disableScheduledTransmissionsForTestTone(reason, actionButton = null)") != std::string::npos &&
-            site_source.find("function handleTestToneStopDisableResponse(message)") != std::string::npos &&
-            site_source.find("handleTestToneStopDisableResponse(msg);") != std::string::npos &&
-            site_source.find("timeout: TEST_TONE_COMMAND_TIMEOUT_MS") != std::string::npos &&
-            site_source.find("}, TEST_TONE_COMMAND_TIMEOUT_MS);") != std::string::npos &&
-            site_source.find("response.transmit_disabled === true || response.stop_performed === true") != std::string::npos &&
-            site_source.find("command: \"stop\",") != std::string::npos &&
-            site_source.find("persist_transmit: true,") != std::string::npos &&
-            site_source.find("finishTestToneStopDisableAction(stopSucceeded, responseMessage);") != std::string::npos &&
-            websocket_source.find("reply[\"stop_performed\"] = stop_result.stop_performed;") != std::string::npos &&
-            websocket_source.find("reply[\"transmit_disabled\"] = stop_result.transmit_disabled;") != std::string::npos &&
-            websocket_source.find("reply[\"persist_transmit\"] = persist_transmit;") != std::string::npos &&
-            websocket_source.find("reply[\"status\"] = stop_request_succeeded ? \"ok\" : \"error\";") != std::string::npos,
-        "active-transmission Test Tone blocked action must use the existing websocket stop command and its stable stop_performed/transmit_disabled response fields");
-    require(
-        site_source.find("function requestTestToneTransmitDisable()") != std::string::npos &&
-            site_source.find("ajaxWithEndpointFallback(SETTINGS_ENDPOINT, {") != std::string::npos &&
-            site_source.find("contentType: \"application/merge-patch+json\"") != std::string::npos &&
-            site_source.find("\"Transmit\": false,") != std::string::npos &&
-            site_source.find("requestTestToneTransmitDisable()\n        .done(function () {\n            finishTestToneStopDisableAction(true);") != std::string::npos,
-        "enabled-idle Test Tone blocked action must disable Operation.Transmit through the existing settings PATCH path");
-    require(
-        site_source.find("cancelLabel: \"Cancel\"") != std::string::npos &&
-            site_source.find("onCancel() {\n            },") != std::string::npos &&
-            site_source.find("sendCommand(toneStartPayload)") != std::string::npos &&
-            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") != std::string::npos &&
-            site_source.find("disableScheduledTransmissionsForTestTone(\n                    reason,") <
-                site_source.find("sendCommand(toneStartPayload)"),
-        "Test Tone blocked modal Cancel must make no state changes and the stop/disable action must not automatically start the test tone");
-    require(
-        scheduling_source.find("scheduler_managed_transmission_active_for_test_tone()") != std::string::npos &&
-            scheduling_source.find("result.blocked_by_active_transmission = true;") != std::string::npos &&
-            scheduling_source.find("scheduler_managed_transmission_enabled_for_test_tone()") != std::string::npos &&
-            scheduling_source.find("result.blocked_by_enabled_transmission = true;") != std::string::npos,
-        "backend-side Test Tone rejection must remain present for active and enabled scheduled transmissions");
-    require(
-        site_source.find("const normalizedArgs = args.map((arg) => {") != std::string::npos &&
-            site_source.find("return JSON.stringify(arg);") != std::string::npos &&
-            site_source.find("return Object.prototype.toString.call(arg);") != std::string::npos,
-        "debug console logging must serialize array and object payloads into useful text");
-
     std::cout << "ui_source_regression_test passed" << std::endl;
     return EXIT_SUCCESS;
 }

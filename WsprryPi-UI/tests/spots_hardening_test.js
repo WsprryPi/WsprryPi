@@ -4,38 +4,39 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const source = fs.readFileSync(path.resolve(__dirname, "../data/view_spots.js"), "utf8");
-const styles = fs.readFileSync(path.resolve(__dirname, "../data/view_spots.css"), "utf8");
-
-assert.match(
-    source,
-    /function setSpotsBusy\(isBusy\)[\s\S]*?setAttribute\("aria-busy", isBusy \? "true" : "false"\)/,
-    "spots loading state must be exposed to assistive technology"
-);
-assert.match(
-    source,
-    /if \(requestId === _requestSequence\) \{[\s\S]*?_activeRequest = null;[\s\S]*?setSpotsBusy\(false\);[\s\S]*?scheduleNext\(\);/,
-    "a superseded request must not settle or reschedule the active request"
-);
-assert.match(
-    source,
-    /const requestId = \+\+_requestSequence;[\s\S]*?clearRefreshTimer\(\);[\s\S]*?clearActiveRequest\(\);[\s\S]*?const selectedSource/,
-    "every new lookup must cancel its prior timer and request before taking an early-return path"
-);
-assert.match(
-    source,
-    /window\.addEventListener\("offline", \(\) => \{[\s\S]*?_requestSequence\+\+;[\s\S]*?clearRefreshTimer\(\);[\s\S]*?clearActiveRequest\(\);[\s\S]*?renderError/,
-    "offline transition must invalidate active work and prevent a timed retry"
-);
-assert.match(
-    styles,
-    /\.spots-card \.table-responsive\s*\{[\s\S]*?overflow-x:\s*auto;/,
-    "the Spots table must remain horizontally navigable on narrow screens"
-);
-assert.match(
-    styles,
-    /\.spots-card \.table\s*\{[\s\S]*?min-width:\s*68rem;/,
-    "the twelve-column Spots table must retain readable columns instead of wrapping by character"
-);
-
-console.log("spots_hardening_test passed");
+// Execute the named production lookup helpers without entering the HTTP handler.
+// PHP tokens retain function bodies exactly; the response boundary throws locally.
+const { spawnSync } = require("node:child_process");
+const lookup = String.raw`
+function respond(int $status, array $payload): never { throw new InvalidArgumentException($payload['error']); }
+$wanted = ['chooseLookupBaseCallsignSegment', 'normalizeLookupBaseCallsign', 'buildLookupCallsignCandidates'];
+$tokens = token_get_all(file_get_contents($argv[1]));
+for ($i = 0; $i < count($tokens); ++$i) {
+    if (!is_array($tokens[$i]) || $tokens[$i][0] !== T_FUNCTION) continue;
+    $start = $i; $name = '';
+    for ($j = $i + 1; $j < count($tokens); ++$j) {
+        if (is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) { $name = $tokens[$j][1]; break; }
+        if ($tokens[$j] === '(') break;
+    }
+    if (!in_array($name, $wanted, true)) continue;
+    $body = ''; $depth = 0; $opened = false;
+    for (; $i < count($tokens); ++$i) {
+        $token = $tokens[$i]; $body .= is_array($token) ? $token[1] : $token;
+        if ($token === '{') { ++$depth; $opened = true; }
+        if ($token === '}' && --$depth === 0 && $opened) break;
+    }
+    eval($body);
+}
+foreach ([' aa0nt ', 'AA0NT/P', 'W0/AA0NT', '<AA0NT>', 'AA0NT/12'] as $input) {
+    $actual = buildLookupCallsignCandidates($input);
+    $expected = ['base' => 'AA0NT', 'downloader' => ['AA0NT', '%/AA0NT', 'AA0NT/%', '<AA0NT>'],
+                 'clickhouse_regexes' => ['^AA0NT$', '^<AA0NT>$', '^[A-Z0-9]+/AA0NT$', '^AA0NT/[A-Z0-9]+$']];
+    if ($actual !== $expected) throw new RuntimeException('compound callsign lookup candidates changed');
+}
+try { buildLookupCallsignCandidates(''); throw new RuntimeException('empty callsign admitted'); }
+catch (InvalidArgumentException $expected) {}
+echo 'Production compound callsign lookup candidates passed';
+`;
+const lookupResult = spawnSync("php", ["-r", lookup, path.resolve(__dirname, "../data/fetch_spots.php")], {encoding: "utf8", timeout: 5000});
+assert.equal(lookupResult.status, 0, lookupResult.stderr);
+console.log(lookupResult.stdout);

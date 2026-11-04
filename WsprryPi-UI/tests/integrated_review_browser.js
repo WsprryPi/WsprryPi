@@ -66,6 +66,107 @@ function operationDisconnectFixture() {
     }
 }
 
+function spotsRequestBehavior() {
+    const ok = (value, label) => { if (!value) throw Error(label); };
+    const original = {ajax: $.ajax, timeout: window.setTimeout, clear: window.clearTimeout, href: location.href, callsign: document.getElementById("callsign").value};
+    const requests = [], timers = new Map(); let nextTimer = 900000;
+    const busy = () => document.querySelector(".card-body.tab-content").getAttribute("aria-busy");
+    $.ajax = options => {
+        if (options.url !== "fetch_spots.php") return original.ajax(options);
+        const request = {options, aborted: 0, done(fn) {this.success = fn; return this;}, fail(fn) {this.failure = fn; return this;}, always(fn) {this.complete = fn; return this;}, abort() {this.aborted++;}};
+        requests.push(request); return request;
+    };
+    window.setTimeout = (fn, ms) => { if (ms !== 300000) return original.timeout(fn, ms); const id = nextTimer++; timers.set(id, fn); return id; };
+    window.clearTimeout = id => { if (!timers.delete(id)) original.clear(id); };
+    try {
+        const url = new URL(location.href); url.searchParams.delete("demo"); history.replaceState(null, "", url);
+        document.getElementById("callsign").value = "AA0NT";
+        const source = document.getElementById("spotsSource"); source.value = "auto"; source.dispatchEvent(new Event("change", {bubbles: true}));
+        ok(requests.length === 1 && busy() === "true", "lookup exposes busy state");
+        source.value = "wspr_live_clickhouse"; source.dispatchEvent(new Event("change", {bubbles: true}));
+        ok(requests[0].aborted === 1 && requests.length === 2, "new selection aborts prior request");
+        requests[0].success({data: []}); requests[0].complete();
+        ok(busy() === "true" && timers.size === 0, "stale completion cannot settle active request or schedule refresh");
+        fetchSpots(); ok(requests[1].aborted === 1, "stale completion cannot erase active request ownership");
+        document.getElementById("callsign").value = ""; fetchSpots();
+        ok(requests[2].aborted === 1, "empty-callsign early return still cancels prior work");
+        document.getElementById("callsign").value = "AA0NT"; fetchSpots();
+        const active = requests.at(-1); window.dispatchEvent(new Event("offline"));
+        ok(active.aborted === 1 && timers.size === 0 && busy() === "false", "offline cancels request and refresh timer");
+        active.failure({}, "error"); active.complete();
+        ok(timers.size === 0 && busy() === "false", "late offline completion cannot schedule retry");
+        ok(document.body.textContent.includes("browser went offline"), "offline result stays visible");
+    } finally {
+        for (const id of timers.keys()) timers.delete(id);
+        $.ajax = original.ajax; window.setTimeout = original.timeout; window.clearTimeout = original.clear;
+        history.replaceState(null, "", original.href); document.getElementById("callsign").value = original.callsign;
+        document.getElementById("spotsSource").dispatchEvent(new Event("change", {bubbles: true}));
+    }
+    return "Real Spots request cancellation, stale completion, early return, offline and busy-state checks passed";
+}
+
+function runtimeContractBehavior() {
+    const ok = (value, label) => { if (!value) throw Error(label); };
+    const field = id => document.getElementById(id);
+    const original = {runtime: currentRuntimeStatus, config: currentRuntimeConfigStatus, snapshot: operationSnapshot,
+        ajax: ajaxWithEndpointFallback, refresh: getTxState, socket: ws, online: Object.getOwnPropertyDescriptor(navigator, "onLine")};
+    Object.defineProperty(navigator, "onLine", {configurable: true, get: () => true});
+    try {
+        for (const mode of ["QRSS", "FSKCW", "DFCW"]) {
+            currentRuntimeConfigStatus = {mode, transmitEnabled: true};
+            currentRuntimeStatus = normalizeRuntimeStatus({runtime_mode: mode, tx_state: "transmitting", frequency_hz: 14097100,
+                offset_hz: 5, selector_gpio_enabled: true, selector_gpio: 4, selector_gpio_active_high: true,
+                cw_message: "A  B", cw_active_char_index: 2, next_transmission_at: "2026-11-04T20:00:00Z", plan_type: "STALE-WSPR"});
+            renderRuntimeControlStatus();
+            ok(field("runtime_wspr_plan_value").textContent === "A  B", mode + " renders actual message and spaces instead of stale WSPR plan");
+            ok(field("runtime_wspr_plan_value").querySelector(".is-active").textContent === " ", mode + " active character retains whitespace");
+            ok(field("runtime_frequency_value").textContent.includes("14.0971 MHz @ GPIO4H"), mode + " frequency and selector");
+            if (mode !== "QRSS") ok(field("runtime_frequency_value").textContent.includes("5 Hz"), mode + " shift keeps Hz units");
+            currentRuntimeStatus.txState = "idle"; renderRuntimeControlStatus();
+            ok(field("runtime_wspr_plan_value").textContent === "2026-11-04T20:00:00Z", mode + " idle next time");
+            currentRuntimeConfigStatus.transmitEnabled = false; renderRuntimeControlStatus();
+            ok(field("runtime_wspr_plan_value").textContent === "Disabled", mode + " paused state cannot display stale next time");
+        }
+        currentRuntimeConfigStatus = {mode: "WSPR", transmitEnabled: true};
+        currentRuntimeStatus = normalizeRuntimeStatus({runtime_mode: "WSPR", tx_state: "idle", frequency_is_skip: true, frequency_hz: 14097100,
+            plan_type: "Type2AndType3", frame_count: 2, current_frame: 1, frame_callsign: "AA0NT/12", frame_locator: "EM18IG", power_dbm: 20});
+        renderRuntimeControlStatus();
+        ok(field("runtime_frequency_value").textContent === "(Skip)", "skip window is not a stale frequency");
+        ok(field("runtime_wspr_plan_value").textContent === "Type2AndType3 F1/2 AA0NT/12 EM18IG 20dBm", "frame, identity and power remain meaningful");
+        ok(field("stop_transmit").disabled, "idle enabled scheduling cannot expose Stop as active");
+        currentRuntimeStatus.txState = "transmitting"; renderRuntimeControlStatus();
+        ok(!field("stop_transmit").disabled, "actual active runtime enables Stop");
+        const sent = []; ws = {readyState: WebSocket.OPEN, send: text => sent.push(JSON.parse(text))};
+        stopTransmission(); stopTransmission();
+        ok(sent.length === 1 && sent[0].command === "stop" && sent[0].persist_transmit === true && Object.keys(sent[0]).length === 2,
+            "Stop is explicit, persistent and single-flight");
+        clearStopRequestTimeout(); stopRequestInFlight = false;
+        const requests = []; let pending; let refreshes = 0;
+        getTxState = () => {refreshes++;};
+        ajaxWithEndpointFallback = (endpoint, options) => {
+            ok(endpoint === SETTINGS_ENDPOINT && options.type === "PATCH", "canonical settings mutation boundary");
+            requests.push(JSON.parse(options.data)); pending = $.Deferred(); return pending;
+        };
+        operationSnapshot = {...operationSnapshot, enableOnBoot: "Never"};
+        for (const [value, expected] of [["restart", "Always"], ["follow_last", "Follow"], ["disable", "Never"]]) {
+            const radio = document.querySelector(`input[name="operation_reboot_behavior"][value="${value}"]`);
+            radio.checked = true; radio.dispatchEvent(new Event("change", {bubbles: true}));
+            ok(JSON.stringify(requests.at(-1)) === JSON.stringify({Operation: {"Enable on Boot": expected}}), "actual reboot radio emits " + expected);
+            pending.resolve({});
+        }
+        const before = refreshes; requestTransmitEnabledChange(false, true); pending.resolve({});
+        ok(JSON.stringify(requests.at(-1)) === JSON.stringify({Operation: {Transmit: false}}), "transmit uses canonical Operation field");
+        ok(refreshes === before + 1, "successful transmit setting refreshes runtime immediately");
+    } finally {
+        clearStopRequestTimeout(); stopRequestInFlight = false;
+        currentRuntimeStatus = original.runtime; currentRuntimeConfigStatus = original.config; operationSnapshot = original.snapshot;
+        ajaxWithEndpointFallback = original.ajax; getTxState = original.refresh; ws = original.socket;
+        if (original.online) Object.defineProperty(navigator, "onLine", original.online); else delete navigator.onLine;
+        renderRuntimeControlStatus();
+    }
+    return "Actual runtime modes, message progression, next-time/paused state, Stop, reboot radios and transmit refresh passed";
+}
+
 async function reviewIntegratedUi(client, origin, evidence) {
     fs.mkdirSync(evidence, {recursive: true});
     const evaluate = expression => client.evaluate(expression);
@@ -112,6 +213,7 @@ async function reviewIntegratedUi(client, origin, evidence) {
         await client.send("Page.bringToFront");
         if (view==='operation') {
             console.log(await evaluate(`(${operationDisconnectFixture.toString()})()`));
+            console.log(await evaluate(`(${runtimeContractBehavior.toString()})()`));
         }
         if (view === "operation") {
             for (const [name, state] of [['frequency',{frequencyHz:14095600,offsetHz:0,txState:'transmitting'}],['frequency_gpio',{frequencyHz:14095600,offsetHz:-37,txState:'idle',selectorGpioEnabled:true,selectorGpio:7,selectorGpioActiveHigh:false}]]) {
@@ -125,6 +227,7 @@ async function reviewIntegratedUi(client, origin, evidence) {
                 fs.writeFileSync(path.join(evidence,'docs-'+name+'.png'),Buffer.from(shot.data,'base64'));
             }
         }
+        if (view === "spots") console.log(await evaluate(`(${spotsRequestBehavior.toString()})()`));
         if (view === "logs") {
             await evaluate(`__reviewLogStream.onopen();__reviewLogStream.emit('message',{type:'journal',__REALTIME_TIMESTAMP:'1792173600000000',PRIORITY:'6',SYSLOG_IDENTIFIER:'wsprrypi-long-service-identifier',MESSAGE:'First visible record: '+ 'long-technical-value-'.repeat(14)});`);
             await waitFor("!!document.querySelector('.logs-line')", "production log record");
@@ -143,6 +246,9 @@ async function reviewIntegratedUi(client, origin, evidence) {
             await client.send("Emulation.setDeviceMetricsOverride", {width:size.width,height:size.height,deviceScaleFactor:1,mobile:size.name==='mobile'});
             await evaluate(`document.documentElement.style.fontSize='';applyThemePreference('${theme}');window.scrollTo(0,0);`);
             await settled();
+            if (view === "spots" && size.name === "mobile") {
+                assert.ok(await evaluate("(()=>{const box=document.querySelector('.spots-card .table-responsive');return box.scrollWidth>box.clientWidth && ['auto','scroll'].includes(getComputedStyle(box).overflowX)})()"), "mobile Spots retains readable columns with horizontal navigation");
+            }
             const result=await measure();measurements.push({view,theme,size:size.name,...result});fs.writeFileSync(path.join(evidence,'measurements.json'),JSON.stringify(measurements,null,2));
             assert.ok(result.scrollWidth<=result.width+1, `${view} ${theme} ${size.name} overflow: ${JSON.stringify(result)}`);
             assert.deepEqual(result.dangling,[],`${view}: descriptions resolve`);

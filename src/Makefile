@@ -215,7 +215,7 @@ SUPPORT_BUNDLE_MAINTAINER_INTAKE_INSPECTION_TEST := ../scripts/tests/support_bun
 SUPPORT_BUNDLE_MAINTAINER_PROCESSING_TEST := ../scripts/tests/support_bundle_maintainer_processing_test.py
 SUPPORT_BUNDLE_RETENTION_AUDIT_TEST := ../scripts/tests/support_bundle_retention_audit_test.py
 SUPPORT_BUNDLE_RETENTION_DELETION_TEST := ../scripts/tests/support_bundle_retention_deletion_test.py
-SUPPORT_BUNDLE_CONTRACT_RECONCILIATION_TEST := ../scripts/tests/support_bundle_contract_reconciliation_test.py
+SUPPORT_BUNDLE_COLLECTOR_CONTRACT_TEST := ../scripts/tests/collect-support-bundle_test.sh
 BUILD_METADATA_REPO_ROOT := ..
 BUILD_METADATA_PROJECT := $(PRJ)
 BUILD_METADATA_EXECUTABLE := $(OUT)
@@ -1150,7 +1150,7 @@ $(BIN_DIR)/$(OUT): $(PROFILE_RELEASE_BIN) FORCE_PROFILE_BINARY
 .PHONY: support-bundle-intake-publication-verification-test support-bundle-intake-trust-compilation-test
 .PHONY: support-bundle-intake-production-trust-test support-bundle-intake-identity-ceremony-preflight-test
 .PHONY: support-bundle-maintainer-intake-inspection-test support-bundle-maintainer-processing-test support-bundle-retention-audit-test support-bundle-retention-deletion-test
-.PHONY: support-bundle-contract-reconciliation-test
+.PHONY: support-bundle-collector-contract-test
 .PHONY: support-bundle-intake-validation-test support-bundle-intake-state-test support-bundle-intake-retrieval-test
 .PHONY: support-bundle-intake-controller-test support-bundle-intake-runtime-test support-bundle-intake-production-test
 .PHONY: build-dependency-regression-test backend-capabilities-regression-test backend-capabilities-make-regression-test semantics-make-regression-test
@@ -1664,8 +1664,8 @@ support-bundle-retention-audit-test:
 support-bundle-retention-deletion-test:
 	$(Q)python3 $(SUPPORT_BUNDLE_RETENTION_DELETION_TEST)
 
-support-bundle-contract-reconciliation-test:
-	$(Q)python3 $(SUPPORT_BUNDLE_CONTRACT_RECONCILIATION_TEST)
+support-bundle-collector-contract-test:
+	$(Q)bash $(SUPPORT_BUNDLE_COLLECTOR_CONTRACT_TEST)
 
 support-bundle-intake-validation-test: $(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(SUPPORT_BUNDLE_INTAKE_VALIDATION_TEST_OUT)

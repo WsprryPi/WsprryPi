@@ -202,46 +202,30 @@ run_and_assert \
 printf "%s\n" ""
 printf "%s\n" "== CLI JSON sanity =="
 
-run_and_assert \
-    "CLI encode JSON" \
-    "${BUILD_DIR}/wspr-encode --json AA0NT EM18 20" \
-    '"type": "TYPE1"' \
-    '"callsign": "AA0NT"' \
-    '"locator": "EM18"' \
-    '"power_dbm": 20'
-
-run_and_assert \
-    "CLI decode Type 1 JSON" \
-    "${BUILD_DIR}/wspr-decode --json ${TYPE1_SYMBOLS}" \
-    '"type": "TYPE1"' \
-    '"callsign": "AA0NT"' \
-    '"locator": "EM18"' \
-    '"power_dbm": 20'
-
-run_and_assert \
-    "CLI decode Type 2 ambiguous JSON" \
-    "${BUILD_DIR}/wspr-decode --json ${TYPE2_AMBIGUOUS_SYMBOLS}" \
-    '"type": "TYPE2"' \
-    '"callsign": "<hashed>/Z"' \
-    '"extra": "/Z"' \
-    '"has_ambiguity": true' \
-    '"alternate_extra": "/09"'
-
-run_and_assert \
-    "CLI correlate JSON" \
-    "${BUILD_DIR}/wspr-correlate --json ${TYPE2_SUFFIX_SYMBOLS} ${PAIRED_TYPE3_SYMBOLS}" \
-    '"status": "CORRELATED"' \
-    '"type": "TYPE2"' \
-    '"callsign": "<callsign>/12"' \
-    '"locator": "EM18IG"' \
-    '"is_partial": false'
-
-run_and_assert \
-    "CLI correlate ambiguous JSON" \
-    "${BUILD_DIR}/wspr-correlate --json ${TYPE2_AMBIGUOUS_SYMBOLS} ${PAIRED_TYPE3_SYMBOLS}" \
-    '"status": "CORRELATED"' \
-    '"type": "TYPE2"' \
-    '"callsign": "<callsign>/Z"' \
-    '"has_ambiguity": false'
+python3 - "$BUILD_DIR" "$TYPE1_SYMBOLS" "$TYPE2_SUFFIX_SYMBOLS" "$TYPE2_AMBIGUOUS_SYMBOLS" "$PAIRED_TYPE3_SYMBOLS" <<'PY_JSON'
+import json, pathlib, subprocess, sys
+build = pathlib.Path(sys.argv[1])
+type1, suffix, ambiguous, paired = sys.argv[2:]
+def check(program, args, expected):
+    result = subprocess.run([str(build / program), "--json", *args], check=True,
+                            capture_output=True, text=True, timeout=30)
+    actual = json.loads(result.stdout)
+    assert actual == expected, (program, actual, expected)
+    assert all(type(actual[k]) is type(v) for k, v in expected.items()), actual
+base = {"type": "TYPE1", "callsign": "AA0NT", "power_dbm": 20, "locator": "EM18"}
+check("wspr-encode", ["AA0NT", "EM18", "20"],
+      dict(base, plan_type="Type1Single", message_count=1, symbols=type1))
+check("wspr-decode", [type1], dict(base, is_partial=False, has_hash=False, has_ambiguity=False))
+check("wspr-decode", [ambiguous],
+      {"type": "TYPE2", "callsign": "<hashed>/Z", "power_dbm": 20, "extra": "/Z",
+       "is_partial": True, "has_hash": True, "hash": 19169,
+       "has_ambiguity": True, "alternate_extra": "/09"})
+for symbols, extra in ((suffix, "/12"), (ambiguous, "/Z")):
+    check("wspr-correlate", [symbols, paired],
+          {"status": "CORRELATED", "type": "TYPE2", "callsign": "<callsign>" + extra,
+           "power_dbm": 20, "locator": "EM18IG", "extra": extra, "hash": 19169,
+           "is_partial": False, "has_hash": True, "has_ambiguity": False})
+print("Five CLI JSON documents match exact independently specified fields, types, and vectors.")
+PY_JSON
 
 printf "All major regressions completed successfully.\n"
