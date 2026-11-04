@@ -102,3 +102,18 @@ for(const [platform,expected] of [[{},null],[{"Si5351 Detected":false},false],[{
 }
 assert(!warnings.some(message=>message.includes("Si5351 Detected")));
 console.log("Si5351 absent inventory stays unknown without console warnings; explicit detection is retained");
+
+// Native responses must identify the exact transport and selected endpoint.
+context.window.WSPRRYPI_PLATFORM.si5351Transport = "mcp2221a-hid";
+context.formatSi5351Address = value => "0x" + Number(value).toString(16).toUpperCase();
+context.selectedAdapterIdentity = () => "usb:04d8:00dd:serial:61";
+bus = 1; backend = "si5351"; field.value = "0x60";
+context.refreshSi5351Addresses(1);
+const nativeRequest = requests.at(-1);
+nativeRequest.done({"I2C Bus":1,Addresses:["0x60"],"Discovery Error":"",Transport:"mcp2221a-hid","Adapter Identity":"usb:04d8:00dd:serial:62"});
+assert.match(populations.at(-1)[3], /mismatched/);
+assert(!populations.at(-1)[2].length);
+context.refreshSi5351Addresses(1);
+requests.at(-1).done({"I2C Bus":1,Addresses:["0x60"],"Discovery Error":"",Transport:"mcp2221a-hid","Adapter Identity":"usb:04d8:00dd:serial:61"});
+assert.equal(populations.at(-1)[3], "");
+console.log("Native selected-address replies reject mismatched identities before accepting inventory");

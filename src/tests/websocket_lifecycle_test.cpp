@@ -1,5 +1,8 @@
 #include "../web_socket.hpp"
 #include "../privileged_network_runtime.hpp"
+#include "../machine_power_control.hpp"
+#include "../json.hpp"
+#include "../scheduling.hpp"
 #include <arpa/inet.h>
 #include <algorithm>
 #include <atomic>
@@ -366,6 +369,26 @@ class WebSocketLifecycleTest {
     }
 public:
     static int run() {
+        if (!machine_power_control_supported()) {
+            WebSocketServer power;
+            power.firmware_maintenance_for_test_ = [] { return false; };
+            std::string reply;
+            power.reply_ready_for_test_ = [&](const std::string& value) { reply = value; };
+            const bool shutdown_before = shutdown_flag.load(), reboot_before = reboot_flag.load();
+            for (const auto* command : {"reboot", "shutdown"}) {
+                power.handleMessage(std::string("{\"command\":\"") + command + "\"}");
+                const auto body = nlohmann::json::parse(reply);
+                assert(body.at("status") == "error" && body.at("error") == "unsupported");
+                assert(!body.contains("requested"));
+                assert(shutdown_flag.load() == shutdown_before && reboot_flag.load() == reboot_before);
+            }
+            // All callers, including non-WebSocket shutdown-button callbacks,
+            // must refuse before mutation on an unsupported platform.
+            shutdown_system(); reboot_system();
+            assert(shutdown_flag.load() == shutdown_before && reboot_flag.load() == reboot_before);
+            power.handleMessage(R"({"command":"echo","payload":"still-running"})");
+            assert(nlohmann::json::parse(reply).at("payload") == "still-running");
+        }
         // The Test Tone lifecycle fixture uses 39526 and runs in parallel.
         verify_stream_and_control_queue(39527);
         verify_loopback_binding(39518);

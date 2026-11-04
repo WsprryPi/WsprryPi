@@ -758,6 +758,21 @@ legend {
     max-width: 100%;
 }
 
+/* Keep the explanation below its controls without widening the header row. */
+.group-wrapper.machine-power-group {
+    max-width: 19rem;
+}
+
+#machine-power-status {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.config-header-actions .group-wrapper.machine-power-group {
+    flex-wrap: wrap;
+}
+
 .icons-wrapper {
     flex: 0 0 auto;
     gap: 0.25rem;

@@ -8,7 +8,11 @@ const path = require("node:path");
 
 function operationDisconnectFixture() {
     const ok = (condition, message) => { if (!condition) throw Error(message); };
-    const original = { WebSocket: window.WebSocket, reloadAllData, getTxState, ajax: $.ajax, systemPaused };
+    const original = { WebSocket: window.WebSocket, reloadAllData, getTxState, ajax: $.ajax, systemPaused,
+        online: Object.getOwnPropertyDescriptor(navigator, 'onLine') };
+    // Model an online browser losing its controller, even when the host test
+    // runs in a network-isolated container. Browser-offline has separate cases.
+    Object.defineProperty(navigator, 'onLine', {configurable:true, get:()=>true});
     const sockets = [], httpMethods = [];
     class Socket {
         static OPEN=1; static CONNECTING=0;
@@ -33,7 +37,7 @@ function operationDisconnectFixture() {
             updateRuntimeControlConfigStatus('WSPR',active);
             connected.message({tx_state:active?'transmitting':'idle'});
             const expected=active?'Transmitting':'Transmit paused';
-            ok(document.getElementById('operationCurrentState').textContent===expected,'known runtime fixture must load');
+            ok(document.getElementById('operationCurrentState').textContent===expected,'known runtime fixture must load: '+JSON.stringify({active,failure,actual:document.getElementById('operationCurrentState').textContent,expected}));
             const cached=JSON.stringify({operationSnapshot,currentRuntimeStatus,currentRuntimeConfigStatus});
             let failing=connected;
             if (failure==='fallback') { ws=null; failing=connectWebSocket('ws://fixture',5000,1); }
@@ -56,6 +60,8 @@ function operationDisconnectFixture() {
         clearWebSocketReconnectTimer(); clearWsprBandCatalogPendingRequest(); ws=null;
         window.WebSocket=original.WebSocket; reloadAllData=original.reloadAllData; getTxState=original.getTxState;
         $.ajax=original.ajax; systemPaused=original.systemPaused;
+        if (original.online) Object.defineProperty(navigator, 'onLine', original.online);
+        else delete navigator.onLine;
     }
 }
 
@@ -110,9 +116,15 @@ async function reviewIntegratedUi(client, origin, evidence) {
     `});
     await client.send("DOM.enable");await client.send("CSS.enable");
     const measurements=[];
+    let navigationGeneration = 0;
     for (const view of ["operation","config","logs","spots","maintenance"]) {
+        // Page.navigate can return while the old document is still ready.
+        // Retire that document explicitly so its cached runtime/tone state
+        // cannot satisfy the new page's load predicate.
+        const retired = ++navigationGeneration;
+        await evaluate(`window.__integratedReviewRetiredDocument=${retired}`);
         await client.send("Page.navigate", {url:`${origin}/index.php?page=${view}${view==='spots'?'&demo=1':''}`});
-        await waitFor("document.readyState==='complete' && typeof applyThemePreference==='function' && window.PicoFirmwareSafety?.locked===false", `${view} load and idle host firmware status`);
+        await waitFor(`window.__integratedReviewRetiredDocument!==${retired} && document.readyState==='complete' && typeof applyThemePreference==='function' && window.PicoFirmwareSafety?.locked===false`, `${view} fresh document and idle host firmware status`);
         await client.send("Page.bringToFront");
         if (view==='operation') {
             console.log(await evaluate(`(${operationDisconnectFixture.toString()})()`));

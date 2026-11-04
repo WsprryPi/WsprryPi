@@ -121,6 +121,8 @@ jobs:
         run: |
           python3 scripts/tests/macos_si5351_audit.py src/build/bin/wsprrypi
           python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi mcp2221a-hid
+      - name: Check native cached inventory and unsupported machine-power admission
+        run: make -C src si5351-inventory-isolation-test websocket-lifecycle-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
 
   wtp-network-loopback:
     needs: change_scope

@@ -4,6 +4,17 @@
 $root = realpath(__DIR__ . '/../data');
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'none'; frame-src 'none'");
+// Optional native-host fixture: production templates/scripts, synthetic host data.
+if (getenv('WSPRRYPI_NATIVE_HOST_FIXTURE') === '1') {
+    if ($path === '/__native_host_fixture__.js') {
+        header('Content-Type: application/javascript');
+        readfile(__DIR__ . '/native_host_fixture.js'); return true;
+    }
+    if ($path === '/index.php') {
+        chdir($root); require $root . '/index.php';
+        echo '<script src="/__native_host_fixture__.js"></script>'; return true;
+    }
+}
 // Supply only synthetic read-only status so the production maintenance guard
 // can settle. No request is forwarded to an application or attached device.
 if ($path === '/api/control/v1/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {

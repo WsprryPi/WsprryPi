@@ -507,6 +507,10 @@ void callback_shutdown_system()
  */
 void shutdown_system()
 {
+    if (!machine_power_control_supported()) {
+        llog.logS(WARN, "Machine reboot and power-off are unavailable on this host; application remains running.");
+        return;
+    }
     shutdown_flag.store(true, std::memory_order_relaxed);
     request_wspr_shutdown("system power-off requested");
 
@@ -546,6 +550,10 @@ void shutdown_system()
  */
 void reboot_system()
 {
+    if (!machine_power_control_supported()) {
+        llog.logS(WARN, "Machine reboot and power-off are unavailable on this host; application remains running.");
+        return;
+    }
     reboot_flag.store(true, std::memory_order_relaxed);
     request_wspr_shutdown("System reboot requested");
 

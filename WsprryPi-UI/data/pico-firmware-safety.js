@@ -32,7 +32,9 @@
             held.clear();
             root.WtpUi?.refreshControls?.();
             root.syncBackendPanelVisibility?.();
+            root.syncBackendControlAvailability?.();
             root.syncTransmitAvailabilityUi?.();
+            root.syncMachinePowerControls?.();
         }
     }
     async function poll() {

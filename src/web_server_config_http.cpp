@@ -54,6 +54,12 @@ RouteResponse build_si5351_addresses_response(const std::string &i2c_bus,
             config_handler_serialization::config_serialization_si5351_i2c_address(address));
     const nlohmann::json body = {
         {"I2C Bus", inventory.i2c_bus},
+        {"Adapter Identity", adapter_identity},
+#ifdef WSPRRYPI_SI5351_TRANSPORT
+        {"Transport", WSPRRYPI_SI5351_TRANSPORT},
+#else
+        {"Transport", "unavailable"},
+#endif
         {"Addresses", addresses},
         {"Discovery Error", inventory.error}};
     return {200, body.dump(4), "application/json", true};

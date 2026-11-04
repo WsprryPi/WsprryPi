@@ -136,7 +136,13 @@ bool si5351_device_detected(
     const std::string &adapter_identity = {});
 void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command);
 void clear_si5351_inventory_command_override_for_test();
-Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity = {});
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+namespace mcp2221a { struct Inventory; }
+mcp2221a::Inventory native_si5351_inventory();
+void set_native_si5351_inventory_for_test(const mcp2221a::Inventory& inventory);
+void clear_native_si5351_inventory_for_test();
+#endif
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity = {}, int selected_address = -1);
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
     int reference_hz,
