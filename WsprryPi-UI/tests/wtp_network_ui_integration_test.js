@@ -352,7 +352,13 @@ async function main() {
         })()`);
         await evaluate(`document.getElementById('wtp_transport').value='usb'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));`);
         assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
-        await evaluate(`document.getElementById('wtp_transport').value='network'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('wtp-management').open=true; document.getElementById('wtp-remote-load').click();`);
+        await evaluate(`document.getElementById('wtp_transport').value='network'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('wtp-management').open=true;`);
+        assert.equal(await evaluate('document.getElementById("wtp-combined-settings").open'), false,
+            'combined settings start collapsed');
+        await evaluate('document.querySelector("#wtp-combined-settings > summary").click()');
+        assert(await evaluate('document.getElementById("wtp-remote-load").getClientRects().length > 0'),
+            'opening combined settings exposes its read action');
+        await evaluate('document.getElementById("wtp-remote-load").click()');
         await waitFor(async () => await evaluate('document.getElementById("wtp-remote-callsign").value === "AA0NT"'), 'standalone settings');
         await evaluate(`document.getElementById('wtp-remote-callsign').value='MYDRAFT'; window.__remoteFailure=true; document.getElementById('wtp-remote-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-management-feedback").textContent.includes("changed elsewhere")'), 'revision feedback');
@@ -522,7 +528,13 @@ async function main() {
                 await waitFor(async () => await evaluate(`(() => {
                     const element=document.getElementById('wtp-management-feedback');
                     element.scrollIntoView({block:'center',behavior:'instant'});
-                    const r=element.getBoundingClientRect(); return r.height>0 && r.top>=0 && r.bottom<=innerHeight-32;
+                    const r=element.getBoundingClientRect();
+                    if (!(r.height>0 && r.top>=0 && r.bottom<=innerHeight-32)) {
+                        throw Error(JSON.stringify({state:'${state}',theme:'${theme}',viewport:'${viewport.name}',
+                            rect:{top:r.top,bottom:r.bottom,height:r.height},height:innerHeight,
+                            closedDisclosures:[...document.querySelectorAll('details:not([open])')].filter(d=>d.contains(element)).map(d=>d.id)}));
+                    }
+                    return true;
                 })()`), 'settings feedback in viewport');
                 await new Promise(resolve=>setTimeout(resolve,200));
                 await capture(`${viewport.name}-${theme}-settings-${state}.png`, {format:'png'});
@@ -612,6 +624,12 @@ async function main() {
         console.log('Rendered selector workflow, GPIO/polarity input, exact readback and themes passed');
         console.log(captureScreenshots ? 'Screenshots: '+output : 'Screenshot capture disabled; existing visual evidence retained.');
     } catch (error) {
+        // Preserve the actual failing viewport, rather than only earlier
+        // successful captures, before the owned browser is shut down.
+        if (client && chrome?.exitCode === null) {
+            try { await capture('failure.png'); }
+            catch (captureError) { console.error('Failure capture:', captureError.message); }
+        }
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {
         const errors = failure ? [failure] : [];
