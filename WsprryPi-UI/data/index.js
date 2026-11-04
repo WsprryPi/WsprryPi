@@ -4271,7 +4271,7 @@ function populateNativeSi5351Adapters(savedBus, savedIdentity) {
         if (seen.has(adapter.Identity)) continue;
         seen.add(adapter.Identity);
         const unique = adapters.filter(item => item.Identity === adapter.Identity).length === 1;
-        const option = new Option(`${adapter.Name} — ${adapter.Identity.includes(":path:") ? "host/USB port identity" : "serial identity"}${unique && adapter.Available ? "" : " (unavailable or ambiguous)"}`, adapter.Identity);
+        const option = new Option(`${adapter.Name} — ${adapter.Identity}${unique && adapter.Available ? "" : " (unavailable or ambiguous)"}`, adapter.Identity);
         option.disabled = !unique || !adapter.Available;
         field.add(option);
     }
@@ -4287,7 +4287,7 @@ function populateNativeSi5351Adapters(savedBus, savedIdentity) {
     if (label) label.textContent = "USB I2C adapter";
     const hint = document.getElementById("si5351-bus-hint");
     hint.textContent = present
-        ? `Selected MCP2221A. ${savedIdentity.includes(":path:") ? "This identity belongs to this Mac and USB port. " : ""}Only the selected address is checked. Reload after reconnecting.`
+        ? `Selected MCP2221A. ${savedIdentity.includes(":path:") ? "This identity belongs to this Mac and USB port. " : ""}Only the selected address is checked. Reload after reconnecting. Identity: ${savedIdentity}`
         : "Select one available MCP2221A identity. Check the USB connection and access, then reload. No adapter is selected automatically.";
     if (selectedTransmitBackend() === "si5351") {
         field.setCustomValidity(present ? "" : "Select one available, uniquely identified MCP2221A adapter.");

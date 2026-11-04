@@ -2,7 +2,7 @@
 <div class="w-100 d-sm-none"></div>
 
 <!-- Group wrapper: Icons + Clocks -->
-<div class="d-flex flex-wrap align-items-center group-wrapper">
+<div class="d-flex flex-wrap align-items-center group-wrapper machine-power-group">
     <!-- icons -->
     <div class="icons-wrapper d-flex align-items-center mb-2 mb-sm-0 me-sm-3">
         <!-- Reboot button with extra right margin -->
@@ -30,8 +30,6 @@
         </button>
     </div>
 
-    <span id="machine-power-status" class="small text-body-secondary" role="status" aria-live="polite">Checking machine power support…</span>
-
     <!-- Break between icons and times on XS only -->
     <div class="w-100 d-sm-none"></div>
 
@@ -48,4 +46,5 @@
             <span class="time-value" id="utcTime">--:--:--</span>
         </div>
     </div>
+    <span id="machine-power-status" class="small text-body-secondary" role="status" aria-live="polite">Checking machine power support…</span>
 </div>

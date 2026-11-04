@@ -918,7 +918,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                             disabled>
                                             <option value="">Waiting for I2C buses</option>
                                         </select>
-                                        <div id="si5351-bus-hint" class="form-text mt-2" role="status" aria-live="polite">
+                                        <div id="si5351-bus-hint" class="form-text mt-2 text-break" role="status" aria-live="polite">
                                             Waiting for the system's I2C bus list.
                                         </div>
                                     </div>
