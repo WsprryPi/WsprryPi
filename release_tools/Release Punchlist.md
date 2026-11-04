@@ -81,12 +81,13 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    covers independent valid-field saves, incomplete progress, explicit
    application, and uncertain-save recovery. The historical P15.14
    documentation reference was superseded by P15.20 numbering.
-10. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
+10. ⏳ **Review and Streamline UI.**
+11. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
-11. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
+12. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
    published RP1-GPCLK-DKMS release, update the pinned consumer integration
    where needed, and validate the selected release before the next WsprryPi beta.
-12. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
+13. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
 
 ## Final 4.0 stable release gate
