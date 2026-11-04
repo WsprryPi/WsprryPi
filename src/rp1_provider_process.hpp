@@ -14,9 +14,12 @@
 #include <vector>
 
 namespace wsprrypi {
-// Fixed production callers supply the argv. The duration seam is test-only.
+namespace detail {
+// Typed fixture synchronization runs inside the owned-child cleanup boundary.
+// Production callers use the unchanged wrapper below with a no-op gate.
+template<class AwaitReady>
 inline std::string runRp1ProviderProcess(const std::vector<std::string>& arguments,
-    std::chrono::milliseconds timeout = std::chrono::seconds{3}, bool require_response = true)
+    std::chrono::milliseconds timeout, bool require_response, AwaitReady&& await_ready)
 {
     if (arguments.empty()) throw std::runtime_error("Missing RP1 provider command.");
     std::vector<char*> argv;
@@ -39,9 +42,10 @@ inline std::string runRp1ProviderProcess(const std::vector<std::string>& argumen
     }
     ::setpgid(child, child);
     ::close(output[1]);
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
     bool reaped = false;
     try {
+        await_ready(child);
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
         std::string response;
         char buffer[4096];
         for (;;) {
@@ -83,6 +87,14 @@ inline std::string runRp1ProviderProcess(const std::vector<std::string>& argumen
         }
         throw;
     }
+}
+} // namespace detail
+
+// Fixed production callers supply the argv. The duration seam is test-only.
+inline std::string runRp1ProviderProcess(const std::vector<std::string>& arguments,
+    std::chrono::milliseconds timeout = std::chrono::seconds{3}, bool require_response = true)
+{
+    return detail::runRp1ProviderProcess(arguments, timeout, require_response, [](pid_t) {});
 }
 
 // Consumes the connected descriptor. One deadline covers the entire exchange,
