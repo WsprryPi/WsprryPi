@@ -76,10 +76,9 @@ Primary references:
 - [Apple asynchronous report submission](https://developer.apple.com/documentation/iokit/1438422-iohiddevicesetreportwithcallback).
 - [HIDAPI 0.15.0 macOS implementation](https://github.com/libusb/hidapi/blob/hidapi-0.15.0/mac/hid.c).
 
-The transport implementation and operator setup documentation are in `devel`.
-The native web setup and machine-power capability handling are completed by the
-current feature branch and require its final validation before release disposition.
-Accepted hardware work retains its recorded setup and limits.
+The native transport, web setup, cached status, and machine-power capability
+handling share the existing Si5351 backend. Accepted hardware work retains its
+recorded setup and limits. Release disposition is tracked separately in #419.
 
 ## Configuration and operator documentation
 
@@ -108,7 +107,7 @@ The operator setup guide is maintained in the separate `WsprryPi-Docs`
 repository at `docs/Install/macos_si5351.md`, linked from the installation index
 and Linux guide. It covers the preferred Adafruit pair, build selection,
 OpenSSL, metadata identity, access denial, topology limits, CLI/INI configuration,
-and recovery/output uncertainty. Its Sphinx build, local links, and desktop/mobile
-rendering were validated in documentation commit `6ec93a2`.
-The guide covers the native web selection/status workflow and unavailable machine-power controls.
+and recovery/output uncertainty. Documentation commit `fb5f159` adds the native
+web selection/status workflow and unavailable machine-power controls. Its Sphinx
+build, local links, and desktop/mobile rendering were validated.
 Software and documentation checks do not extend recorded physical acceptance.
