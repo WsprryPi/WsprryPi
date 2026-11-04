@@ -1,6 +1,6 @@
 /**
  * @file si5351_device.cpp
- * @brief Low-level Linux I2C access helper for Si5351 devices.
+ * @brief Portable register access helper for Si5351 devices.
  *
  * Copyright © 2025 - 2026 Lee C. Bussy (@LBussy). All rights reserved.
  *
@@ -24,7 +24,7 @@
  */
 
 #include "si5351_device.hpp"
-#include "linux_i2c_identity.hpp"
+
 
 #include <cerrno>
 #include <cstring>
@@ -33,13 +33,6 @@
 #include <string>
 #include <utility>
 
-#include <fcntl.h>
-#include <linux/i2c-dev.h>
-#include <linux/i2c.h>
-#include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 
 namespace
 {
@@ -104,81 +97,8 @@ namespace
         return false;
     }
 
-    static std::string system_error_message(
-        const std::string& operation,
-        const std::string& target)
-    {
-        std::ostringstream stream;
-        stream << operation << " failed for " << target << ": "
-               << std::strerror(errno);
-        return stream.str();
-    }
 
-    class LinuxI2CAdapter final : public Si5351Device::I2CAdapter
-    {
-    public:
-        explicit LinuxI2CAdapter(const Si5351Device::Config& config) : config_(config) {}
-        int openDevice(const std::string& path, int flags) override
-        {
-            diagnostic_.clear();
-            auto selected_path = path;
-            if (!config_.adapter_identity.empty()) {
-                const auto resolved = linux_i2c_identity::resolve(
-                    linux_i2c_identity::discover(), config_.adapter_identity, config_.i2c_bus);
-                if (!resolved.error.empty()) { diagnostic_ = resolved.error; errno = ENODEV; return -1; }
-                binding_ = resolved.adapter;
-                selected_path = binding_.node.string();
-            }
-            const int fd = ::open(selected_path.c_str(), flags);
-            if (fd < 0) { diagnostic_ = system_error_message("Open", selected_path); return -1; }
-            if (config_.adapter_identity.empty()) {
-                const auto resolved = linux_i2c_identity::resolve(
-                    linux_i2c_identity::discover(), {}, config_.i2c_bus);
-                if (!resolved.error.empty()) { diagnostic_ = resolved.error; errno = ENODEV; return rejectOpenedDevice(fd); }
-                binding_ = resolved.adapter;
-            }
-            if (!validate(fd)) return rejectOpenedDevice(fd);
-            diagnostic_ = "linux-i2c adapter " + (config_.adapter_identity.empty()
-                ? std::string("explicit bus ") + std::to_string(config_.i2c_bus) : config_.adapter_identity) +
-                " resolved to " + selected_path;
-            return fd;
-        }
-        int queryCapabilities(int fd, unsigned long& capabilities) override
-        { return validate(fd) ? ::ioctl(fd, I2C_FUNCS, &capabilities) : -1; }
-        int selectSlave(int fd, std::uint8_t address) override
-        { return validate(fd) ? ::ioctl(fd, I2C_SLAVE, address) : -1; }
-        ssize_t writeData(int fd, const void* data, std::size_t size) override
-        { return validate(fd) ? ::write(fd, data, size) : -1; }
-        ssize_t readData(int fd, void* data, std::size_t size) override
-        { return validate(fd) ? ::read(fd, data, size) : -1; }
-        int closeDevice(int fd) override { return ::close(fd); }
-        std::string diagnostic() const override { return diagnostic_; }
-    private:
-        int rejectOpenedDevice(int fd) {
-            const int primary_error = errno;
-            if (::close(fd) != 0)
-                diagnostic_ += "; " + system_error_message("Close rejected I2C device", binding_.node.string()) +
-                    "; cleanup failed; output state is unconfirmed.";
-            errno = primary_error;
-            return -1;
-        }
-        bool validate(int fd) {
-            const auto current = linux_i2c_identity::resolve(linux_i2c_identity::discover(),
-                config_.adapter_identity, config_.adapter_identity.empty() ? config_.i2c_bus : binding_.bus);
-            struct stat status{};
-            if (!current.error.empty() || !(current.adapter == binding_) ||
-                ::fstat(fd, &status) != 0 || !S_ISCHR(status.st_mode) ||
-                major(status.st_rdev) != 89 || minor(status.st_rdev) != static_cast<unsigned>(binding_.bus)) {
-                diagnostic_ = "linux-i2c adapter identity changed or device was removed; output state is unconfirmed.";
-                errno = ENODEV;
-                return false;
-            }
-            return true;
-        }
-        Si5351Device::Config config_;
-        linux_i2c_identity::Adapter binding_;
-        std::string diagnostic_;
-    };
+
 }
 
 /**
@@ -188,14 +108,14 @@ namespace
  */
 Si5351Device::Si5351Device(
     const Config& config,
-    std::shared_ptr<I2CAdapter> adapter)
+    std::shared_ptr<Si5351Transport> adapter)
     : config_(config),
-      adapter_(adapter ? std::move(adapter) : std::make_shared<LinuxI2CAdapter>(config)),
-      fd_(-1),
+      adapter_(adapter ? std::move(adapter) : make_si5351_transport(config)),
       last_error_(),
       cache_valid_(256, false),
       cache_values_(256, 0)
 {
+    adapter_->configure(config.i2c_bus, config.i2c_address);
 }
 
 /**
@@ -216,32 +136,11 @@ bool Si5351Device::open()
 
     clearRegisterCache();
 
-    const std::string path = buildI2CDevicePath();
-    const std::string target = config_.adapter_identity.empty() ? path : config_.adapter_identity;
-    fd_ = adapter_->openDevice(path, O_RDWR | O_CLOEXEC);
-    if (fd_ < 0)
-    {
-        setLastError(system_error_message("Open", target));
+    if (!adapter_->open()) {
+        setLastError("Open Si5351 transport failed.");
         return false;
     }
-
-    unsigned long capabilities = 0;
-    const int capability_result = adapter_->queryCapabilities(fd_, capabilities);
-    if (capability_result < 0 || !(capabilities & I2C_FUNC_I2C))
-    {
-        setLastError(capability_result < 0
-            ? system_error_message("Query I2C capabilities", target)
-            : "linux-i2c adapter lacks required I2C_FUNC_I2C capability.");
-        close();
-        return false;
-    }
-
-    if (adapter_->selectSlave(fd_, config_.i2c_address) < 0)
-    {
-        setLastError(system_error_message("Select I2C slave", target));
-        close();
-        return false;
-    }
+    open_ = true;
 
     last_error_.clear();
     return true;
@@ -249,11 +148,10 @@ bool Si5351Device::open()
 
 bool Si5351Device::close()
 {
-    const int fd = std::exchange(fd_, -1);
+    const bool was_open = std::exchange(open_, false);
     clearRegisterCache();
-    if (fd >= 0 && adapter_->closeDevice(fd) != 0) {
-        last_error_ += (last_error_.empty() ? "" : "; ") +
-            system_error_message("Close I2C device", config_.adapter_identity.empty() ? buildI2CDevicePath() : config_.adapter_identity) +
+    if (was_open && !adapter_->close()) {
+        last_error_ += std::string(last_error_.empty() ? "" : "; ") + "Close Si5351 transport failed: " + adapter_->diagnostic() +
             "; cleanup failed; output state is unconfirmed.";
         return false;
     }
@@ -262,7 +160,7 @@ bool Si5351Device::close()
 
 bool Si5351Device::isOpen() const noexcept
 {
-    return fd_ >= 0;
+    return open_;
 }
 
 bool Si5351Device::probe()
@@ -392,8 +290,8 @@ bool Si5351Device::writeRegister(
         return true;
     }
     const std::uint8_t buffer[2] = {address, value};
-    const ssize_t written = adapter_->writeData(fd_, buffer, sizeof(buffer));
-    if (written != static_cast<ssize_t>(sizeof(buffer)))
+    const auto written = adapter_->write(buffer, sizeof(buffer));
+    if (written != static_cast<std::ptrdiff_t>(sizeof(buffer)))
     {
         std::ostringstream stream;
         stream << "Write Si5351 register 0x" << std::hex
@@ -423,9 +321,9 @@ bool Si5351Device::readRegister(
         return false;
     }
 
-    const ssize_t address_written =
-        adapter_->writeData(fd_, &address, sizeof(address));
-    if (address_written != static_cast<ssize_t>(sizeof(address)))
+    const auto address_written =
+        adapter_->write(&address, sizeof(address));
+    if (address_written != static_cast<std::ptrdiff_t>(sizeof(address)))
     {
         std::ostringstream stream;
         stream << "Select Si5351 register 0x" << std::hex
@@ -438,8 +336,8 @@ bool Si5351Device::readRegister(
         return false;
     }
 
-    const ssize_t bytes_read = adapter_->readData(fd_, &value, sizeof(value));
-    if (bytes_read != static_cast<ssize_t>(sizeof(value)))
+    const auto bytes_read = adapter_->read(&value, sizeof(value));
+    if (bytes_read != static_cast<std::ptrdiff_t>(sizeof(value)))
     {
         std::ostringstream stream;
         stream << "Read Si5351 register 0x" << std::hex
@@ -488,8 +386,8 @@ bool Si5351Device::writeRegisters(const std::vector<RegisterWrite>& writes)
             std::uint8_t buffer[9] = {writes[begin].address};
             for (std::size_t i = begin; i < end; ++i) buffer[i - begin + 1] = writes[i].value;
             const std::size_t size = end - begin + 1;
-            const ssize_t written = adapter_->writeData(fd_, buffer, size);
-            if (written != static_cast<ssize_t>(size))
+            const auto written = adapter_->write(buffer, size);
+            if (written != static_cast<std::ptrdiff_t>(size))
             {
                 // Some bytes may have reached silicon. Never retry or trust cache.
                 setLastError("Si5351 parameter block write failed or was short.");
@@ -521,11 +419,6 @@ void Si5351Device::clearRegisterCache()
 const std::string& Si5351Device::getLastError() const noexcept
 {
     return last_error_;
-}
-
-std::string Si5351Device::buildI2CDevicePath() const
-{
-    return "/dev/i2c-" + std::to_string(config_.i2c_bus);
 }
 
 void Si5351Device::updateRegisterCache(

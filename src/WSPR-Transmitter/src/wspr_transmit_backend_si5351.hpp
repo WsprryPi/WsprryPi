@@ -41,7 +41,7 @@ public:
     {
         Si5351Device::Config device;
         Si5351Planner::Config planner;
-        std::shared_ptr<Si5351Device::I2CAdapter> device_adapter{};
+        std::shared_ptr<Si5351Transport> device_adapter{};
 
         /**
          * @brief Si5351 drive-strength power level.

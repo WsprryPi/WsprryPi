@@ -12,7 +12,7 @@
 #include <iostream>
 #include <mutex>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -26,14 +26,14 @@ extern char** environ;
 #endif
 
 namespace si5351_inventory_process {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 namespace {
 std::mutex worker_mutex;
 pid_t outstanding = -1;
 }
 #endif
 void reap() noexcept {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     try {
         std::unique_lock lock(worker_mutex, std::try_to_lock);
         if (!lock.owns_lock() || outstanding <= 0) return;
@@ -44,7 +44,7 @@ void reap() noexcept {
 #endif
 }
 Reply run(const std::vector<std::string>& command, std::chrono::milliseconds timeout) {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     std::unique_lock lock(worker_mutex, std::try_to_lock);
     if (!lock.owns_lock()) return {{}, "Si5351 address discovery is already running."};
     if (outstanding > 0) {
@@ -57,8 +57,14 @@ Reply run(const std::vector<std::string>& command, std::chrono::milliseconds tim
     if (command.empty() || command.front().empty() || timeout.count() <= 0)
         return {{}, "Invalid Si5351 discovery command."};
     int pipefd[2];
-    if (::pipe2(pipefd, O_CLOEXEC) != 0)
-        return {{}, "Unable to create Si5351 discovery channel."};
+#if defined(__APPLE__)
+    if (::pipe(pipefd) != 0) return {{}, "Unable to create Si5351 discovery channel."};
+    if (::fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) < 0 || ::fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) < 0) {
+        ::close(pipefd[0]); ::close(pipefd[1]); return {{}, "Unable to protect Si5351 discovery channel."};
+    }
+#else
+    if (::pipe2(pipefd, O_CLOEXEC) != 0) return {{}, "Unable to create Si5351 discovery channel."};
+#endif
     // Preserve the IPC channel even when the caller started with closed stdio.
     for (auto& descriptor : pipefd) {
         if (descriptor >= 3) continue;
@@ -76,13 +82,27 @@ Reply run(const std::vector<std::string>& command, std::chrono::milliseconds tim
     if (rc == 0) {
         rc = posix_spawn_file_actions_adddup2(&actions, pipefd[1], STDOUT_FILENO);
         // Do not retain listener/client sockets or hardware descriptors in a stalled child.
+#if defined(__APPLE__)
+        if (rc == 0) rc = posix_spawn_file_actions_addclose(&actions, pipefd[0]);
+        if (rc == 0) rc = posix_spawn_file_actions_addclose(&actions, pipefd[1]);
+#else
         if (rc == 0) rc = posix_spawn_file_actions_addclosefrom_np(&actions, 3);
+#endif
     }
     std::vector<char*> args;
     for (const auto& argument : command) args.push_back(const_cast<char*>(argument.c_str()));
     args.push_back(nullptr);
     pid_t child = -1;
+#if defined(__APPLE__)
+    posix_spawnattr_t attributes;
+    const int attribute_result = posix_spawnattr_init(&attributes);
+    if (rc == 0) rc = attribute_result;
+    if (rc == 0) rc = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
+    if (rc == 0) rc = ::posix_spawn(&child, args[0], &actions, &attributes, args.data(), environ);
+    if (attribute_result == 0) posix_spawnattr_destroy(&attributes);
+#else
     if (rc == 0) rc = ::posix_spawn(&child, args[0], &actions, nullptr, args.data(), environ);
+#endif
     if (actions_initialized) posix_spawn_file_actions_destroy(&actions);
     ::close(pipefd[1]);
     if (rc != 0) {
@@ -182,11 +202,17 @@ std::optional<int> helper_main(int argc, char** argv) {
         !integer(argv[3], reference) || reference <= 0 ||
         (argc >= 5 && (!integer(argv[4], selected) || selected < 0x60 || selected > 0x6F))) return 2;
     nlohmann::json result = {{"bus", bus}, {"addresses", nlohmann::json::array()}, {"error", ""}};
-#if defined(__linux__) && WSPRRYPI_BACKEND_SI5351
+#if (defined(__linux__) || defined(__APPLE__)) && WSPRRYPI_BACKEND_SI5351
     const auto* disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
     if (disabled && std::string(disabled) == "1") {
         result["error"] = "Si5351 address discovery is disabled for hardware-free validation.";
     } else {
+#if defined(__APPLE__)
+        if (argc != 6 || selected < 0x60 || std::string(argv[5]).empty()) {
+            result["error"] = "Native HID requires an explicit identity and address.";
+            std::cout << result.dump() << std::flush; return 0;
+        }
+#endif
         for (int address = selected < 0 ? 0x60 : selected;
              address <= (selected < 0 ? 0x6F : selected); ++address) {
             Si5351Device::Config settings;

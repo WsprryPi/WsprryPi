@@ -3,8 +3,9 @@
 The Si5351 component owns metadata-only stable identity discovery in
 `src/WSPR-Transmitter/src/linux_i2c_identity.hpp`. Application configuration and
 the production Linux transport share its resolver. The backend remains
-`si5351`, and the transport is `linux-i2c`. No direct USB HID implementation,
-backend fallback, or macOS physical transport is provided.
+`si5351`, and the transport is `linux-i2c`. Linux provides no direct USB HID implementation or backend fallback. The
+separately selected [native macOS transport](macos-mcp2221a.md) uses the same
+Si5351 backend without Linux device access.
 
 ## Configuration and identity
 

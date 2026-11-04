@@ -134,6 +134,7 @@ namespace
         }
     };
 
+#ifndef SI5351_ONLY_STARTUP_TEST
     enum class FailurePoint
     {
         Support,
@@ -413,6 +414,7 @@ namespace
         bool mapped_{false};
     };
 
+#endif
     class NoopCompiler final : public wsprrypi::IExecutionPlanCompiler
     {
     public:
@@ -585,6 +587,7 @@ namespace
                "Si5351 dry-run startup quiesce must not access I2C");
     }
 
+#ifndef SI5351_ONLY_STARTUP_TEST
     std::vector<std::string> successful_gpio_trace(
         const char *gpio_register,
         std::uint32_t original_gpio,
@@ -1074,6 +1077,7 @@ namespace
         expect(wrong_size.close(error),
                "fake access must allow cleanup after rejecting an invalid map");
     }
+#endif
 }
 
 int main()
@@ -1083,6 +1087,7 @@ int main()
     test_si5351_reference_source_initialization();
     test_si5351_quiesce_failures_close_handles();
     test_si5351_dry_run_avoids_i2c();
+#ifndef SI5351_ONLY_STARTUP_TEST
     test_gpio_ppm_sign_and_bounds();
     test_gpio_rf_clock_planning_and_divider_bounds();
     test_gpio_continuous_tone_fractional_dither();
@@ -1093,6 +1098,7 @@ int main()
     test_rpi_failure_injection_and_cleanup();
     test_scheduled_gpio_capability_and_cleanup();
     test_fake_rejects_invalid_lifecycle_and_bounds();
+#endif
     expect(production_platform_support_checks == 0,
            "GPIO startup-quiesce tests must never reach the production adapter");
     std::cout << "startup_quiesce_test: passed\n";

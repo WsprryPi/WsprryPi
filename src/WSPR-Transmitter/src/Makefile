@@ -4,7 +4,9 @@
 DEBUG := -DDEBUG_WSPR_TRANSMIT
 # C++ Version
 CXXVER := 20
-HOST_OS := $(shell uname -s 2>/dev/null)
+comma := ,
+BACKENDS ?= si5351
+include si5351_transport_rules.mk
 # Ordinary sibling components used by the standalone build.
 COMPONENT_SRCDIRS := $(wildcard ../../WSPR-Reference/src/wspr)
 COMPONENT_SRCDIRS += $(wildcard ../../Mailbox/src)
@@ -23,9 +25,9 @@ OUT := $(strip $(OUT))
 TEST_OUT := $(strip $(TEST_OUT))
 
 # Output directories
-OBJ_DIR_RELEASE = build/obj/release
-OBJ_DIR_DEBUG   = build/obj/debug
-DEP_DIR         = build/dep
+OBJ_DIR_RELEASE = build/obj/release/$(SI5351_TRANSPORT)
+OBJ_DIR_DEBUG   = build/obj/debug/$(SI5351_TRANSPORT)
+DEP_DIR         = build/dep/$(SI5351_TRANSPORT)
 BIN_DIR		 	= build/bin
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ GPIO_QUALIFICATION_TEST_SOURCE := ./gpio_startup_quiesce_qualification_test.cc
 SI5351_MIN_DRIVE_SOURCE := ./si5351_min_drive_qualification.cc
 SI5351_MIN_DRIVE_MAIN_SOURCE := ./si5351_min_drive_qualification_main.cc
 SI5351_MIN_DRIVE_TEST_SOURCE := ./si5351_min_drive_qualification_test.cc
+LOCAL_CPP_SOURCES := $(filter-out ./si5351_transport_linux.cpp ./si5351_transport_macos.cpp,$(LOCAL_CPP_SOURCES))
+LOCAL_CPP_SOURCES += $(addprefix ./,$(SI5351_TRANSPORT_SOURCE))
 LOCAL_CPP_SOURCES := $(filter-out $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE),$(LOCAL_CPP_SOURCES))
 
 # Find sources in each sibling component, explicitly skipping demo entry points.
@@ -74,6 +78,7 @@ CPP_DEBUG_OBJECTS := $(patsubst %.cpp, $(OBJ_DIR_DEBUG)/%.o,$(REL_CPP_SOURCES))
 SI5351_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./si5351_backend_harness.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
+	$(OBJ_DIR_DEBUG)/./$(SI5351_TRANSPORT_SOURCE:.cpp=.o) \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
 SI5351_PLANNER_TEST_OBJECTS := \
@@ -83,6 +88,7 @@ SI5351_TRANSITION_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./si5351_transition_test.o \
 	$(OBJ_DIR_DEBUG)/./transmission_controller.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
+	$(OBJ_DIR_DEBUG)/./$(SI5351_TRANSPORT_SOURCE:.cpp=.o) \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
 STARTUP_QUIESCE_TEST_OBJECTS := \
@@ -92,6 +98,7 @@ STARTUP_QUIESCE_TEST_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_rpi.o \
 	$(OBJ_DIR_DEBUG)/./gpio_frequency_plan.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
+	$(OBJ_DIR_DEBUG)/./$(SI5351_TRANSPORT_SOURCE:.cpp=.o) \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o \
 	$(OBJ_DIR_DEBUG)/Mailbox/src/mailbox.o \
@@ -108,10 +115,12 @@ SIMULATED_BACKEND_REALTIME_TEST_OBJECTS := \
 SI5351_QUALIFICATION_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./si5351_startup_quiesce_qualification.o \
 	$(OBJ_DIR_DEBUG)/./wspr_transmit_backend_si5351.o \
+	$(OBJ_DIR_DEBUG)/./$(SI5351_TRANSPORT_SOURCE:.cpp=.o) \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
 SI5351_MIN_DRIVE_OBJECTS := \
 	$(OBJ_DIR_DEBUG)/./si5351_min_drive_qualification.o \
+	$(OBJ_DIR_DEBUG)/./$(SI5351_TRANSPORT_SOURCE:.cpp=.o) \
 	$(OBJ_DIR_DEBUG)/./si5351_device.o \
 	$(OBJ_DIR_DEBUG)/./si5351_planner.o
 $(OBJ_DIR_DEBUG)/./si5351_min_drive_qualification.o \
@@ -128,7 +137,7 @@ GPIO_QUALIFICATION_OBJECTS := \
 # ────────────────────────────────────────────────────────────────────────────────
 
 # Linker Flags
-LDFLAGS := -lpthread
+LDFLAGS := $(SI5351_TRANSPORT_LIBS) -lpthread
 ifeq ($(HOST_OS),Linux)
 LDFLAGS += -latomic
 endif
@@ -158,7 +167,7 @@ endif
 # Common flags for both C and C++ compilers
 CXX_VERSION_LINE := $(shell $(CXX) --version 2>/dev/null | head -n 1)
 ifneq ($(findstring clang,$(CXX_VERSION_LINE)),)
-COMPILER_DIAGNOSTIC_FLAGS :=
+COMPILER_DIAGNOSTIC_FLAGS := -ferror-limit=10
 else
 COMPILER_DIAGNOSTIC_FLAGS := -fmax-errors=10
 endif
@@ -173,7 +182,7 @@ C_DEBUG_FLAGS := $(CFLAGS) -g $(DEBUG)	# Debug flags
 C_RELEASE_FLAGS := $(CFLAGS) -O2		# Release optimized
 
 # C++ Flags
-CXXFLAGS := -Wno-psabi -std=c++$(CXXVER)
+CXXFLAGS := $(SI5351_TRANSPORT_FLAGS) $(if $(findstring clang,$(CXX_VERSION_LINE)),,-Wno-psabi) -std=c++$(CXXVER)
 CXXFLAGS += $(COMMON_FLAGS) $(COMM_CXX_FLAGS)
 
 # Include paths
@@ -207,20 +216,20 @@ endif
 ##
 
 # Generic debug compile (your own code)
-$(OBJ_DIR_DEBUG)/%.o: %.c
+$(OBJ_DIR_DEBUG)/%.o: %.c Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (debug) $< into $@"
 	$(Q)$(CC) $(C_DEBUG_FLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
 
-$(OBJ_DIR_DEBUG)/%.o: %.cpp
+$(OBJ_DIR_DEBUG)/%.o: %.cpp Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (debug) $< into $@"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
 
 # Explicitly named qualification-only .cc sources are never broadly discovered.
-$(OBJ_DIR_DEBUG)/%.o: %.cc
+$(OBJ_DIR_DEBUG)/%.o: %.cc Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling qualification (debug) $< into $@"
@@ -228,13 +237,13 @@ $(OBJ_DIR_DEBUG)/%.o: %.cc
 
 # Auto-generate debug compile rules for each sibling component.
 define MAKE_DEBUG_COMPONENT_RULES
-$(OBJ_DIR_DEBUG)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp
+$(OBJ_DIR_DEBUG)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $$(@D)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)echo "Compiling (debug) $$< into $$@"
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(DEP_DIR)/$$*.d -c $$< -o $$@
 
-$(OBJ_DIR_DEBUG)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.c
+$(OBJ_DIR_DEBUG)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.c Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $$(@D)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)echo "Compiling (debug) $$< into $$@"
@@ -317,13 +326,13 @@ build/bin/gpio_startup_quiesce_qualification_test: $(OBJ_DIR_DEBUG)/./gpio_start
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
 # Generic release compile (your own code)
-$(OBJ_DIR_RELEASE)/%.o: %.cpp
+$(OBJ_DIR_RELEASE)/%.o: %.cpp Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (release) $< into $@"
 	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(DEP_DIR)/$*.d -c $< -o $@
 
-$(OBJ_DIR_RELEASE)/%.o: %.c
+$(OBJ_DIR_RELEASE)/%.o: %.c Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $(dir $@)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $*)
 	$(Q)echo "Compiling (release) $< into $@"
@@ -331,13 +340,13 @@ $(OBJ_DIR_RELEASE)/%.o: %.c
 
 # Auto-generate release compile rules for each sibling component.
 define MAKE_RELEASE_COMPONENT_RULES
-$(OBJ_DIR_RELEASE)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp
+$(OBJ_DIR_RELEASE)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.cpp Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $$(@D)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)echo "Compiling (release) $$< into $$@"
 	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) -MF $(DEP_DIR)/$$*.d -c $$< -o $$@
 
-$(OBJ_DIR_RELEASE)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.c
+$(OBJ_DIR_RELEASE)/$(patsubst ../../%,%,$(1))/%.o: $(1)/%.c Makefile si5351_transport_rules.mk
 	$(Q)mkdir -p $$(@D)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
 	$(Q)mkdir -p $(DEP_DIR)/$(dir $$*)
@@ -468,3 +477,15 @@ linux-i2c-identity-test:
 	@mkdir -p build/bin
 	$(CXX) -std=c++20 -Wall -Wextra -Werror linux_i2c_identity_test.cc -o build/bin/linux_i2c_identity_test
 	./build/bin/linux_i2c_identity_test
+
+.PHONY: mcp2221a-transport-test
+mcp2221a-transport-test:
+	$(Q)mkdir -p build/bin
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -DMCP2221A_DEVICE_INTEGRATION mcp2221a_protocol_test.cc si5351_device.cpp $(SI5351_TRANSPORT_SOURCE) $(SI5351_TRANSPORT_LIBS) -o build/bin/mcp2221a_protocol_test
+	$(Q)./build/bin/mcp2221a_protocol_test
+
+.PHONY: si5351-startup-portable-test
+si5351-startup-portable-test:
+	$(Q)mkdir -p build/bin
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -DSI5351_ONLY_STARTUP_TEST startup_quiesce_test.cpp transmission_controller.cpp wspr_transmit_backend_si5351.cpp si5351_device.cpp $(SI5351_TRANSPORT_SOURCE) si5351_planner.cpp $(LDFLAGS) -o build/bin/si5351_startup_portable_test
+	$(Q)./build/bin/si5351_startup_portable_test

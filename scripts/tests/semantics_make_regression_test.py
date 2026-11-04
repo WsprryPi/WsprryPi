@@ -51,6 +51,7 @@ def main() -> int:
     unsupported = run(
         "semantics-test",
         "HOST_OS=Darwin",
+        "SI5351_TRANSPORT=mcp2221a-hid",
         "GPIOD_CPP_HEADER_AVAILABLE=1",
         expect=2,
     )
@@ -62,6 +63,7 @@ def main() -> int:
     missing_header = run(
         "semantics-test",
         "HOST_OS=Linux",
+        "SI5351_TRANSPORT=linux-i2c",
         "GPIOD_CPP_HEADER_AVAILABLE=0",
         expect=2,
     )
