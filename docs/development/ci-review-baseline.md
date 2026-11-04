@@ -1,6 +1,8 @@
 # CI review baseline and coverage map
 
-Phase 1 establishes the accounting and execution map. Phases 2–7 remain unimplemented.
+Phase 1 freezes the accounting and execution map. The Phase 2 browser-harness
+implementation and its validation gates are recorded below; Phases 3–7 remain
+unimplemented.
 No test, workflow, product behavior, installed service, device, or RF path is changed
 by this phase. This is an engineering baseline, not release or hardware qualification.
 
@@ -394,3 +396,94 @@ finding remained. The 145-line helper is one new executable infrastructure file,
 charged as Phase 1 overhead in the later after-total. Actual feature-ref run,
 commit identity and remaining CI limitations are reported with the phase result;
 this baseline is not retroactively rewritten to disguise a failed or absent run.
+
+
+## Phase 2 browser infrastructure
+
+The frozen ledger and source denominator above are unchanged. Phase 2 replaces
+13 active copied CDP clients with one shared implementation in
+`WsprryPi-UI/tests/browser_harness.js`. All 14 active browser launchers use it;
+`integrated_review_browser.js` and `page_warning_browser.js` retain their imported
+scenarios and use the shared evaluation/readiness/render operations. Ten active
+copies each of port allocation, JSON/status probing, and polling become shared
+primitives. The existing process-group helper remains a separate owned-process
+boundary. No new runtime package or large browser framework is introduced.
+
+Disposition at implementation: REWRITE those infrastructure blocks, process
+verification, and `logging_stream_fixture.js` readiness/cleanup; DELETE only
+superseded copied machinery after migration checks; RETAIN scenario policy,
+production pair adapters, the safe PHP router, capture matrices, and npm/Make
+entry points; HOLD the unscheduled Si5351/firmware browser tools. No unused test
+or dormant section is deleted for credit. The support-intake exported cleanup
+contracts remain available. Browser fixture policy does not enable privileged,
+journal, proxy, transmitter, or other application endpoints in the safe router.
+
+Startup uses fresh registered profiles and their own DevTools discovery file,
+validates the endpoint and usable page, and logs executable/version. The caller
+still navigates its owned page and waits for actual scripts/state. Existing
+60-second network/USB/Fleet/recovery startup budgets and support-intake's
+12-second policy are explicit. HTTP operations consume the remaining stage
+budget rather than introducing a shorter arbitrary probe cutoff. Native dialogs
+are rejected unless the caller supplies its exact confirmation allowlist;
+recovery retains explicit accept/cancel behavior. CDP framing/errors/exceptions,
+disconnects, child exit, stage cancellation, and disposal reject outstanding
+operations. Owned groups are checked for live writers (excluding zombies),
+terminated/escalated with bounded waits, then profiles are removed. A failed
+launch preserves ownership across the caller's finalizer; verified no-PID spawn
+failure removes its empty profile while retaining the original launch error.
+
+O08, O13, and O14 gain stronger lifecycle/failure evidence; O01–O07 and O09–O15
+retain their scenarios and contexts. Four core browser scenario functions are
+byte-identical to Phase 1. The 32-case conditional-GPIO matrix, 18 tone workflows,
+160 page-warning combinations, integrated layout/theme/keyboard/accessibility
+checks, both UDP-editor surfaces, maximum-history bounds, and logging recovery
+cases remain. The new focused suite adds 17 socket/process fault tests; counts
+are not a global executed-case total. There are still eight job definitions and
+nine expanded required contexts. npm browser dispatch adds one focused harness
+invocation without removing a scenario invocation.
+
+Visual synchronization waits for required state or shown events and settles
+fonts, finite animations, and paint frames. Deliberate failure/latency fixtures
+and USB Logs' two negative pause/online observation windows remain intentional
+test stimulus/observation, not readiness proof. The maximum UDP history is a
+load case: the original source took 13.556s locally despite a nominal five-second
+poll count, because inner calls were unbounded. It now acknowledges the final
+production cursor, then asserts all 4,160 retained rows and the 4,096-source
+limit once, under a separate 60-second load deadlock watchdog. No product timing
+contract or safety deadline is relaxed. Errors include runtime stage,
+elapsed/budget, last transition/observed result type, call site, and bounded
+browser exception details; request payloads are not dumped.
+
+| Code/count measure | Phase 1 delivered | Phase 2 candidate |
+| --- | ---: | ---: |
+| Active infrastructure files, including Phase 1 helper | 144 | 146 |
+| Active physical lines, including Phase 1 helper | 32,116 | 31,557 |
+| Active copied CDP classes / shared class | 13 / 0 | 0 / 1 |
+| New helper plus focused-test physical lines | 0 | 594 |
+| Unused cleanup credited | 0 | 0 |
+
+Phase 2's raw physical reduction is 559 lines. Conservatively excluding all 84
+removed blank/comment lines gives 475 credited lines for this phase (1.49% of
+the frozen 31,971-line denominator). Charging Phase 1's 145-line tool gives a
+cumulative credited saving of 330 lines (1.03%). New helpers/tests are fully
+charged; the increase of two files is reported without claiming file-count
+reduction. These figures are not achievement of the overall 50% target.
+
+Local validation uses Node 26/macOS for real socket/process faults and an
+isolated Node 22/Debian PHP/Chromium container for `npm test`,
+`npm run test:browser`, the selected-Pico UDP editor, UDP Logs, and USB Logs with
+`LOGGING_REAL_STREAM=1`. The Pico checkout is read-only at
+`74dd300b6688984359c13ed576443fff356b5033`; no companion edits are needed.
+Representative desktop/mobile/light/dark PPS, tone, support, and logging
+captures are inspected; production UI assets and operator behavior are unchanged.
+The component README documents the shared test APIs and local requirements.
+Operator documentation was considered and does not require changes.
+
+Independent adversarial review and corrective reassessments cover failed-launch
+ownership, no-PID cleanup, port collisions, inherited budgets, strict mode,
+exception details, callback lifetime and cancellation. The complete actual
+network/USB recipes and all required CI contexts must still be inspected for
+the final pushed feature revision; local fixtures or historical green results
+do not substitute for those gates. Final CI outcome/source identities and timing
+limitations belong with the execution result. No comparable full-success timing
+improvement is claimed from the prior partial baseline or local runs.

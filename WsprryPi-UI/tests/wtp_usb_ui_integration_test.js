@@ -1,139 +1,32 @@
+"use strict";
+
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn } = require("./browser_harness.js");
 // SPDX-License-Identifier: MIT
 // Hardware-free rendered USB profile, settings and logging workflow with mocked HTTP responses.
-"use strict";
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
 const os = require("node:os");
-const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try {
-                    resolve(JSON.parse(body));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 10000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.dialogs = [];
-        this.dialogError = null;
-        const reviewDialogs = new Set([
-            "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
-            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?"
-        ]);
-        const failDialog = error => {
-            this.dialogError = error;
-            for (const { reject } of this.pending.values()) reject(error);
-            this.pending.clear();
-        };
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (message.method === 'Page.javascriptDialogOpening') {
-                const expected = message.params.type === 'confirm' && reviewDialogs.has(message.params.message);
-                this.dialogs.push(message.params.message);
-                if (!expected) failDialog(new Error(`Unexpected browser dialog: ${message.params.type}: ${message.params.message}`));
-                void this.send('Page.handleJavaScriptDialog', { accept: expected }).catch(failDialog);
-                return;
-            }
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}, timeoutMs = 15000) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error("CDP deadline: "+method));},timeoutMs);
-            this.pending.set(id, { resolve:value=>{clearTimeout(timer);resolve(value);}, reject:error=>{clearTimeout(timer);reject(error);} });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 async function main() {
+    let page;
     const fs=require("node:fs");
     const phpPort=await freePort(), debugPort=await freePort();
     const url=`http://127.0.0.1:${phpPort}/index.php?page=config`;
     const output=path.resolve(process.env.WSPRRYPI_USB_UI_EVIDENCE_DIR || path.join(UI_ROOT,"../src/build/wtp-network/ui-usb-progress"));fs.mkdirSync(output,{recursive:true});
-    const profileDir=fs.mkdtempSync(path.join(os.tmpdir(),"wsprrypi-usb-ui-"));
+    const profileDir=createBrowserProfile();
     let php,chrome,client,failure;
     try {
         php=spawnFixtureChild(process.env.PHP_BIN || "php",["-S",`127.0.0.1:${phpPort}`,"-t","data","tests/browser_fixture_router.php"],{cwd:UI_ROOT});
-        await waitForSpawn(php);await waitFor(async()=>await getStatus(url)===200,"PHP fixture");
-        chrome=spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":"chromium"),
-            ["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking",`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profileDir}`,"about:blank"]);
-        await waitForSpawn(chrome);
-        const page=await waitFor(async()=>(await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p=>p.type==="page"),"Chrome",60000);
-        client=new CdpClient(page.webSocketDebuggerUrl);await client.open();await client.send("Page.enable");
+        await waitForSpawn(php);await waitForPhp(php, url, "PHP fixture");
+        ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":"chromium"), args: ["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking","about:blank"], profile: profileDir, timeoutMs: 60000, expectedDialogs: [
+            "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
+            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?"
+        ]}));await client.send("Page.enable");
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url}, 60000);
         const evaluate=async expression=>{const result=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
@@ -184,7 +77,7 @@ async function main() {
             await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
             for(const theme of ["light","dark"]) {
                 await evaluate(`applyThemePreference('${theme}');document.getElementById('wtp-usb-settings').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-110)`);
-                await new Promise(resolve=>setTimeout(resolve,100));
+                await client.settleRendering();
                 assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${name}/${theme} horizontal overflow`);
                 await evaluate("document.getElementById('wtp-usb-logging-controls').open=true;document.getElementById('wtp-usb-logging-enabled').focus()");
                 assert.equal(await evaluate("document.activeElement.id"),'wtp-usb-logging-enabled',await evaluate("JSON.stringify((()=>{const a=[];for(let e=document.getElementById('wtp-usb-logging-enabled');e;e=e.parentElement)a.push({id:e.id,cls:e.className,hidden:e.hidden,disabled:e.disabled,display:getComputedStyle(e).display});return a;})())"));
@@ -233,7 +126,7 @@ async function main() {
                 await evaluate(`bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();document.getElementById('fleet-name').scrollIntoView({block:'center',behavior:'instant'});document.getElementById('fleet-name').focus()`);
                 for(const surface of ["fleet","wtp"]) {
                     const field=surface==="fleet"?"fleet-uncertainty":"wtp_uncertainty";
-                    await new Promise(resolve=>setTimeout(resolve,100));
+                    await client.settleRendering();
                     const state=await evaluate(`(() => {const input=document.getElementById('${field}'),r=input.getBoundingClientRect(),name=document.getElementById('fleet-name');return {hidden:!!input.closest('[hidden]'),focus:document.activeElement===name,width:r.width,height:r.height,value:input.value,nameWidth:name.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
                     assert(state.hidden&&state.focus&&state.width===0&&state.height===0&&state.nameWidth>150&&!state.overflow,JSON.stringify(state));
                     findings.push({name,theme,surface,...state});
@@ -258,11 +151,7 @@ async function main() {
         console.log("Rendered Fleet navigation, configured common name and USB no-network/logging editors at desktop/mobile in light/dark; uncertainty veto controls stay hidden, stored values survive explicit profile rename/save/reload, visible focus and layout passed");
         console.log(output);
     } catch(error) {failure=error;throw error;} finally {
-        if(client)client.close();
-        const stopped=await Promise.allSettled([stopIsolatedProcess(chrome),stopChild(php)]);
-        const errors=stopped.filter(result=>result.status==='rejected').map(result=>result.reason);
-        if(errors.length)throw new AggregateError(failure?[failure,...errors]:errors,'USB UI fixture shutdown failed');
-        fs.rmSync(profileDir,{recursive:true,force:true,maxRetries:10,retryDelay:100});
+        await finishFixture({failure: failure, client, browser: chrome, php, profile: profileDir});
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

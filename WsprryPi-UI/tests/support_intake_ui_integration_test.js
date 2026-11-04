@@ -1,63 +1,16 @@
 "use strict";
 
+const { waitForPhp, createBrowserProfile, freePort, waitFor: sharedWaitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn } = require("./browser_harness.js");
+const waitFor = (check, description, timeoutMs = 12000) => sharedWaitFor(check, description, timeoutMs);
+
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 12000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
 
 async function removeProfileDirectory(profileDir, options = {}) {
     const remove = options.remove || fs.rmSync;
@@ -92,36 +45,6 @@ function chromiumBinary() {
     throw new Error("Chromium-compatible browser not found");
 }
 
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-    send(method, params = {}) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-    close() { this.socket.close(); }
-}
 
 async function browserTest() {
     const fail = (message) => { throw new Error(message); };
@@ -568,16 +491,15 @@ async function capture(client, outputPath, width, height, state, theme = "light"
         const detail = rendered.exceptionDetails.exception && rendered.exceptionDetails.exception.description;
         throw new Error(detail || rendered.exceptionDetails.text || "Screenshot state rendering failed");
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await client.settleRendering();
     const screenshot = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
     fs.writeFileSync(outputPath, screenshot.data, "base64");
 }
 
 async function main() {
+    let page;
     const phpPort = await freePort();
-    const debugPort = await freePort();
-
-    const profileDir = `/tmp/wsprrypi-support-intake-ui-${process.pid}`;
+    const profileDir = createBrowserProfile();
     let chromium;
     let client, php;
     let primaryError;
@@ -586,21 +508,11 @@ async function main() {
             cwd: UI_ROOT,
         });
         await waitForSpawn(php);
-        await waitFor(async () => await getStatus(
-            `http://127.0.0.1:${phpPort}/index.php?page=maintenance`) === 200, "Maintenance fixture");
-        chromium = spawnIsolatedProcess(chromiumBinary(), [
+        await waitForPhp(php, `http://127.0.0.1:${phpPort}/index.php?page=maintenance`, "Maintenance fixture", 12000);
+        ({browser: chromium, client, page} = await launchBrowser({executable: chromiumBinary(), args: [
             "--headless", "--no-sandbox", "--disable-gpu",
-            `--remote-debugging-port=${debugPort}`,
-            `--user-data-dir=${profileDir}`,
-            `http://127.0.0.1:${phpPort}/index.php?page=maintenance`,
-        ]);
-        await waitForSpawn(chromium);
-        const page = await waitFor(async () => {
-            const pages = await getJson(`http://127.0.0.1:${debugPort}/json`);
-            return pages.find((item) => item.type === "page");
-        }, "Maintenance page in Chromium");
-        client = new CdpClient(page.webSocketDebuggerUrl);
-        await client.open();
+            ], profile: profileDir, timeoutMs: 12000}));
+        await client.send("Page.navigate", {url: `http://127.0.0.1:${phpPort}/index.php?page=maintenance`});
         await client.send("Page.bringToFront");
         await waitFor(async () => {
             const result = await client.send("Runtime.evaluate", {
@@ -648,25 +560,7 @@ async function main() {
     } catch (error) {
         primaryError = error;
     } finally {
-        let cleanupError;
-        if (client && chromium?.exitCode === null) {
-            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
-        }
-        const cleanupSteps = [
-            async () => { if (client) client.close(); },
-            async () => stopIsolatedProcess(chromium),
-            async () => stopChild(php),
-            async () => removeProfileDirectory(profileDir),
-        ];
-        for (const cleanupStep of cleanupSteps) {
-            try {
-                await cleanupStep();
-            } catch (error) {
-                cleanupError ||= error;
-            }
-        }
-        const failure = preferredHarnessError(primaryError, cleanupError);
-        if (failure) throw failure;
+        await finishFixture({failure: primaryError, client, browser: chromium, php, profile: profileDir});
     }
 }
 

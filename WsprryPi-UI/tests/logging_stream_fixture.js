@@ -3,7 +3,7 @@
 // cleanup. Only its journalctl input is deterministic; no system journal is read.
 "use strict";
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), http = require('node:http');
-const {spawnFixtureChild, waitForSpawn, stopIsolatedProcess} = require('./browser_fixture_process.js');
+const {spawnFixtureChild, waitForSpawn, stopIsolatedProcess, failedBeforeSpawn, waitForPhp} = require('./browser_harness.js');
 
 async function createProductionStream(root) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'logging-stream-'));
@@ -19,14 +19,17 @@ async function createProductionStream(root) {
         detached:process.platform !== 'win32',
         env:{...process.env, PHP_CLI_SERVER_WORKERS:'16', PATH:directory + path.delimiter + process.env.PATH, LOGGING_JOURNAL_FIXTURE:input}
     });
-    await waitForSpawn(php);
+    const closeOwned = async failure => {
+        const errors = failure ? [failure] : [];
+        try {
+            if (!failedBeforeSpawn(php)) await stopIsolatedProcess(php);
+            fs.rmSync(directory, {recursive:true, force:true});
+        } catch (error) { errors.push(error); }
+        if (errors.length) throw new AggregateError(errors, "Production log fixture or cleanup failed", {cause:failure || errors[0]});
+    };
     try {
-        let ready = false;
-        for (let i = 0; i < 100 && !ready; i++) {
-            try { ready = (await fetch(`http://127.0.0.1:${port}/log_origin.php`)).ok; } catch (_) {}
-            if (!ready) await new Promise(resolve => setTimeout(resolve, 20));
-        }
-        if (!ready) throw Error('PHP fixture did not start');
+        await waitForSpawn(php);
+        await waitForPhp(php, `http://127.0.0.1:${port}/log_origin.php`, "production log adapter ready", 2000);
         return {
             forward(req, res, rows) {
                 const journal = rows.map(row => ({
@@ -46,10 +49,10 @@ async function createProductionStream(root) {
                 upstream.on('error', error => res.destroy(error));
                 res.on('close', () => upstream.destroy());
             },
-            async close() { await stopIsolatedProcess(php); fs.rmSync(directory, {recursive:true, force:true}); }
+            async close() { await closeOwned(); }
         };
     } catch (error) {
-        await stopIsolatedProcess(php); fs.rmSync(directory, {recursive:true, force:true}); throw error;
+        await closeOwned(error);
     }
 }
 module.exports = {createProductionStream};

@@ -1,51 +1,16 @@
+"use strict";
+
+const { launchBrowser, finishFixture, waitFor } = require("./browser_harness.js");
+const until=check=>waitFor(check,'browser scenario condition',5000);
 // SPDX-License-Identifier: MIT
 // Real production Logs DOM/CSS/JS, synthetic log API and EventSource transport.
-"use strict";
 const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path'), http=require('node:http');
-const {spawnIsolatedProcess,stopIsolatedProcess,waitForSpawn}=require('./browser_fixture_process.js');
-const WebSocket=require('ws');
 const {createProductionStream}=require('./logging_stream_fixture.js');
 let productionStream, loggingDelay=150, loggingRequests=0, loggingReplies=0, discoveryHeld=true;const heldDiscovery=[];
 const root=path.resolve(__dirname,'../data');
 const html=fs.readFileSync(process.env.LOGGING_RENDERED_HTML,'utf8');
 const evidence=process.env.LOGGING_EVIDENCE_DIR || '/tmp/usb-logging-browser';
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(check){for(let n=0;n<100;n++){const value=await check();if(value)return value;await wait(50);}throw Error('Browser fixture timed out');}
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 
 const a='a'.repeat(32), b='b'.repeat(32), host='c'.repeat(32), urls=[];
@@ -92,12 +57,9 @@ async function main(){
  fs.mkdirSync(evidence,{recursive:true});
  if(process.env.LOGGING_REAL_STREAM==='1')productionStream=await createProductionStream(root);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- const debugServer=http.createServer();await new Promise(resolve=>debugServer.listen(0,'127.0.0.1',resolve));const debugPort=debugServer.address().port;await new Promise(resolve=>debugServer.close(resolve));
- let chrome,client,evaluate;
+ let chrome,client,evaluate,failure;
  try{
-  chrome=spawnIsolatedProcess(process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless','--no-sandbox','--disable-gpu',`--remote-debugging-port=${debugPort}`,`--user-data-dir=/tmp/usb-logging-chrome-${process.pid}`,'about:blank']);await waitForSpawn(chrome);
-  const tab=await until(async()=>{try{return(await(await fetch(`http://127.0.0.1:${debugPort}/json`)).json()).find(row=>row.type==='page');}catch{return null;}});
-  client=new CdpClient(tab.webSocketDebuggerUrl);await client.open();await client.send('Page.enable');
+  ({browser:chrome,client}=await launchBrowser({args:['--headless','--no-sandbox','--disable-gpu']}));
   evaluate=async expression=>{const value=await client.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(value.exceptionDetails)throw Error(value.exceptionDetails.text+': '+value.exceptionDetails.exception?.description);return value.result.value;};
   await client.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.WebSocket=class{static OPEN=1;static CONNECTING=0;readyState=0;addEventListener(){}close(){}};localStorage.setItem('wsprrypi.updateCheckDisabled','true');window.WSPRRYPI_ENABLE_LOG_TEST_HOOKS=true;window.logSourceFetches=0;const NativeFetch=window.fetch;window.fetch=(url,...args)=>{if(String(url).endsWith('/host/logging'))window.logSourceFetches++;return NativeFetch(url,...args)};const NativeInterval=window.setInterval;window.setInterval=(fn,delay,...args)=>{if(delay===10000)window.logSourcePoll=fn;return NativeInterval(fn,delay,...args)};window.logTestStreams=[];const NativeEventSource=window.EventSource;window.EventSource=class extends NativeEventSource{constructor(url){super(url);window.logTestStreams.push(this);this.addEventListener('playback_end',()=>{this.testReplayed=true;});}};`});
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
@@ -114,7 +76,7 @@ async function main(){
   assert(await evaluate(`!document.querySelector('#all script') && document.getElementById('all').textContent.includes('<script>')`));
   for(const [width,height,theme,name] of [[1440,960,'light','desktop-light'],[390,844,'light','mobile-light'],[1440,960,'dark','desktop-dark'],[390,844,'dark','mobile-dark']]){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
-   await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await wait(150);
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await client.settleRendering();
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`),name+' horizontal overflow');
    assert(await evaluate(`Array.from(document.querySelectorAll('.logs-unit[data-pico-id]')).every(row=>row.scrollWidth<=row.clientWidth)`),name+' Pico name and bracketed ID must remain visible');
    const shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
@@ -157,7 +119,7 @@ async function main(){
   assert(await evaluate(`document.getElementById('logs-options-status').textContent===document.getElementById('logs-source-status').textContent`),'Collection feedback must stay visible beside the dialog controls');
   for(const [width,height,theme,name] of [[1440,960,'light','options-desktop-light'],[390,844,'light','options-mobile-light'],[1440,960,'dark','options-desktop-dark'],[390,844,'dark','options-mobile-dark']]){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
-   await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await wait(150);
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await client.settleRendering();
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`));
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
@@ -167,12 +129,12 @@ async function main(){
   await evaluate(`document.getElementById('logs-refresh-sources').click()`);
   await until(()=>evaluate(`Array.from(document.getElementById('logs-source').options).some(row=>row.value==='usb:'+ 'd'.repeat(32))`));
   assert(await evaluate(`Array.from(document.getElementById('logs-source').options).some(row=>row.value==='usb:'+ 'd'.repeat(32))`));
-  await evaluate(`document.getElementById('logs-source').value='usb:'+ 'd'.repeat(32);document.getElementById('logs-source').dispatchEvent(new Event('change'))`);await wait(150);
+  await evaluate(`document.getElementById('logs-source').value='usb:'+ 'd'.repeat(32);document.getElementById('logs-source').dispatchEvent(new Event('change'))`);await until(()=>evaluate(`document.getElementById('logs-collect').disabled && document.getElementById('logs-source-status').textContent.includes('Fleet')`));
   assert(await evaluate(`document.getElementById('logs-collect').disabled && document.getElementById('logs-source-status').textContent.includes('Fleet')`));
   assert.equal(policy.sources.length,0,'Attached inventory must never auto-enroll collection');
   for(const [width,height,theme,name] of [[1440,960,'light','attached-desktop-light'],[390,844,'light','attached-mobile-light'],[1440,960,'dark','attached-desktop-dark'],[390,844,'dark','attached-mobile-dark']]){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});
-   await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await wait(150);
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}';window.scrollTo(0,0)`);await client.settleRendering();
    assert(await evaluate(`document.documentElement.scrollWidth<=${width}`));
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
@@ -227,6 +189,6 @@ async function main(){
    const metrics=await client.send('Page.getLayoutMetrics');const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width,height:metrics.cssContentSize.height,scale:1}});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(shot.data,'base64'));
   }
   console.log('USB Logs browser: stable Fleet aliases, live rename, hostname display/export separation, history reload, cursor-only continuation, Clear, paused changes, stale callbacks/discovery, severity, source isolation and rendered viewports passed');
- }catch(error){if(evaluate)console.error(await evaluate(`({view:document.getElementById("all")?.textContent,internal:document.getElementById("internal")?.textContent,options:document.getElementById("logs-source")?.options.length})`));throw error;}finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);await new Promise(resolve=>server.close(resolve));if(productionStream)await productionStream.close();}
+ }catch(error){failure=error;}finally{await finishFixture({failure,client,browser:chrome,profile:client?.profile,cleanups:[()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));},()=>productionStream?.close()]});}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

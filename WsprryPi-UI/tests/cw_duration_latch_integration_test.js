@@ -1,102 +1,14 @@
 "use strict";
 
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn } = require("./browser_harness.js");
+
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
 const fs = require("node:fs");
-const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try {
-                    resolve(JSON.parse(body));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 10000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 async function browserTest() {
     const fail = (message) => { throw new Error(message); };
@@ -698,10 +610,9 @@ async function browserTest() {
 }
 
 async function main() {
+    let page;
     const phpPort = await freePort();
-    const debugPort = await freePort();
-
-    const profileDir = `/tmp/wsprrypi-cw-duration-test-${process.pid}`;
+    const profileDir = createBrowserProfile();
     let chromium;
 
     let client, php, failure;
@@ -710,34 +621,17 @@ async function main() {
             cwd: UI_ROOT,
         });
         await waitForSpawn(php);
-        await waitFor(
-            async () => await getStatus(
-                `http://127.0.0.1:${phpPort}/index.php?page=config`
-            ) === 200,
-            "local PHP fixture"
-        );
+        await waitForPhp(php, `http://127.0.0.1:${phpPort}/index.php?page=config`, "local PHP fixture");
         const chromiumExecutable = process.env.CHROME_BIN || (
             process.platform === "darwin"
                 ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                 : "chromium"
         );
-        chromium = spawnIsolatedProcess(chromiumExecutable, [
+        ({browser: chromium, client, page} = await launchBrowser({executable: chromiumExecutable, args: [
             "--headless",
             "--no-sandbox",
             "--disable-gpu",
-            `--remote-debugging-port=${debugPort}`,
-            `--user-data-dir=${profileDir}`,
-            `http://127.0.0.1:${phpPort}/index.php?page=config`,
-        ]);
-        await waitForSpawn(chromium);
-
-        const page = await waitFor(async () => {
-            const pages = await getJson(`http://127.0.0.1:${debugPort}/json`);
-            return pages.find((item) => item.type === "page");
-        }, "Setup page in Chromium");
-
-        client = new CdpClient(page.webSocketDebuggerUrl);
-        await client.open();
+            ], profile: profileDir}));
         await client.send("Page.navigate", {
             url: `http://127.0.0.1:${phpPort}/index.php?page=config`,
         });
@@ -746,10 +640,7 @@ async function main() {
                 expression: "({ ready: typeof scheduleAutosave === 'function' && document.readyState === 'complete' && window.PicoFirmwareSafety?.locked === false, state: document.readyState, title: document.title, url: location.href, scheduleType: typeof scheduleAutosave, scripts: [...document.scripts].map((script) => script.src) })",
                 returnByValue: true,
             });
-            if (!result.result.value.ready) {
-                throw new Error(JSON.stringify(result.result.value));
-            }
-            return true;
+            return result.result.value.ready;
         }, "Setup production scripts and idle host firmware status");
 
         const result = await client.send("Runtime.evaluate", {
@@ -904,15 +795,7 @@ async function main() {
         console.log("cw_duration_latch_integration_test passed");
     } catch (error) { failure = error; }
     finally {
-        const errors = failure ? [failure] : [];
-        if (client && chromium?.exitCode === null) {
-            await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
-        }
-        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chromium), () => stopChild(php),
-            () => fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })]) {
-            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
-        }
-        if (errors.length) throw new AggregateError(errors, "CW duration browser workflow or cleanup failed");
+        await finishFixture({failure: failure, client, browser: chromium, php, profile: profileDir});
     }
 }
 

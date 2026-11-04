@@ -1,19 +1,20 @@
 "use strict";
 
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn } = require("./browser_harness.js");
+
 // Actual vendor assets, application handlers, and loopback HTTP only. The PHP
 // fixture refuses control writes, journal execution, and external fallback.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { CdpClient, freePort, getJson, getStatus, waitFor } = require("./test_tone_lifecycle_integration_test.js");
-const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const UI_ROOT = path.resolve(__dirname, "..");
 
 async function main() {
-    const port = await freePort(), debugPort = await freePort();
+    let page;
+    const port = await freePort();
     const origin = `http://127.0.0.1:${port}`;
-    const profile = fs.mkdtempSync(path.join(os.tmpdir(), "wsprrypi-dependencies-"));
+    const profile = createBrowserProfile();
     const evidence = process.env.DEPENDENCY_EVIDENCE_DIR;
     if (evidence) fs.mkdirSync(evidence, { recursive: true });
     let php, browser, client, failure;
@@ -23,15 +24,11 @@ async function main() {
             ? fs.readFileSync(process.env.JQUERY_MIGRATE_PATH, "utf8") : "";
         php = spawnFixtureChild("php", ["-S", `127.0.0.1:${port}`, "-t", "data", "tests/browser_fixture_router.php"], { cwd: UI_ROOT });
         await waitForSpawn(php);
-        await waitFor(async () => await getStatus(`${origin}/index.php`) === 200, "PHP dependency fixture");
-        browser = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"),
-            ["--headless", "--no-sandbox", "--disable-gpu", "--disable-background-networking", `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profile}`, "about:blank"]);
-        await waitForSpawn(browser);
-        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(item => item.type === "page"), "dependency browser");
-        client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
+        await waitForPhp(php, `${origin}/index.php`, "PHP dependency fixture");
+        ({browser: browser, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"), args: ["--headless", "--no-sandbox", "--disable-gpu", "--disable-background-networking", "about:blank"], profile: profile}));
         const eventErrors = [];
-        client.socket.on("message", raw => {
-            const event = JSON.parse(raw), p = event.params;
+        client.on("event", event => {
+            const p = event.params;
             if (event.method === "Runtime.exceptionThrown") exceptions.push(p.exceptionDetails.exception?.description || p.exceptionDetails.text);
             if (event.method === "Runtime.consoleAPICalled") {
                 const text = p.args.map(arg => arg.value || arg.description || "").join(" ");
@@ -62,13 +59,7 @@ async function main() {
             }
             localStorage.setItem('wsprrypi.updateCheckDisabled','true');
         ` });
-        const evaluate = async expression => {
-            let timer;
-            const result = await Promise.race([client.send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }),
-                new Promise((_, reject) => { timer = setTimeout(() => reject(Error("Dependency evaluation deadline")), 15000); })]).finally(() => clearTimeout(timer));
-            assert.ok(!result.exceptionDetails, result.exceptionDetails?.exception?.description || JSON.stringify(result.exceptionDetails));
-            return result.result.value;
-        };
+        const evaluate = expression => client.evaluate(expression);
         const navigate = async url => {
             await client.send("Page.navigate", { url: origin + url });
             await waitFor(() => evaluate("document.readyState==='complete' && typeof jQuery==='function' && typeof bootstrap==='object'"), "vendor scripts");
@@ -97,7 +88,11 @@ async function main() {
             const tab = document.querySelector('[data-persist-tab-state] [data-bs-toggle="tab"]:not(.active)') || document.querySelector('[data-bs-toggle="tab"]:not(.active)');
             if (!tab) throw Error('No tab fixture');
             let shown=0;$(tab).on('shown.bs.tab.dependency',()=>shown++);
-            bootstrap.Tab.getOrCreateInstance(tab).show();await new Promise(r=>setTimeout(r,250));
+            await new Promise(resolve=>{
+                if(tab.classList.contains('active'))return resolve();
+                tab.addEventListener('shown.bs.tab',resolve,{once:true});
+                bootstrap.Tab.getOrCreateInstance(tab).show();
+            });
             if(shown!==1)throw Error('Bootstrap tab event missing or duplicated');
             const target=tab.getAttribute('data-bs-target');
             if(localStorage.getItem(getPersistedTabStorageKey(document.getElementById('configTabs')))!==target)throw Error('Tab preference lost');
@@ -140,7 +135,7 @@ async function main() {
         assert.equal(await evaluate("document.body.textContent.includes('Dependency fixture log record')"), false);
         assert.equal(await evaluate("window.__dependencyStreams.length"), 1, "Clear must not reconnect SSE");
         assert.equal(await evaluate("localStorage.getItem('log_stream_last_cursor')"), "dependency-cursor");
-        await evaluate(`bootstrap.Tab.getOrCreateInstance(document.getElementById('info-tab')).show();new Promise(r=>setTimeout(r,250))`);
+        await evaluate(`new Promise(resolve=>{const tab=document.getElementById('info-tab');if(tab.classList.contains('active'))return resolve();tab.addEventListener('shown.bs.tab',resolve,{once:true});bootstrap.Tab.getOrCreateInstance(tab).show()})`);
         assert.equal(await evaluate("new URL(location.href).searchParams.get('tab')"), "info");
         // Reconnect is explicit and must carry the existing cursor, with one
         // replacement stream rather than duplicate subscriptions.
@@ -151,7 +146,8 @@ async function main() {
         await evaluate(`window.__dependencyStreams[1].onopen?.();window.__dependencyStreams[1].emit({type:'journal',__REALTIME_TIMESTAMP:'1792173600000000',__CURSOR:'dependency-cursor-2',PRIORITY:'6',SYSLOG_IDENTIFIER:'fixture',MESSAGE:'Visible record: '+ 'technical-value-'.repeat(20)});`);
         for (const theme of ["light", "dark"]) for (const size of [{ name: "desktop", width: 1440, height: 1000 }, { name: "mobile", width: 390, height: 844 }]) {
             await client.send("Emulation.setDeviceMetricsOverride", { ...size, deviceScaleFactor: 1, mobile: size.name === "mobile" });
-            await evaluate(`document.documentElement.dataset.bsTheme='${theme}';new Promise(r=>setTimeout(r,250))`);
+            await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);
+            await client.settleRendering();
             assert.ok(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"), `diagnostic ${theme} ${size.name} overflow`);
             if (evidence) {
                 const shot = await client.send("Page.captureScreenshot", { format: "png" });
@@ -170,13 +166,7 @@ async function main() {
         console.log(`Dependency browser: real AJAX, Bootstrap bridge/events, invalid drafts, fonts/icons, standalone SSE, storage/cookie preservation passed${process.env.JQUERY_MIGRATE_PATH ? " with Migrate" : " without Migrate"}`);
     } catch (error) { failure = error; }
     finally {
-        const errors = failure ? [failure] : [];
-        if (client && browser?.exitCode === null) await Promise.race([client.send("Browser.close").catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
-        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(browser), () => stopChild(php),
-            () => fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })]) {
-            try { await cleanup(); } catch (error) { errors.push(error); }
-        }
-        if (errors.length) throw new AggregateError(errors, "Dependency workflow or cleanup failed");
+        await finishFixture({failure: failure, client, browser: browser, php, profile: profile});
     }
 }
 

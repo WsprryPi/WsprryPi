@@ -1,137 +1,33 @@
+"use strict";
+
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn } = require("./browser_harness.js");
 // SPDX-License-Identifier: MIT
 // Hardware-free rendered WTP network workflow with mocked HTTP responses.
-"use strict";
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
-const { spawnFixtureChild, waitForSpawn, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try {
-                    resolve(JSON.parse(body));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 10000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}, timeoutMs = 15000) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                this.pending.delete(id);
-                reject(new Error('CDP deadline: ' + method));
-            }, timeoutMs);
-            this.pending.set(id, {
-                resolve: value => { clearTimeout(timer); resolve(value); },
-                reject: error => { clearTimeout(timer); reject(error); }
-            });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 async function main() {
+    let page;
     const fs = require('node:fs');
-    const phpPort = await freePort(), debugPort = await freePort();
+    const phpPort = await freePort();
     const base = `http://127.0.0.1:${phpPort}/index.php`;
-    const profileDir = `/tmp/wsprrypi-pi-fleet-ui-${process.pid}`;
+    const profileDir = createBrowserProfile();
     const output = path.resolve(UI_ROOT, '../src/build/wtp-pi/ui');
     fs.mkdirSync(output, {recursive: true});
     let php, chrome, client, failure;
     try {
         php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], {cwd: UI_ROOT});
         await waitForSpawn(php);
-        await waitFor(async () => await getStatus(base + '?page=config') === 200, 'PHP fixture');
-        chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"]);
-        await waitForSpawn(chrome);
-        // A fresh CI Chrome profile can take longer than workflow assertions to start.
-        // Keep startup finite without changing any UI assertion deadline.
-        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
-        client = new CdpClient(page.webSocketDebuggerUrl);await client.open();
+        await waitForPhp(php, base + '?page=config', 'PHP fixture');
+        ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'), args: ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', "about:blank"], profile: profileDir, timeoutMs: 60000}));
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url: base + '?page=config'}, 60000);
-        const evaluate = async expression => {
-            const result = await client.send('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true});
-            if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
-            return result.result.value;
-        };
+        const evaluate = expression => client.evaluate(expression);
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.FleetSchedules && !!window.LocalWtp'), 'new UI scripts');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-new").disabled'), true);
         const mock = `(() => {
@@ -281,7 +177,7 @@ async function main() {
             const draftRevision=await evaluate('__fleetRevision');
             await evaluate(`document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='6';document.getElementById('fleet-schedule-plain').checked=true;++window.__fleetRevision;document.getElementById('fleet-schedule-refresh').click();`);
             await waitFor(async()=>await evaluate('__requests.some(r=>r.url.endsWith("/host/fleet")&&r.options.method==="GET"&&window.__fleetRevision>'+draftRevision+')'),'new status revision');
-            await new Promise(resolve=>setTimeout(resolve,100));
+            await waitFor(()=>evaluate('document.getElementById("fleet-output-list").getAttribute("aria-busy")==="false"'),'status refresh acknowledged');
             const before=await evaluate('JSON.stringify(__fleet.assignments)');
             await evaluate(`document.getElementById('fleet-schedule-save').click()`);
             await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("draft is preserved")'),'refreshed draft conflict');
@@ -309,7 +205,7 @@ async function main() {
                 // the middle of the document. Anchor that chrome to document
                 // edges only for capture; no product styles are changed.
                 await evaluate(`(() => {const s=document.createElement('style');s.id='capture-chrome';s.textContent='#mainNavbar{position:absolute!important;top:0!important}footer.fixed-bottom{position:absolute!important;bottom:0!important}html{scroll-behavior:auto!important}body{position:relative!important}';document.head.append(s);window.scrollTo({top:0,behavior:'instant'});document.getAnimations().forEach(a=>a.finish());})()`);
-                await new Promise(resolve=>setTimeout(resolve,350));
+                await client.settleRendering();
                 await evaluate(`document.getAnimations().forEach(a=>a.finish());`);
                 assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'),true,section+' overflow');
                 const height=await evaluate('document.documentElement.scrollHeight');
@@ -352,7 +248,7 @@ async function main() {
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Schedules changed")'),'stale confirmation rejected');
         assert.equal(await evaluate('__fleet.assignments[0].enabled'),true);
         await waitFor(dialogClosed,'stale action closed');
-        await new Promise(resolve=>setTimeout(resolve,100));
+        await waitFor(()=>evaluate('!document.querySelector(".modal-backdrop") && document.getElementById("fleet-output-list").getAttribute("aria-busy")==="false"'),'stale confirmation cleanup complete');
         await clickBench(1);
         await waitFor(dialogOpen,'fresh Pause confirmation');
         await evaluate('document.getElementById("fleet-action-confirm").click();document.getElementById("fleet-action-confirm").click()');
@@ -409,7 +305,7 @@ async function main() {
             for (const viewport of viewports) {
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
                 await evaluate(`document.getElementById('wtp-hardware-settings').open=false;document.getElementById('wtp-complete-station').open=false;document.getElementById('wtp-combined-settings').open=false;window.scrollTo({top:0,behavior:'instant'});document.getAnimations().forEach(a=>a.finish());`);
-                await new Promise(resolve=>setTimeout(resolve,150));
+                await client.settleRendering();
                 const screenshot=async name=>{
                     const shot=await client.send('Page.captureScreenshot',{format:'png'});
                     fs.writeFileSync(path.join(output,viewport.name+'-'+theme+'-'+name+'.png'),Buffer.from(shot.data,'base64'));
@@ -478,15 +374,7 @@ async function main() {
         console.log('Mocked desktop/mobile visual evidence: '+output);
     } catch (error) { failure = error; }
     finally {
-        const errors = failure ? [failure] : [];
-        if (client && chrome?.exitCode === null) {
-            await Promise.race([client.send('Browser.close').catch(() => {}), new Promise(resolve => setTimeout(resolve, 1000))]);
-        }
-        for (const cleanup of [() => client?.close(), () => stopIsolatedProcess(chrome), () => stopChild(php),
-            () => fs.rmSync(profileDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100})]) {
-            try { await cleanup(); } catch (error) { if (!errors.includes(error)) errors.push(error); }
-        }
-        if (errors.length) throw new AggregateError(errors, 'Pi Fleet browser workflow or cleanup failed');
+        await finishFixture({failure: failure, client, browser: chrome, php, profile: profileDir});
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

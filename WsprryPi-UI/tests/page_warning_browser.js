@@ -1,5 +1,6 @@
 "use strict";
 
+const { waitFor } = require("./browser_harness.js");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -7,25 +8,15 @@ const path = require("node:path");
 // Runs in the existing isolated PHP/CDP fixture, with no application transport.
 async function reviewPageWarnings(client, origin, evidence) {
     fs.mkdirSync(evidence, {recursive: true});
-    const evaluate = async expression => {
-        const result = await client.send("Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true});
-        assert.ok(!result.exceptionDetails, result.exceptionDetails?.exception?.description);
-        return result.result.value;
-    };
+    const evaluate = expression => client.evaluate(expression);
     const measurements = [];
     for (const view of ["operation", "config", "logs", "spots", "maintenance"]) {
         await client.send("Page.navigate", {url: `${origin}/index.php?page=${view}`});
-        let ready = false;
-        for (let attempt = 0; attempt < 200; attempt++) {
-            ready = await evaluate(`location.search === '?page=${view}' && document.readyState === 'complete' && typeof showUiConsistencyDiagnostic === 'function' && window.PicoFirmwareSafety?.locked === false`);
-            if (ready) break;
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        assert.ok(ready, `${view}: production scripts and idle firmware status must load`);
+        await waitFor(() => evaluate(`location.search === '?page=${view}' && document.readyState === 'complete' && typeof showUiConsistencyDiagnostic === 'function' && window.PicoFirmwareSafety?.locked === false`), `${view}: scripts initialized`);
         for (const theme of ["light", "dark"]) for (const width of [1440, 1024, 390, 320]) {
             await client.send("Emulation.setDeviceMetricsOverride", {width, height: 1000, deviceScaleFactor: 1, mobile: width < 768});
             await evaluate(`applyThemePreference(${JSON.stringify(theme)});document.documentElement.style.fontSize='';window.scrollTo(0,0)`);
-            await evaluate("new Promise(resolve => setTimeout(resolve, 250))");
+            await client.settleRendering();
             for (const state of ["hidden", "firmware", "identity", "both"]) {
                 const result = await evaluate(`(() => {
                     const state = ${JSON.stringify(state)};

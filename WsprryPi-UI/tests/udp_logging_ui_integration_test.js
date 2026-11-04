@@ -1,20 +1,14 @@
+"use strict";
+
+const { createBrowserProfile, launchBrowser, finishFixture, waitFor } = require("./browser_harness.js");
+const until=check=>waitFor(check,'browser scenario condition',10000);
 // SPDX-License-Identifier: MIT
 // Render the shipped shared editor against incumbent Pico/Pi styles. Transport
 // and storage are qualified separately by the actual production pair fixtures.
-'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),os=require('node:os');
-const WebSocket=require('ws');
-const {spawnIsolatedProcess,stopIsolatedProcess,waitForSpawn}=require('./browser_fixture_process.js');
 const ui=path.resolve(__dirname,'..'),pico=path.resolve(process.argv[2]),output=path.resolve(process.argv[3]||'/tmp/wsprry-udp-ui');
 fs.mkdirSync(output,{recursive:true});
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(fn){for(let i=0;i<200;i++){try{const v=await fn();if(v)return v;}catch{}await wait(50);}throw Error('Browser fixture deadline');}
-class Cdp {
- constructor(url){this.ws=new WebSocket(url);this.id=0;this.pending=new Map();this.ws.on('message',raw=>{const m=JSON.parse(raw);if(m.id){const p=this.pending.get(m.id);if(p){this.pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}}});}
- async open(){if(this.ws.readyState!==1)await new Promise((resolve,reject)=>{this.ws.once('open',resolve);this.ws.once('error',reject);});}
- send(method,params={}){return new Promise((resolve,reject)=>{const id=++this.id;this.pending.set(id,{resolve,reject});this.ws.send(JSON.stringify({id,method,params}));});}
- async eval(expression){const r=await this.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
-}
 const counters=Object.fromEntries(['generated','filtered','redacted_rejected','queued','overflow','expired','reconfigured_drops','truncated','attempted','locally_submitted','locally_failed'].map(k=>[k,'0']));
 const fixtures=`window.fixtureHost=new URL(location).searchParams.get('surface')==='pi';
 const host=window.fixtureHost;window.context=1;window.mode='ok';window.writes=0;
@@ -27,7 +21,7 @@ window.saved=host?{sender:{...common,interface:null,native_enabled:false,usb_sou
 const active=host?{applied_revision:null,sender,collector:{state:'disabled',bind_ipv4:null,port:null,counters:Object.fromEntries(['received','oversize','disallowed','malformed','duplicate','conflict','limited','overflow','journal_failed','journal_submitted','discontinuity'].map(k=>[k,'0'])),peers:[]}}:{...sender,applied_revision:null};
 window.editor=WsprryUdp.mount(document.getElementById('editor'),{host,context:()=>window.context,inputClass:host?'form-control':'',buttonClass:host?'btn btn-outline-secondary':'',checkClass:host?'form-check':'check',usbSources:async()=>({candidates:sourceCandidates}),exchange:async(p,method='GET',body)=>{if(window.mode==='unsupported')throw Error('UDP logging unsupported');if(p.endsWith('/test/capabilities'))return {value:{...(host?{}:{contract:'Wsprry-Control/1'}),schema:host?'udp-logging-test-capabilities/1':'udp-logging-test-capabilities',target,resource:caps.resource+'/test',request_schema:host?'udp-logging-test/1':'udp-logging-test',event_code:host?'PI_LOG':'UDP_TEST',maximum_rate:2}};if(method==='POST'){window.tests=(window.tests||0)+1;return {value:{...(host?{}:{contract:'Wsprry-Control/1'}),schema:host?'udp-logging-test/1':'udp-logging-test',target,accepted:true,receipt:'unknown'}};}if(method==='PUT'){window.writes++;if(window.mode==='lost')throw Error('Lost reply');window.saved=body.settings;}return {value:p.endsWith('capabilities')?caps:{...(host?{}:{contract:'Wsprry-Control/1'}),schema:caps.settings_schema,target,saved:window.saved,active},revision:'revision-1'};}});`;
 (async()=>{
- let chrome,cdp;const profile=fs.mkdtempSync(path.join(os.tmpdir(),'wsprry-udp-chrome-'));
+ let chrome,cdp,failure;const profile=createBrowserProfile();
  const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');let file;
   if(url.pathname==='/module.js')file=path.join(ui,'data/udp-logging.js');
@@ -41,9 +35,7 @@ window.editor=WsprryUdp.mount(document.getElementById('editor'),{host,context:()
  });
  try{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;
-  chrome=spawnIsolatedProcess(process.env.CHROME_BIN||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':'chromium'),['--headless','--no-sandbox','--disable-gpu','--no-first-run','--disable-background-networking','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank']);await waitForSpawn(chrome);
-  const endpoint=await until(()=>{const f=path.join(profile,'DevToolsActivePort');return fs.existsSync(f)&&fs.readFileSync(f,'utf8').split('\n')[0];});
-  const tabs=await until(async()=>{const r=await fetch(`http://127.0.0.1:${endpoint}/json/list`);return (await r.json()).find(t=>t.type==='page');});cdp=new Cdp(tabs.webSocketDebuggerUrl);await cdp.open();
+  ({browser:chrome,client:cdp}=await launchBrowser({profile,args:['--headless','--no-sandbox','--disable-gpu','--no-first-run','--disable-background-networking']}));
   for(const surface of ['pico','pi']){
    await cdp.send('Page.navigate',{url:`http://127.0.0.1:${port}/?surface=${surface}`});await until(()=>cdp.eval(`window.fixtureHost===${surface==='pi'} && typeof window.editor?.read==='function' && !!document.querySelector('fieldset')`));
    assert.equal(await cdp.eval('document.querySelector("fieldset").disabled'),true);
@@ -102,5 +94,5 @@ window.editor=WsprryUdp.mount(document.getElementById('editor'),{host,context:()
    await cdp.eval('document.documentElement.style.zoom="1"');
   }
   console.log('Rendered UDP controls: explicit read, invalid refusal, uncertain save/readback, preserved draft, selection invalidation, labels and 360/390/1280 light/dark layouts passed');
- }finally{cdp?.ws.close();await stopIsolatedProcess(chrome);await new Promise(resolve=>server.close(resolve));fs.rmSync(profile,{recursive:true,force:true});}
+ }catch(error){failure=error;}finally{await finishFixture({failure,client:cdp,browser:chrome,profile,cleanups:[()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));}]});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

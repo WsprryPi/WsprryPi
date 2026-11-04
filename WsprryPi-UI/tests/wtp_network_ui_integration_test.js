@@ -1,136 +1,22 @@
+"use strict";
+
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn, childDiagnostic } = require("./browser_harness.js");
 // SPDX-License-Identifier: MIT
 // Hardware-free rendered WTP network workflow with mocked HTTP responses.
-"use strict";
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
-const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try {
-                    resolve(JSON.parse(body));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 10000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.dialogs = [];
-        this.dialogError = null;
-        const reviewDialogs = new Set([
-            "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
-            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?",
-            "Review saved progress beside your preserved draft. Send one new explicit change using this fresh read?",
-            "Replace these station drafts with this Pico's saved progress?"
-        ]);
-        const failDialog = error => {
-            this.dialogError = error;
-            for (const { reject } of this.pending.values()) reject(error);
-            this.pending.clear();
-        };
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (message.method === 'Page.javascriptDialogOpening') {
-                const expected = message.params.type === 'confirm' && reviewDialogs.has(message.params.message);
-                this.dialogs.push(message.params.message);
-                if (!expected) failDialog(new Error(`Unexpected browser dialog: ${message.params.type}: ${message.params.message}`));
-                void this.send('Page.handleJavaScriptDialog', { accept: expected }).catch(failDialog);
-                return;
-            }
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}, timeoutMs = 15000) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                this.pending.delete(id);
-                reject(new Error('CDP deadline: ' + method));
-            }, timeoutMs);
-            this.pending.set(id, {
-                resolve: value => { clearTimeout(timer); resolve(value); },
-                reject: error => { clearTimeout(timer); reject(error); }
-            });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 async function main() {
+    let page;
     const fs = require('node:fs');
-    const phpPort = await freePort(), debugPort = await freePort();
+    const phpPort = await freePort();
     const url = `${process.env.WSPRRYPI_UI_FIXTURE_URL || `http://127.0.0.1:${phpPort}/`}index.php?page=config&setup_tab=%23fleet-pane`;
-    const profileDir = `/tmp/wsprrypi-network-ui-${process.pid}`;
+    const profileDir = createBrowserProfile();
     const output = path.resolve(UI_ROOT, '../src/build/wtp-network/ui');
     fs.mkdirSync(output, { recursive: true });
     const captureScreenshots = process.env.WSPRRYPI_UI_CAPTURE !== '0';
@@ -154,23 +40,17 @@ async function main() {
             php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: UI_ROOT });
             await waitForSpawn(php);
         }
-        await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
-        chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"]);
-        await waitForSpawn(chrome);
-        // A fresh CI Chrome profile can take longer than workflow assertions to start.
-        // Keep startup finite without changing any UI assertion deadline.
-        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
-        client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
+        await waitForPhp(php, url, 'PHP fixture');
+        ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'), args: ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', "about:blank"], profile: profileDir, timeoutMs: 60000, expectedDialogs: [
+            "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
+            "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?",
+            "Review saved progress beside your preserved draft. Send one new explicit change using this fresh read?",
+            "Replace these station drafts with this Pico's saved progress?"
+        ]}));
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url}, 60000);
         await client.send('Page.enable');
-        const evaluate = async expression => {
-            if (client.dialogError) throw client.dialogError;
-            const result = await client.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-            if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
-            return result.result.value;
-        };
+        const evaluate = expression => client.evaluate(expression);
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
         await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
@@ -307,7 +187,7 @@ async function main() {
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
             await evaluate(`document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
-            await new Promise(resolve=>setTimeout(resolve,200));
+            await client.settleRendering();
             await capture(`${viewport.name}-fleet-selector.png`, {format:'png'});
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Fleet horizontal overflow');
             await evaluate('document.getElementById("fleet-binding").scrollIntoView({block:"center",behavior:"instant"})');
@@ -335,7 +215,7 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), false);
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-            await new Promise(resolve=>setTimeout(resolve,200));
+            await client.settleRendering();
             await evaluate('document.getElementById("wtp_transport").scrollIntoView({block:"center",behavior:"instant"})');
             const transportVisible = await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return {height:r.height,top:r.top,bottom:r.bottom,viewport:window.innerHeight}; })()');
             assert(transportVisible.height > 0 && transportVisible.top >= 0 && transportVisible.bottom <= transportVisible.viewport, `Plain LAN selector visible: ${JSON.stringify(transportVisible)}`);
@@ -375,7 +255,7 @@ async function main() {
             await waitFor(async () => await evaluate('(() => { const tab=document.getElementById("fleet-tab").getBoundingClientRect(); const list=document.getElementById("configTabs").getBoundingClientRect(); return tab.left >= list.left - 1 && tab.right <= list.right + 1; })()'), 'Fleet tab in view');
             for (const section of ['wtp-remote-password','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
-                await new Promise(resolve=>setTimeout(resolve,200));
+                await client.settleRendering();
                 await capture(`${viewport.name}-schedule-${section}.png`, {format:'png'});
             }
         }
@@ -442,7 +322,7 @@ async function main() {
                 await evaluate(`(()=>{for(const [key,value] of [['pps_gp','3'],['enabled','false']]){const e=document.querySelector('#wtp-gps-controls [data-gps="'+key+'"]');e.value=value;e.dispatchEvent(new Event('change',{bubbles:true}));}})()`);
                 for(const view of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844},{name:'landscape',width:740,height:360}]) {
                     await client.send('Emulation.setDeviceMetricsOverride',{width:view.width,height:view.height,deviceScaleFactor:1,mobile:view.name!=='desktop'});
-                    await new Promise(resolve=>setTimeout(resolve,200));
+                    await client.settleRendering();
                     await evaluate(`document.getElementById('wtp-gps-controls').scrollIntoView({block:'start',behavior:'instant'})`);
                     await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
                     const clip=await evaluate(`(()=>{const r=document.getElementById('wtp-gps-controls').getBoundingClientRect();return {x:0,y:r.top+scrollY,width:innerWidth,height:Math.ceil(r.height),scale:1}})()`);
@@ -501,7 +381,7 @@ async function main() {
             for(const theme of ['light','dark'])for(const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
                 await evaluate(`applyThemePreference('${theme}'); document.getElementById('wtp-member-callsign').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-150)`);
-                await new Promise(resolve=>setTimeout(resolve,150));
+                await client.settleRendering();
                 const stationClip=await evaluate(`(()=>{const h=document.getElementById('wtp-member-station-hint').previousElementSibling,r=h.closest('section').getBoundingClientRect(),a=h.getBoundingClientRect(),b=document.getElementById('wtp-usb-progress-state').getBoundingClientRect();return {x:Math.max(0,r.x+scrollX),y:a.top+scrollY,width:r.width,height:b.bottom-a.top+12,scale:1};})()`);
                 await capture(`${viewport.name}-${theme}-station-progress-${state}.png`,{format:'png',captureBeyondViewport:true,clip:stationClip});
                 assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),'station progress overflow');
@@ -536,7 +416,7 @@ async function main() {
                     }
                     return true;
                 })()`), 'settings feedback in viewport');
-                await new Promise(resolve=>setTimeout(resolve,200));
+                await client.settleRendering();
                 await capture(`${viewport.name}-${theme}-settings-${state}.png`, {format:'png'});
                 assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'),'settings horizontal overflow');
             }
@@ -568,12 +448,12 @@ async function main() {
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport, deviceScaleFactor:1,mobile:viewport.name==='mobile'});
             await evaluate('window.scrollTo({top:0,behavior:"instant"})');
-            await new Promise(resolve=>setTimeout(resolve,500));
+            await client.settleRendering();
             const layout=await client.send('Page.getLayoutMetrics');
             await capture(`${viewport.name}-full.png`, {format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:layout.cssContentSize.height,scale:1}});
             for (const section of ['wtp_transport','wtp_hostname','wtp-status-heading','wtp-management','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
-                await new Promise(resolve=>setTimeout(resolve,150));
+                await client.settleRendering();
                 await capture(`${viewport.name}-${section}.png`, {format:'png'});
             }
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'horizontal overflow');
@@ -585,7 +465,7 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-recover").disabled'),true);
         await evaluate(`document.getElementById('wtp-status-heading').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-140);`);
         assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),true);
-        await new Promise(resolve=>setTimeout(resolve,200));
+        await client.settleRendering();
         await capture('mobile-status-failure.png', {format:'png'});
         await evaluate('document.getElementById("transmitter-hardware-tab").click()');
         await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after leaving Fleet');
@@ -632,13 +512,7 @@ async function main() {
         }
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {
-        const errors = failure ? [failure] : [];
-        if (client && chrome?.exitCode === null) await Promise.race([client.send('Browser.close').catch(() => {}),new Promise(resolve=>setTimeout(resolve,1000))]);
-        for(const cleanup of [()=>client?.close(),()=>stopIsolatedProcess(chrome),()=>stopChild(php),
-            ()=>fs.rmSync(profileDir,{recursive:true,force:true,maxRetries:10,retryDelay:100})]) {
-            try { await cleanup(); } catch(error) { if(!errors.includes(error)) errors.push(error); }
-        }
-        if(errors.length) throw new AggregateError(errors,'Network browser workflow or cleanup failed');
+        await finishFixture({failure: failure, client, browser: chrome, php, profile: profileDir});
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

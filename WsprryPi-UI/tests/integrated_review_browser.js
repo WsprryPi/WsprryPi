@@ -1,5 +1,6 @@
 "use strict";
 
+const { waitFor: waitForCondition } = require("./browser_harness.js");
 // Bounded whole-console rendering and behavior checks, using the owning Test
 // Tone fixture's browser/process cleanup. No application transport is available.
 const assert = require("node:assert/strict");
@@ -67,26 +68,9 @@ function operationDisconnectFixture() {
 
 async function reviewIntegratedUi(client, origin, evidence) {
     fs.mkdirSync(evidence, {recursive: true});
-    const evaluate = async expression => {
-        let timer;
-        const result = await Promise.race([
-            client.send("Runtime.evaluate", {expression, awaitPromise:true, returnByValue:true}),
-            new Promise((_,reject) => {timer=setTimeout(()=>reject(Error("Integrated review evaluation deadline")),10000);})
-        ]).finally(()=>clearTimeout(timer));
-        assert.ok(!result.exceptionDetails, result.exceptionDetails?.exception?.description || JSON.stringify(result.exceptionDetails));
-        return result.result.value;
-    };
-    // Bootstrap color transitions last 150ms. Keep the sampling delay finite;
-    // animation.finished can stay pending when Chrome pauses an emulated tab.
-    const settled = () => evaluate("new Promise(resolve => setTimeout(resolve, 250))");
-    const waitFor = async (expression, description) => {
-        const deadline = Date.now() + 10000;
-        while (Date.now() < deadline) {
-            if (await evaluate(expression)) return;
-            await new Promise(resolve => setTimeout(resolve, 25));
-        }
-        throw Error(`Integrated review timed out: ${description}`);
-    };
+    const evaluate = expression => client.evaluate(expression);
+    const settled = () => client.settleRendering();
+    const waitFor = (expression, description) => waitForCondition(() => evaluate(expression), description);
     const capture = async name => {
         const shot = await client.send("Page.captureScreenshot", {format:"png"});
         fs.writeFileSync(path.join(evidence, `${name}.png`), Buffer.from(shot.data, "base64"));

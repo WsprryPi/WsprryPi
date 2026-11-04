@@ -1,49 +1,14 @@
+"use strict";
+
+const { launchBrowser, finishFixture, waitFor } = require("./browser_harness.js");
+const until=(check,description='browser scenario condition',budgetMs=5000)=>waitFor(check,description,budgetMs);
 // SPDX-License-Identifier: MIT
 // Real production Logs DOM/CSS/JS, synthetic log API and EventSource transport.
-"use strict";
 const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path'), http=require('node:http');
-const {spawnIsolatedProcess,stopIsolatedProcess,waitForSpawn}=require('./browser_fixture_process.js');
-const WebSocket=require('ws');
 const root=path.resolve(__dirname,'../data');
 const html=fs.readFileSync(process.env.LOGGING_RENDERED_HTML,'utf8');
 const evidence=process.env.LOGGING_EVIDENCE_DIR || '/tmp/udp-logging-logs-browser';
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function until(check){for(let n=0;n<100;n++){const value=await check();if(value)return value;await wait(50);}throw Error('Browser fixture timed out');}
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map();
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw);
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 
 const a='a'.repeat(32), b='b'.repeat(32), host='c'.repeat(32), urls=[];
@@ -99,13 +64,10 @@ const server=http.createServer((req,res)=>{
 async function main(){
  fs.mkdirSync(evidence,{recursive:true});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- const debugServer=http.createServer();await new Promise(resolve=>debugServer.listen(0,'127.0.0.1',resolve));const debugPort=debugServer.address().port;await new Promise(resolve=>debugServer.close(resolve));
- let chrome,client;
+ let chrome,client,failure;
  try{
-  chrome=spawnIsolatedProcess(process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless','--no-sandbox','--disable-gpu',`--remote-debugging-port=${debugPort}`,`--user-data-dir=/tmp/udp-logging-logs-chrome-${process.pid}`,'about:blank']);await waitForSpawn(chrome);
-  const tab=await until(async()=>{try{return(await(await fetch(`http://127.0.0.1:${debugPort}/json`)).json()).find(row=>row.type==='page');}catch{return null;}});
-  client=new CdpClient(tab.webSocketDebuggerUrl);await client.open();await client.send('Page.enable');
-  const evaluate=async expression=>{const value=await client.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(value.exceptionDetails)throw Error(value.exceptionDetails.text+': '+value.exceptionDetails.exception?.description);return value.result.value;};
+  ({browser:chrome,client}=await launchBrowser({args:['--headless','--no-sandbox','--disable-gpu']}));
+  const evaluate=expression=>client.evaluate(expression);
   await client.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.WebSocket=class{static OPEN=1;static CONNECTING=0;readyState=0;addEventListener(){}close(){}};localStorage.setItem('wsprrypi.updateCheckDisabled','true');window.WSPRRYPI_ENABLE_LOG_TEST_HOOKS=true;`});
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
   await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===5 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===2`));
@@ -148,7 +110,7 @@ async function main(){
   await closeModal('host-logging-modal');
   for(const width of [390,1280])for(const theme of ['light','dark']){
    await client.send('Emulation.setDeviceMetricsOverride',{width,height:960,deviceScaleFactor:1,mobile:width<600});
-   await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await wait(200);
+   await evaluate(`document.documentElement.dataset.bsTheme='${theme}'`);await client.settleRendering();
    assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth`),'Toolbar must reflow without page overflow');
    assert(await evaluate(`['height','fontSize','fontWeight','borderRadius','paddingTop','paddingLeft'].every(k=>getComputedStyle(document.getElementById('btn-clear'))[k]===getComputedStyle(document.getElementById('sse-status-badge'))[k])`),'Stream status must share button geometry and typography');
    let shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,`toolbar-${width}-${theme}.png`),Buffer.from(shot.data,'base64'));
@@ -187,7 +149,10 @@ async function main(){
   }
   rows.splice(0,rows.length,...maximum);
   await client.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.php?page=logs`});
-  await until(()=>evaluate(`document.querySelectorAll('#all .logs-line').length===4160 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===4096`));
+  // The largest replay is a load scenario, not a five-second UI performance contract.
+  // Acknowledge the final production cursor before inspecting the entire retained DOM once.
+  await until(()=>evaluate(`window.WSPRRYPI_LOG_TEST_HOOKS?.viewState().cursor==='max-31-65-relay'`),'maximum history final cursor acknowledged',60000);
+  assert(await evaluate(`document.querySelectorAll('#all .logs-line').length===4160 && document.querySelectorAll('#logs-source option[value^="udp:"]').length===4096`));
   // Force the formerly racy ordering: policy/status readback finishes after
   // the maximum history has populated its bounded source picker.
   await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
@@ -233,6 +198,6 @@ async function main(){
   await evaluate('window.WSPRRYPI_LOG_TEST_HOOKS.refreshSources()');
   assert(await evaluate(`!document.getElementById('logs-source-status').textContent.includes('More network origins') && document.querySelectorAll('#logs-source option[value^="udp:"]').length===0 && document.querySelectorAll('#all .logs-line').length===2 && !document.getElementById('logs-source-status').textContent.includes('An origin ID is claimed')`),'Changed peer bindings clear stale menu warnings without removing All sources history');
   console.log('UDP Logs browser: toolbar order, modal focus/reflow, automatic settings, failed-read recovery, preserved drafts, uncertain-save review, replay-before-policy race, stable ID labels, direct/relay source filters and safe text rendering passed');
- }finally{client?.close();if(chrome)await stopIsolatedProcess(chrome);server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+ }catch(error){failure=error;}finally{await finishFixture({failure,client,browser:chrome,profile:client?.profile,cleanups:[()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));}]});}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

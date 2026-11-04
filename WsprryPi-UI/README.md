@@ -171,3 +171,41 @@ unrelated sentinel survives. `node tests/wtp_pi_fleet_ui_integration_test.js`
 exercises the separate Fleet browser fixture. These use synthetic local
 controller responses; an online test-network interface is needed for workflows
 that honor `navigator.onLine`, even when external access is disabled.
+
+## Development browser fixtures
+
+Run `npm ci --ignore-scripts`, `npm test`, and `npm run test:browser` from this
+component. Browser tests require PHP CLI, Node.js, Chromium, and the POSIX `ps`
+utility for owned process-group verification. `CHROME_BIN` selects an explicit
+browser; the support-intake fixture also retains `CHROMIUM_BIN`. Fixtures use
+loopback services and synthetic application responses, not an installed service.
+
+`tests/browser_harness.js` shares `launchBrowser`, `CdpClient.evaluate`, bounded
+`waitFor`/HTTP probes, `settleRendering`, `createBrowserProfile`, and
+`finishFixture`. Keep scenario assertions, allowed confirmation messages, URLs,
+and meaningful operation budgets in the caller. Navigate the returned owned
+page explicitly and wait for its required scripts/state. Startup discovers its
+own ephemeral endpoint through a fresh profile; do not reserve a browser port
+or attach to an existing browser session.
+
+Use `createBrowserProfile()` before launch and pass that profile to both
+`launchBrowser` and `finishFixture`. Capture a primary error and pass it as
+`failure` to the finalizer: it attempts every cleanup and reports primary and
+secondary errors together. Registered ownership survives a failed launch. Never
+remove a profile independently while its process group might still have writers.
+The separate production log-stream adapter keeps its deterministic journal input
+and owns its PHP workers; it does not read the host journal.
+
+Readiness inherits the enclosing monotonic stage deadline. Every HTTP request,
+CDP request, connection, and startup stage is bounded; completed stages cancel
+pending child operations. Rendering settles fonts, finite animations, and two
+paint frames instead of assuming a fixed delay. An unexpected native browser
+dialog fails the test. Expected confirmations require the caller's exact message
+allowlist; recovery tests may explicitly decline them.
+
+`node --test tests/browser_harness_test.js` runs real loopback socket/process
+fault cases, including fragmented messages, stalled responses, missing replies,
+child exit, partial discovery, missing pages, cancellation, occupied PHP ports,
+and cleanup denial. Each case has a separate 30-second deadlock watchdog.
+Software fixture results do not qualify hardware, installed services, physical
+USB, or RF output.

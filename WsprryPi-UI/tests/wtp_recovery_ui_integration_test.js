@@ -1,117 +1,23 @@
+"use strict";
+
+const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn, childDiagnostic } = require("./browser_harness.js");
 // SPDX-License-Identifier: MIT
 // Opt-in rendered recovery workflow with real shipped UI and mocked HTTP responses.
 // Generate the source-paired resource JSON with wtp-config-interop-test first.
-"use strict";
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const net = require("node:net");
 const path = require("node:path");
-const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
-const WebSocket = require("ws");
 
 const UI_ROOT = path.resolve(__dirname, "..");
 
-function freePort() {
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-            const { port } = server.address();
-            server.close((error) => error ? reject(error) : resolve(port));
-        });
-    });
-}
-
-function getJson(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            let body = "";
-            response.setEncoding("utf8");
-            response.on("data", (chunk) => { body += chunk; });
-            response.on("end", () => {
-                try {
-                    resolve(JSON.parse(body));
-                } catch (error) {
-                    reject(error);
-                }
-            });
-        }).on("error", reject);
-    });
-}
-
-function getStatus(url) {
-    return new Promise((resolve, reject) => {
-        http.get(url, (response) => {
-            response.resume();
-            response.on("end", () => resolve(response.statusCode));
-        }).on("error", reject);
-    });
-}
-
-async function waitFor(check, description, timeoutMs = 10000) {
-    const deadline = Date.now() + timeoutMs;
-    let lastError;
-    while (Date.now() < deadline) {
-        try {
-            const value = await check();
-            if (value) return value;
-        } catch (error) {
-            lastError = error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    throw new Error(`Timed out waiting for ${description}${lastError ? `: ${lastError.message}` : ""}`);
-}
-
-class CdpClient {
-    constructor(url) {
-        this.socket = new WebSocket(url);
-        this.nextId = 1;
-        this.pending = new Map(); this.dialogs=[]; this.acceptDialogs=true;
-        this.socket.on("message", (raw) => {
-            const message = JSON.parse(raw); if(message.method==='Page.javascriptDialogOpening'){this.dialogs.push(message.params.message);void this.send('Page.handleJavaScriptDialog',{accept:this.acceptDialogs});return;}
-            if (!message.id || !this.pending.has(message.id)) return;
-            const { resolve, reject } = this.pending.get(message.id);
-            this.pending.delete(message.id);
-            if (message.error) reject(new Error(message.error.message));
-            else resolve(message.result);
-        });
-    }
-
-    async open() {
-        if (this.socket.readyState === WebSocket.OPEN) return;
-        await new Promise((resolve, reject) => {
-            this.socket.once("open", resolve);
-            this.socket.once("error", reject);
-        });
-    }
-
-    send(method, params = {}, timeoutMs = 15000) {
-        const id = this.nextId++;
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                this.pending.delete(id);
-                reject(new Error('CDP deadline: ' + method));
-            }, timeoutMs);
-            this.pending.set(id, {
-                resolve: value => { clearTimeout(timer); resolve(value); },
-                reject: error => { clearTimeout(timer); reject(error); }
-            });
-            this.socket.send(JSON.stringify({ id, method, params }));
-        });
-    }
-
-    close() {
-        this.socket.close();
-    }
-}
 
 async function main() {
+    let page;
     const fs = require('node:fs');
-    const phpPort = await freePort(), debugPort = await freePort();
+    const phpPort = await freePort();
     const url = `http://127.0.0.1:${phpPort}/index.php?page=config&setup_tab=%23fleet-pane`;
-    const profileDir = path.join(require("node:os").tmpdir(), `wsprrypi-recovery-profile-${process.pid}`);
+    const profileDir = createBrowserProfile();
     const output = path.resolve(process.argv[3] || path.join(require('node:os').tmpdir(), `wsprrypi-recovery-ui-${process.pid}`));
     fs.mkdirSync(output, { recursive: true });
     const captureScreenshots = process.env.WSPRRYPI_UI_CAPTURE !== '0';
@@ -129,21 +35,11 @@ async function main() {
     try {
         php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: UI_ROOT });
         await waitForSpawn(php);
-        await waitFor(async () => await getStatus(url) === 200, 'PHP fixture');
-        chrome = spawnIsolatedProcess(process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'),
-            ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profileDir}`, "about:blank"]);
-        await waitForSpawn(chrome);
-        // A fresh CI Chrome profile can take longer than workflow assertions to start.
-        // Keep startup finite without changing any UI assertion deadline.
-        const page = await waitFor(async () => (await getJson(`http://127.0.0.1:${debugPort}/json`)).find(p => p.type === 'page'), 'browser startup', 60000);
-        client = new CdpClient(page.webSocketDebuggerUrl); await client.open();
+        await waitForPhp(php, url, 'PHP fixture');
+        ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'), args: ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', "about:blank"], profile: profileDir, timeoutMs: 60000, expectedDialogs: ["Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?", `Retire login ${"b".repeat(32)} on Pico ${"a".repeat(32)} at 192.168.1.53 (consumer_station)? It may belong to another operator. Saved settings and radio jobs remain.`]}));
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url}, 60000);
-        const evaluate = async expression => {
-            const result = await client.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-            if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
-            return result.result.value;
-        };
+        const evaluate = expression => client.evaluate(expression);
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
         await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
@@ -313,13 +209,7 @@ async function main() {
     } catch (error) {
         failure = new Error(`${error.message}\n${childDiagnostic(chrome || php)}`, { cause: error });
     } finally {
-        const errors = failure ? [failure] : [];
-        if (client && chrome?.exitCode === null) await Promise.race([client.send('Browser.close').catch(() => {}),new Promise(resolve=>setTimeout(resolve,1000))]);
-        for(const cleanup of [()=>client?.close(),()=>stopIsolatedProcess(chrome),()=>stopChild(php),
-            ()=>fs.rmSync(profileDir,{recursive:true,force:true,maxRetries:10,retryDelay:100})]) {
-            try { await cleanup(); } catch(error) { if(!errors.includes(error)) errors.push(error); }
-        }
-        if(errors.length) throw new AggregateError(errors,'Network browser workflow or cleanup failed');
+        await finishFixture({failure: failure, client, browser: chrome, php, profile: profileDir});
     }
 }
 if (process.env.WSPRRYPI_RUN_RECOVERY_BROWSER === "1") main().catch(error=>{console.error(error);process.exitCode=1;});
