@@ -484,11 +484,6 @@ nlohmann::json Rp1GpclkRouteService::operate(const std::string &operation,
   try {
   invalidateRp1GpclkDevelopmentOperation();
   const int gpio = gpioForRoute(route);
-  if ((operation == "preflight" || operation == "switch" || operation == "apply-and-reboot") &&
-      operations_.gpio_conflict) {
-    const auto conflict = operations_.gpio_conflict(gpio);
-    if (!conflict.empty()) return failure("pps_gpio_conflict", conflict);
-  }
   const std::string executor_route = gpio == 4    ? "gpio4"
                                      : gpio == 20 ? "gpio20"
                                                   : "";
@@ -945,12 +940,6 @@ Rp1GpclkRouteService &productionRp1GpclkRouteService() {
              "/usr/local/lib/wsprrypi/rp1_qualification.py", "status"};
          if (!route.empty()) arguments.insert(arguments.end(), {"--route", route});
          return nlohmann::json::parse(runRp1ProviderProcess(arguments, std::chrono::seconds{10}));
-       },
-       [](int gpio) {
-         const auto snapshot = current_test_tone_planning_config_snapshot();
-         return snapshot.gpio_use_direct_pps_calibration && snapshot.gpio_pps_input_pin == gpio
-             ? "GPIO" + std::to_string(gpio) + " is reserved by the selected direct PPS input."
-             : std::string{};
        }});
   return service;
 }

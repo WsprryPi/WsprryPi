@@ -71,7 +71,6 @@ void serialize_runtime_config_to_json(
     target["GPIO"]["Use System Clock Frequency Estimate"] =
         source.gpio_use_system_clock_frequency_estimate;
     target["GPIO"]["Use Direct PPS Calibration"] = source.gpio_use_direct_pps_calibration;
-    target["GPIO"]["PPS Input Pin"] = source.gpio_pps_input_pin;
     target["GPIO"]["Frequency Residual PPM"] =
         source.gpio_frequency_residual_ppm;
     target["GPIO"]["Manual PPM"] = source.gpio_manual_ppm;

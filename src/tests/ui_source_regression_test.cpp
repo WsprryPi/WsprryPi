@@ -1208,7 +1208,7 @@ int main()
     require(
         ui_source.find("const si5351Active = selectedTransmitBackend() !== \"gpio\";") != std::string::npos &&
             ui_source.find("const estimateEnabled = $(\"#use_system_clock_frequency_estimate\").is(\":checked\") ||") != std::string::npos &&
-            ui_source.find("(directSupported && $(\"#use_direct_pps_calibration\").is(\":checked\"))") != std::string::npos &&
+            ui_source.find("(isRp1GpioPlatform() && $(\"#use_direct_pps_calibration\").is(\":checked\"))") != std::string::npos &&
             ui_source.find("$residual.prop(\"disabled\", si5351Active || !estimateEnabled);") != std::string::npos &&
             ui_source.find("let use_system_clock_frequency_estimate = parseBool($(\"#use_system_clock_frequency_estimate\").is(\":checked\"));") != std::string::npos &&
             ui_source.find("let gpio_frequency_residual_ppm = Number($(\"#gpio_frequency_residual_ppm\").val());") != std::string::npos &&

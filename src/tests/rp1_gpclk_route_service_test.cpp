@@ -117,21 +117,6 @@ StartupOutcome startup(const nlohmann::json &next, int persisted,
 } // namespace
 
 int main() {
-  {
-    unsigned requests = 0;
-    wsprrypi::Rp1GpclkRouteExecutorOperations operations;
-    operations.request = [&](const nlohmann::json&) { ++requests; return nlohmann::json::object(); };
-    operations.idle_state = idle;
-    operations.persisted_gpio = [] { return 4; };
-    operations.gpio_conflict = [](int gpio) { return gpio == 20 ? "GPIO20 is reserved for PPS." : std::string{}; };
-    wsprrypi::Rp1GpclkRouteService guarded(std::move(operations));
-    for (const auto& action : {"preflight", "switch", "apply-and-reboot"}) {
-      const auto result = guarded.operate(action, "GPIO20", 0);
-      assert(!result.at("ok").get<bool>() && result.at("result") == "pps_gpio_conflict");
-      assert(requests == 0);
-    }
-  }
-
   std::vector<nlohmann::json> requests;
   nlohmann::json next = response("query", "ok", state());
   int persisted = 4;

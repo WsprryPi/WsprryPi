@@ -44,7 +44,6 @@
 #include "chipset_offsets.hpp"
 #include "rp1_route_bridge.hpp"
 #include "rp1_pps_calibration.hpp"
-#include "bcm_pps_calibration.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_development_policy.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_planner.hpp"
 
@@ -110,7 +109,6 @@ namespace
     std::mutex frequency_estimate_mutex;
     FrequencyEstimateQualifier frequency_estimate_qualifier;
     wsprrypi::Rp1PpsCalibration direct_pps_calibration;
-    wsprrypi::BcmPpsCalibration bcm_pps_calibration;
     std::string direct_pps_reference_identity;
     SystemClockFrequencyEstimate current_frequency_estimate{};
     SystemClockFrequencyEstimate current_chrony_frequency_estimate{};
@@ -175,24 +173,16 @@ namespace
         // Every future request, including inbound WTP preparation, must check
         // the cached report's current age. Committed requests remain frozen.
         const bool direct_pps = cfg.gpio_use_direct_pps_calibration &&
-            (cfg.transmit_backend == TransmitBackendKind::RP1_GPCLK ||
-             cfg.transmit_backend == TransmitBackendKind::GPIO);
-        const bool bcm_direct = direct_pps && cfg.transmit_backend == TransmitBackendKind::GPIO;
+            cfg.transmit_backend == TransmitBackendKind::RP1_GPCLK;
         const auto reference = provider.withAgeAt(std::chrono::steady_clock::now());
         const bool reference_ready = wsprrypi::rp1_pps_reference_ready(reference);
         if (direct_pps && direct_pps_reference_identity != reference.source_signature) {
             (void)direct_pps_calibration.snapshot(false);
-            (void)bcm_pps_calibration.snapshot(false);
             direct_pps_reference_identity = reference.source_signature;
         }
-        const auto capture_now = std::chrono::steady_clock::now();
-        auto direct_sample = direct_pps_calibration.snapshot(direct_pps && !bcm_direct && reference_ready,
-            capture_now, static_cast<unsigned>(cfg.gpio_pps_input_pin));
-        auto bcm_sample = bcm_pps_calibration.snapshot(bcm_direct && reference_ready,
-            capture_now, static_cast<unsigned>(cfg.gpio_pps_input_pin));
-        if (bcm_direct) direct_sample = std::move(bcm_sample);
+        auto direct_sample = direct_pps_calibration.snapshot(direct_pps && reference_ready);
         if (direct_pps && !reference_ready) {
-            direct_sample.provider_name = bcm_direct ? "BCM PPS" : "RP1 PPS";
+            direct_sample.provider_name = "RP1 PPS";
             direct_sample.reason = "Direct PPS requires a current, single selected local Chrony reference. Check GPS/PPS lock and source configuration; using manual fallback.";
         }
         if (direct_pps)
@@ -3364,8 +3354,7 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     std::lock_guard<std::mutex> lk(set_config_mtx);
 
     if (config.gpio_use_direct_pps_calibration &&
-        (config.transmit_backend == TransmitBackendKind::RP1_GPCLK ||
-         config.transmit_backend == TransmitBackendKind::GPIO))
+        config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
         (void)select_and_publish_gpio_correction(config);
 
     WsprRuntimeStatusSnapshot snapshot;

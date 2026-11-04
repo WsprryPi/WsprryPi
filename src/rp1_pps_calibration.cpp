@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 #include "rp1_pps_calibration.hpp"
-#include "pps_input.hpp"
 #include "Chipset-Offsets/src/chipset_offsets.hpp"
 #include "PPM-Manager/src/ppm_manager.hpp"
 
@@ -80,8 +79,7 @@ struct Rp1PpsCalibration::Impl {
     std::thread worker;
     SystemClockFrequencyEstimate current;
     std::chrono::steady_clock::time_point acquired{};
-    std::function<std::unique_ptr<Rp1PpsCapture>(unsigned)> factory;
-    unsigned input_pin = 17;
+    std::function<std::unique_ptr<Rp1PpsCapture>()> factory;
 
     void publish_error(const std::string& reason) {
         std::lock_guard lock(mutex);
@@ -95,18 +93,17 @@ struct Rp1PpsCalibration::Impl {
     struct Capture : Rp1PpsCapture {
         int fd = -1;
         int sm = -1;
-        unsigned input_pin;
-        PpsInputBinding reference;
-        explicit Capture(unsigned pin) : input_pin(pin) {
+        explicit Capture() {
             if (const auto* disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
                 disabled && std::string(disabled) == "1")
                 throw std::runtime_error("Direct PPS hardware access is disabled.");
             // Refuse another board, another PPS route, or a clock-tree change.
             std::ifstream model("/proc/device-tree/model");
             std::string board; std::getline(model, board, '\0');
-            if (board.find("Raspberry Pi 5") == std::string::npos)
-                throw std::runtime_error("Direct RP1 PPS requires Raspberry Pi 5.");
-            reference = resolve_pps_input(input_pin);
+            std::ifstream name("/sys/class/pps/pps0/name");
+            std::string pps; std::getline(name, pps);
+            if (board.find("Raspberry Pi 5") == std::string::npos || pps != "pps@11.-1")
+                throw std::runtime_error("Direct PPS requires Raspberry Pi 5 with pps0 on GPIO17.");
             verify_clock_tree();
             fd = ::open("/dev/pio0", O_RDWR | O_CLOEXEC | O_NOFOLLOW);
             if (fd < 0) throw std::runtime_error("Unable to open /dev/pio0 for direct PPS.");
@@ -125,9 +122,9 @@ struct Rp1PpsCalibration::Impl {
                 rp1_pio_sm_init_args init{};
                 init.sm = sm;
                 init.config.clkdiv = 1U << 16;
-                init.config.execctrl = (input_pin << 24) | (13U << 12);
+                init.config.execctrl = (17U << 24) | (13U << 12);
                 init.config.shiftctrl = (1U << 18) | (1U << 19);
-                init.config.pinctrl = input_pin << 15;
+                init.config.pinctrl = 17U << 15;
                 call(PIO_IOC_SM_INIT, &init);
                 rp1_pio_sm_set_enabled_args enable{};
                 enable.mask = 1U << sm; enable.enable = 1;
@@ -146,6 +143,9 @@ struct Rp1PpsCalibration::Impl {
             return result;
         }
         static void verify_clock_tree() {
+            std::ifstream source("/sys/class/pps/pps0/name");
+            std::string name; std::getline(source, name);
+            if (name != "pps@11.-1") throw std::runtime_error("PPS input identity changed or disappeared.");
             std::ifstream clocks("/sys/kernel/debug/clk/clk_summary");
             std::string line;
             std::size_t parent_indent = 0;
@@ -163,12 +163,7 @@ struct Rp1PpsCalibration::Impl {
             }
             if (!child) throw std::runtime_error("Cannot verify RP1 clk_sys directly from 200 MHz pll_sys.");
         }
-        void verify_reference() const {
-            if (resolve_pps_input(input_pin).identity != reference.identity)
-                throw std::runtime_error("Selected RP1 PPS input changed or disappeared.");
-        }
         Rp1PpsMeasurement measure(const std::atomic<bool>& stop) override {
-            verify_reference();
             verify_clock_tree();
             rp1_pio_sm_fifo_state_args fifo{}; fifo.sm = sm;
             call(PIO_IOC_SM_FIFO_STATE, &fifo);
@@ -189,7 +184,6 @@ struct Rp1PpsCalibration::Impl {
                     m.iterations = ~sample.data;
                     m.completed_at = std::chrono::steady_clock::now();
                     verify_clock_tree();
-                    verify_reference();
                     return m;
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -201,7 +195,7 @@ struct Rp1PpsCalibration::Impl {
     void run() {
         while (!stop) {
           try {
-            auto capture = factory(input_pin);
+            auto capture = factory();
             if (!capture) throw std::runtime_error("PPS capture unavailable.");
             std::array<double, 3> history{};
             unsigned observations = 0;
@@ -214,8 +208,8 @@ struct Rp1PpsCalibration::Impl {
                 const bool stable = observations >= history.size() && *high - *low <= 0.1;
                 SystemClockFrequencyEstimate next;
                 next.provider_name = "RP1 PPS";
-                next.source_provenance = "Direct PPS on GPIO" + std::to_string(input_pin) + " (operator-qualified reference)";
-                next.source_signature = "rp1:pll_sys:200000000:pio0:gpio" + std::to_string(input_pin);
+                next.source_provenance = "Direct PPS on GPIO17 (operator-qualified reference)";
+                next.source_signature = "rp1:pll_sys:200000000:pio0:pps0:gpio17";
                 next.qualification = stable ? FrequencyEstimateQualification::Qualified : FrequencyEstimateQualification::Converging;
                 next.frequency_ppm = result.additional_ppm;
                 next.reason = stable ? result.reason : "Collecting three stable, distinct ten-second PPS measurements.";
@@ -245,33 +239,21 @@ struct Rp1PpsCalibration::Impl {
     }
 };
 
-Rp1PpsCalibration::Rp1PpsCalibration() : Rp1PpsCalibration([](unsigned pin) -> std::unique_ptr<Rp1PpsCapture> {
+Rp1PpsCalibration::Rp1PpsCalibration() : Rp1PpsCalibration([]() -> std::unique_ptr<Rp1PpsCapture> {
 #if WSPRRYPI_HAVE_RP1_PPS_CAPTURE
-    return std::make_unique<Impl::Capture>(pin);
+    return std::make_unique<Impl::Capture>();
 #else
-    (void)pin;
     throw std::runtime_error("Direct PPS requires Linux RP1 PIO support; using configured manual fallback.");
 #endif
 }) {}
 Rp1PpsCalibration::Rp1PpsCalibration(std::function<std::unique_ptr<Rp1PpsCapture>()> factory)
-    : Rp1PpsCalibration([f=std::move(factory)](unsigned) { return f(); }) {}
-Rp1PpsCalibration::Rp1PpsCalibration(std::function<std::unique_ptr<Rp1PpsCapture>(unsigned)> factory)
     : impl_(std::make_unique<Impl>()) { impl_->factory = std::move(factory); }
 Rp1PpsCalibration::~Rp1PpsCalibration() {
     impl_->stop = true;
     if (impl_->worker.joinable()) impl_->worker.join();
 }
 SystemClockFrequencyEstimate Rp1PpsCalibration::snapshot(bool enabled,
-    std::chrono::steady_clock::time_point now, unsigned input_pin) {
-    if (impl_->worker.joinable() && (!enabled || input_pin > 27 || impl_->input_pin != input_pin)) {
-        impl_->stop = true;
-        impl_->worker.join();
-    }
-    if (enabled && input_pin > 27) {
-        impl_->publish_error("PPS input GPIO must be from 0 through 27.");
-        std::lock_guard lock(impl_->mutex);
-        return impl_->current;
-    }
+    std::chrono::steady_clock::time_point now) {
     // Called under the scheduler's estimate mutex. Joining is bounded by one
     // nonblocking RPC plus a 20 ms poll; no device call waits for a PPS edge.
     if (!enabled) {
@@ -281,7 +263,6 @@ SystemClockFrequencyEstimate Rp1PpsCalibration::snapshot(bool enabled,
         return {};
     }
     if (!impl_->worker.joinable()) {
-        impl_->input_pin = input_pin;
         impl_->stop = false;
         impl_->publish_error("Waiting for direct PPS capture.");
         try {

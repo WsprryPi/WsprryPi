@@ -795,36 +795,6 @@ int main(int argc, char *argv[])
                 catch (const std::exception&) { refused = true; }
                 require(refused, "direct PPS JSON opt-in requires a boolean before candidate acceptance");
             }
-            auto custom_pps = serialized;
-            custom_pps["GPIO"]["PPS Input Pin"] = 18;
-            ArgParserConfig custom_pps_config;
-            config_handler_deserialization::deserialize_json_to_runtime_config(custom_pps, custom_pps_config);
-            ArgParserConfig custom_pps_copy(custom_pps_config);
-            require(custom_pps_copy.gpio_pps_input_pin == 18, "configured PPS GPIO survives parse and copy");
-            nlohmann::json custom_pps_saved;
-            config_handler_serialization::serialize_runtime_config_to_json(custom_pps_copy, custom_pps_saved);
-            require(custom_pps_saved["GPIO"]["PPS Input Pin"] == 18, "configured PPS GPIO survives serialization");
-            for (const auto& bad_pin : {nlohmann::json(-1), nlohmann::json(28), nlohmann::json(18.5), nlohmann::json(true), nlohmann::json("18"), nlohmann::json(nullptr)}) {
-                auto bad = custom_pps; bad["GPIO"]["PPS Input Pin"] = bad_pin;
-                bool refused=false;
-                try { ArgParserConfig target; config_handler_deserialization::deserialize_json_to_runtime_config(bad,target); }
-                catch (...) { refused=true; }
-                require(refused,"PPS input pin requires a bounded integer before mutation");
-            }
-            if (transmit_backend_is_compiled(TransmitBackendKind::GPIO)) {
-                auto activated = custom_pps_copy;
-                activated.transmit_backend = TransmitBackendKind::GPIO;
-                activated.use_led = activated.use_amp = activated.use_shutdown = false;
-                activated.gpio_tx_pin = 4;
-                activated.gpio_pps_input_pin = 4;
-                std::string conflict_error;
-                require(!validate_config_candidate(activated, &conflict_error, false) && conflict_error.find("GPIO4") != std::string::npos,
-                    "backend activation cannot reuse PPS input as RF output");
-                activated.gpio_pps_input_pin = 18;
-                activated.use_amp = true; activated.amp_pin = 18;
-                require(!validate_config_candidate(activated, &conflict_error, false) && conflict_error.find("GPIO18") != std::string::npos,
-                    "CLI/backend activation reserves configured PPS input against Pi I/O");
-            }
             auto conflicted = serialized;
             conflicted["Operation"]["Transmit Backend"] = "rp1-gpclk";
             conflicted["Operation"]["Use LED"] = true;
@@ -836,12 +806,6 @@ int main(int argc, char *argv[])
                 try { ArgParserConfig target; config_handler_deserialization::deserialize_json_to_runtime_config(conflicted, target); }
                 catch (const std::exception& error) { refused = std::string(error.what()).find("GPIO17") != std::string::npos; }
                 require(refused, "PPS GPIO conflicts are refused with or without a Band GPIO section");
-                conflicted["Operation"]["Transmit Backend"] = "gpio";
-                refused = false;
-                try { ArgParserConfig target; config_handler_deserialization::deserialize_json_to_runtime_config(conflicted, target); }
-                catch (const std::exception& error) { refused = std::string(error.what()).find("GPIO17") != std::string::npos; }
-                require(refused, "BCM GPIO backend reserves the existing PPS input too");
-                conflicted["Operation"]["Transmit Backend"] = "rp1-gpclk";
             }
             require(serialized["Calibration"]["PPM"].get<double>() == value &&
                     serialized["GPIO"]["Manual PPM"].get<double>() == value &&

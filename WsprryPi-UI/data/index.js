@@ -501,7 +501,6 @@ function restorePersistedConfigDraft() {
         gpio["Use System Clock Frequency Estimate"] !== false
     ).trigger("change");
     $("#gpio_frequency_residual_ppm").val(Number(gpio["Frequency Residual PPM"] ?? 0)).trigger("change");
-    $("#pps_input_pin").val(Object.prototype.hasOwnProperty.call(gpio, "PPS Input Pin") ? gpio["PPS Input Pin"] : 17);
     $("#use_direct_pps_calibration").prop("checked", gpio["Use Direct PPS Calibration"] === true).trigger("change");
     populateGpioManualPpm(Number(gpio["Manual PPM"] ?? 0));
     $("#ppm").val(Number(calibration.PPM)).trigger("change");
@@ -569,7 +568,6 @@ function bindIndexActions() {
     // Bind the GPIO system-clock frequency-estimate switch.
     $("#use_system_clock_frequency_estimate").on("change", clickUseSystemClockFrequencyEstimate);
     $("#use_direct_pps_calibration").on("change", clickUseSystemClockFrequencyEstimate);
-    $("#pps_input_pin").on("input change", function () { validateTransmitterHardwareFields(); scheduleAutosave(); });
     $("#gpio_manual_ppm").on("input", function () {
         if (isSubnormalPpm(Number(this.value))) {
             markSubnormalGpioManualPpm(this, false);
@@ -2458,22 +2456,12 @@ function updateBackendPlatformSupportUi() {
     syncBackendPanelVisibility();
 }
 
-function directPpsPlatformSupported() {
-    const generation = Number((window.WSPRRYPI_PLATFORM || {}).raspberryPiGeneration);
-    return Number.isInteger(generation) && generation >= 1 && generation <= 5;
-}
-
 function syncCalibrationControls() {
     const si5351Active = selectedTransmitBackend() !== "gpio";
-    const directSupported = directPpsPlatformSupported();
-    $("#use_direct_pps_calibration").prop("disabled", si5351Active || !directSupported);
-    const settling = document.getElementById("direct-pps-settling");
-    if (settling) settling.textContent = isRp1GpioPlatform()
-        ? "Allow at least 30 seconds to settle."
-        : "Allow at least six minutes to settle; busy hosts may need longer.";
-    $("#pps_input_pin").prop("disabled", si5351Active || !directSupported);
+    if (si5351Active || !isRp1GpioPlatform())
+        $("#use_direct_pps_calibration").prop("disabled", true);
     const estimateEnabled = $("#use_system_clock_frequency_estimate").is(":checked") ||
-        (directSupported && $("#use_direct_pps_calibration").is(":checked"));
+        (isRp1GpioPlatform() && $("#use_direct_pps_calibration").is(":checked"));
     const $residual = $("#gpio_frequency_residual_ppm");
     $residual.prop("disabled", si5351Active || !estimateEnabled);
     $residual.prop("required", !si5351Active && estimateEnabled);
@@ -4415,23 +4403,18 @@ function validateTransmitterHardwareFields() {
     const ppsField = document.getElementById("use_direct_pps_calibration");
     const ppsError = document.getElementById("direct-pps-error");
     if (ppsField) {
-        const pinField = document.getElementById("pps_input_pin");
-        const pin = Number(pinField?.value);
-        const active = gpioOperatorActive && directPpsPlatformSupported() && ppsField.checked;
-        const malformed = gpioOperatorActive && directPpsPlatformSupported() && (!pinField?.value || !Number.isInteger(pin) || pin < 0 || pin > 27);
-        const conflict = active && !malformed &&
-            (getReservedPiControlPins().has(String(pin)) || getSelectedBandGpioPins().has(String(pin)) ||
-             String(getTxPin()) === String(pin));
-        const message = malformed ? "PPS input GPIO must be a whole number from 0 through 27."
-            : conflict ? `GPIO${pin} is already assigned to an output or Pi I/O. Free that assignment before enabling direct PPS.` : "";
-        if (pinField) { pinField.setCustomValidity(message); setFieldValidationState(pinField, !message); }
+        const conflict = gpioOperatorActive && isRp1GpioPlatform() && ppsField.checked &&
+            (getReservedPiControlPins().has("17") || getSelectedBandGpioPins().has("17"));
+        const message = conflict
+            ? "GPIO17 is already assigned to Pi I/O. Free that assignment before enabling direct PPS."
+            : "";
         ppsField.setCustomValidity(message);
-        setFieldValidationState(ppsField, !message);
+        setFieldValidationState(ppsField, !conflict);
         if (ppsError) {
             ppsError.textContent = message;
-            ppsError.hidden = !message;
+            ppsError.hidden = !conflict;
         }
-        if (message) invalidCount++;
+        if (conflict) invalidCount++;
     }
 
     const manualPpmField = document.getElementById("gpio_manual_ppm");
@@ -4767,7 +4750,6 @@ function buildConfigPayload(options = {}) {
         "RP1 Drive mA": rp1_gpio_drive_ma,
         "Use System Clock Frequency Estimate": use_system_clock_frequency_estimate,
         "Use Direct PPS Calibration": $("#use_direct_pps_calibration").is(":checked"),
-        "PPS Input Pin": $("#pps_input_pin").val() === "" ? null : Number($("#pps_input_pin").val()),
         "Frequency Residual PPM": gpio_frequency_residual_ppm,
         "Manual PPM": gpio_manual_ppm,
         "Transmit Pin": gpio_tx_pin,
@@ -5606,7 +5588,6 @@ function setHardwareControlsDisabled(disabled) {
         "#rp1_gpio_drive_ma",
         "#use_system_clock_frequency_estimate",
         "#use_direct_pps_calibration",
-        "#pps_input_pin",
         "#gpio_frequency_residual_ppm",
         "#gpio_manual_ppm",
         "#si5351_i2c_bus",
@@ -5665,7 +5646,6 @@ function setOfflineDefaults() {
     populateRp1GpioDrive(2);
     $("#use_system_clock_frequency_estimate").prop("checked", true);
     $("#use_direct_pps_calibration").prop("checked", false);
-    $("#pps_input_pin").val(17);
     $("#gpio_frequency_residual_ppm").val(0);
     $("#gpio_manual_ppm").val(0);
     populateI2cBuses(1);

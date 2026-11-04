@@ -3,16 +3,28 @@
 The optional Raspberry Pi 5 adapter measures RP1 `clk_sys` against an existing
 GPS PPS input. It supplies the RP1 RF parent estimate independently of Chrony's
 host-frequency estimate. Chrony remains the UTC authority. Pi 1–4, Si5351,
-outbound WTP, symbol timing, alternative parents, and new RF output routing are
-outside this adapter's measurement scope. The separate Pi 1–4 BCM provider
-is described in [BCM direct PPS calibration](bcm-direct-pps-calibration.md).
+outbound WTP, symbol timing, alternative parents, and new GPIO routing are
+outside this adapter's measurement scope.
+
+## Pi 1–4 host-clock calibration
+
+Pi 1–4 GPIO RF parents derive from the main SoC oscillator shared with host
+timing. The existing system-clock estimate applies Chrony's measured host-rate
+error to the RF frequency model. WsprryPi does not implement direct GPIO PPS
+capture for these hosts, and PPS hardware is not required for this mechanism.
+
+GPS/PPS can improve the operating system's reference. Linux/GPS services and
+Chrony own its capture, configuration, and clock discipline; WsprryPi consumes
+Chrony's frequency estimate when **System clock estimate** is enabled. Chrony
+can also use network time sources. UTC synchronization and RF correction remain
+separate: WsprryPi applies the estimate to its RF model, rather than relying on
+Chrony to adjust the RF output. Residual and manual correction retain their
+existing meanings. RP1's separate RF clock requires its own optional direct
+measurement, described below.
 
 ## Reference and clock identity
 
-The PPS input is configurable with `GPIO.PPS Input Pin` (BCM GPIO 0–27,
-default 17). Exactly one existing Linux `ppsN` source must identify
-`pps@<GPIO in hexadecimal>.-1`; the adapter does not configure that source.
-Changing the selection releases capture and clears qualification. The
+The implemented input is Linux `pps0`, named `pps@11.-1`, on GPIO17. The
 adapter requires Raspberry Pi 5, `/dev/pio0`, and a readable clock tree showing
 200 MHz `clk_sys` directly below 200 MHz `pll_sys`. Identity and clock ancestry
 are rechecked around each observation. The existing PPS driver retains its

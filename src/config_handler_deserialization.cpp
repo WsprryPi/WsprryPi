@@ -588,10 +588,6 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
     if (gpio.contains("Use Direct PPS Calibration") && !gpio.at("Use Direct PPS Calibration").is_boolean())
         throw std::runtime_error("GPIO.Use Direct PPS Calibration must be a boolean.");
     target.gpio_use_direct_pps_calibration = gpio.value("Use Direct PPS Calibration", false);
-    const auto pps_pin = gpio.value("PPS Input Pin", nlohmann::json(17));
-    if (!pps_pin.is_number_integer() || pps_pin < 0 || pps_pin > 27)
-        throw std::runtime_error("GPIO.PPS Input Pin must be an integer from 0 through 27.");
-    target.gpio_pps_input_pin = pps_pin.get<int>();
     target.gpio_frequency_residual_ppm = parse_gpio_ppm_value(
         gpio.value("Frequency Residual PPM", 0.0),
         "GPIO.Frequency Residual PPM");
@@ -842,17 +838,14 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
 
     const auto validate_pps_pin = [&] {
         if (!target.gpio_use_direct_pps_calibration ||
-            (target.transmit_backend != TransmitBackendKind::RP1_GPCLK &&
-             target.transmit_backend != TransmitBackendKind::GPIO)) return;
-        const int pps_pin = target.gpio_pps_input_pin;
-        bool conflict = target.gpio_tx_pin == pps_pin ||
-            (target.use_led && target.led_pin == pps_pin) ||
-            (target.use_amp && target.amp_pin == pps_pin) ||
-            (target.use_shutdown && target.shutdown_pin == pps_pin);
+            target.transmit_backend != TransmitBackendKind::RP1_GPCLK) return;
+        bool conflict = (target.use_led && target.led_pin == 17) ||
+            (target.use_amp && target.amp_pin == 17) ||
+            (target.use_shutdown && target.shutdown_pin == 17);
         for (const auto& band : target.band_gpio)
-            conflict = conflict || (band.enabled && band.gpio == pps_pin);
+            conflict = conflict || (band.enabled && band.gpio == 17);
         if (conflict) throw std::runtime_error(
-            "GPIO" + std::to_string(pps_pin) + " is reserved for the selected direct PPS input; remove conflicting output or Pi I/O assignments.");
+            "GPIO17 is reserved for the existing direct PPS input; remove conflicting Pi I/O assignments.");
     };
 
     // Missing Band GPIO data is allowed; explicit disabled defaults stay in place.

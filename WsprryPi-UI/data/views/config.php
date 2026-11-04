@@ -904,22 +904,16 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                 </section>
                                 <div class="form-check form-switch mt-3">
                                     <input class="form-check-input" type="checkbox" role="switch" id="use_direct_pps_calibration" aria-describedby="direct-pps-hint direct-pps-error" />
-                                    <label class="form-check-label" for="use_direct_pps_calibration">Direct PPS calibration (Pi GPIO)</label>
-                                </div>
-                                <div class="mt-3 col-12 col-sm-6 col-lg-4">
-                                    <label class="form-label" for="pps_input_pin">PPS input GPIO</label>
-                                    <input class="form-control" type="number" id="pps_input_pin" min="0" max="27" step="1" value="17" aria-describedby="pps-input-pin-hint direct-pps-error" />
-                                    <div id="pps-input-pin-hint" class="form-text">BCM GPIO number, not physical header pin. Default: GPIO17. Match the existing Linux PPS wiring.</div>
+                                    <label class="form-check-label" for="use_direct_pps_calibration">Direct PPS calibration (Pi 5 / RP1)</label>
                                 </div>
                                 <div id="direct-pps-error" class="form-text text-danger mt-2" aria-live="polite" hidden></div>
                                 <div id="direct-pps-status" class="form-text mt-2" role="status" aria-live="polite"></div>
                                 <div id="direct-pps-hint" class="form-text mt-2">
-                                    Measure the RF clock against an existing GPS PPS input on the selected GPIO.
-                                    WsprryPi discovers its Linux PPS device without changing the pin configuration.
+                                    Measure the RF clock against an existing GPS PPS input on GPIO17 (pps0).
                                     Enable only with a verified reference whose edge error is at most 1 microsecond.
                                     Chrony must select that local PPS reference without combined sources.
-                                    Overrides the system clock estimate for Pi 1–5 GPIO output.
-                                    <span id="direct-pps-settling">Allow at least six minutes to settle on Pi 1–4, or 30 seconds on Pi 5.</span> Loss or expiry selects Fallback PPM.
+                                    Overrides the system clock estimate for RP1; other backends retain their own calibration.
+                                    Allow at least 30 seconds to settle. Loss or expiry selects Fallback PPM.
                                     The Operations frequency correction panel shows acquisition status and the selected source.
                                 </div>
                                 </div>

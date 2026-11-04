@@ -18,7 +18,6 @@ struct Rp1GpclkRouteExecutorOperations {
                      const std::string &)>
       runtime_route_launch;
   std::function<nlohmann::json(const std::string &)> qualification_status;
-  std::function<std::string(int)> gpio_conflict;
 };
 class Rp1GpclkRouteService {
 public:

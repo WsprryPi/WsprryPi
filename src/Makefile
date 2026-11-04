@@ -1445,32 +1445,16 @@ $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT): tests/gpio_frequency_correctio
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -o $@
 
-gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT) chrony-frequency-correction-test rp1-pps-calibration-test bcm-pps-calibration-test pps-input-test
+gpio-frequency-correction-test: $(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT) chrony-frequency-correction-test rp1-pps-calibration-test
 	$(Q)echo "Running hardware-independent GPIO frequency-correction tests."
 	$(Q)./$(BIN_DIR)/$(GPIO_FREQUENCY_CORRECTION_TEST_OUT)
-
-.PHONY: pps-input-test
-pps-input-test: $(BIN_DIR)/pps_input_test
-	$(Q)./$(BIN_DIR)/pps_input_test
-
-$(BIN_DIR)/pps_input_test: tests/pps_input_test.cpp pps_input.cpp bcm_pps_calibration.cpp rp1_pps_calibration.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp pps_input.hpp bcm_pps_calibration.hpp rp1_pps_calibration.hpp
-	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -lpthread -o $@
-
-.PHONY: bcm-pps-calibration-test
-bcm-pps-calibration-test: $(BIN_DIR)/bcm_pps_calibration_test
-	$(Q)./$(BIN_DIR)/bcm_pps_calibration_test
-
-$(BIN_DIR)/bcm_pps_calibration_test: tests/bcm_pps_calibration_test.cpp bcm_pps_calibration.cpp pps_input.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp bcm_pps_calibration.hpp
-	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -lpthread -o $@
 
 .PHONY: rp1-pps-calibration-test
 rp1-pps-calibration-test: $(BIN_DIR)/rp1_pps_calibration_test
 	$(Q)python3 ../scripts/tests/rp1_pps_vendor_test.py
 	$(Q)./$(BIN_DIR)/rp1_pps_calibration_test
 
-$(BIN_DIR)/rp1_pps_calibration_test: tests/rp1_pps_calibration_test.cpp rp1_pps_calibration.cpp pps_input.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp rp1_pps_calibration.hpp vendor/rp1_pio/rp1_pio_if.h
+$(BIN_DIR)/rp1_pps_calibration_test: tests/rp1_pps_calibration_test.cpp rp1_pps_calibration.cpp system_clock_frequency_estimate.cpp WSPR-Transmitter/src/legacy_gpio_clock_model.cpp rp1_pps_calibration.hpp vendor/rp1_pio/rp1_pio_if.h
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(GPIO_FREQUENCY_CORRECTION_TEST_FLAGS) $(filter %.cpp,$^) -lpthread -o $@
 

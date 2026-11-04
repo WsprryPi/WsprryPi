@@ -2085,7 +2085,6 @@ function populateConfig(callback = null) {
 
                     // Frequency Calibration
                     $("#use_system_clock_frequency_estimate").prop("checked", use_system_clock_frequency_estimate).trigger("change");
-                    $("#pps_input_pin").val(Object.prototype.hasOwnProperty.call(gpio, "PPS Input Pin") ? gpio["PPS Input Pin"] : 17);
                     $("#use_direct_pps_calibration").prop("checked", getConfigBoolValue(gpio, "GPIO", "Use Direct PPS Calibration", false)).trigger("change");
                     $("#gpio_frequency_residual_ppm").val(gpio_frequency_residual_ppm).trigger("change");
                     populateGpioManualPpm(gpio_manual_ppm);
@@ -3199,7 +3198,7 @@ function renderRuntimeStatus(status) {
 function renderGpioFrequencyCorrection(status) {
     const ppsStatus = document.getElementById("direct-pps-status");
     if (ppsStatus && status) {
-        const text = ["RP1 PPS", "BCM PPS"].includes(status.frequencyEstimateProvider)
+        const text = status.frequencyEstimateProvider === "RP1 PPS"
             ? `Direct PPS: ${status.frequencyEstimateQualification}. ${status.frequencyEstimateReason || ""}`
             : "";
         if (ppsStatus.textContent !== text) ppsStatus.textContent = text;

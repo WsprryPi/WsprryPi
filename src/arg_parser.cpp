@@ -412,14 +412,6 @@ static bool validate_pi_io_gpio_assignments(
     };
 
     std::vector<ReservedAssignment> reserved_assignments;
-    if (candidate.gpio_use_direct_pps_calibration &&
-        transmit_backend_uses_gpio_output(candidate.transmit_backend)) {
-        if (candidate.gpio_pps_input_pin < 0 || candidate.gpio_pps_input_pin > 27) {
-            if (error_message) *error_message = "PPS input GPIO must be from 0 through 27.";
-            return false;
-        }
-        reserved_assignments.push_back({candidate.gpio_pps_input_pin, "Direct PPS Input"});
-    }
     if (candidate.use_led && candidate.led_pin >= 0)
     {
         reserved_assignments.push_back({candidate.led_pin, "Transmit LED"});
@@ -1702,8 +1694,7 @@ bool validate_config_candidate(
 
     const bool frequencies_ok = set_frequencies(candidate);
     if ((candidate.transmit || (candidate.gpio_use_direct_pps_calibration &&
-             (candidate.transmit_backend == TransmitBackendKind::RP1_GPCLK ||
-              candidate.transmit_backend == TransmitBackendKind::GPIO))) &&
+             candidate.transmit_backend == TransmitBackendKind::RP1_GPCLK)) &&
         !frequencies_ok &&
         !trim_copy_string(candidate.frequencies).empty())
     {
@@ -2350,10 +2341,9 @@ bool set_frequencies(ArgParserConfig &target)
             }
             entry.dial_frequency_hz = freq;
             if (target.gpio_use_direct_pps_calibration &&
-                (target.transmit_backend == TransmitBackendKind::RP1_GPCLK ||
-                 target.transmit_backend == TransmitBackendKind::GPIO) &&
-                entry.selector_gpio == target.gpio_pps_input_pin) {
-                llog.logS(ERROR, "GPIO", target.gpio_pps_input_pin, " is reserved for the selected direct PPS input.");
+                target.transmit_backend == TransmitBackendKind::RP1_GPCLK &&
+                entry.selector_gpio == 17) {
+                llog.logS(ERROR, "GPIO17 is reserved for the existing direct PPS input.");
                 target.wspr_dial_freq_set.clear();
                 target.wspr_frequency_entries.clear();
                 return false;

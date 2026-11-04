@@ -289,8 +289,7 @@ struct ArgParserConfig
     int gpio_power_level; ///< GPIO backend power level (0-7).
     int rp1_gpio_drive_ma; ///< RP1 GPIO pad drive selection in mA.
     bool gpio_use_system_clock_frequency_estimate; ///< Enable the GPIO system-clock estimate.
-    int gpio_pps_input_pin = 17; ///< Existing Linux PPS input, BCM GPIO numbering.
-    bool gpio_use_direct_pps_calibration = false; ///< Explicit BCM/RP1 PPS RF clock measurement.
+    bool gpio_use_direct_pps_calibration = false; ///< Explicit RP1/PPS RF clock measurement.
     double gpio_frequency_residual_ppm; ///< RF residual added to a usable provider estimate.
     double gpio_manual_ppm; ///< Fixed GPIO correction and final configured fallback.
     double si5351_ppm; ///< Persisted Si5351 reference-oscillator correction.
@@ -475,7 +474,6 @@ struct ArgParserConfig
         rp1_gpio_drive_ma = other.rp1_gpio_drive_ma;
         gpio_use_system_clock_frequency_estimate = other.gpio_use_system_clock_frequency_estimate;
         gpio_use_direct_pps_calibration = other.gpio_use_direct_pps_calibration;
-        gpio_pps_input_pin = other.gpio_pps_input_pin;
         gpio_frequency_residual_ppm = other.gpio_frequency_residual_ppm;
         gpio_manual_ppm = other.gpio_manual_ppm;
         si5351_ppm = other.si5351_ppm;
@@ -558,8 +556,6 @@ extern ArgParserConfig config;
 struct TestTonePlanningConfigSnapshot
 {
     TransmitBackendKind transmit_backend = TransmitBackendKind::GPIO;
-    bool gpio_use_direct_pps_calibration = false;
-    int gpio_pps_input_pin = 17;
     bool allow_unqualified_frequency = false;
     bool allow_non_amateur_frequency = false;
     double wspr_audio_offset_hz = WSPR_AUDIO_OFFSET_HZ;
