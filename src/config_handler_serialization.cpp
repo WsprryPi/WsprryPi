@@ -9,6 +9,10 @@
 #include "config_handler_serialization.hpp"
 #include "arg_parser.hpp"
 #include "i2c_bus_inventory.hpp"
+#include "machine_power_control.hpp"
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+#include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
+#endif
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 
 #include <algorithm>
@@ -198,7 +202,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
                       "Si5351.Reference Frequency")
                 : kDefaultSi5351ReferenceHz;
         si5351_address_inventory = cached_si5351_addresses(
-            i2c_bus, reference_hz, si5351.value("Adapter Identity", std::string{}));
+            i2c_bus, reference_hz, si5351.value("Adapter Identity", std::string{}), i2c_address);
         si5351_detected = si5351_address_inventory.contains(i2c_address);
         if (!si5351_detected)
         {
@@ -236,11 +240,32 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
             if (adapter.bus == bus.number) identity = adapter.identity;
         i2c_buses.push_back({{"Number", bus.number}, {"Name", bus.name}, {"Identity", identity}});
     }
+    auto native_adapters = nlohmann::json::array();
+    std::string native_error;
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+    const auto native_inventory = native_si5351_inventory();
+    native_error = native_inventory.error;
+    for (const auto& endpoint : native_inventory.endpoints) {
+        mcp2221a::Endpoint resolved; std::string error;
+        const bool available = mcp2221a::resolve(native_inventory, endpoint.identity, resolved, error);
+        native_adapters.push_back({{"Identity", endpoint.identity}, {"Name", "MCP2221A"},
+                                   {"Available", available}});
+    }
+#endif
     auto si5351_addresses = nlohmann::json::array();
     for (const int address : si5351_address_inventory.addresses)
         si5351_addresses.push_back(
             config_serialization_si5351_i2c_address(address));
     public_json["Platform"] = {
+        {"Machine Reboot Supported", machine_power_control_supported()},
+        {"Machine Power Off Supported", machine_power_control_supported()},
+#ifdef WSPRRYPI_SI5351_TRANSPORT
+        {"Si5351 Transport", WSPRRYPI_SI5351_TRANSPORT},
+#else
+        {"Si5351 Transport", "unavailable"},
+#endif
+        {"Si5351 Adapters", native_adapters},
+        {"Si5351 Adapter Discovery Error", native_error},
         {"I2C Buses", i2c_buses},
         {"I2C Bus Discovery Error", i2c_inventory.error.empty() ? adapter_inventory.error : i2c_inventory.error},
         {"Si5351 Address Bus", si5351_address_inventory.i2c_bus},

@@ -30,6 +30,7 @@
 #include "wtp_runtime_bridge.hpp"
 #include "pico_usb_installer_state.hpp"
 #include "backend_capabilities.hpp"
+#include "machine_power_control.hpp"
 #if WSPRRYPI_BACKEND_RP1_GPCLK
 #include "WSPR-Transmitter/src/rp1_gpclk_transmit_backend.hpp"
 #endif
@@ -230,17 +231,24 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             reply["error"]="pico_firmware_maintenance";
             reply["message"]="Pico firmware maintenance is active. Continue or recover the update before making changes.";
         }
+        else if ((cmd == "shutdown" || cmd == "reboot") && !machine_power_control_supported())
+        {
+            reply = {{"command", cmd}, {"status", "error"}, {"error", "unsupported"},
+                     {"message", "Machine reboot and power-off are unavailable on this host. WsprryPi remains running."}};
+        }
         else if (cmd == "shutdown")
         {
             llog.logS(INFO, "Received websocket shutdown command.");
             reply["command"] = "shutdown";
             shutdown_system();
+            reply["status"] = "ok"; reply["requested"] = true;
         }
         else if (cmd == "reboot")
         {
             llog.logS(INFO, "Received websocket reboot command.");
             reply["command"] = "reboot";
             reboot_system();
+            reply["status"] = "ok"; reply["requested"] = true;
         }
         else if (cmd == "stop")
         {
@@ -267,6 +275,8 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
             reply["tx_state"] = snapshot.tx_state;
+            reply["machine_power"] = {{"reboot", machine_power_control_supported()},
+                                      {"power_off", machine_power_control_supported()}};
             reply["firmware_maintenance"]=wtp_runtime_firmware_busy();
             reply["runtime_mode"] = snapshot.runtime_mode;
             reply["transmit_backend"] = snapshot.transmit_backend;

@@ -135,6 +135,11 @@ namespace
     Si5351AddressInventory si5351_inventory_cache;
     [[maybe_unused]] int si5351_inventory_reference = 0;
     std::string si5351_inventory_identity;
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+    std::optional<mcp2221a::Inventory> si5351_native_inventory_override;
+    std::optional<mcp2221a::Endpoint> si5351_native_binding;
+    int si5351_native_address = -1;
+#endif
     std::optional<linux_i2c_identity::Adapter> si5351_inventory_binding;
     std::optional<std::vector<std::string>> si5351_inventory_command_override;
     std::string interactive_enable_file_stamp;
@@ -737,6 +742,16 @@ bool si5351_device_detected(
     return detected;
 }
 
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+mcp2221a::Inventory native_si5351_inventory() {
+    return si5351_native_inventory_override ? *si5351_native_inventory_override : mcp2221a::discover();
+}
+void set_native_si5351_inventory_for_test(const mcp2221a::Inventory& inventory) {
+    si5351_native_inventory_override = inventory;
+}
+void clear_native_si5351_inventory_for_test() { si5351_native_inventory_override.reset(); }
+#endif
+
 Si5351AddressInventory discover_si5351_addresses(
     int i2c_bus,
     int reference_hz,
@@ -781,15 +796,16 @@ Si5351AddressInventory discover_si5351_addresses(
         return native_result;
     }
     mcp2221a::Endpoint binding;
-    if (!mcp2221a::resolve(mcp2221a::discover(), adapter_identity, binding, native_result.error)) return native_result;
+    if (!mcp2221a::resolve(native_si5351_inventory(), adapter_identity, binding, native_result.error)) return native_result;
     std::uint32_t path_size = 0;
     _NSGetExecutablePath(nullptr, &path_size);
     std::vector<char> path(path_size);
     if (!path_size || _NSGetExecutablePath(path.data(), &path_size) != 0) {
         native_result.error = "Unable to locate the Si5351 discovery worker."; return native_result;
     }
-    const auto reply = si5351_inventory_process::run({path.data(), "--internal-si5351-inventory",
-        std::to_string(i2c_bus), std::to_string(reference_hz), std::to_string(selected_address), adapter_identity});
+    const auto reply = si5351_inventory_process::run(si5351_inventory_command_override.value_or(
+        std::vector<std::string>{path.data(), "--internal-si5351-inventory",
+        std::to_string(i2c_bus), std::to_string(reference_hz), std::to_string(selected_address), adapter_identity}));
     native_result.checked = true; native_result.error = reply.error;
     if (native_result.error.empty()) {
         try {
@@ -806,8 +822,16 @@ Si5351AddressInventory discover_si5351_addresses(
         } catch (const std::exception&) { native_result.addresses.clear(); native_result.error = "Invalid native Si5351 discovery reply."; }
     }
     mcp2221a::Endpoint current; std::string error;
-    if (!mcp2221a::resolve(mcp2221a::discover(), adapter_identity, current, error) || !(current == binding)) {
+    if (!mcp2221a::resolve(native_si5351_inventory(), adapter_identity, current, error) || !(current == binding)) {
         native_result.addresses.clear(); native_result.error = "MCP2221A binding changed during discovery.";
+    }
+    {
+        std::lock_guard lock(si5351_inventory_mutex);
+        si5351_inventory_cache = native_result;
+        si5351_inventory_reference = reference_hz;
+        si5351_inventory_identity = adapter_identity;
+        si5351_native_binding = binding;
+        si5351_native_address = selected_address;
     }
     return native_result;
 #else
@@ -890,7 +914,7 @@ Si5351AddressInventory discover_si5351_addresses(
 #endif
 }
 
-Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity)
+Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, const std::string &adapter_identity, [[maybe_unused]] int selected_address)
 {
     si5351_inventory_process::reap(); // Nonblocking cleanup only; never launches a probe.
     // Test fixtures model already available inventory, without starting a probe.
@@ -899,7 +923,17 @@ Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, co
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
     Si5351AddressInventory native_result;
     native_result.i2c_bus = i2c_bus;
-    native_result.error = "Native HID status requires an explicitly selected adapter and address probe.";
+    mcp2221a::Endpoint current;
+    if (!mcp2221a::resolve(native_si5351_inventory(), adapter_identity, current, native_result.error))
+        return native_result;
+    std::lock_guard lock(si5351_inventory_mutex);
+    if (si5351_inventory_reference == reference_hz && si5351_inventory_identity == adapter_identity &&
+        si5351_native_address == selected_address && si5351_native_binding && *si5351_native_binding == current) {
+        auto result = si5351_inventory_cache;
+        result.i2c_bus = i2c_bus; // Presentation only; HID binding has no Linux bus.
+        return result;
+    }
+    native_result.error = "This adapter and address have not been checked. Check the selected address before saving.";
     return native_result;
 #else
     std::optional<linux_i2c_identity::Adapter> current_binding;
@@ -2138,7 +2172,7 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         {
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
             mcp2221a::Endpoint endpoint;
-            mcp2221a::resolve(mcp2221a::discover(), candidate_config.si5351_adapter_identity, endpoint, error_message);
+            mcp2221a::resolve(native_si5351_inventory(), candidate_config.si5351_adapter_identity, endpoint, error_message);
 #else
             error_message = candidate_config.si5351_adapter_identity.empty()
                 ? i2c_bus_inventory::selection_error(i2c_bus_inventory::discover(), candidate_config.si5351_i2c_bus)

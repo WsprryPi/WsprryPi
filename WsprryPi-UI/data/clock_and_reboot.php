@@ -9,6 +9,7 @@
         <button
             type="button"
             id="rebootButton"
+            disabled aria-disabled="true" aria-describedby="machine-power-status"
             class="btn btn-link text-body p-0 custom-tooltip system-action-button me-2"
             data-bs-toggle="tooltip"
             aria-label="Reboot system"
@@ -20,6 +21,7 @@
         <button
             type="button"
             id="shutdownButton"
+            disabled aria-disabled="true" aria-describedby="machine-power-status"
             class="btn btn-link text-body p-0 custom-tooltip system-action-button"
             data-bs-toggle="tooltip"
             aria-label="Shutdown system"
@@ -27,6 +29,8 @@
             <i class="fa-solid fa-power-off fa-lg" aria-hidden="true"></i>
         </button>
     </div>
+
+    <span id="machine-power-status" class="small text-body-secondary" role="status" aria-live="polite">Checking machine power support…</span>
 
     <!-- Break between icons and times on XS only -->
     <div class="w-100 d-sm-none"></div>

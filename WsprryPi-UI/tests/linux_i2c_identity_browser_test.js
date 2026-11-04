@@ -195,6 +195,41 @@ async function main() {
                 }
             }
         }
+        // The same shipped controls must also handle a native host without a
+        // numeric device node or automatic selection of an identical adapter.
+        await evaluate(`
+            window.WSPRRYPI_PLATFORM.si5351Transport='mcp2221a-hid';
+            window.WSPRRYPI_PLATFORM.si5351AdapterDiscoveryError='';
+            globalThis.nativeAdapter={Identity:testIdentity,Name:'MCP2221A',Available:true};
+            window.WSPRRYPI_PLATFORM.si5351Adapters=[nativeAdapter];
+            populateI2cBuses(17,testIdentity);populateSi5351Addresses(17,'0x60',['0x60'],'',17);
+            updateMachinePowerCapabilities({reboot:false,power_off:false});
+        `);
+        assert.equal(await evaluate('selectedI2cBusValue()'),17);
+        assert.equal(await evaluate('document.getElementById("si5351_i2c_bus").numericBus'),17);
+        assert.equal(await evaluate('document.getElementById("rebootButton").disabled && document.getElementById("shutdownButton").disabled'),true);
+        assert.match(await evaluate('document.getElementById("machine-power-status").textContent'),/unavailable/);
+        assert.equal(await evaluate('document.getElementById("si5351-bus-hint").textContent.includes("/dev/i2c")'),false);
+        await evaluate(`document.getElementById('si5351_i2c_address').value='0x61';document.getElementById('si5351_i2c_address').dispatchEvent(new Event('change',{bubbles:true}));`);
+        assert.equal(await evaluate('i2cRequests.at(-1).options.data.identity'),'usb:04d8:00dd:serial:6164616672756974');
+        assert.equal(await evaluate('i2cRequests.at(-1).options.data.address'),97);
+        await evaluate(`i2cRequests.at(-1).done({'I2C Bus':17,'Adapter Identity':testIdentity,Transport:'mcp2221a-hid',Addresses:['0x61'],'Discovery Error':''})`);
+        assert.equal(await evaluate('document.getElementById("si5351_i2c_address").value'),'0x61');
+        for (const [device,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+            await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:device==='mobile'});
+            for (const theme of ['light','dark']) for(const state of ['available','denied','missing','duplicate']) {
+                await evaluate(`
+                    document.documentElement.setAttribute('data-bs-theme',${JSON.stringify(theme)});
+                    window.WSPRRYPI_PLATFORM.si5351Adapters=${JSON.stringify(state)}==='missing'?[]:${JSON.stringify(state)}==='duplicate'?[nativeAdapter,nativeAdapter]:[nativeAdapter];
+                    populateI2cBuses(17,testIdentity);
+                    if(['available','denied'].includes(${JSON.stringify(state)}))populateSi5351Addresses(17,'0x60',${JSON.stringify(state)}==='available'?['0x60']:[],${JSON.stringify(state)}==='denied'?'HID access denied. Close the other application and retry.':'',17);
+                    document.getElementById('si5351-backend-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-100);
+                `);
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${device} native overflow`);
+                if(evidence) {const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(evidence,`native-${device}-${theme}-${state}.png`),shot.data,'base64');}
+            }
+        }
+        console.log('Native host browser: retained numeric setting, explicit adapter/address recovery, unavailable machine-power controls, and desktop/mobile light/dark inventory states passed');
         console.log('Linux I2C UI: no/one/multiple adapters, reconnect renumbering, permission error, identity-change late reply, legacy numeric persistence, and desktop/mobile light/dark passed');
     } finally {
         client?.close();

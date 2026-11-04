@@ -76,10 +76,10 @@ Primary references:
 - [Apple asynchronous report submission](https://developer.apple.com/documentation/iokit/1438422-iohiddevicesetreportwithcallback).
 - [HIDAPI 0.15.0 macOS implementation](https://github.com/libusb/hidapi/blob/hidapi-0.15.0/mac/hid.c).
 
-The implementation and operator setup documentation are in `devel`. Physical
-qualification, exact release-candidate validation/publication, and the deferred
-machine-power capability/UI slice remain acceptance gates. Issue #419 stays open
-for its release boundary.
+The transport implementation and operator setup documentation are in `devel`.
+The native web setup and machine-power capability handling are completed by the
+current feature branch and require its final validation before release disposition.
+Accepted hardware work retains its recorded setup and limits.
 
 ## Configuration and operator documentation
 
@@ -90,8 +90,19 @@ opening devices. A serial or topology identity must resolve to exactly one
 `Si5351.Adapter Identity` INI setting or `--si5351-adapter-identity` CLI option.
 The retained Linux I2C bus setting has no device-selection role on macOS.
 Only the explicitly configured Si5351 address is probed for live validation.
-Native CLI access is implemented; the web adapter selector and cached native
-status workflow are not yet supported and must not be treated as available.
+The web adapter selector uses native registry metadata and exact stable identities,
+without a synthetic Linux bus. Only the selected address is probed. Cached status
+is scoped to identity, registry generation, address, and reference frequency; a
+changed binding invalidates it without opening HID. The retained numeric Linux
+bus setting is preserved but does not select native hardware.
+
+Public host configuration and WebSocket status advertise reboot and power-off
+support explicitly. Unsupported WebSocket commands and scheduler entry points
+return before setting power flags, starting application cleanup, or exiting.
+The browser keeps unsupported or unconfirmed controls disabled, explains the
+reason, and displays initiated-action feedback only after a matching accepted
+response. Firmware maintenance, capability retirement, and disconnect still
+veto admission.
 
 The operator setup guide is maintained in the separate `WsprryPi-Docs`
 repository at `docs/Install/macos_si5351.md`, linked from the installation index
@@ -99,5 +110,5 @@ and Linux guide. It covers the preferred Adafruit pair, build selection,
 OpenSSL, metadata identity, access denial, topology limits, CLI/INI configuration,
 and recovery/output uncertainty. Its Sphinx build, local links, and desktop/mobile
 rendering were validated in documentation commit `6ec93a2`.
-Native UI documentation must track the separately implemented workflow after
-Impeccable review. Software and documentation checks do not qualify physical output.
+The guide covers the native web selection/status workflow and unavailable machine-power controls.
+Software and documentation checks do not extend recorded physical acceptance.

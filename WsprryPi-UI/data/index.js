@@ -4102,6 +4102,7 @@ function populateSi5351Addresses(bus, savedAddress, addresses, error = "", inven
     const field = document.getElementById("si5351_i2c_address");
     if (!field) return;
     const normalizedBus = Number(bus);
+    const location = nativeSi5351Transport() ? "the selected MCP2221A" : `I2C bus ${normalizedBus}`;
     const inventoryMatches = Object.is(Number(inventoryBus), normalizedBus);
     const normalizedAddresses = inventoryMatches
         ? normalizedSi5351Addresses(addresses)
@@ -4145,14 +4146,14 @@ function populateSi5351Addresses(bus, savedAddress, addresses, error = "", inven
 
     const hint = document.getElementById("si5351-address-hint");
     hint.textContent = si5351AddressInventoryState.error
-        ? `${si5351AddressInventoryState.error} Reload or select the bus again to retry.`
+        ? `${si5351AddressInventoryState.error} Reload or select the adapter again to retry.`
         : normalizedAddresses.length === 0
             ? stableSelection
-                ? `No compatible response at ${normalizedSaved} on I2C bus ${normalizedBus}. Select the fitted address; valid address changes save automatically.`
-                : `No register-compatible Si5351 device was detected from 0x60 through 0x6F on I2C bus ${normalizedBus}.`
+                ? `No compatible response at ${normalizedSaved} on ${location}. Select the fitted address; valid address changes save automatically.`
+                : `No register-compatible Si5351 device was detected from 0x60 through 0x6F on ${location}.`
             : !present
-                ? `The saved address ${normalizedSaved || "is unavailable"}. Select a detected address on I2C bus ${normalizedBus}.`
-                : `Detected ${normalizedAddresses.length} compatible address${normalizedAddresses.length === 1 ? "" : "es"} on I2C bus ${normalizedBus}.`;
+                ? `The saved address ${normalizedSaved || "is unavailable"}. Select a detected address on ${location}.`
+                : `Detected ${normalizedAddresses.length} compatible address${normalizedAddresses.length === 1 ? "" : "es"} on ${location}.`;
     validateSi5351I2cAddress();
 }
 
@@ -4172,11 +4173,11 @@ function refreshSi5351Addresses(bus, savedAddressOverride = null) {
     }
     const requestSequence = ++si5351AddressDiscoverySequence;
     si5351AddressInventoryState = { bus, addresses: [], error: "", loading: true };
-    field.replaceChildren(new Option("Checking I2C bus…", savedAddress, true, true));
+    field.replaceChildren(new Option(window.WSPRRYPI_PLATFORM?.si5351Transport === "mcp2221a-hid" ? "Checking selected adapter…" : "Checking I2C bus…", savedAddress, true, true));
     field.disabled = true;
     field.setAttribute("aria-busy", "true");
     document.getElementById("si5351-address-hint").textContent =
-        identity ? `Checking the selected address on /dev/i2c-${bus}.` : `Checking I2C bus ${bus} for compatible addresses from 0x60 through 0x6F.`;
+        identity ? `Checking the selected address on ${window.WSPRRYPI_PLATFORM?.si5351Transport === "mcp2221a-hid" ? "the selected MCP2221A" : `/dev/i2c-${bus}`}.` : `Checking I2C bus ${bus} for compatible addresses from 0x60 through 0x6F.`;
     validateTransmitterHardwareFields();
 
     ajaxWithEndpointFallback(SI5351_ADDRESSES_ENDPOINT, {
@@ -4187,6 +4188,16 @@ function refreshSi5351Addresses(bus, savedAddressOverride = null) {
     }).done((inventory) => {
         if (requestSequence !== si5351AddressDiscoverySequence ||
             selectedTransmitBackend() !== "si5351" || selectedI2cBusValue() !== bus || selectedAdapterIdentity() !== identity) return;
+        if (window.WSPRRYPI_PLATFORM?.si5351Transport === "mcp2221a-hid" &&
+            (!inventory || Array.isArray(inventory) || Object.keys(inventory).sort().join(",") !== "Adapter Identity,Addresses,Discovery Error,I2C Bus,Transport" ||
+             inventory.Transport !== "mcp2221a-hid" || inventory["Adapter Identity"] !== identity ||
+             inventory["I2C Bus"] !== bus || typeof inventory["Discovery Error"] !== "string" ||
+             !Array.isArray(inventory.Addresses) || inventory.Addresses.length > 1 ||
+             inventory.Addresses.some(value => value !== formatSi5351Address(selectedAddress)))) {
+            populateSi5351Addresses(bus, savedAddress, [], "The adapter check returned an invalid or mismatched reply.", bus);
+            validatePage();
+            return;
+        }
         const platform = window.WSPRRYPI_PLATFORM || {};
         platform.si5351Detected = !inventory?.["Discovery Error"] &&
             normalizedSi5351Addresses(inventory?.Addresses).includes(formatSi5351Address(savedAddress));
@@ -4231,14 +4242,68 @@ function validateSi5351I2cAddress() {
     }
     fld.setCustomValidity(valid
         ? ""
-        : "Select a detected Si5351 address on the selected I2C bus.");
+        : "Select a detected Si5351 address on the selected adapter.");
 
     setFieldValidationState(fld, valid);
     return valid;
 }
 
+function nativeSi5351Transport() {
+    return window.WSPRRYPI_PLATFORM?.si5351Transport === "mcp2221a-hid";
+}
+function nativeSi5351Adapters() {
+    const platform = window.WSPRRYPI_PLATFORM || {};
+    if (typeof platform.si5351AdapterDiscoveryError !== "string" || platform.si5351AdapterDiscoveryError ||
+        !Array.isArray(platform.si5351Adapters)) return [];
+    const valid = platform.si5351Adapters.every(item => item &&
+        Object.keys(item).sort().join(",") === "Available,Identity,Name" &&
+        typeof item.Identity === "string" && item.Identity.length <= 2048 && /^usb:04d8:00dd:(serial|path):(?:[0-9a-f]{2})+$/.test(item.Identity) &&
+        typeof item.Name === "string" && typeof item.Available === "boolean");
+    return valid ? platform.si5351Adapters : [];
+}
+function populateNativeSi5351Adapters(savedBus, savedIdentity) {
+    const field = document.getElementById("si5351_i2c_bus");
+    field.numericBus = Number(savedBus); // Preserve the unrelated Linux INI value.
+    field.replaceChildren(new Option("Select an MCP2221A adapter", ""));
+    const adapters = nativeSi5351Adapters();
+    const seen = new Set();
+    for (const adapter of adapters) {
+        if (seen.has(adapter.Identity)) continue;
+        seen.add(adapter.Identity);
+        const unique = adapters.filter(item => item.Identity === adapter.Identity).length === 1;
+        const option = new Option(`${adapter.Name} — ${adapter.Identity.includes(":path:") ? "host/USB port identity" : "serial identity"}${unique && adapter.Available ? "" : " (unavailable or ambiguous)"}`, adapter.Identity);
+        option.disabled = !unique || !adapter.Available;
+        field.add(option);
+    }
+    const present = [...field.options].some(option => option.value === savedIdentity && savedIdentity && !option.disabled);
+    if (savedIdentity && !seen.has(savedIdentity)) {
+        const missing = new Option("Saved MCP2221A — unavailable", savedIdentity);
+        missing.disabled = true; field.add(missing);
+    }
+    field.value = savedIdentity;
+    field.title = savedIdentity || "Select an MCP2221A adapter";
+    field.disabled = selectedTransmitBackend() !== "si5351" || adapters.length === 0;
+    const label = document.querySelector('label[for="si5351_i2c_bus"]');
+    if (label) label.textContent = "USB I2C adapter";
+    const hint = document.getElementById("si5351-bus-hint");
+    hint.textContent = present
+        ? `Selected MCP2221A. ${savedIdentity.includes(":path:") ? "This identity belongs to this Mac and USB port. " : ""}Only the selected address is checked. Reload after reconnecting.`
+        : "Select one available MCP2221A identity. Check the USB connection and access, then reload. No adapter is selected automatically.";
+    if (selectedTransmitBackend() === "si5351") {
+        field.setCustomValidity(present ? "" : "Select one available, uniquely identified MCP2221A adapter.");
+        setFieldValidationState(field, present);
+        if (!present) {
+            ++si5351AddressDiscoverySequence;
+            populateSi5351Addresses(NaN, document.getElementById("si5351_i2c_address").value,
+                [], "Select one available MCP2221A before checking its address.", NaN);
+        }
+    }
+}
+
 function availableI2cBuses() {
     const platform = window.WSPRRYPI_PLATFORM || {};
+    if (nativeSi5351Transport()) return nativeSi5351Adapters();
+    if (typeof platform.si5351Transport === "string" && platform.si5351Transport !== "linux-i2c") return [];
     if (platform.i2cBusDiscoveryError || !Array.isArray(platform.i2cBuses)) return [];
     return platform.i2cBuses.filter(bus => bus && Number.isInteger(bus.Number) && bus.Number >= 0 && bus.Number <= 2147483647)
         .sort((a, b) => a.Number - b.Number);
@@ -4252,6 +4317,10 @@ function selectedAdapterIdentity() {
 function selectedI2cBusValue() {
     const field = document.getElementById("si5351_i2c_bus");
     const identity = selectedAdapterIdentity();
+    if (nativeSi5351Transport()) {
+        const matches = nativeSi5351Adapters().filter(item => item.Identity === identity);
+        return identity && matches.length === 1 && matches[0].Available ? field.numericBus : NaN;
+    }
     if (identity) {
         const matches = availableI2cBuses().filter(bus => bus.Identity === identity);
         return matches.length === 1 ? matches[0].Number : NaN;
@@ -4262,6 +4331,7 @@ function selectedI2cBusValue() {
 }
 
 function populateI2cBuses(savedBus, savedIdentity = selectedAdapterIdentity()) {
+    if (nativeSi5351Transport()) return populateNativeSi5351Adapters(savedBus, savedIdentity);
     const field = document.getElementById("si5351_i2c_bus");
     if (!field) return;
     const platform = window.WSPRRYPI_PLATFORM || {};

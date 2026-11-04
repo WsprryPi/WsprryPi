@@ -8,9 +8,15 @@
 #include <iostream>
 #include <thread>
 #include <unistd.h>
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+#include "WSPR-Transmitter/src/mcp2221a_protocol.hpp"
+#endif
 
 using namespace std::chrono_literals;
 int main(int argc, char** argv) {
+    if (argc == 2 && std::string(argv[1]) == "--native-inventory-fixture") {
+        std::cout << R"({"bus":1,"addresses":[96],"error":""})"; return 0;
+    }
     if (argc == 4 && std::string(argv[1]) == "--inventory-fixture") {
         std::ofstream(argv[2]) << "started";
         std::this_thread::sleep_for(400ms);
@@ -34,6 +40,34 @@ int main(int argc, char** argv) {
     assert(before.at("Si5351").at("I2C Address") == "0x60");
     // Invalid metadata must remain an explicit error without affecting the saved value.
     assert(web_server_routes::build_si5351_addresses_response("1junk").status == 400);
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+    const std::string identity = mcp2221a::identity("", 0x12340000);
+    mcp2221a::Endpoint endpoint{identity, 42, 0x12340000};
+    set_native_si5351_inventory_for_test({{endpoint}, {}});
+    const auto host = get_public_config_json().at("Platform");
+    assert(host.at("Si5351 Transport") == "mcp2221a-hid");
+    assert(host.at("Si5351 Adapters").size() == 1 && host.at("Si5351 Adapters").at(0).at("Available") == true);
+    assert(host.at("Machine Reboot Supported") == false && host.at("Machine Power Off Supported") == false);
+    assert(!cached_si5351_addresses(1, 25000000, identity, 96).checked);
+    set_si5351_inventory_command_override_for_test({argv[0], "--native-inventory-fixture"});
+    assert(discover_si5351_addresses(1, 25000000, 96, identity).contains(96));
+    // Status is metadata-only: a broken worker must not affect a cached read.
+    set_si5351_inventory_command_override_for_test({"/nonexistent-inventory-worker"});
+    assert(cached_si5351_addresses(1, 25000000, identity, 96).contains(96));
+    const auto retained_bus_change = cached_si5351_addresses(17, 25000000, identity, 96);
+    assert(retained_bus_change.contains(96) && retained_bus_change.i2c_bus == 17);
+    assert(!cached_si5351_addresses(1, 27000000, identity, 96).checked);
+    assert(!cached_si5351_addresses(1, 25000000, identity, 97).checked);
+    endpoint.generation++;
+    set_native_si5351_inventory_for_test({{endpoint}, {}});
+    assert(!cached_si5351_addresses(1, 25000000, identity, 96).checked);
+    set_native_si5351_inventory_for_test({{endpoint, endpoint}, {}});
+    assert(!cached_si5351_addresses(1, 25000000, identity, 96).error.empty());
+    set_native_si5351_inventory_for_test({{}, {}});
+    assert(!cached_si5351_addresses(1, 25000000, identity, 96).error.empty());
+    clear_native_si5351_inventory_for_test();
+    clear_si5351_inventory_command_override_for_test();
+#endif
 #if defined(__linux__)
     char marker[] = "/tmp/wsprrypi-inventory-test-XXXXXX";
     const int fd = mkstemp(marker);
@@ -82,6 +116,14 @@ int main(int argc, char** argv) {
     clear_si5351_inventory_command_override_for_test();
     unlink(marker);
 #endif
+#if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
+    // Exercise INI concurrency using a backend actually compiled in this
+    // native-only profile. Detection remains an injected software result.
+    config.simulated_backend_override = false;
+    config.transmit_backend = TransmitBackendKind::SI5351;
+    config.si5351_adapter_identity = identity;
+    set_si5351_detection_override_for_test(true);
+#endif
     // A prepared INI candidate must not overwrite a newer web transaction.
     char ini_path[] = "/tmp/wsprrypi-inventory-ini-XXXXXX";
     const int ini_fd = mkstemp(ini_path);
@@ -96,6 +138,7 @@ int main(int argc, char** argv) {
         json_to_ini();
         PreparedConfigCandidate candidate;
         prepare_ini_config_candidate(ini_path, candidate);
+        if (!candidate.valid) std::cerr << "Prepared candidate: " << candidate.error_reason << "\n";
         assert(candidate.valid);
         const auto committed = patch_all_from_web_revision(
             {{"Meta", {{"debug_logging", !candidate.normalized_config.debug_logging}}}}, {});

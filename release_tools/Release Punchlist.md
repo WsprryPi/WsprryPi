@@ -26,11 +26,13 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    Implementation and scoped Ubuntu/Raspberry Pi OS bench qualification accepted;
    **Ready for Release**. Keep the issue open for its next release boundary,
    including exact release-candidate validation and publication.
-5. ✅ **[#419 — Add a native macOS MCP2221A transport beneath the Si5351 backend](https://github.com/WsprryPi/WsprryPi/issues/419).**
-   Native transport implementation and operator setup documentation are in `devel`;
-   **Ready for Release**. Keep the issue open for the release boundary. Native
-   physical qualification and the deferred machine-power capability/UI slice
-   remain separate acceptance gates.
+5. ⏳ **[#419 — Add a native macOS MCP2221A transport beneath the Si5351 backend](https://github.com/WsprryPi/WsprryPi/issues/419).**
+   Native transport implementation and operator setup documentation are in `devel`,
+   and its full CI matrix passes. Hardware acceptance stands. Native web adapter
+   selection/status and unsupported macOS Reboot/Shutdown capability, command
+   admission, and UI handling are implemented on the completion feature branch.
+   Keep the issue open and in progress until the completed branch is validated
+   and merged; Ready for Release has been removed.
 6. ✅ **Installer Git clone requirement.** Research complete; retain the
    current clone requirement to deliver supporting tooling, configuration,
    service templates, and web assets. Closed for now with no installer changes.

@@ -1689,6 +1689,9 @@ function populateConfig(callback = null) {
                         "RP1 GPIO Operator Visible",
                         false
                     ),
+                    si5351Transport: platform["Si5351 Transport"],
+                    si5351Adapters: platform["Si5351 Adapters"],
+                    si5351AdapterDiscoveryError: platform["Si5351 Adapter Discovery Error"],
                     i2cBuses: Array.isArray(platform["I2C Buses"]) ? platform["I2C Buses"] : null,
                     i2cBusDiscoveryError: String(platform["I2C Bus Discovery Error"] || ""),
                     si5351AddressBus: getConfigIntValue(
@@ -1712,6 +1715,9 @@ function populateConfig(callback = null) {
                         ""
                     )
                 };
+
+                updateMachinePowerCapabilities({reboot: platform["Machine Reboot Supported"],
+                    power_off: platform["Machine Power Off Supported"]});
 
                 let mode = getConfigValue(operation, "Operation", "Mode", "WSPR");
                 if (!["WSPR", "QRSS", "FSKCW", "DFCW"].includes(mode)) {
@@ -3951,6 +3957,12 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
             return;
         }
 
+        if (msg.command === "reboot" || msg.command === "shutdown") {
+            handleMachinePowerResponse(msg);
+            return;
+        }
+        if (msg.machine_power !== undefined) updateMachinePowerCapabilities(msg.machine_power);
+
         if (msg.command === "tone_start" || msg.command === "tone_end") {
             if (typeof handleTestToneCommandResponse === "function") {
                 handleTestToneCommandResponse(msg, socket);
@@ -4128,6 +4140,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
         if (ws !== socket) {
             return;
         }
+        updateMachinePowerCapabilities(null);
         debugConsole(
             "debug",
             `WebSocket 🔌 closed (code=${ev.code}), reconnecting in ${reconnectDelay}ms`
@@ -7573,6 +7586,43 @@ function sendCommand(payload) {
     }
 }
 
+let machinePowerCapabilities = { reboot: false, power_off: false };
+let machinePowerRequestTimer = null;
+let machinePowerRequestId = null;
+let machinePowerCapabilitiesKnown = false;
+function updateMachinePowerCapabilities(value) {
+    const valid = value && typeof value === "object" && !Array.isArray(value) &&
+        Object.keys(value).sort().join(",") === "power_off,reboot" &&
+        typeof value.reboot === "boolean" && typeof value.power_off === "boolean";
+    machinePowerCapabilitiesKnown = Boolean(valid);
+    machinePowerCapabilities = valid ? value : { reboot: false, power_off: false };
+    syncMachinePowerControls();
+}
+function syncMachinePowerControls(message = "") {
+    const busy = pendingSystemAction !== null || window.PicoFirmwareSafety?.locked === true;
+    for (const [id, key] of [["rebootButton", "reboot"], ["shutdownButton", "power_off"]]) {
+        const button = document.getElementById(id);
+        if (button) {
+            button.disabled = busy || machinePowerCapabilities[key] !== true;
+            button.setAttribute("aria-disabled", String(button.disabled));
+        }
+    }
+    const hint = document.getElementById("machine-power-status");
+    if (hint) {
+        hint.textContent = message || (machinePowerCapabilities.reboot && machinePowerCapabilities.power_off
+            ? "" : machinePowerCapabilitiesKnown ? "Machine reboot and power-off are unavailable on this host." : "Machine power controls are unavailable until host support is confirmed.");
+        hint.hidden = !hint.textContent;
+    }
+}
+function handleMachinePowerResponse(reply) {
+    if (!["reboot", "shutdown"].includes(reply.command) || reply.command !== pendingSystemAction || reply.client_request_id !== machinePowerRequestId) return;
+    clearTimeout(machinePowerRequestTimer);
+    pendingSystemAction = null;
+    machinePowerRequestId = null;
+    if (reply.status === "ok" && reply.requested === true) showSystemModal(reply.command);
+    else syncMachinePowerControls(typeof reply.message === "string" ? reply.message : "The machine power request was rejected. WsprryPi remains running.");
+}
+
 // Show the system modal for reboot
 function handleRebootClick() {
     showSystemModal("reboot");
@@ -7665,6 +7715,10 @@ function showSystemModal(action, pause = true) {
 
 // Show the “Are you sure?” question
 function openConfirmModal(action, confirmModal) {
+    if (window.PicoFirmwareSafety?.locked === true || pendingSystemAction !== null || machinePowerCapabilities[action === "reboot" ? "reboot" : "power_off"] !== true) {
+        syncMachinePowerControls();
+        return;
+    }
     showConfirmationDialog({
         title: "Please Confirm",
         message: action === "reboot"
@@ -7673,13 +7727,21 @@ function openConfirmModal(action, confirmModal) {
         confirmLabel: "Yes, proceed",
         confirmClass: "btn-danger",
         onConfirm: () => {
-            pendingSystemAction = action;
-            if (action === "reboot") {
-                showSystemModal("reboot", false);
-            } else {
-                showSystemModal("shutdown", true);
+            if (window.PicoFirmwareSafety?.locked === true || pendingSystemAction !== null ||
+                machinePowerCapabilities[action === "reboot" ? "reboot" : "power_off"] !== true) return;
+            machinePowerRequestId = nextTestToneRequestId();
+            if (!sendCommand({command: action, client_request_id: machinePowerRequestId})) {
+                machinePowerRequestId = null;
+                syncMachinePowerControls("The controller is disconnected. No machine power request was sent.");
+                return;
             }
-            sendCommand(action);
+            pendingSystemAction = action;
+            syncMachinePowerControls("Waiting for the controller to accept the machine power request…");
+            machinePowerRequestTimer = setTimeout(() => {
+                pendingSystemAction = null;
+                machinePowerRequestId = null;
+                syncMachinePowerControls("The machine power request is unconfirmed. Check the host before trying again.");
+            }, 5000);
         }
     }, confirmModal);
 }
