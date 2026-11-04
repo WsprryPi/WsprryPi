@@ -108,3 +108,6 @@ docs/_build/
 
 # Node outputs
 node_modules/
+
+# Local generated Impeccable metadata
+WsprryPi-UI/.impeccable/design.json
