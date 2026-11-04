@@ -76,10 +76,12 @@ Primary references:
 - [Apple asynchronous report submission](https://developer.apple.com/documentation/iokit/1438422-iohiddevicesetreportwithcallback).
 - [HIDAPI 0.15.0 macOS implementation](https://github.com/libusb/hidapi/blob/hidapi-0.15.0/mac/hid.c).
 
-Physical qualification, final #411 acceptance, published operator documentation,
-final merge, and the deferred machine-power UI slice remain #419 acceptance gates.
+The implementation and operator setup documentation are in `devel`. Physical
+qualification, exact release-candidate validation/publication, and the deferred
+machine-power capability/UI slice remain acceptance gates. Issue #419 stays open
+for its release boundary.
 
-## Configuration and remaining operator documentation
+## Configuration and operator documentation
 
 `--si5351-transport` is a read-only compiled-transport report, not an availability
 probe. `--list-i2c-adapters` lists identities from native metadata without
@@ -91,10 +93,11 @@ Only the explicitly configured Si5351 address is probed for live validation.
 Native CLI access is implemented; the web adapter selector and cached native
 status workflow are not yet supported and must not be treated as available.
 
-The separate `WsprryPi-Docs` repository was inspected read-only. Before operator
-publication, add a native macOS installation/setup guide alongside
-`docs/Install/linux_si5351.md`, link it from `docs/Install/index.md`, and document
-build selection, OpenSSL, metadata identity, access denial, topology limits,
-CLI configuration, qualified hardware, and explicit recovery/output uncertainty.
-Update UI documentation only when the separately implemented native UI workflow
-has passed Impeccable review. No operator-documentation publication is claimed.
+The operator setup guide is maintained in the separate `WsprryPi-Docs`
+repository at `docs/Install/macos_si5351.md`, linked from the installation index
+and Linux guide. It covers the preferred Adafruit pair, build selection,
+OpenSSL, metadata identity, access denial, topology limits, CLI/INI configuration,
+and recovery/output uncertainty. Its Sphinx build, local links, and desktop/mobile
+rendering were validated in documentation commit `6ec93a2`.
+Native UI documentation must track the separately implemented workflow after
+Impeccable review. Software and documentation checks do not qualify physical output.
