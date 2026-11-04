@@ -459,21 +459,49 @@ browser exception details; request payloads are not dumped.
 | Active infrastructure files, including Phase 1 helper | 144 | 146 |
 | Active physical lines, including Phase 1 helper | 32,116 | 31,557 |
 | Active copied CDP classes / shared class | 13 / 0 | 0 / 1 |
-| New helper plus focused-test physical lines | 0 | 594 |
+| New Pi helper plus focused-test physical lines | 0 | 594 |
+| Charged companion source additions outside frozen Pi roots | 0 | 54 |
 | Unused cleanup credited | 0 | 0 |
 
-Phase 2's raw physical reduction is 559 lines. Conservatively excluding all 84
-removed blank/comment lines gives 475 credited lines for this phase (1.49% of
-the frozen 31,971-line denominator). Charging Phase 1's 145-line tool gives a
-cumulative credited saving of 330 lines (1.03%). New helpers/tests are fully
-charged; the increase of two files is reported without claiming file-count
-reduction. These figures are not achievement of the overall 50% target.
+Phase 2's raw Pi physical reduction is 559 lines. Conservatively excluding all
+84 removed blank/comment lines gives 475 Pi lines of credit. The companion
+startup correction adds 54 source lines (including replacements); all are
+charged, while its 17 removed lines earn zero credit outside the frozen Pi
+roots. Phase 2 therefore earns 421 lines (1.32% of the frozen 31,971-line
+denominator). Charging Phase 1's 145-line tool leaves 276 cumulative credited
+lines (0.86%). The Pi after-total is 31,557 physical lines including that tool;
+the conservative companion-adjusted after-total is 31,611, before the blank/
+comment exclusion. Pi active file count increases from 144 to 146; two existing
+companion harness files are also modified, with no new companion source file.
+New helpers/tests are fully charged. No file-count reduction or achievement of
+the overall 50% target is claimed.
 
 Local validation uses Node 26/macOS for real socket/process faults and an
 isolated Node 22/Debian PHP/Chromium container for `npm test`,
 `npm run test:browser`, the selected-Pico UDP editor, UDP Logs, and USB Logs with
-`LOGGING_REAL_STREAM=1`. The Pico checkout is read-only at
-`74dd300b6688984359c13ed576443fff356b5033`; no companion edits are needed.
+`LOGGING_REAL_STREAM=1`. The initial Pico source was `74dd300b6688984359c13ed576443fff356b5033`.
+The first feature CI run,
+[41879882300](https://github.com/WsprryPi/WsprryPi/actions/runs/41879882300),
+failed its inherited Pico no-page startup test before the Pi browser checks:
+the 750ms deadline expired before any endpoint probe. It also had a macOS
+simulated runner-acquisition cancellation. Neither is recorded as a pass.
+
+The narrowly required companion correction is committed as
+`1c30709186fabb64aa250da96d08914296ff3d89`, on its own
+`codex/ci-review-simplification` branch/worktree at
+`/Users/lbussy/.codex/worktrees/ci-review-simplification-pico/WsprryPico`.
+`tests/chrome_startup.mjs` and `chrome_startup.test.mjs` now gate negative
+deadline cases on observed probes/stderr, and gate partial-file publication on
+the startup reader's incomplete-discovery counter. Tests advance an injected
+logical deadline after establishing that state. Normal startup remains a
+monotonic 60 seconds; a separate real watchdog remains finite. The real
+21-second cold-start check remains. All 14 startup/process-cleanup tests pass
+on macOS and Linux, and independent review closes the partial-state sensitivity
+finding. The engineering README explains the clocks. Firmware, protocols,
+operator behavior, and production resources are unchanged. Both final carrier
+jobs must explicitly select this new immutable companion source; neither
+repository is delivered on devel/main by these feature-branch pushes.
+
 Representative desktop/mobile/light/dark PPS, tone, support, and logging
 captures are inspected; production UI assets and operator behavior are unchanged.
 The component README documents the shared test APIs and local requirements.
