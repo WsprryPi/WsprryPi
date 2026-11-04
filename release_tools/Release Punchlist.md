@@ -88,13 +88,6 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    where needed, and validate the selected release before the next WsprryPi beta.
 12. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
-13. ▧ **Post-4.0: [#333 — Research Spike: Advanced Scheduling](https://github.com/WsprryPi/WsprryPi/issues/333).**
-   Follows #419.
-14. ▧ **Post-4.0: [#444 — Track Standard Feld-Hell implementation and qualification](https://github.com/WsprryPi/WsprryPi/issues/444).**
-    Follows #333. Includes its separate Si5351 implementation and qualification
-    phase and two optional test cleanups.
-15. ▧ **Deferred beyond 4.0: Custom-domain TLS.** Address the separate
-    documentation custom-domain TLS follow-up.
 
 ## Final 4.0 stable release gate
 
