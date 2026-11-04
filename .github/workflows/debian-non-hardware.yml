@@ -397,7 +397,10 @@ jobs:
       - name: Run RP1 non-hardware regression
         working-directory: src
         run: |
-          strace -f -e trace=openat,open \
+          uname -sr
+          strace -V
+          trap 'ci_rp1_status=$?; if [ "$ci_rp1_status" -ne 0 ]; then tail -n 120 /tmp/wsprrypi-rp1.strace >&2 || :; fi; exit "$ci_rp1_status"' EXIT
+          strace -f -e trace=openat,open,clone,clone3,fork,vfork,wait4,waitid,exit,exit_group,kill,tgkill,setpgid \
             -o /tmp/wsprrypi-rp1.strace \
             make object-dependency-test \
               rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test \
