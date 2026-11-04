@@ -17,15 +17,20 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    required for any resulting changes. This is a new review; prior Beta review
    acceptance remains bound to its recorded implementation.
 2. ⏳ **Direct PPS frequency calibration.** RP1 work is complete; standard
-   GPIO/mailbox backend support remains in progress.
+   GPIO/mailbox support and configurable PPS inputs for both families are on
+   `codex/pi1-4-direct-pps`. Scoped BCM2711/Pi 4 GPIO4 RF acceptance passed
+   with GPIO18 PPS; all six untrimmed measurements were below 0.093 ppm,
+   and residual control and restoration passed. The feature remains unmerged.
    Optional Pi 5/RP1 input-only
    GPIO17 capture replaces the host-rate proxy, with bounded qualification,
    per-job correction, residual adjustment, and manual fallback. Thirty
    conducted cases on wspr5's GPIO4/GPIO20 routes passed the declared scoped
    accuracy/trim checks; full Linux, UI, and actual Pi/Pico network/USB suites
-   passed, and adversarial findings are closed. Pi 1–4 direct capture remains
-   outside this adapter. Merged into `devel`; the release build is installed on
-   wspr5 with direct PPS enabled and qualified. No published release implied. See the
+   passed, and adversarial findings are closed. The separate Pi 1–4 provider
+   measures the common BCM oscillator through the system timer; its software
+   contract and physical qualification boundary are recorded in
+   [BCM direct PPS calibration](../docs/bcm-direct-pps-calibration.md).
+   RP1 is merged into `devel`; the release build is installed on wspr5 with direct PPS enabled and qualified. No published release implied. See the
    [capture contract](../docs/direct-pps-calibration.md),
    [validation and RF evidence](../docs/direct-pps-validation.md), and
    [scope](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-acceptance-criteria).

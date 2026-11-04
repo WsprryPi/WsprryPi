@@ -66,13 +66,14 @@ public:
     Rp1PpsCalibration();
     // Typed developer/test seam. Never exposed through CLI, INI, or the UI.
     explicit Rp1PpsCalibration(std::function<std::unique_ptr<Rp1PpsCapture>()> factory);
+    explicit Rp1PpsCalibration(std::function<std::unique_ptr<Rp1PpsCapture>(unsigned)> factory);
     ~Rp1PpsCalibration();
     Rp1PpsCalibration(const Rp1PpsCalibration&) = delete;
     Rp1PpsCalibration& operator=(const Rp1PpsCalibration&) = delete;
-    // Explicit opt-in only. GPIO17 is the current supported input; it must
-    // already be configured as a PPS input. This adapter never configures GPIO.
+    // Explicit opt-in only. The selected GPIO (default 17) must already be
+    // configured as a Linux PPS input. This adapter never configures GPIO.
     SystemClockFrequencyEstimate snapshot(bool enabled,
-        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now(), unsigned input_pin = 17);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

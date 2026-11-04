@@ -2,7 +2,8 @@
 
 Optional direct PPS RF calibration is implemented for Raspberry Pi 5/RP1.
 Its independent conducted acceptance is tracked in the release punchlist.
-Direct capture for Pi 1–4 remains outside the selected implementation.
+A separate [BCM provider](../docs/bcm-direct-pps-calibration.md) implements
+Pi 1–4 oscillator capture; its software and physical evidence are distinct.
 The bounded alternative RP1 clock-parent review is closed: retain nominal
 200 MHz `pll_sys`, with no alternative-parent hardware testing selected.
 The [release punchlist](Release%20Punchlist.md#saved-items) retains unfinished
@@ -108,9 +109,9 @@ local scheduler's candidate/committed status fields.
 
 ## Direct PPS disposition and acceptance criteria
 
-**RP1 direct capture is selected; legacy direct capture remains unimplemented.**
+**RP1 direct capture and a separate BCM oscillator provider are implemented.**
 The optional [RP1 adapter](../docs/direct-pps-calibration.md) uses one input-only
-PIO state machine to count ten complete GPIO17 PPS periods. It verifies that
+PIO state machine to count ten complete PPS periods on the selected GPIO. It verifies that
 nominal 200 MHz `clk_sys` derives directly from `pll_sys`. It replaces the
 host-frequency estimate, subtracts the existing intrinsic term before passing
 additional correction to the backend, and leaves Chrony as UTC authority.
@@ -119,10 +120,15 @@ reference identity, and expiry retire it. The public PIO UAPI is pinned and
 vendored with its upstream licenses. This is a measurement of a verified RF
 parent derivative, not software timing of PPS callbacks.
 
-Pi 1–4 transmit from a main-SoC clock parent. Their host and RF clocks can share
-an oscillator, but a portable raw-host-counter/PLLD or oscillator ratio has not
-been established here. The existing host estimate remains available there.
-No Pi 1–4 direct capture implementation or hardware acceptance is implied.
+Pi 1–4 transmit from main-SoC PLLD or, on Pi 4, an oscillator parent. The
+[BCM provider](../docs/bcm-direct-pps-calibration.md) measures the common
+oscillator through the verified system-timer divider, using read-only edge brackets on the selected PPS GPIO. It verifies clock ancestry, fractional mode and PLLD lock,
+qualifies distinct observations, and replaces the host estimate. Both families
+persist `GPIO.PPS Input Pin` (default 17), discover its unique existing Linux
+PPS source, and reset qualification when it changes. Software
+validation is separate from physical capture and RF acceptance. The scoped
+BCM2711/GPIO4 conducted results, GPIO18 PPS qualification, residual control,
+and restoration are recorded in the BCM provider document.
 
 The following requirements govern acceptance and any later capture adapter.
 The independent RF campaign must satisfy its declared cases before the

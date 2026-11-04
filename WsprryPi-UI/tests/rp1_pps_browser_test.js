@@ -119,6 +119,8 @@ async function main() {
    document.querySelectorAll('.modal-backdrop').forEach(el=>el.remove());document.body.classList.remove('modal-open');
    document.getElementById('transmitter-hardware-tab').click();
    document.getElementById('use_system_clock_frequency_estimate').checked=false;
+   document.getElementById('pps_input_pin').value=18;
+   document.getElementById('pps_input_pin').dispatchEvent(new Event('change',{bubbles:true}));
    document.getElementById('use_direct_pps_calibration').checked=true;
    document.getElementById('use_direct_pps_calibration').dispatchEvent(new Event('change',{bubbles:true}));
   `);
@@ -131,6 +133,7 @@ async function main() {
   assert.equal(await evaluate('document.getElementById("gpio_frequency_residual_ppm").disabled'),false,'direct PPS enables residual with host estimate off');
   assert.equal(await evaluate('buildConfigPayload().GPIO["Use Direct PPS Calibration"]'),true,'producer persists explicit opt-in');
   assert.equal(await evaluate('buildConfigPayload().GPIO["Use System Clock Frequency Estimate"]'),false,'host preference stays independent');
+  assert.equal(await evaluate('buildConfigPayload().GPIO["PPS Input Pin"]'),18,'producer persists selected BCM GPIO');
   assert(await evaluate('autosaveCalls>0'),'new switch participates in autosave');
   await evaluate("document.getElementById('use_direct_pps_calibration').focus()");
   for(let pass=0;pass<2;pass++) {
@@ -138,7 +141,7 @@ async function main() {
    await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
    assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").checked'),pass===1,'keyboard switch preserves native behavior');
   }
-  await evaluate("setLEDPin(17);document.getElementById('use_led').checked=true;validateTransmitterHardwareFields()");
+  await evaluate("setLEDPin(18);document.getElementById('use_led').checked=true;validateTransmitterHardwareFields()");
   assert.equal(await evaluate('document.getElementById("direct-pps-error").hidden'),false,'PPS pin conflict feedback stays beside its control');
   assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").checkValidity()'),false,'conflict blocks saving without discarding the opt-in draft');
   await evaluate("document.getElementById('use_led').checked=false;validateTransmitterHardwareFields()");
@@ -146,28 +149,47 @@ async function main() {
   await evaluate(`globalThis.draft=buildConfigPayload();sessionStorage.setItem(CONFIG_DRAFT_STORAGE_KEY,JSON.stringify({payload:draft}));document.getElementById('use_direct_pps_calibration').checked=false;suppressNextConfigDraftRestore=false;lastSavedConfigPayload='{}';restorePersistedConfigDraft();`);
   assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").checked'),true,'draft restores direct PPS');
   assert.equal(await evaluate('document.getElementById("use_system_clock_frequency_estimate").checked'),false,'draft preserves independent host preference');
+  assert.equal(await evaluate('document.getElementById("pps_input_pin").value'),'18','draft restores configured PPS GPIO');
+  await evaluate("document.getElementById('pps_input_pin').value=4;validateTransmitterHardwareFields()");
+  assert.equal(await evaluate('document.getElementById("pps_input_pin").checkValidity()'),false,'PPS cannot share RF output');
+  await evaluate("document.getElementById('pps_input_pin').value=18.5;validateTransmitterHardwareFields()");
+  assert.equal(await evaluate('document.getElementById("pps_input_pin").checkValidity()'),false,'PPS requires a whole GPIO number');
+  await evaluate("document.getElementById('pps_input_pin').value=18;validateTransmitterHardwareFields()");
+  for (const generation of [5,4]) {
+   await evaluate(`window.WSPRRYPI_PLATFORM.raspberryPiGeneration=${generation};updateBackendPlatformSupportUi();refreshTransmitGpioOptions();syncCalibrationControls()`);
   for(const [device,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:device==='mobile'});
    for(const theme of ['light','dark']) for(const [state,reason] of [
     ['converging','Collecting three stable, distinct ten-second PPS measurements.'],
     ['qualified','RF clock counted over ten PPS periods; conditional uncertainty <=0.202 ppm with a 1 us reference-edge budget.'],
     ['unavailable','PPS capture timed out; reference missing or interrupted. Using configured manual fallback.']]) {
-    await evaluate(`document.documentElement.setAttribute('data-bs-theme',${JSON.stringify(theme)});renderGpioFrequencyCorrection(normalizeRuntimeStatus({transmit_backend:'rp1-gpclk',frequency_estimate_provider:'RP1 PPS',frequency_estimate_qualification:${JSON.stringify(state)},frequency_estimate_reason:${JSON.stringify(reason)},frequency_estimate_age_seconds:2}));document.getElementById('gpio-calibration-heading').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-90)`);
+    await evaluate(`document.documentElement.setAttribute('data-bs-theme',${JSON.stringify(theme)});renderGpioFrequencyCorrection(normalizeRuntimeStatus({transmit_backend:${JSON.stringify(generation===5?'rp1-gpclk':'gpio')},frequency_estimate_provider:${JSON.stringify(generation===5?'RP1 PPS':'BCM PPS')},frequency_estimate_qualification:${JSON.stringify(state)},frequency_estimate_reason:${JSON.stringify(generation===5?reason:reason.replace('ten-second','120-second').replace('ten PPS','120 PPS').replace('0.202','0.250'))},frequency_estimate_age_seconds:2}));document.getElementById('gpio-calibration-heading').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-90)`);
     assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${device} page overflow`);
     assert.match(await evaluate('document.getElementById("direct-pps-status").textContent'),new RegExp(state));
     if(evidence) {
      const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-     fs.writeFileSync(path.join(evidence,`${device}-${theme}-${state}.png`),shot.data,'base64');
+     fs.writeFileSync(path.join(evidence,`${generation===5?"rp1":"bcm"}-${device}-${theme}-${state}.png`),shot.data,'base64');
      await evaluate("document.getElementById('direct-pps-status').scrollIntoView({block:'end',behavior:'instant'});window.scrollBy(0,70)");
      const detail=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-     fs.writeFileSync(path.join(evidence,`${device}-${theme}-${state}-detail.png`),detail.data,'base64');
+     fs.writeFileSync(path.join(evidence,`${generation===5?"rp1":"bcm"}-${device}-${theme}-${state}-detail.png`),detail.data,'base64');
     }
    }
+  }
   }
   await evaluate(`document.getElementById('use_direct_pps_calibration').checked=false;document.getElementById('use_direct_pps_calibration').dispatchEvent(new Event('change',{bubbles:true}));`);
   assert.equal(await evaluate('document.getElementById("gpio_frequency_residual_ppm").disabled'),true,'manual-only source does not apply residual');
   await evaluate("window.WSPRRYPI_PLATFORM.raspberryPiGeneration=4;syncCalibrationControls()");
-  assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").disabled'),true,'unsupported boards cannot opt in through the UI');
+  assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").disabled'),false,'Pi4 supports BCM direct PPS');
+  assert.match(await evaluate('document.getElementById("direct-pps-settling").textContent'),/six minutes/);
+  await evaluate(`document.getElementById('use_direct_pps_calibration').checked=true;document.getElementById('use_direct_pps_calibration').dispatchEvent(new Event('change',{bubbles:true}));renderGpioFrequencyCorrection(normalizeRuntimeStatus({transmit_backend:'gpio',frequency_estimate_provider:'BCM PPS',frequency_estimate_qualification:'converging',frequency_estimate_reason:'Collecting three stable, distinct 120-second PPS measurements.'}));`);
+  assert.equal(await evaluate('document.getElementById("gpio_frequency_residual_ppm").disabled'),false,'BCM direct source enables residual');
+  assert.match(await evaluate('document.getElementById("direct-pps-status").textContent'),/Direct PPS: converging/);
+  for (const generation of [1,2,3]) {
+    await evaluate(`window.WSPRRYPI_PLATFORM.raspberryPiGeneration=${generation};updateBackendPlatformSupportUi();refreshTransmitGpioOptions();syncCalibrationControls()`);
+    assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").disabled'),false,'Pi1–3 support BCM direct PPS');
+  }
+  await evaluate("window.WSPRRYPI_PLATFORM.raspberryPiGeneration=0;syncCalibrationControls()");
+  assert.equal(await evaluate('document.getElementById("use_direct_pps_calibration").disabled'),true,'unsupported hosts cannot opt in');
   console.log('PPS browser: explicit autosave, independent host preference, retained draft, residual availability, live acquisition/qualified/fallback states, four size/theme combinations passed');
  } finally {
   if(client) client.close();
