@@ -637,7 +637,7 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
             return result;
         }
         struct timespec start_time{};
-        if (::clock_gettime(CLOCK_MONOTONIC, &start_time) != 0)
+        if (readMonotonicClock(&start_time) != 0)
         {
             result.error = "Could not read monotonic clock for Si5351 "
                            "execution.";
@@ -663,7 +663,7 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
                 while (!stop_requested_ && !owner_.backendShouldStop())
                 {
                     timespec now{};
-                    if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+                    if (readMonotonicClock(&now) != 0)
                     {
                         throw std::system_error(
                             errno,
@@ -750,7 +750,7 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
             while (!stop_requested_ && !owner_.backendShouldStop())
             {
                 timespec now{};
-                if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+                if (readMonotonicClock(&now) != 0)
                 {
                     throw std::system_error(
                         errno,
@@ -796,6 +796,13 @@ wsprrypi::ExecutionResult WsprSi5351Backend::execute(
         log_si5351(owner_, WsprTransmitLogLevel::ERROR, result.error);
         return result;
     }
+}
+
+int WsprSi5351Backend::readMonotonicClock(timespec* value) const
+{
+    return config_.monotonic_clock_for_test
+        ? config_.monotonic_clock_for_test(value)
+        : ::clock_gettime(CLOCK_MONOTONIC, value);
 }
 
 bool WsprSi5351Backend::runEnvelopeEvent(
@@ -858,7 +865,7 @@ bool WsprSi5351Backend::runEnvelopeEvent(
                   std::chrono::milliseconds(5));
     auto remaining_until = [&](std::chrono::nanoseconds offset) {
         timespec now{};
-        if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        if (readMonotonicClock(&now) != 0)
             throw std::system_error(errno, std::generic_category(), "clock_gettime");
         return diff_ns(add_ns(event_start, offset.count()), now);
     };
@@ -1401,7 +1408,7 @@ bool WsprSi5351Backend::enableTransmitOutput()
          config_.first_output_enabled))
     {
         timespec now{};
-        if (::clock_gettime(CLOCK_MONOTONIC, &now) != 0) return false;
+        if (readMonotonicClock(&now) != 0) return false;
         first_enable_time_ = now;
         if (config_.first_output_enabled) config_.first_output_enabled();
     }

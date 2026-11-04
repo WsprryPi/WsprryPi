@@ -385,6 +385,9 @@ causation remains unestablished. See the
 [readiness investigation and disposition](../../docs/si5351-support.md).
 Duty-cycle fades use the
 scheduled event deadlines, including I2C overhead; missed slices are skipped.
+The typed `Config::monotonic_clock_for_test` hook lets hardware-free deadline
+tests advance waits and fake I2C latency on one controlled clock. Production
+leaves it unset and uses `CLOCK_MONOTONIC`; it has no CLI, INI, or UI control.
 These fades still switch RF fully on/off and do not produce an analog amplitude
 envelope. Spectral improvement must be measured, not inferred from the shape name.
 

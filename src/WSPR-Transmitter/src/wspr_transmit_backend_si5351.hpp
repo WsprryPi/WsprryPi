@@ -74,6 +74,10 @@ public:
         // For scheduled plans beginning with an RF-off interval, admit the
         // timeline before its monotonic origin is sampled.
         std::function<bool()> silent_start_admission;
+
+        // Typed test seam for deterministic deadline/transfer-latency checks.
+        // Unset in production: all execution deadlines use CLOCK_MONOTONIC.
+        std::function<int(timespec*)> monotonic_clock_for_test;
     };
 
     /**
@@ -164,6 +168,7 @@ public:
     const Config& getConfig() const noexcept;
 
 private:
+    int readMonotonicClock(timespec* value) const;
     bool outputIsDisabled();
     std::optional<timespec> first_enable_time_;
     /**

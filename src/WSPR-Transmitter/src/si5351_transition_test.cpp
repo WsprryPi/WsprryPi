@@ -163,6 +163,7 @@ namespace
         {
             ++wait_calls;
             if (on_wait) on_wait();
+            if (advance_wait) advance_wait(duration);
             if (real_waits) std::this_thread::sleep_for(duration);
             if (interrupt_on_wait_call != 0 &&
                 wait_calls == interrupt_on_wait_call)
@@ -189,6 +190,7 @@ namespace
 
         bool real_waits = false;
         std::function<void()> on_wait;
+        std::function<void(std::chrono::nanoseconds)> advance_wait;
         std::size_t progress_calls = 0;
         std::size_t wait_calls = 0;
         std::size_t interrupt_on_wait_call = 0;
@@ -1151,10 +1153,27 @@ void test_envelope_deadlines_and_off_retune_readiness()
 {
     for (auto shape : {wsprrypi::FadeShape::LINEAR, wsprrypi::FadeShape::RAISED_COSINE})
     for (bool cancel : {false, true})
+    for (bool expired : {false, true})
     {
-        TestBridge bridge; bridge.real_waits = true;
+        // Wall-clock scheduling cannot guarantee a pulse in a 1 ms slice.
+        // Advance one clock for waits and I2C latency, including a scheduler
+        // overshoot that expires the entire key-down window before admission.
+        TestBridge bridge;
+        auto now = std::chrono::seconds(1) + std::chrono::nanoseconds(0);
+        bool first_wait = true;
+        bridge.advance_wait = [&](std::chrono::nanoseconds duration) {
+            now += duration;
+            if (expired && first_wait) now += std::chrono::milliseconds(100);
+            first_wait = false;
+        };
         auto adapter = std::make_shared<FakeI2CAdapter>();
         auto cfg = config(adapter); cfg.device.optimize_register_writes = true;
+        cfg.monotonic_clock_for_test = [&](timespec* value) {
+            const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(now);
+            *value = {static_cast<time_t>(seconds.count()),
+                      static_cast<long>((now - seconds).count())};
+            return 0;
+        };
         WsprSi5351Backend backend(bridge,cfg);
         auto plan = single_tone_plan(); plan.events[0].rf_on = false;
         auto key = plan.events[0]; key.rf_on = true;
@@ -1165,23 +1184,29 @@ void test_envelope_deadlines_and_off_retune_readiness()
         key.envelope.fade_slice = std::chrono::milliseconds(1);
         plan.events.push_back(key); plan.summary.event_count = 2;
         expect(configure(backend,plan), "deadline envelope configure");
-        std::chrono::steady_clock::time_point first_on{}, last_off{};
+        std::chrono::nanoseconds first_on{}, last_off{};
         unsigned enables = 0;
         adapter->after_write = [&](std::uint8_t r, std::uint8_t v, std::size_t) {
             if (r != 3) return;
             if (v == 0xfe) {
-                if (enables++ == 0) first_on = std::chrono::steady_clock::now();
+                if (enables++ == 0) first_on = now;
                 if (cancel) bridge.backendSignalStopRequest();
-            } else if (enables != 0) last_off = std::chrono::steady_clock::now();
+            } else if (enables != 0) last_off = now;
             // Deliberately make each output transaction longer than a slice.
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            now += std::chrono::milliseconds(2);
         };
         const auto result = backend.execute(plan);
-        expect(result.ok && result.stopped == cancel, "envelope completes or cancels cleanly");
-        expect(enables != 0 && adapter->registers[3] == 255, "envelope ends inhibited");
-        expect(last_off-first_on < std::chrono::milliseconds(65),
-            "slow I2C must not accumulate across all fade slices");
-        if (cancel) expect(enables == 1, "cancelled envelope never re-enables");
+        expect(result.ok && result.stopped == (cancel && !expired),
+            "envelope completes or cancels cleanly");
+        expect(adapter->registers[3] == 255, "envelope ends inhibited");
+        if (expired) {
+            expect(enables == 0, "expired envelope never replays stale pulses");
+        } else {
+            expect(enables != 0, "on-time envelope emits a pulse");
+            expect(last_off-first_on <= std::chrono::milliseconds(42),
+                "slow I2C must not accumulate across all fade slices");
+            if (cancel) expect(enables == 1, "cancelled envelope never re-enables");
+        }
     }
     TestBridge bridge; auto adapter=std::make_shared<FakeI2CAdapter>();
     auto cfg=config(adapter); cfg.pll_only_updates=true; cfg.device.optimize_register_writes=true;
