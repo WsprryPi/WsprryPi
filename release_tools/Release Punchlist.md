@@ -83,14 +83,17 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    documentation reference was superseded by P15.20 numbering.
 10. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
-11. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
+11. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
+   published RP1-GPCLK-DKMS release, update the pinned consumer integration
+   where needed, and validate the selected release before the next WsprryPi beta.
+12. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
-12. ▧ **Post-4.0: [#333 — Research Spike: Advanced Scheduling](https://github.com/WsprryPi/WsprryPi/issues/333).**
+13. ▧ **Post-4.0: [#333 — Research Spike: Advanced Scheduling](https://github.com/WsprryPi/WsprryPi/issues/333).**
    Follows #419.
-13. ▧ **Post-4.0: [#444 — Track Standard Feld-Hell implementation and qualification](https://github.com/WsprryPi/WsprryPi/issues/444).**
+14. ▧ **Post-4.0: [#444 — Track Standard Feld-Hell implementation and qualification](https://github.com/WsprryPi/WsprryPi/issues/444).**
     Follows #333. Includes its separate Si5351 implementation and qualification
     phase and two optional test cleanups.
-14. ▧ **Deferred beyond 4.0: Custom-domain TLS.** Address the separate
+15. ▧ **Deferred beyond 4.0: Custom-domain TLS.** Address the separate
     documentation custom-domain TLS follow-up.
 
 ## Final 4.0 stable release gate
