@@ -144,6 +144,7 @@ jobs:
           cmake -S src/build/network-reference/pico -B src/build/network-reference/pico-browser -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DWSPRRY_PICO_TEST_MBEDTLS_PATH="$PWD/src/build/network-reference/mbedtls"
           cmake --build src/build/network-reference/pico-browser --target consumer_session_driver consumer_bootstrap_driver -j2
           npm --prefix src/build/network-reference/pico/src/network/bootstrap_web ci --ignore-scripts
+          node --test src/build/network-reference/pico/tests/chrome_startup.test.mjs src/build/network-reference/pico/tests/ui_process_cleanup.test.mjs
           node src/build/network-reference/pico/tests/consumer_sessions.test.mjs src/build/network-reference/pico-browser/consumer_session_driver
           node src/build/network-reference/pico/tests/operator_cleanup_browser.mjs src/build/network-reference/pico-browser/consumer_session_driver
           PROGRESS_BROWSER_NO_CAPTURE=1 node src/build/network-reference/pico/tests/progress_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
@@ -168,6 +169,14 @@ jobs:
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
+      - name: Retain failed network browser captures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: network-browser-failure-${{ github.run_attempt }}
+          path: src/build/wtp-network/ui
+          if-no-files-found: ignore
+          retention-days: 7
 
   wtp-usb-management-pair:
     needs: change_scope
