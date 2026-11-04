@@ -120,6 +120,9 @@ async function main() {
     let chrome, client, php, failure;
     const capture = async (name, parameters = {format:'png'}) => {
         if (!captureScreenshots) return;
+        await client.send('Runtime.evaluate', {expression:`document.getAnimations().forEach(animation=>{
+            if(Number.isFinite(animation.effect?.getComputedTiming().endTime)) animation.finish();
+        });new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`,awaitPromise:true});
         const shot = await client.send('Page.captureScreenshot', parameters);
         fs.writeFileSync(path.join(output, name), Buffer.from(shot.data, 'base64'));
     };
@@ -213,6 +216,11 @@ async function main() {
         await client.send('Page.enable');
         await evaluate(`document.getElementById('wtp-management').open=true;document.getElementById('wtp-management-carrier').value='consumer_station';document.getElementById('wtp-management-carrier').dispatchEvent(new Event('change'));document.getElementById('wtp-management-host').value='192.168.1.53';document.getElementById('wtp-management-password').value='synthetic-test-password';document.getElementById('wtp-management-connect').click();`);
         await waitFor(async()=>await evaluate('document.getElementById("wtp-management").getAttribute("aria-busy")==="false"'),'consumer connected');
+        assert.equal(await evaluate('document.getElementById("wtp-combined-settings").open'),false,
+            'combined settings start collapsed');
+        await evaluate('document.querySelector("#wtp-combined-settings > summary").click()');
+        assert(await evaluate('document.getElementById("wtp-remote-load").getClientRects().length>0'),
+            'opening combined settings exposes its read action');
         await evaluate(`document.getElementById('wtp-remote-load').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("wtp-remote-save").disabled'),'settings loaded');
         await evaluate(`document.getElementById('wtp-remote-callsign').value='MYDRAFT';window.__mutationFailure='ambiguous';document.getElementById('wtp-remote-save').click();`);
