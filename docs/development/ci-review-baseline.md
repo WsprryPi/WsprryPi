@@ -457,20 +457,20 @@ browser exception details; request payloads are not dumped.
 | Code/count measure | Phase 1 delivered | Phase 2 candidate |
 | --- | ---: | ---: |
 | Active infrastructure files, including Phase 1 helper | 144 | 146 |
-| Active physical lines, including Phase 1 helper | 32,116 | 31,557 |
+| Active physical lines, including Phase 1 helper | 32,116 | 31,559 |
 | Active copied CDP classes / shared class | 13 / 0 | 0 / 1 |
-| New Pi helper plus focused-test physical lines | 0 | 594 |
+| New Pi helper plus focused-test physical lines | 0 | 596 |
 | Charged companion source additions outside frozen Pi roots | 0 | 54 |
 | Unused cleanup credited | 0 | 0 |
 
-Phase 2's raw Pi physical reduction is 559 lines. Conservatively excluding all
-84 removed blank/comment lines gives 475 Pi lines of credit. The companion
+Phase 2's raw Pi physical reduction is 557 lines. Conservatively excluding all
+84 removed blank/comment lines gives 473 Pi lines of credit. The companion
 startup correction adds 54 source lines (including replacements); all are
 charged, while its 17 removed lines earn zero credit outside the frozen Pi
-roots. Phase 2 therefore earns 421 lines (1.32% of the frozen 31,971-line
-denominator). Charging Phase 1's 145-line tool leaves 276 cumulative credited
-lines (0.86%). The Pi after-total is 31,557 physical lines including that tool;
-the conservative companion-adjusted after-total is 31,611, before the blank/
+roots. Phase 2 therefore earns 419 lines (1.31% of the frozen 31,971-line
+denominator). Charging Phase 1's 145-line tool leaves 274 cumulative credited
+lines (0.86%). The Pi after-total is 31,559 physical lines including that tool;
+the conservative companion-adjusted after-total is 31,613, before the blank/
 comment exclusion. Pi active file count increases from 144 to 146; two existing
 companion harness files are also modified, with no new companion source file.
 New helpers/tests are fully charged. No file-count reduction or achievement of
@@ -515,3 +515,5 @@ the final pushed feature revision; local fixtures or historical green results
 do not substitute for those gates. Final CI outcome/source identities and timing
 limitations belong with the execution result. No comparable full-success timing
 improvement is claimed from the prior partial baseline or local runs.
+
+The next paired run [41884960203](https://github.com/WsprryPi/WsprryPi/actions/runs/41884960203) passed both production interoperability blocks and the corrected Pico startup tests, but the final Pi network browser exposed a missing shared-client constructor default: `dialogError` was undefined rather than the existing consumers' explicit null success state. The constructor now initializes that state, and the expected-dialog socket test asserts it after acknowledgment. The strict consumer assertion is preserved. Independent reassessment found no further issue; the final revised source still requires paired CI. The two added correction lines are charged in the totals above. Two macOS ARM contexts in that run executed no steps because GitHub could not acquire hosted runners.

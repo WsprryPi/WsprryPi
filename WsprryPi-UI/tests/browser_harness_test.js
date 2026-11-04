@@ -75,6 +75,7 @@ test("expected dialog policy is per consumer and explicitly supports declining",
     }, async client => {
         client.expectedDialogs.add("expected review"); client.acceptDialogs = false;
         await client.send("trigger");
+        assert.equal(client.dialogError, null, "expected dialog preserves the successful consumer contract");
         assert.equal(handled, false); assert.deepEqual(client.dialogs, ["expected review"]);
     }, { createInStage: true });
 });

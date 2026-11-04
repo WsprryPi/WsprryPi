@@ -119,6 +119,7 @@ class CdpClient extends EventEmitter {
         this.nextId = 1;
         this.pending = new Map();
         this.dialogs = [];
+        this.dialogError = null;
         this.acceptDialogs = true;
         this.expectedDialogs = new Set(expectedDialogs);
         this.failure = null;
