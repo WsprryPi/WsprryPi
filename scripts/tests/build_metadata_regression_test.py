@@ -7,7 +7,7 @@ import importlib.util
 import subprocess
 import sys
 import tempfile
-import time
+import os
 from pathlib import Path
 
 
@@ -27,6 +27,12 @@ def run(*args: str, cwd: Path | None = None, expect: int = 0) -> subprocess.Comp
             f"stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
     return result
+
+
+def preserved_timestamp(output: Path) -> int:
+    # A rewrite must differ even on a coarse filesystem; elapsed sleeps cannot prove this.
+    os.utime(output, ns=(1_000_000_000, 1_000_000_000))
+    return output.stat().st_mtime_ns
 
 
 def generate(repo: Path, output: Path, expect: int = 0) -> subprocess.CompletedProcess[str]:
@@ -112,12 +118,11 @@ def main() -> int:
 
         generate(repo, output)
         first_content = output.read_text(encoding="utf-8")
-        first_mtime = output.stat().st_mtime_ns
+        first_mtime = preserved_timestamp(output)
         assert f'#define MAKE_COMMIT "{commit_a}"' in first_content
         assert f"3.2.0-devel+{commit_a[:7]}" in first_content
         assert '#define MAKE_DIRTY "false"' in first_content
 
-        time.sleep(0.02)
         generate(repo, output)
         assert output.read_text(encoding="utf-8") == first_content
         assert output.stat().st_mtime_ns == first_mtime
@@ -157,8 +162,7 @@ def main() -> int:
 
         generate(repo, output)
         assert output.read_text(encoding="utf-8") == dirty_content
-        dirty_mtime = output.stat().st_mtime_ns
-        time.sleep(0.02)
+        dirty_mtime = preserved_timestamp(output)
         generate(repo, output)
         assert output.stat().st_mtime_ns == dirty_mtime
 
@@ -167,9 +171,8 @@ def main() -> int:
         assert not status.stdout, status.stdout
         generate(repo, output)
         assert '#define MAKE_DIRTY "false"' in output.read_text(encoding="utf-8")
-        restored_mtime = output.stat().st_mtime_ns
+        restored_mtime = preserved_timestamp(output)
         (repo / "untracked.txt").write_text("ignored by dirty contract\n", encoding="utf-8")
-        time.sleep(0.02)
         generate(repo, output)
         assert '#define MAKE_DIRTY "false"' in output.read_text(encoding="utf-8")
         assert output.stat().st_mtime_ns == restored_mtime
@@ -190,9 +193,8 @@ def main() -> int:
         compile_and_round_trip(escape_value, Path(temporary))
 
         concurrent_generate(repo, output)
-        concurrent_mtime = output.stat().st_mtime_ns
+        concurrent_mtime = preserved_timestamp(output)
         concurrent_hash = output.read_bytes()
-        time.sleep(0.02)
         generate(repo, output)
         assert output.stat().st_mtime_ns == concurrent_mtime
         assert output.read_bytes() == concurrent_hash

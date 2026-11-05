@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <string>
 
 inline constexpr const char *kWsprryPiIntakeManifestUrl =
@@ -39,8 +40,9 @@ struct SupportBundleIntakeRetrievalResult {
         SupportBundleIntakeRetrievalFailure::invalid_request;
     std::string manifest_bytes;
     std::string signature_envelope_bytes;
+    std::string cleanup_diagnostic = {};
     [[nodiscard]] bool retrieved() const noexcept {
-        return failure == SupportBundleIntakeRetrievalFailure::none;
+        return failure == SupportBundleIntakeRetrievalFailure::none && cleanup_diagnostic.empty();
     }
 };
 
@@ -49,6 +51,8 @@ SupportBundleIntakeRetrievalResult retrieve_support_bundle_intake(
 
 struct SupportBundleIntakeRetrievalTestHooks {
     bool fail_parent_process_group_setup = false;
+    std::function<void(int, const std::string&)> after_spawn = {};
+    bool force_reap_pending = false;
 };
 
 // Typed in-process fixture seam; production always requires root-owned /usr/bin/curl.

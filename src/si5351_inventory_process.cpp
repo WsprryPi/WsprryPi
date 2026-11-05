@@ -10,6 +10,7 @@
 #include <charconv>
 #include <cstdlib>
 #include <iostream>
+#include <exception>
 #include <mutex>
 
 #if defined(__linux__) || defined(__APPLE__)
@@ -43,7 +44,8 @@ void reap() noexcept {
     } catch (...) {}
 #endif
 }
-Reply run(const std::vector<std::string>& command, std::chrono::milliseconds timeout) {
+static Reply run_internal(const std::vector<std::string>& command, std::chrono::milliseconds timeout,
+                          const std::function<void()>& after_spawn) {
 #if defined(__linux__) || defined(__APPLE__)
     std::unique_lock lock(worker_mutex, std::try_to_lock);
     if (!lock.owns_lock()) return {{}, "Si5351 address discovery is already running."};
@@ -110,8 +112,12 @@ Reply run(const std::vector<std::string>& command, std::chrono::milliseconds tim
         return {{}, "Unable to start Si5351 discovery worker."};
     }
     outstanding = child;
+    std::exception_ptr gate_failure;
+    try { if (after_spawn) after_spawn(); }
+    catch (...) { gate_failure = std::current_exception(); }
     const auto expires = std::chrono::steady_clock::now() + timeout;
     Reply result;
+    if (gate_failure) result.error = "Si5351 discovery fixture readiness failed.";
     const int flags = ::fcntl(pipefd[0], F_GETFL);
     if (flags < 0 || ::fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK) < 0)
         result.error = "Unable to read Si5351 discovery channel.";
@@ -183,11 +189,21 @@ Reply run(const std::vector<std::string>& command, std::chrono::milliseconds tim
         // Never wait synchronously or create a second worker behind it.
     }
     if (!result.error.empty()) result.output.clear();
+    if (gate_failure) std::rethrow_exception(gate_failure);
     return result;
 #else
-    (void)command; (void)timeout;
+    (void)command; (void)timeout; (void)after_spawn;
     return {{}, "Si5351 address discovery requires Linux."};
 #endif
+}
+
+Reply run(const std::vector<std::string>& command, std::chrono::milliseconds timeout) {
+    return run_internal(command, timeout, {});
+}
+
+Reply run_for_test(const std::vector<std::string>& command, std::chrono::milliseconds timeout,
+                   const std::function<void()>& after_spawn) {
+    return run_internal(command, timeout, after_spawn);
 }
 
 std::optional<int> helper_main(int argc, char** argv) {

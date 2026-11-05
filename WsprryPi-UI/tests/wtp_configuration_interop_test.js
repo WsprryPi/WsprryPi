@@ -4,26 +4,20 @@
 const controlRequest=require('./control_pair_request.js');
 const assert=require('node:assert/strict'), path=require('node:path');
 const crypto=require('node:crypto'), readline=require('node:readline');
-const {spawn}=require('node:child_process');
+const {spawnFixtureChild:spawn,finishChildren}=require('./browser_fixture_process.js');
 const {browser,response}=require('./wtp_management_fixture.js');
 const [build]=process.argv.slice(2);
 function lines(process) {
   const queued=[], waiting=[];
   readline.createInterface({input:process.stdout}).on('line',line=>waiting.length?waiting.shift()(line):queued.push(line));
   return ()=>queued.length?Promise.resolve(queued.shift()):new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(new Error('Fixture response deadline')),45000);
+    const timer=setTimeout(()=>reject(Error(`stage=configuration-pair-reply; expected=complete response line; child_exit=${process.exitCode}; child_signal=${process.signalCode}; hang_guard=45000ms`)),45000);
     waiting.push(line=>{clearTimeout(timer);resolve(line);});
   });
 }
-async function stop(child) {
-  if (!child || child.exitCode!==null) return;
-  await new Promise(resolve=>{
-    const timer=setTimeout(()=>child.kill('SIGKILL'),5000);
-    child.once('exit',()=>{clearTimeout(timer);resolve();}); child.kill();
-  });
-}
+
 (async()=>{
-  let server,client;
+  let server,client,primary;
   try {
     server=spawn(path.join(build,'pico_tls_server'),['0','a','settings'],{stdio:['pipe','pipe','inherit']});
     const serverLine=lines(server); assert.match(await serverLine(),/^READY /);
@@ -151,5 +145,5 @@ async function stop(child) {
     await b.click('wtp-remote-save'); assert.equal(calls.at(-1).result.status,503);
     const after=await dump(); assert.deepEqual(after.config,before.config); assert.equal(after.cursor,before.cursor);
     console.log(`Current sources: actual UI/protected routing/runtime/HTTPS/Pico resources and journal preservation, resets, revisions and ambiguous saves passed`);
-  } finally {await stop(client);await stop(server);}
+  } catch(error){primary=error;} finally {await finishChildren({failure:primary,children:[client,server]});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,11 +1,11 @@
 // Actual protected Pi -> engineering TLS / authenticated Consumer-Radio -> Pico.
 'use strict';
 const controlRequest=require('./control_pair_request.js');
-const assert=require('node:assert/strict'),path=require('node:path'),readline=require('node:readline'),{spawn}=require('node:child_process');
+const assert=require('node:assert/strict'),path=require('node:path'),readline=require('node:readline'),{spawnFixtureChild:spawn,finishChildren}=require('./browser_fixture_process.js');
 const build=path.resolve(process.argv[2]);
-function lines(child){const queue=[],waiters=[];readline.createInterface({input:child.stdout}).on('line',l=>waiters.length?waiters.shift()(l):queue.push(l));return()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('GPIO pair deadline')),30000);waiters.push(l=>{clearTimeout(t);resolve(l);});});}
+function lines(child){const queue=[],waiters=[];readline.createInterface({input:child.stdout}).on('line',l=>waiters.length?waiters.shift()(l):queue.push(l));return()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error(`stage=amplifier-pair-reply; expected=complete response line; child_exit=${child.exitCode}; child_signal=${child.signalCode}; hang_guard=30000ms`)),30000);waiters.push(l=>{clearTimeout(t);resolve(l);});});}
 (async()=>{for(const carrier of process.argv.includes('--engineering-only')?['engineering']:['engineering','station','ap']){
- let server,client;
+ let server,client,primary;
  try{
   let readServer;
   if(carrier==='engineering'){server=spawn(path.join(build,'pico_tls_server'),['0','a','settings'],{stdio:['pipe','pipe','inherit']});readServer=lines(server);assert.match(await readServer(),/^READY /);}
@@ -23,5 +23,5 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   await require('./filter_selector_pair_cases.js')(call);
   await require('./si5351_pair_cases.js')(call);
   await require('./gps_pair_cases.js')(call);
- }finally{for(const child of [client,server])if(child&&child.exitCode===null){child.stdin.end();child.kill();}}
+ }catch(error){primary=error;}finally{await finishChildren({failure:primary,children:[client,server]});}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

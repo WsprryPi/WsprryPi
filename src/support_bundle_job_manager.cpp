@@ -482,20 +482,32 @@ void SupportBundleJobManager::expiration_loop() {
             continue;
         }
 
-        const ExpirationEntry entry = *earliest;
-        SupportBundleJobDirectoryRemovalResult cleanup_result;
-        try {
-            cleanup_result = remover_(storage_root_, entry.id);
-        } catch (...) {
-            cleanup_result = {SupportBundleJobDirectoryRemovalFailure::removal_failed};
-        }
-        if (cleanup_result.removed()) {
-            expirations_.erase(earliest);
-            clear_current_download_locked(entry.id);
-        } else {
-            earliest->deadline = std::chrono::steady_clock::now() + retry_delay_;
-        }
+        (void)expire_next_locked(std::chrono::steady_clock::now());
     }
+}
+
+bool SupportBundleJobManager::expire_next_locked(std::chrono::steady_clock::time_point now) {
+    if (expirations_.empty()) return false;
+    const auto earliest = std::min_element(
+        expirations_.begin(), expirations_.end(),
+        [](const ExpirationEntry &left, const ExpirationEntry &right) {
+            return left.deadline < right.deadline;
+        });
+    if (now < earliest->deadline) return false;
+    const ExpirationEntry entry = *earliest;
+    SupportBundleJobDirectoryRemovalResult cleanup_result;
+    try {
+        cleanup_result = remover_(storage_root_, entry.id);
+    } catch (...) {
+        cleanup_result = {SupportBundleJobDirectoryRemovalFailure::removal_failed};
+    }
+    if (cleanup_result.removed()) {
+        expirations_.erase(earliest);
+        clear_current_download_locked(entry.id);
+    } else {
+        earliest->deadline = std::chrono::steady_clock::now() + retry_delay_;
+    }
+    return true;
 }
 
 void SupportBundleJobManager::remove_unsuccessful_job_directory(

@@ -173,6 +173,7 @@ private:
     std::function<void(const std::string &)> reply_ready_for_test_;
     std::function<bool()> firmware_maintenance_for_test_;
     std::function<void(const std::string &)> inbound_message_for_test_;
+    std::function<void(std::size_t, std::size_t)> inbound_buffer_for_test_;
     void boundedToneLoop();
     void cancelBoundedTone();
     bool loopback_only_{false};

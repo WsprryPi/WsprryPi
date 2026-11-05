@@ -75,6 +75,7 @@ enum class SupportBundleIntakeStateTestFault {
 struct SupportBundleIntakeStateTestHooks {
     SupportBundleIntakeStateTestFault fault = SupportBundleIntakeStateTestFault::none;
     std::function<void()> after_locked_state_load;
+    std::function<void(int)> before_lock_attempt = {};
 };
 
 // Typed in-process fault seam for unit tests; not a CLI, configuration, or UI control.

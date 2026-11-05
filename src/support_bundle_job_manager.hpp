@@ -158,10 +158,12 @@ public:
     void shutdown();
     static bool valid_id(const std::string &id);
 private:
+    friend struct SupportBundleJobManagerTestAccess;
     void run(std::string id, bool probe_i2c, std::filesystem::path job_directory,
              std::string expected_case_id,
              std::optional<SupportBundleContext> support_context);
     void expiration_loop();
+    bool expire_next_locked(std::chrono::steady_clock::time_point now);
     void clear_current_download_locked(const std::string &id);
     void cancel_expiration_locked(const std::string &id);
     void remove_unsuccessful_job_directory(const std::string &id,

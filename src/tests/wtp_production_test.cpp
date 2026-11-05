@@ -182,8 +182,8 @@ void usb_first_identity_lease_race() {
   wsprrypi::WtpTargetRuntime target(settings,clock,clock.peer,
       {backend_test::sid,backend_test::owner_id,backend_test::device},[&]{clock.peer.open();return true;});
   std::promise<void> release;auto ready=release.get_future().share();
-  auto first=std::async(std::launch::async,[&]{ready.wait();return target.reserve_output(std::string(32,'c'));});
-  auto delayed_management=std::async(std::launch::async,[&]{ready.wait();return target.reserve_output(std::string(32,'c'));});
+  auto first=std::async(std::launch::async,[&]{CHECK(ready.wait_for(5s)==std::future_status::ready);return target.reserve_output(std::string(32,'c'));});
+  auto delayed_management=std::async(std::launch::async,[&]{CHECK(ready.wait_for(5s)==std::future_status::ready);return target.reserve_output(std::string(32,'c'));});
   release.set_value();CHECK(first.get() && delayed_management.get());
   CHECK(target.output_lease_snapshot()!=nullptr);
   // A later contradictory management HELLO cannot repurpose that reservation.
@@ -812,10 +812,10 @@ void run(const std::string &credentials) {
     auto released = release.get_future().share();
     std::thread holder([&] {
       (void)wtp_runtime_safe_probe([&] {
-        entered.set_value(); released.wait(); return nlohmann::json::object();
+        entered.set_value(); CHECK(released.wait_for(5s)==std::future_status::ready); return nlohmann::json::object();
       });
     });
-    entered_future.wait();
+    CHECK(entered_future.wait_for(5s)==std::future_status::ready);
     auto competing = std::async(std::launch::async, [] {
       return wtp_runtime_management("member/configuration", "POST", "{}", "");
     });

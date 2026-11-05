@@ -106,4 +106,12 @@ async function stopIsolatedProcess(child) {
     if (!await waitForExit(child, 2000)) throw new Error(`[cleanup leader exit] ${childDiagnostic(child)}`);
 }
 
-module.exports = { failedBeforeSpawn, spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild };
+async function finishChildren({failure, children = []} = {}) {
+    const stopped = await Promise.allSettled(children.map(child => stopChild(child)));
+    const errors = stopped.filter(result => result.status === "rejected").map(result => result.reason);
+    if (failure) errors.unshift(failure);
+    if (errors.length > 1) throw new AggregateError(errors, "Fixture operation and child cleanup failed", {cause: failure});
+    if (errors.length) throw errors[0];
+}
+
+module.exports = { waitForExit, finishChildren, failedBeforeSpawn, spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild };

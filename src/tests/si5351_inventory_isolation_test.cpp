@@ -4,9 +4,11 @@
 #include "web_server_config_http.hpp"
 #include <cassert>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <future>
 #include <unistd.h>
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 #include "WSPR-Transmitter/src/mcp2221a_protocol.hpp"
@@ -19,7 +21,6 @@ int main(int argc, char** argv) {
     }
     if (argc == 4 && std::string(argv[1]) == "--inventory-fixture") {
         std::ofstream(argv[2]) << "started";
-        std::this_thread::sleep_for(400ms);
         if (std::string(argv[3]) == "bad") std::cout << "malformed";
         else std::cout << R"({"bus":1,"addresses":[96,97],"error":""})";
         return 0;
@@ -73,10 +74,10 @@ int main(int argc, char** argv) {
     const int fd = mkstemp(marker);
     assert(fd >= 0);
     close(fd);
-    const auto prepare = [&](const std::string& mode) {
+    const auto prepare = [&](const std::string& mode, std::function<void()> after_spawn = {}) {
         unlink(marker);
         set_si5351_inventory_command_override_for_test({
-            "/proc/self/exe", "--inventory-fixture", marker, mode});
+            "/proc/self/exe", "--inventory-fixture", marker, mode},std::move(after_spawn));
     };
     const auto started = [&] {
         const auto deadline = std::chrono::steady_clock::now() + 2s;
@@ -84,17 +85,41 @@ int main(int argc, char** argv) {
             std::this_thread::sleep_for(5ms);
         assert(access(marker, F_OK) == 0);
     };
-    prepare("good");
+    std::promise<void> entry, release;
+    auto entered = entry.get_future();
+    auto released = release.get_future();
+    prepare("good",[&] {
+        started(); entry.set_value();
+        if (released.wait_for(10s)!=std::future_status::ready) {
+            std::cerr << "stage=inventory-transaction-release; expected=explicit release; budget=10s\n";
+            std::abort();
+        }
+    });
     std::string conflict;
     std::thread update([&] {
         try { patch_all_from_web_revision({{"Si5351", {{"I2C Address", "0x61"}}}}, revision); }
         catch (const std::exception& error) { conflict = error.what(); }
     });
-    started();
-    const auto read_start = std::chrono::steady_clock::now();
-    for (int i = 0; i < 10; ++i) assert(get_public_config_snapshot().second == revision);
-    assert(std::chrono::steady_clock::now() - read_start < 200ms);
-    const auto newer_revision = patch_all_from_web_revision({{"Meta", {{"debug_logging", true}}}}, revision);
+    if (entered.wait_for(5s)!=std::future_status::ready) {
+        std::cerr << "stage=inventory-transaction-entry; expected=acknowledged worker; budget=5s\n";
+        std::abort();
+    }
+    std::promise<std::string> observed;
+    auto progress = observed.get_future();
+    std::thread observer([&] {
+        try {
+            for (int i=0;i<10;++i) assert(get_public_config_snapshot().second==revision);
+            observed.set_value(patch_all_from_web_revision({{"Meta", {{"debug_logging", true}}}},revision));
+        } catch (...) { observed.set_exception(std::current_exception()); }
+    });
+    const bool metadata_progress = progress.wait_for(5s)==std::future_status::ready;
+    release.set_value();
+    if (!metadata_progress) {
+        std::cerr << "stage=inventory-metadata-progress; expected=snapshots and newer transaction while discovery held; budget=5s\n";
+        std::abort();
+    }
+    observer.join();
+    const auto newer_revision = progress.get();
     update.join();
     assert(conflict == "revision_conflict");
     const auto [after, after_revision] = get_public_config_snapshot();

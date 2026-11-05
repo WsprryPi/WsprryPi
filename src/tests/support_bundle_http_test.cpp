@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cassert>
+#include <cstdlib>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -45,7 +46,10 @@ public:
         context_ = context;
         entered_ = true;
         entered_condition_.notify_all();
-        release_condition_.wait(lock, [this] { return released_ || stopped_; });
+        if (!release_condition_.wait_for(lock,5s,[this] { return released_ || stopped_; })) {
+            std::cerr << "stage=support-http-executor-release; expected=release or stop; budget=5s\n";
+            std::abort();
+        }
         if (stopped_) {
             return {false, "stopped", "raw executor output /secret"};
         }

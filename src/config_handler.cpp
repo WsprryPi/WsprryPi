@@ -142,6 +142,7 @@ namespace
 #endif
     std::optional<linux_i2c_identity::Adapter> si5351_inventory_binding;
     std::optional<std::vector<std::string>> si5351_inventory_command_override;
+    std::function<void()> si5351_inventory_after_spawn_for_test;
     std::string interactive_enable_file_stamp;
 
     // Identify our own persisted interactive Enable across file-monitor reloads.
@@ -805,9 +806,10 @@ Si5351AddressInventory discover_si5351_addresses(
     if (!path_size || _NSGetExecutablePath(path.data(), &path_size) != 0) {
         native_result.error = "Unable to locate the Si5351 discovery worker."; return native_result;
     }
-    const auto reply = si5351_inventory_process::run(si5351_inventory_command_override.value_or(
+    const auto reply = si5351_inventory_process::run_for_test(si5351_inventory_command_override.value_or(
         std::vector<std::string>{path.data(), "--internal-si5351-inventory",
-        std::to_string(i2c_bus), std::to_string(reference_hz), std::to_string(selected_address), adapter_identity}));
+        std::to_string(i2c_bus), std::to_string(reference_hz), std::to_string(selected_address), adapter_identity}),
+        std::chrono::seconds(2),si5351_inventory_after_spawn_for_test);
     native_result.checked = true; native_result.error = reply.error;
     if (native_result.error.empty()) {
         try {
@@ -864,8 +866,9 @@ Si5351AddressInventory discover_si5351_addresses(
         std::to_string(i2c_bus), std::to_string(reference_hz)};
     if (selected_address >= 0) command.push_back(std::to_string(selected_address));
     if (!adapter_identity.empty()) command.push_back(adapter_identity);
-    const auto reply = si5351_inventory_process::run(
-        si5351_inventory_command_override.value_or(command));
+    const auto reply = si5351_inventory_process::run_for_test(
+        si5351_inventory_command_override.value_or(command),std::chrono::seconds(2),
+        si5351_inventory_after_spawn_for_test);
     result.error = reply.error;
     result.checked = true;
     if (result.error.empty())
@@ -962,13 +965,16 @@ Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, co
 }
 
 
-void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command)
+void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command,
+    std::function<void()> after_spawn)
 {
     si5351_inventory_command_override = command;
+    si5351_inventory_after_spawn_for_test = std::move(after_spawn);
 }
 void clear_si5351_inventory_command_override_for_test()
 {
     si5351_inventory_command_override.reset();
+    si5351_inventory_after_spawn_for_test = {};
 }
 
 void set_si5351_detection_override_for_test(bool detected) noexcept

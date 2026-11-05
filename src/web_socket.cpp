@@ -992,6 +992,7 @@ void WebSocketServer::clientLoop(
                 throw std::runtime_error("WebSocket command count exceeded its limit.");
         }
         buffered.erase(0, consumed);
+        if (bytes>0 && inbound_buffer_for_test_) inbound_buffer_for_test_(buffered.size(),pending.size());
         if (pending.empty()) continue;
         Frame frame = std::move(pending.front());
         pending.pop_front();

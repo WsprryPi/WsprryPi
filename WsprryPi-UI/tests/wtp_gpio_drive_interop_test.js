@@ -1,13 +1,13 @@
 // Actual protected Pi -> engineering TLS / authenticated Consumer-Radio -> Pico.
 'use strict';
 const controlRequest=require('./control_pair_request.js');
-const assert=require('node:assert/strict'),path=require('node:path'),readline=require('node:readline'),{spawn}=require('node:child_process');
+const assert=require('node:assert/strict'),path=require('node:path'),readline=require('node:readline'),{spawnFixtureChild:spawn,finishChildren}=require('./browser_fixture_process.js');
 if(!process.argv[2])throw Error('Usage: node wtp_gpio_drive_interop_test.js BUILD_DIRECTORY');
 const {driveCases}=require('./gpio_drive_pair_cases.js');
 const build=path.resolve(process.argv[2]);
-function lines(child){const queue=[],waiters=[];readline.createInterface({input:child.stdout}).on('line',l=>waiters.length?waiters.shift()(l):queue.push(l));return()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('GPIO pair deadline')),30000);waiters.push(l=>{clearTimeout(t);resolve(l);});});}
+function lines(child){const queue=[],waiters=[];readline.createInterface({input:child.stdout}).on('line',l=>waiters.length?waiters.shift()(l):queue.push(l));return()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error(`stage=gpio-pair-reply; expected=complete response line; child_exit=${child.exitCode}; child_signal=${child.signalCode}; hang_guard=30000ms`)),30000);waiters.push(l=>{clearTimeout(t);resolve(l);});});}
 (async()=>{for(const carrier of process.argv.includes('--engineering-only')?['engineering']:['engineering','station','ap']){
- let server,client;
+ let server,client,primary;
  try{
   let readServer;
   if(carrier==='engineering'){server=spawn(path.join(build,'pico_tls_server'),['0','a','settings'],{stdio:['pipe','pipe','inherit']});readServer=lines(server);assert.match(await readServer(),/^READY /);}
@@ -45,5 +45,5 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   if(carrier!=='engineering'){assert.notEqual(reconciled.status,200);await call({control:'expire'});const reconnected=await connect();assert.equal(reconnected.status,200,JSON.stringify(reconnected));reconciled=await get('gpio-drive');}
   assert.equal(reconciled.status,200,JSON.stringify(reconciled));assert.equal(reconciled.body.saved,4);assert.equal(reconciled.body.pending_restart,true);
   console.log(carrier+': all strengths, settings updates, invalid mutation and lost-reply reconciliation passed through actual protected runtime/carrier/Pico services');
- }finally{for(const child of [client,server])if(child&&child.exitCode===null){child.stdin.end();child.kill();}}
+ }catch(error){primary=error;}finally{await finishChildren({failure:primary,children:[client,server]});}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

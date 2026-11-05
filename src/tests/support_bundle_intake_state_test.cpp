@@ -2,6 +2,8 @@
 #include "json.hpp"
 
 #include <cassert>
+#include <cerrno>
+#include <cstdlib>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -13,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <vector>
 
@@ -233,7 +236,7 @@ void test_concurrent_stale_writer_cannot_roll_back() {
     std::condition_variable condition;
     bool higher_loaded = false;
     bool release_higher = false;
-    std::atomic<bool> lower_finished = false;
+    bool lower_contended = false;
     SupportBundleIntakeStateCommitResult higher;
     SupportBundleIntakeStateCommitResult lower;
 
@@ -243,23 +246,43 @@ void test_concurrent_stale_writer_cannot_roll_back() {
             std::unique_lock lock(mutex);
             higher_loaded = true;
             condition.notify_all();
-            condition.wait(lock, [&] { return release_higher; });
+            if (!condition.wait_for(lock, 5s, [&] { return release_higher; })) {
+                std::cerr << "stage=state-higher-release; expected=explicit release; budget=5s\n";
+                std::abort();
+            }
         };
         higher = commit_support_bundle_intake_state_for_test(
             root.path, {7, kDigestB}, hooks);
     });
     {
         std::unique_lock lock(mutex);
-        condition.wait(lock, [&] { return higher_loaded; });
+        if (!condition.wait_for(lock, 5s, [&] { return higher_loaded; })) {
+            std::cerr << "stage=state-higher-loaded; expected=locked load acknowledgment; budget=5s\n";
+            std::abort();
+        }
     }
     std::thread stale_lower_writer([&] {
-        lower = commit_support_bundle_intake_state(root.path, {6, kDigestA});
-        lower_finished = true;
+        SupportBundleIntakeStateTestHooks hooks;
+        hooks.before_lock_attempt = [&](int descriptor) {
+            errno = 0;
+            const auto attempted = flock(descriptor, LOCK_EX | LOCK_NB);
+            if (attempted != -1 || (errno != EWOULDBLOCK && errno != EAGAIN)) {
+                std::cerr << "stage=state-lock-contention; expected=held higher-writer lock; result="
+                          << attempted << "; errno=" << errno << '\n';
+                std::abort();
+            }
+            std::lock_guard lock(mutex);
+            lower_contended = true;
+            condition.notify_all();
+        };
+        lower = commit_support_bundle_intake_state_for_test(root.path, {6, kDigestA}, hooks);
     });
-    std::this_thread::sleep_for(50ms);
-    assert(!lower_finished.load());
     {
-        std::lock_guard lock(mutex);
+        std::unique_lock lock(mutex);
+        if (!condition.wait_for(lock, 5s, [&] { return lower_contended; })) {
+            std::cerr << "stage=state-lock-contention; expected=lower writer contention acknowledgment; budget=5s\n";
+            std::abort();
+        }
         release_higher = true;
     }
     condition.notify_all();

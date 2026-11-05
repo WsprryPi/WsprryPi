@@ -164,6 +164,7 @@ SupportBundleIntakeStateCommitResult commit_internal(
         return {SupportBundleIntakeStateCommitStatus::invalid_input};
     auto root = open_root(storage_root);
     if (*root < 0) return {SupportBundleIntakeStateCommitStatus::unsafe_root};
+    if (hooks.before_lock_attempt) hooks.before_lock_attempt(*root);
     if (flock(*root, LOCK_EX) != 0)
         return {SupportBundleIntakeStateCommitStatus::unsafe_root};
     const auto current = load_from_directory(*root);

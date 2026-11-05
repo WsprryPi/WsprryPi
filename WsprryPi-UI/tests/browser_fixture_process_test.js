@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
+const { waitForExit, finishChildren, spawnFixtureChild, waitForSpawn, childDiagnostic, spawnIsolatedProcess, stopIsolatedProcess, stopChild } = require("./browser_fixture_process.js");
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function main() {
@@ -12,6 +12,22 @@ async function main() {
         console.log("POSIX fixture process-group test skipped on Windows");
         return;
     }
+    const signalled = spawnFixtureChild(process.execPath,["-e",
+        "process.stdin.once('data',()=>process.kill(process.pid,'SIGTERM'))"],{stdio:["pipe","ignore","pipe"]});
+    try {
+        await waitForSpawn(signalled); signalled.stdin.write("x");
+        assert.equal(await waitForExit(signalled,2000),true,
+            "stage=pair-signalled-exit; expected=owned child exit; hang_guard=2s");
+        assert.equal(signalled.signalCode,"SIGTERM");
+        await finishChildren({children:[signalled]});
+    } finally { await stopChild(signalled); }
+    const primary = new Error("controlled pair operation failure");
+    const firstCleanup = new Error("first child cleanup refusal");
+    const secondCleanup = new Error("second child cleanup refusal");
+    const refused = error => ({exitCode:null,signalCode:null,kill(){throw error;}});
+    await assert.rejects(finishChildren({failure:primary,children:[refused(firstCleanup),refused(secondCleanup)]}),
+        error => error instanceof AggregateError && error.errors.length===3 &&
+            error.errors[0]===primary && error.errors[1]===firstCleanup && error.errors[2]===secondCleanup);
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "wsprrypi-browser-process-"));
     const profile = path.join(root, "profile"), ticks = path.join(profile, "ticks");
     const writer = `const fs=require('node:fs');let n=0;process.on('SIGTERM',()=>{});setInterval(()=>{fs.mkdirSync(${JSON.stringify(profile)},{recursive:true});fs.writeFileSync(${JSON.stringify(ticks)},String(++n));},10);`;

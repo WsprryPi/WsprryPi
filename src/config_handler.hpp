@@ -39,6 +39,7 @@
 #include "json.hpp"
 
 #include <stdexcept>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -134,7 +135,8 @@ bool si5351_device_detected(
     int reference_hz,
     std::string *error_message = nullptr,
     const std::string &adapter_identity = {});
-void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command);
+void set_si5351_inventory_command_override_for_test(const std::vector<std::string>& command,
+    std::function<void()> after_spawn = {});
 void clear_si5351_inventory_command_override_for_test();
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 namespace mcp2221a { struct Inventory; }

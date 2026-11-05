@@ -11,6 +11,8 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
+#include <fcntl.h>
+#include <poll.h>
 
 extern char **environ;
 
@@ -43,6 +45,21 @@ bool valid_contract(const std::vector<std::string> &arguments) {
 
 } // namespace
 
+int held_transition(const std::string& executable) {
+    const int ready = open((executable+".ready").c_str(),O_WRONLY);
+    const std::string identity = std::to_string(getpid())+" "+std::to_string(getpgrp())+"\n";
+    if (ready<0 || write(ready,identity.data(),identity.size())!=static_cast<ssize_t>(identity.size())) return 71;
+    const int release = open((executable+".release").c_str(),O_RDONLY|O_NONBLOCK);
+    pollfd descriptor{release,POLLIN,0};
+    char value = 0;
+    const bool released = release>=0 && poll(&descriptor,1,10000)==1 && read(release,&value,1)==1 && value=='x';
+    // A natural exit must never masquerade as successful group termination,
+    // even if the parent is descheduled until after this fixture hang guard.
+    (void)write(ready,"U",1);
+    close(release); close(ready);
+    return released ? 0 : 72;
+}
+
 int main(int argc, char **argv) {
     std::vector<std::string> arguments(argv, argv + argc);
     if (!valid_contract(arguments)) return 64;
@@ -55,8 +72,7 @@ int main(int argc, char **argv) {
     }
     if ((scenario == "manifest-timeout" && manifest) ||
         (scenario == "signature-timeout" && !manifest)) {
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        return 0;
+        return held_transition(argv[0]);
     }
     if (scenario == "signature-signal" && !manifest) {
         raise(SIGKILL);
@@ -66,10 +82,7 @@ int main(int argc, char **argv) {
         if (descendant < 0) return 70;
         if (descendant == 0) {
             signal(SIGTERM, SIG_IGN);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
-            std::ofstream(argv[0] + std::string(".survived"))
-                << "descendant survived cleanup\n";
-            _exit(0);
+            _exit(held_transition(argv[0]));
         }
     }
     if ((scenario == "manifest-fail" && manifest) ||

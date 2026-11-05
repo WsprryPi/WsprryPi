@@ -3,6 +3,7 @@
 #include <cassert>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
@@ -10,6 +11,19 @@
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
+
+struct SupportBundleJobManagerTestAccess {
+    static std::chrono::steady_clock::time_point next_deadline(SupportBundleJobManager &manager) {
+        std::lock_guard lock(manager.mutex_);
+        assert(manager.expirations_.size() == 1);
+        return manager.expirations_.front().deadline;
+    }
+    static bool expire_at(SupportBundleJobManager &manager,
+                          std::chrono::steady_clock::time_point now) {
+        std::lock_guard lock(manager.mutex_);
+        return manager.expire_next_locked(now);
+    }
+};
 
 class FakeExecutor final : public SupportBundleJobExecutor {
 public:
@@ -24,7 +38,12 @@ public:
     SupportBundleExecutionResult run(const SupportBundleExecutionContext &context) override {
         const bool requested = context.probe_i2c; directory = context.job_directory;
         std::unique_lock lock(mutex); ++calls; probe=requested; entered=true; cv.notify_all();
-        cv.wait(lock, [&] { return released || cancelled; });
+        if (!cv.wait_for(lock, std::chrono::seconds(5), [&] { return released || cancelled; })) {
+            std::cerr << "stage=job-executor-release; expected=release or cancellation; budget=5s; calls="
+                      << calls << "; entered=" << entered << "; released=" << released
+                      << "; cancelled=" << cancelled << '\n';
+            std::abort();
+        }
         if (throw_exception) throw 1;
         if (cancelled) return {true, {}, {}}; // Manager must preserve cancellation over this late success.
         if (!fail && !throw_exception && mode != ResultMode::none) {
@@ -321,7 +340,7 @@ int main(int argc, char **argv) {
             (void)concurrent.download_reference(concurrent_job->id);
         }
     });
-    while (!reader_started.load()) std::this_thread::yield();
+    wait_for_condition([&] { return reader_started.load(); });
     assert(concurrent.delete_download(concurrent_job->id).status ==
            SupportBundleDownloadDeletionStatus::removed);
     reader.join();
@@ -335,16 +354,17 @@ int main(int argc, char **argv) {
                                 const std::string &job_id) {
             ++expiry_cleanup_calls;
             return remove_support_bundle_job_directory(storage_root, job_id);
-        }, std::chrono::milliseconds(40), std::chrono::milliseconds(20));
+        }, std::chrono::hours(24), std::chrono::milliseconds(20));
     const auto expiry_job = expiry.create({}, error);
     expiry_executor->wait_entered();
     expiry_executor->release();
     wait_terminal(expiry, expiry_job->id);
     assert(expiry.download_reference(expiry_job->id).status ==
            SupportBundleDownloadReferenceStatus::available);
-    wait_for_condition([&] {
-        return !expiry.lookup(expiry_job->id)->download_available;
-    });
+    const auto expiry_deadline = SupportBundleJobManagerTestAccess::next_deadline(expiry);
+    assert(!SupportBundleJobManagerTestAccess::expire_at(expiry, expiry_deadline - std::chrono::nanoseconds(1)));
+    assert(expiry_cleanup_calls.load() == 0);
+    assert(SupportBundleJobManagerTestAccess::expire_at(expiry, expiry_deadline));
     assert(expiry_cleanup_calls.load() == 1 &&
            expiry.lookup(expiry_job->id)->state == SupportBundleJobState::succeeded &&
            expiry.download_reference(expiry_job->id).status ==
@@ -354,6 +374,25 @@ int main(int argc, char **argv) {
            !std::filesystem::exists(root / expiry_job->id));
     expiry.shutdown();
 
+    std::atomic<int> real_expiry_cleanup_calls = 0;
+    auto real_expiry_executor = std::make_shared<FakeExecutor>();
+    SupportBundleJobManager real_expiry(
+        real_expiry_executor, [] { return id('V'); }, root,
+        [&real_expiry_cleanup_calls](const std::filesystem::path &storage_root,
+                                     const std::string &job_id) {
+            ++real_expiry_cleanup_calls;
+            return remove_support_bundle_job_directory(storage_root, job_id);
+        }, std::chrono::milliseconds::zero());
+    const auto real_expiry_job = real_expiry.create({}, error);
+    real_expiry_executor->wait_entered();
+    real_expiry_executor->release();
+    wait_terminal(real_expiry, real_expiry_job->id);
+    wait_for_condition([&] { return !real_expiry.lookup(real_expiry_job->id)->download_available; });
+    assert(real_expiry_cleanup_calls.load() == 1 &&
+           real_expiry.lookup(real_expiry_job->id)->state == SupportBundleJobState::succeeded &&
+           !std::filesystem::exists(root / real_expiry_job->id));
+    real_expiry.shutdown();
+
     std::atomic<int> explicit_cleanup_calls = 0;
     auto explicit_executor = std::make_shared<FakeExecutor>();
     SupportBundleJobManager explicit_delete(
@@ -362,14 +401,16 @@ int main(int argc, char **argv) {
                                   const std::string &job_id) {
             ++explicit_cleanup_calls;
             return remove_support_bundle_job_directory(storage_root, job_id);
-        }, std::chrono::milliseconds(80), std::chrono::milliseconds(20));
+        }, std::chrono::hours(24), std::chrono::milliseconds(20));
     const auto explicit_job = explicit_delete.create({}, error);
     explicit_executor->wait_entered();
     explicit_executor->release();
     wait_terminal(explicit_delete, explicit_job->id);
     assert(explicit_delete.delete_download(explicit_job->id).status ==
            SupportBundleDownloadDeletionStatus::removed);
-    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    assert(!SupportBundleJobManagerTestAccess::expire_at(
+        explicit_delete, std::chrono::steady_clock::now() + std::chrono::hours(48)) &&
+        "explicit deletion must cancel the actual expiration entry");
     assert(explicit_cleanup_calls.load() == 1 &&
            explicit_delete.download_reference(explicit_job->id).status ==
                SupportBundleDownloadReferenceStatus::no_download);
@@ -386,18 +427,21 @@ int main(int argc, char **argv) {
                     SupportBundleJobDirectoryRemovalFailure::removal_failed};
             }
             return remove_support_bundle_job_directory(storage_root, job_id);
-        }, std::chrono::milliseconds(20), std::chrono::milliseconds(120));
+        }, std::chrono::hours(24), std::chrono::hours(24));
     const auto retry_expiry_job = retry_expiry.create({}, error);
     retry_executor->wait_entered();
     retry_executor->release();
     wait_terminal(retry_expiry, retry_expiry_job->id);
-    wait_for_condition([&] { return retry_cleanup_calls.load() == 1; });
+    assert(SupportBundleJobManagerTestAccess::expire_at(
+        retry_expiry, SupportBundleJobManagerTestAccess::next_deadline(retry_expiry)));
     assert(retry_expiry.lookup(retry_expiry_job->id)->download_available &&
            retry_expiry.download_reference(retry_expiry_job->id).status ==
                SupportBundleDownloadReferenceStatus::available);
-    wait_for_condition([&] {
-        return !retry_expiry.lookup(retry_expiry_job->id)->download_available;
-    });
+    const auto retry_deadline = SupportBundleJobManagerTestAccess::next_deadline(retry_expiry);
+    assert(!SupportBundleJobManagerTestAccess::expire_at(
+        retry_expiry, retry_deadline - std::chrono::nanoseconds(1)));
+    assert(retry_cleanup_calls.load() == 1);
+    assert(SupportBundleJobManagerTestAccess::expire_at(retry_expiry, retry_deadline));
     assert(retry_cleanup_calls.load() == 2 &&
            retry_expiry.download_reference(retry_expiry_job->id).status ==
                SupportBundleDownloadReferenceStatus::no_download);
@@ -550,7 +594,9 @@ int main(int argc, char **argv) {
         }, std::chrono::milliseconds::zero(), std::chrono::milliseconds(20));
     const auto active_job = active_expiry.create({}, error);
     active_executor->wait_entered();
-    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    assert(!SupportBundleJobManagerTestAccess::expire_at(
+        active_expiry, std::chrono::steady_clock::now() + std::chrono::hours(48)) &&
+        "a held active executor must not have an expiration entry");
     assert(active_cleanup_calls.load() == 0 &&
            active_expiry.lookup(active_job->id)->state == SupportBundleJobState::running);
     active_executor->release();

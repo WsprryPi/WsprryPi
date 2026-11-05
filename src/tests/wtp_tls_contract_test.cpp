@@ -4,6 +4,7 @@
 #include <openssl/pem.h>
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <condition_variable>
 #include <iostream>
 #include <filesystem>
@@ -141,7 +142,10 @@ int main(int argc, char **argv) {
       lookup_state->hosts.push_back(host);
       lookup_state->changed.notify_all();
       if (lookup_state->calls == 1)
-        lookup_state->changed.wait(lock, [&] { return lookup_state->release_first; });
+        if (!lookup_state->changed.wait_for(lock,std::chrono::seconds(5),[&] { return lookup_state->release_first; })) {
+          std::cerr << "stage=tls-lookup-release; expected=explicit release; budget=5s\n";
+          std::abort();
+        }
       --lookup_state->active;
       lookup_state->changed.notify_all();
       return std::vector<std::string>{"127.0.0.1"};

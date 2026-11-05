@@ -4,7 +4,7 @@
 'use strict';
 const controlRequest=require('./control_pair_request.js');
 const assert=require('node:assert/strict'), fs=require('node:fs'), path=require('node:path'), readline=require('node:readline');
-const {spawn}=require('node:child_process');
+const {spawnFixtureChild:spawn,finishChildren}=require('./browser_fixture_process.js');
 const {browser,response}=require('./wtp_management_fixture.js');
 const build=path.resolve(process.argv[2]);
 const trace=(...args)=>{if(process.env.WSPRRYPI_INTEROP_TRACE)console.error(...args);};
@@ -12,16 +12,13 @@ function lines(child) {
   const queue=[],waiters=[];
   readline.createInterface({input:child.stdout}).on('line',line=>waiters.length?waiters.shift()(line):queue.push(line));
   return ()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(Error('Resource fixture deadline')),45000);
+    const timer=setTimeout(()=>reject(Error(`stage=resources-pair-reply; expected=complete response line; child_exit=${child.exitCode}; child_signal=${child.signalCode}; hang_guard=45000ms`)),45000);
     waiters.push(line=>{clearTimeout(timer);resolve(line);});
   });
 }
-async function stop(child) {
-  if (!child || child.exitCode!==null) return;
-  await new Promise(resolve=>{const timer=setTimeout(()=>child.kill('SIGKILL'),3000);child.once('exit',()=>{clearTimeout(timer);resolve();});child.kill();});
-}
+
 async function cases(carrier, failure="storage") {
-  const consumer=carrier!=='engineering_mtls'; let server,client;
+  const consumer=carrier!=='engineering_mtls'; let server,client,primary;
   try {
     let serverLine;
     if (!consumer) {
@@ -287,6 +284,6 @@ async function cases(carrier, failure="storage") {
     loaded=await load();fs.writeFileSync(path.join(build,`resources-fault-${carrier}.json`),JSON.stringify(loaded.body));assert.equal(loaded.body.application.hardware.storage_healthy,false);assert(b.element('wtp-member-hardware-save').disabled);
     if(consumer) assert.equal((await control('dump')).wtp_io,0);
     console.log(`${carrier}: UI, protected routes, production runtime/coordinator, actual Pico/journal, preview, saved/active, stale context, profile/encoder, STOP/cursors, dropped reply and storage failure passed`);
-  } finally {await stop(client);await stop(server);}
+  } catch(error){primary=error;} finally {await finishChildren({failure:primary,children:[client,server]});}
 }
 (async()=>{for(const carrier of ['engineering_mtls','consumer_station','consumer_ap']){await cases(carrier);await cases(carrier,'disable');await cases(carrier,'blank');}})().catch(e=>{console.error(e);process.exitCode=1;});

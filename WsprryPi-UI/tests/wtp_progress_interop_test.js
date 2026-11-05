@@ -1,23 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Actual Pi UI -> protected API/runtime -> unmodified Pico persistence/crypto.
 "use strict";
-const assert=require("node:assert/strict"),path=require("node:path"),{spawn}=require("node:child_process"),readline=require("node:readline");
+const assert=require("node:assert/strict"),path=require("node:path"),{spawnFixtureChild:spawn,finishChildren}=require("./browser_fixture_process.js"),readline=require("node:readline");
 const {browser,response}=require("./wtp_management_fixture.js");
 const build=path.resolve(process.argv[2]);
 function channel(child) {
     const queue=[],waiting=[];
     readline.createInterface({input:child.stdout}).on("line",line=>waiting.length?waiting.shift()(line):queue.push(line));
     return ()=>queue.length?Promise.resolve(queue.shift()):new Promise((resolve,reject)=>{
-        const timer=setTimeout(()=>reject(new Error("Progress pair deadline")),45000);
+        const timer=setTimeout(()=>reject(Error(`stage=progress-pair-reply; expected=complete response line; child_exit=${child.exitCode}; child_signal=${child.signalCode}; hang_guard=45000ms`)),45000);
         waiting.push(line=>{clearTimeout(timer);resolve(line);});
     });
 }
-async function stop(child) {
-    if(!child || child.exitCode!==null)return;
-    await new Promise(resolve=>{const timer=setTimeout(()=>child.kill("SIGKILL"),3000);child.once("exit",()=>{clearTimeout(timer);resolve();});child.kill("SIGTERM");});
-}
+
 async function scenario(carrier) {
-    let server,client;
+    let server,client,primary;
     try {
         const consumer=carrier!=="engineering_mtls";
         let serverLine;
@@ -85,6 +82,6 @@ async function scenario(carrier) {
         assert.deepEqual(applied.config.wifi,initial.config.wifi);assert.deepEqual(applied.config.pins,initial.config.pins);
         assert.deepEqual(applied.config.schedules,initial.config.schedules);
         console.log(`${carrier}: genuine UI partial/null/zero/invalid field persistence, unchanged applied configuration and explicit application/profile authority passed`);
-    } finally {await stop(client);await stop(server);}
+    } catch(error){primary=error;} finally {await finishChildren({failure:primary,children:[client,server]});}
 }
 (async()=>{for(const carrier of ["engineering_mtls","consumer_station","consumer_ap"])await scenario(carrier);})().catch(error=>{console.error(error);process.exitCode=1;});

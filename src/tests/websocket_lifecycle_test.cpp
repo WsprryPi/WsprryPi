@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
@@ -137,7 +138,10 @@ class WebSocketLifecycleTest {
             std::unique_lock<std::mutex> state(state_mutex);
             holder_acquired=true;
             state_cv.notify_all();
-            state_cv.wait(state,[&]{return release_holder;});
+            if (!state_cv.wait_for(state,std::chrono::seconds(5),[&]{return release_holder;})) {
+                std::cerr << "stage=websocket-holder-release; expected=explicit release; budget=5s\n";
+                std::abort();
+            }
         });
         {
             std::unique_lock<std::mutex> state(state_mutex);
@@ -320,20 +324,36 @@ class WebSocketLifecycleTest {
         std::mutex mutex;
         std::condition_variable cv;
         std::vector<std::string> messages;
+        std::pair<std::size_t,std::size_t> partial{0,0};
+        local.inbound_buffer_for_test_ = [&](std::size_t bytes, std::size_t queued) {
+            std::lock_guard lock(mutex); partial = {bytes,queued}; cv.notify_all();
+        };
+        const auto observed_partial = [&](std::size_t bytes) {
+            std::unique_lock lock(mutex);
+            if (!cv.wait_for(lock,std::chrono::seconds(2),[&] { return partial.first==bytes; })) {
+                std::cerr << "stage=websocket-partial-frame; expected buffered=" << bytes
+                          << "; last buffered=" << partial.first << "; queued=" << partial.second << "; budget=2s\n";
+                std::abort();
+            }
+            assert(partial.second==0 && messages.empty());
+        };
         bool release = false;
         local.inbound_message_for_test_ = [&](const std::string &message) {
             std::unique_lock<std::mutex> lock(mutex);
             messages.push_back(message); cv.notify_all();
-            if (message == "barrier") cv.wait(lock, [&]{ return release; });
+            if (message == "barrier" && !cv.wait_for(lock,std::chrono::seconds(5),[&]{ return release; })) {
+                std::cerr << "stage=websocket-barrier-release; expected=explicit release; budget=5s\n";
+                std::abort();
+            }
         };
         assert(local.start(port, 0, true, WebSocketLoopbackFamily::IPv4));
         int fd = connect_client(port);
         const auto split = text_frame(std::string(1800, 'x'));
         // Separate reads in the middle of both an extended header and payload.
         send_bytes(fd, split.substr(0, 3));
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        observed_partial(3);
         send_bytes(fd, split.substr(3, 401));
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        observed_partial(404);
         { std::lock_guard<std::mutex> lock(mutex); assert(messages.empty()); }
         send_bytes(fd, split.substr(404) + text_frame("barrier"));
         {

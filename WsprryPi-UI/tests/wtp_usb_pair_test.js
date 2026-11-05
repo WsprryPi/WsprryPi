@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 "use strict";
 const controlRequest=require('./control_pair_request.js');
-const assert=require("node:assert/strict"), readline=require("node:readline"),{spawn}=require("node:child_process");
+const assert=require("node:assert/strict"), readline=require("node:readline");
+const {spawnFixtureChild:spawn,finishChildren}=require("./browser_fixture_process.js");
 const {browser,reply,target}=require("./wtp_usb_settings_test.js");
 const {driveCases}=require("./gpio_drive_pair_cases.js");
 (async()=>{
     const args=process.argv.slice(2);if(!args.length)throw new Error("Usage: node wtp_usb_pair_test.js CLIENT_COMMAND [arguments]");
     const child=spawn(args[0],args.slice(1),{stdio:["pipe","pipe","inherit"]});
-    let pending=null, exited=false;
+    let pending=null, exited=false, primary;
     const lines=readline.createInterface({input:child.stdout});
     lines.on("line",line=>{if(!pending)return;const callback=pending;pending=null;callback.resolve(JSON.parse(line));});
     child.on("exit",code=>{exited=true;if(pending){pending.reject(new Error(`Pair client exited ${code}`));pending=null;}});
     child.on("error",error=>{if(pending){pending.reject(error);pending=null;}});
     const request=command=>new Promise((resolve,reject)=>{
+        if(exited||child.exitCode!==null||child.signalCode!==null){reject(new Error("stage=pair-exchange; child already exited"));return;}
         assert.equal(pending,null);const timer=setTimeout(()=>{if(pending){pending=null;reject(new Error("Pair exchange deadline"));child.kill("SIGTERM");}},15000);
         pending={resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}};
         child.stdin.write(JSON.stringify(controlRequest(command))+"\n");
@@ -134,7 +136,7 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         await b.click("load");b.element("wtp-usb-ssid").value="recreated-network";b.element("wtp-usb-password").value="different-synthetic-password";await b.click("wifi-save");
         assert.match(b.element("wtp-usb-feedback").textContent,/Settings saved/);await b.click("load");assert.equal(b.element("wtp-usb-ssid").value,"recreated-network");
         console.log("Actual production pair: UMP framing+ACK, protected UI requests, blank USB name/Wi-Fi create/replace/delete-last/recreate, partial station progress vs applied configuration, preserved station and UTC synchronization passed (no network/hardware)");
-    } finally {
-        child.stdin.end();lines.close();if(!exited)child.kill("SIGTERM");
+    } catch(error){primary=error;} finally {
+        lines.close();await finishChildren({failure:primary,children:[child]});
     }
 })().catch(error=>{console.error(error);process.exitCode=1;});
