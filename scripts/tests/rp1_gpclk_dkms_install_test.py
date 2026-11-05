@@ -572,13 +572,13 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         scripts.mkdir(exist_ok=True)
         version_source = root / "include/rp1_gpclk/version.h"
         version_source.parent.mkdir(parents=True, exist_ok=True)
-        version_source.write_text('#define RP1_GPCLK_MODULE_VERSION "1.0.0"\n')
+        version_source.write_text('#define RP1_GPCLK_MODULE_VERSION "0.0.1"\n')
         installer = scripts / "development-install"
         installer.write_text(f"#!/bin/sh\nprintf '%s\\n' '{help_text}'\n")
         preflight = scripts / "development-preflight"
         identity = {
             "classification": "source-development", "moduleName": MOD.MODULE_NAME,
-            "moduleVersion": "1.0.0", "versionSource": "include/rp1_gpclk/version.h",
+            "moduleVersion": "0.0.1", "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": digest(version_source.read_bytes()),
         }
         preflight.write_text("#!/bin/sh\nprintf '%s\\n' '" + json.dumps(identity) + "'\n")
@@ -587,6 +587,8 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         return root
 
     def setUp(self):
+        self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
+        MOD.configure_provider_repository(MOD.MIGRATION_REPOSITORY)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
 
@@ -604,7 +606,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
     def test_development_identity_comes_from_upstream_preflight(self):
         source = self.lifecycle_source("usage: development-install --route-neutral --runtime-controller")
         identity = MOD.development_identity(source, MOD.Runner())
-        self.assertEqual(identity["version"], "1.0.0")
+        self.assertEqual(identity["version"], "0.0.1")
         self.assertEqual(identity["versionSource"], "include/rp1_gpclk/version.h")
         (source / "include/rp1_gpclk/version.h").write_text('#define RP1_GPCLK_MODULE_VERSION "changed"\n')
         with self.assertRaisesRegex(MOD.ContractError, "differs from the selected source"):
@@ -620,9 +622,9 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
              mock.patch.object(MOD, 'runtime_source_interface'), \
              mock.patch.object(MOD, 'runtime_source_identity'):
             result = MOD.prepare_development(source, 'commit', 'a'*40, MOD.Runner())
-        self.assertEqual(result['version'], '1.0.0')
+        self.assertEqual(result['version'], '0.0.1')
         self.assertEqual(json.loads(result['compatibilityIdentity']),
-                         {'gpio4': 'v1.0.0-rp1-gpio4', 'gpio20': 'v1.0.0-rp1-gpio20'})
+                         {'gpio4': 'v0.0.1-rp1-gpio4', 'gpio20': 'v0.0.1-rp1-gpio20'})
 
     def test_runtime_source_identity_binds_product_and_both_rp1_routes(self):
         source = pathlib.Path(self.temp.name) / "runtime-source"
@@ -633,37 +635,37 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         )
         (scripts / "runtime_binding.py").write_text(
             "CONTRACT = 'rp1-gpclk-runtime-binding-v3'\n"
-            "PRODUCT_VERSION = '1.0.0'\n"
-            "COMPATIBILITY = {'gpio4': 'v1.0.0-rp1-gpio4', 'gpio20': 'v1.0.0-rp1-gpio20'}\n"
+            "PRODUCT_VERSION = '0.0.1'\n"
+            "COMPATIBILITY = {'gpio4': 'v0.0.1-rp1-gpio4', 'gpio20': 'v0.0.1-rp1-gpio20'}\n"
         )
-        MOD.runtime_source_identity(source, "1.0.0")
+        MOD.runtime_source_identity(source, "0.0.1")
         (scripts / "runtime_binding.py").write_text(
             "CONTRACT = 'rp1-gpclk-runtime-binding-v3'\n"
-            "PRODUCT_VERSION = '1.0.0'\n"
-            "COMPATIBILITY = {'gpio4': 'v1.0.0-pi5-gpio4', 'gpio20': 'v1.0.0-pi5-gpio20'}\n"
+            "PRODUCT_VERSION = '0.0.1'\n"
+            "COMPATIBILITY = {'gpio4': 'v0.0.1-pi5-gpio4', 'gpio20': 'v0.0.1-pi5-gpio20'}\n"
         )
         with self.assertRaisesRegex(MOD.ContractError, "route compatibility identities differ"):
-            MOD.runtime_source_identity(source, "1.0.0")
+            MOD.runtime_source_identity(source, "0.0.1")
         (scripts / "runtime_binding.py").write_text(
             "CONTRACT = 'rp1-gpclk-runtime-binding-v3'\n"
-            "PRODUCT_VERSION = '1.0.0'\n"
-            "COMPATIBILITY = {'gpio4': 'v1.0.0-rp1-gpio4', 'gpio20': 'v1.0.0-rp1-gpio20'}\n"
+            "PRODUCT_VERSION = '0.0.1'\n"
+            "COMPATIBILITY = {'gpio4': 'v0.0.1-rp1-gpio4', 'gpio20': 'v0.0.1-rp1-gpio20'}\n"
         )
         (scripts / "runtime_layout.py").write_text("KERNEL = 'fixture-kernel'\n")
         with self.assertRaisesRegex(MOD.ContractError, "hard-codes a kernel"):
-            MOD.runtime_source_identity(source, "1.0.0")
+            MOD.runtime_source_identity(source, "0.0.1")
 
     def test_development_result_is_bound_before_recording(self):
         manifest_path = pathlib.Path(self.temp.name) / "DEVELOPMENT_MANIFEST.json"
-        resolved = {"commit": "a" * 40, "version": "1.0.0", "uapiSha256": "b" * 64,
+        resolved = {"commit": "a" * 40, "version": "0.0.1", "uapiSha256": "b" * 64,
                     "versionSource": "include/rp1_gpclk/version.h", "versionSourceSha256": "e" * 64}
         manifest = {
             "schema": "rp1-gpclk-source-development-manifest",
             "classification": "source-development", "qualification": False,
             "releaseQualified": False, "sourceCommit": "a" * 40,
-            "sourceState": "clean", "renderedVersion": "1.0.0",
+            "sourceState": "clean", "renderedVersion": "0.0.1",
             "versionIdentity": {"path": "include/rp1_gpclk/version.h", "sha256": "e" * 64,
-                                "moduleVersion": "1.0.0"},
+                                "moduleVersion": "0.0.1"},
             "dkmsName": MOD.DKMS_NAME, "moduleName": MOD.MODULE_NAME,
             "targetKernel": MOD.platform.release(),
             "buildProfile": "runtime-controller",
@@ -675,7 +677,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "uapiIdentity": {"sha256": "b" * 64},
             "parameters": {"output_inhibit": 1},
             "installedModule": {
-                "moduleName": MOD.MODULE_NAME, "moduleVersion": "1.0.0",
+                "moduleName": MOD.MODULE_NAME, "moduleVersion": "0.0.1",
                 "kernel": MOD.platform.release(), "installedFileSha256": "c" * 64,
                 "decompressedElfSha256": "d" * 64,
                 "installedPath": f"/lib/modules/{MOD.platform.release()}/updates/dkms/{MOD.MODULE_NAME}.ko",
@@ -684,7 +686,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         manifest["installedModules"] = {
             MOD.MODULE_NAME: manifest["installedModule"],
             MOD.CONTROLLER_MODULE_NAME: {
-                "moduleName": MOD.CONTROLLER_MODULE_NAME, "moduleVersion": "1.0.0",
+                "moduleName": MOD.CONTROLLER_MODULE_NAME, "moduleVersion": "0.0.1",
                 "kernel": MOD.platform.release(), "installedFileSha256": "f" * 64,
                 "decompressedElfSha256": "1" * 64,
                 "installedPath": f"/lib/modules/{MOD.platform.release()}/updates/dkms/{MOD.CONTROLLER_MODULE_NAME}.ko",
@@ -703,7 +705,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         source = self.lifecycle_source("usage: development-install --route-neutral --runtime-controller")
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
-            "routeArguments": ["--route-neutral"], "version": "1.0.0",
+            "routeArguments": ["--route-neutral"], "version": "0.0.1",
         }
         existing = {
             "packageVersion": None, "dkms": "rp1-gpclk-dkms/foreign, kernel: installed",
@@ -724,16 +726,16 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
         }
         existing = {
             "packageVersion": None,
-            "dkms": f"{MOD.DKMS_NAME}/1.0.0, {MOD.platform.release()}, arm64: installed",
+            "dkms": f"{MOD.DKMS_NAME}/0.0.1, {MOD.platform.release()}, arm64: installed",
             "activeModule": False, "configuredRoute": False,
-            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-1.0.0"],
+            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-0.0.1"],
             "moduleCandidates": [
                 f"/lib/modules/{MOD.platform.release()}/updates/dkms/{MOD.MODULE_NAME}.ko"
             ],
@@ -749,7 +751,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "versionSource": resolved["versionSource"],
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         record = pathlib.Path(self.temp.name) / "record.json"
@@ -780,7 +782,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -788,12 +790,12 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         existing = {
             "packageVersion": None,
             "dkms": (
-                f"{MOD.DKMS_NAME}/1.0.0, {MOD.platform.release()}, "
+                f"{MOD.DKMS_NAME}/0.0.1, {MOD.platform.release()}, "
                 "arm64: installed"
             ),
             "activeModule": False, "activeController": True,
             "configuredRoute": False,
-            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-1.0.0"],
+            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-0.0.1"],
             "moduleCandidates": [
                 f"/lib/modules/{MOD.platform.release()}/updates/dkms/"
                 f"{MOD.MODULE_NAME}.ko"
@@ -815,7 +817,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "versionSource": resolved["versionSource"],
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         runner = self.runner({
@@ -825,7 +827,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
                     "--runtime-controller\n", "", 0,
                 ),
             ("modinfo", "-k", MOD.platform.release(), "-F", "version",
-             MOD.MODULE_NAME): MOD.CommandResult("1.0.0\n", "", 0),
+             MOD.MODULE_NAME): MOD.CommandResult("0.0.1\n", "", 0),
         })
         stdout = io.StringIO()
         with mock.patch.object(MOD, "revalidate_checkout", return_value=source), \
@@ -847,18 +849,18 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
         }
         existing = {
             "packageVersion": None,
-            "dkms": (f"{MOD.DKMS_NAME}/1.0.0, {MOD.platform.release()}, "
+            "dkms": (f"{MOD.DKMS_NAME}/0.0.1, {MOD.platform.release()}, "
                      "arm64: installed"),
             "activeModule": False, "activeController": True,
             "configuredRoute": False,
-            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-1.0.0"],
+            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-0.0.1"],
             "moduleCandidates": ["consumer.ko"],
             "controllerCandidates": ["controller.ko"],
             "installedOverlays": [], "enrollment": False,
@@ -872,7 +874,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "versionSource": resolved["versionSource"],
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         runner = self.runner({
@@ -889,8 +891,8 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "productVersion": owned["productVersion"],
             "targetKernel": MOD.platform.release(),
             "compatibilityIdentities": {
-                "gpio4": "v1.0.0-rp1-gpio4",
-                "gpio20": "v1.0.0-rp1-gpio20",
+                "gpio4": "v0.0.1-rp1-gpio4",
+                "gpio20": "v0.0.1-rp1-gpio20",
             },
             "deploymentPlanSha256": "3" * 64,
             "activationPlanSha256": "4" * 64,
@@ -919,12 +921,12 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         inventory = {
             "packageVersion": None,
             "dkms": (
-                f"{MOD.DKMS_NAME}/1.0.0, {MOD.platform.release()}, "
+                f"{MOD.DKMS_NAME}/0.0.1, {MOD.platform.release()}, "
                 "arm64: installed"
             ),
             "activeModule": False, "activeController": True,
             "configuredRoute": False,
-            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-1.0.0"],
+            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-0.0.1"],
             "moduleCandidates": ["consumer.ko"],
             "controllerCandidates": ["controller.ko"],
             "installedOverlays": [], "enrollment": False,
@@ -932,7 +934,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         }
         runner = self.runner({
             ("modinfo", "-k", MOD.platform.release(), "-F", "version",
-             MOD.MODULE_NAME): MOD.CommandResult("1.0.0\n", "", 0),
+             MOD.MODULE_NAME): MOD.CommandResult("0.0.1\n", "", 0),
         })
         for field, message in (
             ("activeModule", "transmission consumer"),
@@ -944,7 +946,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(
                     MOD.ContractError, message):
                 MOD.validate_runtime_development_provider(
-                    {"productVersion": "1.0.0"}, unsafe, runner
+                    {"productVersion": "0.0.1"}, unsafe, runner
                 )
 
     def test_owned_development_identity_drift_is_not_reused(self):
@@ -952,7 +954,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -965,12 +967,12 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         }
         owned = {
             "channel": "development", "sourceCommit": "e" * 40,
-            "productVersion": "1.0.0", "sourceTree": "b" * 40,
+            "productVersion": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         runner = self.runner({
             Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
@@ -989,17 +991,17 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
         }
         before = {
             "packageVersion": None,
-            "dkms": f"{MOD.DKMS_NAME}/1.0.0, kernel, arm64: installed",
+            "dkms": f"{MOD.DKMS_NAME}/0.0.1, kernel, arm64: installed",
             "activeModule": True, "activeController": True,
             "configuredRoute": False,
-            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-1.0.0"],
+            "sourceTrees": [f"/usr/src/{MOD.PACKAGE_NAME}-0.0.1"],
             "moduleCandidates": [
                 "/lib/modules/kernel/updates/dkms/rp1_gpclk_dkms.ko"
             ],
@@ -1023,7 +1025,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         record = pathlib.Path(self.temp.name) / "record.json"
@@ -1067,7 +1069,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -1089,7 +1091,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "versionSource": resolved["versionSource"],
             "versionSourceSha256": resolved["versionSourceSha256"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         runner = self.runner({
             Command((str(source / "scripts/development-install"), "--help"), cwd=str(source)):
@@ -1114,7 +1116,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -1146,7 +1148,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -1161,12 +1163,12 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         absent = dict(provider, dkms="", sourceTrees=[], moduleCandidates=[])
         owned = {
             "schema": MOD.RECORD_SCHEMA, "channel": "development",
-            "sourceCommit": "e" * 40, "productVersion": "1.0.0",
+            "sourceCommit": "e" * 40, "productVersion": "0.0.1",
             "sourceTree": "f" * 40, "uapiSha256": "1" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "2" * 64,
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+            "compatibilityIdentity": MOD.development_compatibility("0.0.1"),
         }
         identity = mock.Mock(st_dev=1, st_ino=2)
         record = pathlib.Path(self.temp.name) / "record.json"
@@ -1200,7 +1202,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
             "routeArguments": ["--route-neutral"], "commit": "a" * 40,
-            "version": "1.0.0", "sourceTree": "b" * 40,
+            "version": "0.0.1", "sourceTree": "b" * 40,
             "uapiSha256": "c" * 64,
             "versionSource": "include/rp1_gpclk/version.h",
             "versionSourceSha256": "d" * 64,
@@ -1237,7 +1239,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         source = self.lifecycle_source("usage: development-install --route-neutral --runtime-controller")
         resolved = {
             "checkout": {"path": str(source)}, "interface": "route-neutral-flag",
-            "routeArguments": ["--route-neutral"], "version": "1.0.0",
+            "routeArguments": ["--route-neutral"], "version": "0.0.1",
         }
         existing = {
             "packageVersion": None, "dkms": "", "activeModule": False,
@@ -1889,13 +1891,18 @@ activate_rp1_gpclk_runtime_administration debug
 cleanup_rp1_gpclk_dkms_state
 [[ -z "$RP1_GPCLK_DKMS_STATE_DIR" && -z "$RP1_GPCLK_DKMS_HELPER" ]]
 '''
-        for selector, branch in (("release", "main"), ("devel", "codex/issue-412-test")):
+        for selector, branch, repository in (
+            ("release", "main", MOD.LEGACY_REPOSITORY),
+            ("devel", "codex/issue-412-test", MOD.LEGACY_REPOSITORY),
+            ("commit:" + "a"*40, "devel", MOD.MIGRATION_REPOSITORY),
+        ):
             sentinel = self.root / f"{selector}.invoked"
             environment = os.environ.copy()
             environment.update({
                 "INSTALL_SCRIPT": str(install_script),
                 "SENTINEL": str(sentinel),
                 "SOURCE_SELECTOR": selector,
+                "RP1_GPCLK_DKMS_REPOSITORY": repository,
                 "WSPRRYPi_BRANCH": branch,
             })
             result = subprocess.run(
@@ -1931,18 +1938,18 @@ cleanup_rp1_gpclk_dkms_state
             self.assertIn("Name:    Apply RP1-GPCLK-DKMS installation plan", result.stderr)
             helper = install_script.parent / "rp1_gpclk_dkms_install.py"
             prepare_command = (
-                f"Command: python3 {helper} prepare --state-dir dry-run:no-state-created "
+                f"Command: python3 {helper} --provider-repository {repository} prepare --state-dir dry-run:no-state-created "
                 f"--install true --source {selector} --wsprry-source {branch} --dry-run --debug"
             )
             apply_command = (
-                f"Command: python3 {helper} apply --state-dir dry-run:no-state-created --debug"
+                f"Command: python3 {helper} --provider-repository {repository} apply --state-dir dry-run:no-state-created --debug"
             )
             update_command = (
-                f"Command: python3 {helper} prepare-runtime-update "
+                f"Command: python3 {helper} --provider-repository {repository} prepare-runtime-update "
                 "--state-dir dry-run:no-state-created --debug"
             )
             activation_command = (
-                f"Command: python3 {helper} activate-runtime "
+                f"Command: python3 {helper} --provider-repository {repository} activate-runtime "
                 "--state-dir dry-run:no-state-created --debug"
             )
             self.assertIn(prepare_command, result.stderr)
@@ -2170,6 +2177,89 @@ cleanup_rp1_gpclk_dkms_state
         self.assertEqual(arguments.count("ARG=--debug"), 4)
         self.assertIn("ARG=/usr/local/lib/wsprrypi/runtime_reconcile.py", arguments)
 
+    def test_repository_selection_reaches_every_lifecycle_operation_and_retry(self):
+        shell = r'''
+set -e
+source "$INSTALL_SCRIPT"
+python3() {
+    { printf '%s\t' "$@"; printf '\n'; } >>"$CAPTURE"
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" == remove ]]; then
+            printf 'RP1-GPCLK-DKMS absent: no provider removal was required.\n'
+        fi
+    done
+    return 0
+}
+systemctl() { :; }
+logI() { :; }
+logD() { :; }
+ACTION=install DRY_RUN=false INSTALL_RP1_GPCLK_DKMS=true
+RP1_GPCLK_DKMS_SOURCE=commit:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+REPO_BRANCH=devel
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+for pass in first repeat; do
+    prepare_rp1_gpclk_dkms_installation debug
+    prepare_rp1_gpclk_runtime_update debug
+    apply_rp1_gpclk_dkms_installation debug
+    activate_rp1_gpclk_runtime_administration debug
+    cleanup_rp1_gpclk_dkms_state
+done
+ACTION=uninstall
+prepare_owned_rp1_gpclk_runtime_removal debug
+remove_owned_rp1_gpclk_dkms_provider debug
+'''
+        for repository in MOD.SUPPORTED_REPOSITORIES:
+            with self.subTest(repository=repository):
+                capture = self.root / 'repository-argv.txt'
+                capture.unlink(missing_ok=True)
+                result = subprocess.run(['bash', '-c', shell], text=True, capture_output=True,
+                    env={**os.environ, 'INSTALL_SCRIPT': str(ROOT/'scripts/install.sh'),
+                         'CAPTURE': str(capture), 'RP1_GPCLK_DKMS_REPOSITORY': repository})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                calls = [line.split() for line in capture.read_text().splitlines()]
+                helpers = [args for args in calls if args[0].endswith('rp1_gpclk_dkms_install.py')]
+                self.assertEqual(len(helpers), 10)
+                for args in helpers:
+                    self.assertEqual(args[1:3], ['--provider-repository', repository])
+                    self.assertIn('--debug', args)
+                    # Parse actual shell arguments with the real helper CLI.
+                    parsed = MOD.parser().parse_args(args[1:])
+                    self.assertEqual(parsed.provider_repository, repository)
+                self.assertEqual([args[3] for args in helpers],
+                    ['prepare', 'prepare-runtime-update', 'apply', 'activate-runtime']*2 +
+                    ['prepare-runtime-removal', 'remove'])
+                self.assertEqual(len(calls)-len(helpers), 2, 'separate startup route-restoration calls')
+
+    def test_invalid_repository_stops_before_helper_staging_or_dependency_resolution(self):
+        shell = r'''
+source "$INSTALL_SCRIPT"
+python3() { printf python >>"$CAPTURE"; return 99; }
+curl() { printf curl >>"$CAPTURE"; return 99; }
+mktemp() { printf staging >>"$CAPTURE"; return 99; }
+uname() { printf kernel >>"$CAPTURE"; return 99; }
+warn() { printf '%s\n' "$*"; }
+ACTION=install DRY_RUN=false INSTALL_RP1_GPCLK_DKMS=true
+[[ "$OPERATION" != *removal && "$OPERATION" != remove_owned* ]] || ACTION=uninstall
+"$OPERATION" && exit 98
+[[ ! -e "$CAPTURE" ]]
+'''
+        operations = ('resolve_apt_package_list', 'prepare_rp1_gpclk_dkms_installation',
+            'prepare_rp1_gpclk_runtime_update', 'apply_rp1_gpclk_dkms_installation',
+            'activate_rp1_gpclk_runtime_administration', 'prepare_owned_rp1_gpclk_runtime_removal',
+            'remove_owned_rp1_gpclk_dkms_provider')
+        for repository in ('', 'attacker/provider', 'WsprryPi/RP1-DKMS;false'):
+            for operation in operations:
+                with self.subTest(repository=repository, operation=operation):
+                    capture = self.root / 'invalid-repository-effects'
+                    result = subprocess.run(['bash', '-c', shell], text=True, capture_output=True,
+                        env={**os.environ, 'INSTALL_SCRIPT': str(ROOT/'scripts/install.sh'),
+                             'CAPTURE': str(capture), 'OPERATION': operation,
+                             'RP1_GPCLK_DKMS_REPOSITORY': repository})
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn('RP1_GPCLK_DKMS_REPOSITORY must be', result.stdout)
+                    self.assertFalse(capture.exists())
+
     def test_selected_uninstall_dry_run_reports_check_without_invoking_python(self):
         install_script = ROOT / "scripts" / "install.sh"
         sentinel = self.root / "uninstall-python-invoked"
@@ -2201,7 +2291,7 @@ cleanup_rp1_gpclk_dkms_state
         self.assertLessEqual(max(map(len, result.stdout.splitlines())), 80)
         helper = install_script.parent / "rp1_gpclk_dkms_install.py"
         self.assertIn(
-            f"Command: python3 {helper} remove --remove auto --debug",
+            f"Command: python3 {helper} --provider-repository WsprryPi/RP1-GPCLK-DKMS remove --remove auto --debug",
             result.stderr,
         )
 
@@ -2533,17 +2623,17 @@ def write_record(path, value):
     path.chmod(0o600)
 
 
-def development_record() -> dict[str, object]:
+def development_record(version: str = "1.0.0") -> dict[str, object]:
     return {
         "schema": MOD.RECORD_SCHEMA, "repository": MOD.REPOSITORY,
         "owner": "WsprryPi", "channel": "development",
         "installationMethod": "upstream-development-rollback",
-        "sourceCommit": "a" * 40, "productVersion": "1.0.0",
+        "sourceCommit": "a" * 40, "productVersion": version,
         "sourceTree": "b" * 40, "uapiSha256": "c" * 64,
         "versionSource": "include/rp1_gpclk/version.h",
         "versionSourceSha256": "d" * 64,
         "targetKernel": MOD.platform.release(),
-        "compatibilityIdentity": MOD.development_compatibility("1.0.0"),
+        "compatibilityIdentity": MOD.development_compatibility(version),
         "upstreamEvidence": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence",
         "rollbackRecord": "/var/lib/wsprrypi/rp1-gpclk-dkms-development-evidence/ROLLBACK.json",
         "rollbackRecordSha256": "e" * 64,
@@ -2837,7 +2927,7 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
             "sourceCommit": record["sourceCommit"],
             "productVersion": record["productVersion"],
             "targetKernel": MOD.platform.release(),
-            "compatibilityIdentities": {"gpio4": "v1.0.0-rp1-gpio4", "gpio20": "v1.0.0-rp1-gpio20"},
+            "compatibilityIdentities": {r: f"v{record['productVersion']}-rp1-{r}" for r in ("gpio4", "gpio20")},
             "deploymentPlanSha256": "5" * 64, "activationPlanSha256": "6" * 64,
             "activationRequestId": "request-1234", "controllerSession": 1,
             "controllerGeneration": 0, "state": "neutral_ready", "route": None,
@@ -2872,6 +2962,14 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
         self.assertFalse(self.record.exists())
 
 
+    def test_rp1_dkms_001_runtime_removal_uses_its_owning_rollback(self):
+        self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
+        MOD.configure_provider_repository(MOD.MIGRATION_REPOSITORY)
+        record = development_record('0.0.1')
+        with mock.patch(__name__ + '.development_record', return_value=record):
+            self.test_owned_runtime_uninstall_recovers_before_dkms_rollback()
+
+
 class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
     # Reuse the existing strict ownership fixtures, not alternate production views.
 
@@ -2888,7 +2986,8 @@ class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
 
     def plan(self, selected=None):
         MOD.atomic_json(self.state / 'plan.json', {'schema': MOD.STATE_SCHEMA,
-            'dryRun': False, 'decision': {'install': True}, 'resolved': selected or self.selected})
+            'dryRun': False, 'decision': {'install': True}, 'resolved': selected or self.selected,
+            'providerRepository': MOD.REPOSITORY})
         return MOD.parser().parse_args(['apply', '--state-dir', str(self.state),
                                       '--record', str(self.record), '--root', str(self.root)])
 
@@ -3207,9 +3306,18 @@ class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
 
 
     def test_same_version_development_source_change_retains_immutable_recovery(self):
+        self.check_same_version_source_update(MOD.CONSUMER_PROVIDER_VERSION)
+
+    def test_rp1_dkms_001_source_update_retains_recovery_before_removal(self):
+        self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
+        MOD.configure_provider_repository(MOD.MIGRATION_REPOSITORY)
+        self.selected['version'] = '0.0.1'
+        self.check_same_version_source_update('0.0.1')
+
+    def check_same_version_source_update(self, version):
         previous,entrypoint,rollback=self.development_recovery_inputs()
-        previous['productVersion']=MOD.CONSUMER_PROVIDER_VERSION
-        previous['compatibilityIdentity']=MOD.development_compatibility(MOD.CONSUMER_PROVIDER_VERSION)
+        previous['productVersion']=version
+        previous['compatibilityIdentity']=MOD.development_compatibility(version)
         write_record(self.record, previous); args=self.plan()
         def remove(*_):
             evidence=list(self.root.glob('rp1-provider-migration.*/previous-development-rollback.json'))

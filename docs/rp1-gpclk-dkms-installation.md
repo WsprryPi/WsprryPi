@@ -2,7 +2,9 @@
 
 WsprryPi can orchestrate installation of the independently maintained
 [`WsprryPi/RP1-GPCLK-DKMS`](https://github.com/WsprryPi/RP1-GPCLK-DKMS)
-provider. WsprryPi does not vendor its module source, reproduce its DKMS
+provider or explicitly selected
+[`WsprryPi/RP1-DKMS`](https://github.com/WsprryPi/RP1-DKMS) development source.
+WsprryPi does not vendor its module source, reproduce its DKMS
 lifecycle, edit boot configuration, or enable transmission. A source or release
 that implements the reviewed runtime contract is first activated to route-neutral
 controller and manager administration. Setup then restores an explicitly saved
@@ -404,10 +406,13 @@ argv. No failure selects a fallback backend.
 
 ## Explicit RP1-DKMS development authority
 
-The helper accepts `--provider-repository WsprryPi/RP1-DKMS` before its
-subcommand for explicit maintainer selection. The normal installer continues
-to select `WsprryPi/RP1-GPCLK-DKMS`; it does not discover or fall back to the
-new repository. Ordinary published non-draft/non-prerelease releases do not
+`RP1_GPCLK_DKMS_REPOSITORY` selects the provider for the complete installer
+lifecycle. It accepts exactly `WsprryPi/RP1-GPCLK-DKMS` (the default) or
+`WsprryPi/RP1-DKMS`. Empty or unknown values are refused when provider work is
+selected. The installer passes this selection to planning, runtime-update
+preparation, provider installation, runtime activation, runtime-removal
+preparation, and provider removal. It does not discover or fall back to another
+repository. Ordinary published non-draft/non-prerelease releases do not
 need a GitHub immutability flag. Exact source, package, checksums, UAPI,
 compatibility, runtime capabilities, and ownership checks remain required.
 
@@ -415,8 +420,35 @@ The new selection accepts development identity `0.0.1`; the original selection
 retains `1.0.1`. The adapter accepts only the matching version and route pair,
 with unchanged UAPI and capability checks.
 
-Use the same explicit provider argument for every operation on a new-provider
-plan or ownership record. A plan prepared for one repository cannot be applied
+RP1-DKMS is unreleased, so select development source explicitly. For an install,
+repeat install, or update, use the selected WsprryPi checkout and set the full
+RP1-DKMS source commit before running:
+
+```sh
+: "${RP1_DKMS_COMMIT:?Set the full reviewed RP1-DKMS commit}"
+sudo env RP1_GPCLK_DKMS_REPOSITORY=WsprryPi/RP1-DKMS \
+  RP1_GPCLK_DKMS_SOURCE="commit:${RP1_DKMS_COMMIT}" ./scripts/install.sh
+```
+
+An unchanged source and attributable installed inventory permit the existing
+repeat-install checks. A changed source commit, even at version `0.0.1`, uses
+the owning cleanup-first update workflow and retained recovery inputs. It does
+not replace a different provider in place. For removal of the new provider:
+
+```sh
+sudo env ACTION=uninstall RP1_GPCLK_DKMS_REPOSITORY=WsprryPi/RP1-DKMS \
+  ./scripts/install.sh
+```
+
+Supply the same repository setting on every install, update, and uninstall;
+the setting is invocation-specific. Omitting it selects the legacy repository
+and does not adopt new-repository ownership. `REMOVE_RP1_GPCLK_DKMS=false`
+continues to preserve the provider. Dry runs display the selected helper
+arguments without invoking Python, downloading source, or changing the system.
+Source-development installation needs no tag, release, or release lock.
+
+The helper also accepts `--provider-repository WsprryPi/RP1-DKMS` before its
+subcommand for direct maintainer use. A plan prepared for one repository cannot be applied
 under the other selection. Existing ownership records retain their original
 repository and require their owning cleanup/removal; they are never renamed
 or adopted by selecting another repository. Fresh RP1-DKMS history proves its

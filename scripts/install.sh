@@ -249,6 +249,7 @@ declare UI_PUBLICATION_REPORTED="false"
 declare UI_PUBLICATION_RESULT_FILE=""
 declare INSTALL_RP1_GPCLK_DKMS="${INSTALL_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_SOURCE="${RP1_GPCLK_DKMS_SOURCE:-auto}"
+declare RP1_GPCLK_DKMS_REPOSITORY="${RP1_GPCLK_DKMS_REPOSITORY-WsprryPi/RP1-GPCLK-DKMS}"
 declare REMOVE_RP1_GPCLK_DKMS="${REMOVE_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_STATE_DIR=""
 declare RP1_GPCLK_DKMS_HELPER=""
@@ -2427,6 +2428,19 @@ rp1_gpclk_dkms_installation_selected() {
     esac
 }
 
+# Select exactly one provider authority for the complete installer lifecycle.
+# Source selection remains independent; no alternate repository is discovered.
+validate_rp1_gpclk_repository() {
+    case "$RP1_GPCLK_DKMS_REPOSITORY" in
+        WsprryPi/RP1-GPCLK-DKMS|WsprryPi/RP1-DKMS) return 0 ;;
+        *)
+            warn "RP1_GPCLK_DKMS_REPOSITORY must be WsprryPi/RP1-GPCLK-DKMS or WsprryPi/RP1-DKMS."
+            return 1
+            ;;
+    esac
+}
+
+
 # -----------------------------------------------------------------------------
 # @brief Resolve the APT package closure for this installer invocation.
 # @details Base application build packages apply on every supported Pi. RP1
@@ -2453,6 +2467,8 @@ resolve_apt_package_list() {
     if ! rp1_gpclk_dkms_installation_selected; then
         return 0
     fi
+
+    validate_rp1_gpclk_repository || return 1
 
     kernel_release=$(uname -r) || {
         warn "Unable to identify the running kernel for RP1 DKMS headers."
@@ -2590,6 +2606,7 @@ prepare_rp1_gpclk_dkms_installation() {
 
     [[ "$ACTION" == "install" ]] || return 0
     rp1_gpclk_dkms_installation_selected || return 0
+    validate_rp1_gpclk_repository || return 1
 
     local script_source="${BASH_SOURCE[0]:-}"
     local local_helper=""
@@ -2623,6 +2640,7 @@ prepare_rp1_gpclk_dkms_installation() {
     fi
 
     local prepare_args=(
+        --provider-repository "$RP1_GPCLK_DKMS_REPOSITORY"
         prepare
         --state-dir "$RP1_GPCLK_DKMS_STATE_DIR"
         --install "$INSTALL_RP1_GPCLK_DKMS"
@@ -2666,13 +2684,14 @@ apply_rp1_gpclk_dkms_installation() {
 
     [[ "$ACTION" == "install" ]] || return 0
     rp1_gpclk_dkms_installation_selected || return 0
+    validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" && \
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
         warn "RP1-GPCLK-DKMS plan state is unavailable."
         return 1
     fi
 
-    local apply_args=(apply --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local apply_args=(--provider-repository "$RP1_GPCLK_DKMS_REPOSITORY" apply --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
     local failure_output_file=""
     if [[ "$DRY_RUN" != "true" ]]; then
         failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/apply-output.log"
@@ -2704,13 +2723,14 @@ prepare_rp1_gpclk_runtime_update() {
 
     [[ "$ACTION" == "install" ]] || return 0
     rp1_gpclk_dkms_installation_selected || return 0
+    validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" &&
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
         warn "RP1-GPCLK-DKMS plan state is unavailable."
         return 1
     fi
 
-    local update_args=(prepare-runtime-update --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local update_args=(--provider-repository "$RP1_GPCLK_DKMS_REPOSITORY" prepare-runtime-update --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
     local failure_output_file=""
     if [[ "$DRY_RUN" != "true" ]]; then
         failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/runtime-update-output.log"
@@ -2744,13 +2764,14 @@ activate_rp1_gpclk_runtime_administration() {
 
     [[ "$ACTION" == "install" ]] || return 0
     rp1_gpclk_dkms_installation_selected || return 0
+    validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" && \
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
         warn "RP1-GPCLK-DKMS runtime plan state is unavailable."
         return 1
     fi
 
-    local runtime_args=(activate-runtime --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
+    local runtime_args=(--provider-repository "$RP1_GPCLK_DKMS_REPOSITORY" activate-runtime --state-dir "$RP1_GPCLK_DKMS_STATE_DIR")
     local failure_output_file=""
     if [[ "$DRY_RUN" != "true" ]]; then
         failure_output_file="$RP1_GPCLK_DKMS_STATE_DIR/activation-output.log"
@@ -2797,6 +2818,8 @@ prepare_owned_rp1_gpclk_runtime_removal() {
     [[ "$ACTION" == "uninstall" ]] || return 0
     [[ "$REMOVE_RP1_GPCLK_DKMS" != "false" ]] || return 0
 
+    validate_rp1_gpclk_repository || return 1
+
     local script_source="${BASH_SOURCE[0]:-}"
     local local_helper=""
     local state_dir=""
@@ -2823,7 +2846,7 @@ prepare_owned_rp1_gpclk_runtime_removal() {
         fi
         exec_command "Protect RP1 installer helper" chmod 0700 "$helper" "$debug" || return 1
     fi
-    local update_args=(prepare-runtime-removal)
+    local update_args=(--provider-repository "$RP1_GPCLK_DKMS_REPOSITORY" prepare-runtime-removal)
     local failure_output_file="$state_dir/runtime-removal-output.log"
     if [[ "$debug" == "debug" ]]; then
         update_args+=(--debug)
@@ -2867,6 +2890,8 @@ remove_owned_rp1_gpclk_dkms_provider() {
         return 0
     fi
 
+    validate_rp1_gpclk_repository || return 1
+
     local script_source="${BASH_SOURCE[0]:-}"
     local local_helper=""
     if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
@@ -2895,7 +2920,7 @@ remove_owned_rp1_gpclk_dkms_provider() {
         fi
     fi
 
-    local remove_args=(remove --remove "$REMOVE_RP1_GPCLK_DKMS")
+    local remove_args=(--provider-repository "$RP1_GPCLK_DKMS_REPOSITORY" remove --remove "$REMOVE_RP1_GPCLK_DKMS")
     local removal_output_file=""
     if [[ "$debug" == "debug" ]]; then
         remove_args+=(--debug)
