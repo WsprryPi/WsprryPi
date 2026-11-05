@@ -101,7 +101,7 @@ RUN useradd --create-home --uid 10001 validator && \
     install -d -o validator -g validator /work
 USER validator
 WORKDIR /work
-ENV WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 npm_config_cache=/tmp/wsprrypi-validation-npm JOBS=2
+ENV WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 npm_config_cache=/tmp/wsprrypi-validation-npm MAKEFLAGS=-j2
 ```
 
 From the directory containing that Dockerfile, build the image and bind the

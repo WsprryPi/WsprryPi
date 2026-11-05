@@ -6847,8 +6847,8 @@ apply_build_resource_plan() {
 # -----------------------------------------------------------------------------
 # @brief  Analyze system resources and display compilation concurrency notes.
 # @details
-#   Evaluates the system environment using the same heuristics as the Makefile
-#   JOBS logic, but is strictly informational.
+#   Evaluates the system environment using the same heuristics as the Makefile build-job-count
+#   boundary, but is strictly informational.
 #
 #   Signals considered:
 #     - Total RAM (MemTotal)
@@ -7221,7 +7221,18 @@ compile_binary() {
     if [[ "$DRY_RUN" == "true" ]]; then
         logD "Exec: (cd ${LOCAL_SOURCE_DIR} && make ${type})"
     else
-        exec_command "Compile ${type,,} binary" runuser -u "$SUDO_USER" -- make -C "${LOCAL_SOURCE_DIR}" "${type}" "$debug" || {
+        local build_jobs
+        build_jobs=$(runuser -u "$SUDO_USER" -- make -s --no-print-directory -C "${LOCAL_SOURCE_DIR}" build-job-count SUDO=) || {
+            logE "Error: Unable to select the compilation job count."
+            debug_end "$debug"
+            return 1
+        }
+        if [[ ! "$build_jobs" =~ ^[1-9][0-9]*$ ]]; then
+            logE "Error: Invalid compilation job count."
+            debug_end "$debug"
+            return 1
+        fi
+        exec_command "Compile ${type,,} binary" runuser -u "$SUDO_USER" -- make -j"$build_jobs" -C "${LOCAL_SOURCE_DIR}" "${type}" "$debug" || {
             logE "Error: Unable to compile binary."
             debug_end "$debug"
             return 1

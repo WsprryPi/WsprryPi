@@ -524,9 +524,9 @@ GPIOD_CPP_HEADER_AVAILABLE ?= $(shell printf '%s\n' '\#include <gpiod.hpp>' | $(
 # - Do not override an explicit -j passed to make
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Select a budget only at the CI boundary; ordinary builds leave GNU Make's
+# Select a budget only at an explicit caller boundary; ordinary builds leave GNU Make's
 # explicit/inherited jobserver intact and use its standard serial default.
-ifneq ($(filter ci-build-budget,$(MAKECMDGOALS)),)
+ifneq ($(filter ci-build-budget build-job-count,$(MAKECMDGOALS)),)
 # Keep Linux's memory-aware sizing policy, but do not run Linux-only probes on
 # other hosts. Darwin supplies its logical CPU count through sysctl; unknown
 # hosts use the POSIX getconf interface when available. All non-Linux paths
@@ -569,6 +569,7 @@ endif
 
 # Bound automatic sizing even on hosts exposing many CPUs. Existing low-memory
 # limits still apply; explicit JOBS or command-line -j remain caller decisions.
+ifneq ($(filter ci-build-budget,$(MAKECMDGOALS)),)
 BUILD_JOB_LIMIT ?= 4
 ifneq ($(words $(BUILD_JOB_LIMIT)),1)
 $(error BUILD_JOB_LIMIT must be one integer from 1 through 4)
@@ -577,6 +578,7 @@ ifneq ($(filter 1 2 3 4,$(BUILD_JOB_LIMIT)),$(BUILD_JOB_LIMIT))
 $(error BUILD_JOB_LIMIT must be one integer from 1 through 4)
 endif
 JOBS_COMPUTED := $(shell j=$(JOBS_COMPUTED); if [ $$j -gt $(BUILD_JOB_LIMIT) ]; then echo $(BUILD_JOB_LIMIT); else echo $$j; fi)
+endif
 
 # Allow users to override: JOBS=1 make ...
 JOBS ?= $(JOBS_COMPUTED)
@@ -607,7 +609,11 @@ endif
 
 endif
 
-.PHONY: ci-build-budget
+.PHONY: ci-build-budget build-job-count
+build-job-count:
+	$(Q)case $(call shell_quote,$(JOBS)) in ''|*[!0-9]*|0) echo "stage=build-budget; expected=positive finite job count" >&2; exit 1;; esac; \
+		printf '%s\n' $(call shell_quote,$(JOBS))
+
 ci-build-budget:
 	$(Q)test -n "$$GITHUB_ENV" || { echo "stage=build-budget; GITHUB_ENV is required" >&2; exit 1; }
 	$(Q)set -e; case $(call shell_quote,$(JOBS)) in 1|2|3|4) ;; *) echo "stage=build-budget; jobs must be 1 through 4" >&2; exit 1;; esac; \
