@@ -77,12 +77,21 @@ run it with `python3 -B ../docs/development/wtp-reply-routing-results/rollback_t
 from `src`. The helper contains host-specific service/network operations and is
 not an ordinary test entry point. Its live commands require separate authorization.
 
-## CI review baseline
+## CI ownership, synchronization and build reuse
 
-The [CI baseline and coverage map](ci-review-baseline.md) records the frozen
-source inventory, execution contexts, safety obligations, timing evidence, and
-conditional simplification gates. Later phases continue on its dedicated feature
-branch and worktree; inactive-test cleanup receives no reduction credit.
+The non-hardware workflow retains nine expanded contexts: scope admission, the simulated macOS profile, native Si5351 ARM and Intel profiles, strict Linux I2C, six sequential GCC release profiles, Debian full validation, and the production network and USB software pairs. Platform, capability and carrier contexts provide different evidence; a portable or mocked subset does not replace the full profile or either actual pair.
+
+The scope job resolves the selected Pico revision once. Both carrier jobs require and verify that immutable revision before building. Manual dispatch accepts `pico_ref`; select the intended committed companion explicitly. The network job also checks out its pinned Mbed TLS dependency, and Debian verifies the pinned RP1 provider. Missing, malformed or mismatched source selections fail without substituting another checkout.
+
+`make ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test SUDO=` runs the focused parent state, network policy and support lifecycle owners. `make ci-installer-offline-test SUDO=` runs the offline installation owners. Their workflow execution retains the named syscall traces and final fail-closed hardware-access audit. The audit covers those named processes, not every program or physical hardware behavior. `scripts/tests/ci_execution_graph_test.py` checks execution ownership and source-selection refusal; `scripts/tests/network_build_test.py` exercises real compiler input changes, failure and recovery.
+
+Tests establish readiness and completion through acknowledgments, held transactions, actual lock contention, parser state or terminal results. Operation deadlines, bounded failure guards, logical test clocks and observed duration have separate purposes. A sleep or absence of a marker does not prove entry into a race or completion of cleanup. Preserve the primary failure and secondary cleanup errors, retain ownership of unreaped children, and refuse reuse while cleanup remains unresolved. Fixed-delay manual fixtures are not ordinary-CI timing qualification.
+
+The UI browser fixtures share CDP/startup/HTTP and owned-process primitives in `WsprryPi-UI/tests/browser_harness.js` and `browser_fixture_process.js`. Their fault checks run with `node --test tests/browser_harness_test.js` and `node tests/browser_fixture_process_test.js` from `WsprryPi-UI`. Scenario assertions and production carrier adapters remain independent of the shared plumbing; the dependency-free USB lane must not acquire an undeclared browser package.
+
+Compatible network test binaries share object compilation through `scripts/network_build_rules.mk` and `scripts/build_identity.py`. Reuse depends on compiler-selected inputs, flags, toolchain, dependency contents and output identity; missing or unstable identity refuses reuse. Required test executables still run on unchanged builds. Different architectures, profiles, source revisions and cryptographic contexts do not share artifacts without equivalent input identity. Build budgets respect the parent jobserver and available resources.
+
+Software checks do not qualify physical USB, installation, services, GPIO, transmitter timing or RF. Native inventory delays and historical tracer failures without a demonstrated cause remain diagnostic limitations; a later successful run alone does not establish a repair. Keep manual/component entry points and recovery assets unless their present duties and equivalent replacements are established.
 
 ## Work and cleanup
 
