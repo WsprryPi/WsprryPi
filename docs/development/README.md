@@ -93,6 +93,14 @@ Compatible network test binaries share object compilation through `scripts/netwo
 
 Software checks do not qualify physical USB, installation, services, GPIO, transmitter timing or RF. Native inventory delays and historical tracer failures without a demonstrated cause remain diagnostic limitations; a later successful run alone does not establish a repair. Keep manual/component entry points and recovery assets unless their present duties and equivalent replacements are established.
 
+The production TLS pair uses a logical UTC epoch advanced by one monotonic clock;
+it does not repeatedly correlate independently sampled host wall/steady clocks.
+Its future scheduled-job case selects a full UTC second at least 60 seconds ahead.
+The actual Pico dry-run engine retains its UTC-second launch window and 1-ms
+uncertainty policy. `wtp_fixture_clock_test` checks exact projection, a valid
+start, and narrow-window, late-start, and inconsistent-clock refusals without
+sleeping. Host results do not qualify UTC accuracy or physical launch timing.
+
 ## Work and cleanup
 
 The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected

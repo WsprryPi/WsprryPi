@@ -2124,6 +2124,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_fixture_clock_test"
 	$(Q)python3 -B tests/wtp_network_interop_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 
 .PHONY: wtp-tls-test

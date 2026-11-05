@@ -165,8 +165,11 @@ int main(int argc, char **argv) {
     CHECK(completed.outcome == WtpScheduleOutcome::Complete && completed.job && completed.job->completed());
     CHECK(app.replaceable());
     auto future = request();
-    future.slot.start_time = std::chrono::system_clock::now() + 60s;
+    // Exercise the UTC-second policy with a complete one-second launch window.
+    // An arbitrary fractional phase can leave only nanoseconds before its end.
+    future.slot.start_time = std::chrono::ceil<std::chrono::seconds>(std::chrono::system_clock::now()) + 60s;
     const auto requested_start = *wtp_slot_utc_ns(future.slot);
+    CHECK(requested_start % 1000000000ULL == 0);
     app.prepare(future); app.start();
     auto waited = finish(90000);
     CHECK(waited.outcome == WtpScheduleOutcome::Complete && waited.job &&
