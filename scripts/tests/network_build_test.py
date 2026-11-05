@@ -133,14 +133,50 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
     def reset_log(self):
         (self.root/'commands').unlink(missing_ok=True)
 
-    def archive(self, library, obj):
+    def archive_command(self):
         archiver = shutil.which('ar')
         self.assertIsNotNone(archiver, 'stage=archive-fixture; expected=available archiver')
-        result = run_shell(shlex.join([archiver,'rcs',str(library),str(obj)]),
-            cwd=self.src,env=self.env,stage='archive-fixture:'+archiver,watchdog=10)
-        self.assertEqual(result.returncode,0,'stage=archive-fixture; tool='+archiver+'; '+result.stdout+result.stderr)
+        command = [archiver]
+        if sys.platform != 'darwin':
+            version = run_shell(shlex.join([archiver,'--version']),cwd=self.src,env=self.env,
+                stage='archive-tool-identification',watchdog=10)
+            self.assertEqual(version.returncode,0,version.stdout+version.stderr)
+            if 'GNU ar' in version.stdout:
+                # GNU ar otherwise loads unrelated plugins from bfd-plugins.
+                # Select the same compiler's plugin, retaining real archive/index work.
+                plugin = run_shell(shlex.join([shutil.which('c++'),'-print-file-name=liblto_plugin.so']),
+                    cwd=self.src,env=self.env,stage='archive-compiler-plugin',watchdog=10)
+                self.assertEqual(plugin.returncode,0,plugin.stdout+plugin.stderr)
+                path = Path(plugin.stdout.strip())
+                self.assertTrue(path.is_absolute() and path.is_file(),
+                    'stage=archive-compiler-plugin; expected=existing compiler-selected plugin; got='+str(path))
+                command += ['--plugin',str(path)]
+        return command
+
+    def archive(self, library, obj):
+        command = self.archive_command()
+        result = run_shell(shlex.join([*command,'rcs',str(library),str(obj)]),
+            cwd=self.src,env=self.env,stage='archive-fixture:'+command[0],watchdog=10)
+        self.assertEqual(result.returncode,0,'stage=archive-fixture; tool='+shlex.join(command)+'; '+result.stdout+result.stderr)
         with library.open('rb') as stream:
             self.assertEqual(stream.read(8),b'!<arch>\n','stage=archive-publication; expected=complete ar header')
+
+    def test_archive_plugin_selection_and_refusal(self):
+        plugin = self.root/'compiler plugin.so'
+        plugin.touch()
+        for platform,version,expected in (('darwin','','native'),('linux','LLVM ar','native'),
+                                          ('linux','GNU ar','selected')):
+            replies = [subprocess.CompletedProcess([],0,version,''),
+                       subprocess.CompletedProcess([],0,str(plugin)+'\n','')]
+            with mock.patch.object(sys,'platform',platform), mock.patch(__name__+'.run_shell',side_effect=replies) as run:
+                command = self.archive_command()
+                self.assertEqual(command,[shutil.which('ar')]+(['--plugin',str(plugin)] if expected=='selected' else []))
+                self.assertEqual(run.call_count,0 if platform=='darwin' else 2 if expected=='selected' else 1)
+        for reply in (subprocess.CompletedProcess([],0,'liblto_plugin.so\n',''),
+                      subprocess.CompletedProcess([],9,'','compiler refusal')):
+            with mock.patch.object(sys,'platform','linux'), mock.patch(__name__+'.run_shell',
+                    side_effect=[subprocess.CompletedProcess([],0,'GNU ar',''),reply]):
+                with self.assertRaises(AssertionError): self.archive_command()
 
     def dirty(self, name):
         path = self.src/name
