@@ -101,6 +101,14 @@ uncertainty policy. `wtp_fixture_clock_test` checks exact projection, a valid
 start, and narrow-window, late-start, and inconsistent-clock refusals without
 sleeping. Host results do not qualify UTC accuracy or physical launch timing.
 
+The USB pair lane uses the named Ubuntu 24.04 runner's installed CMake, Python,
+Node, C++ compiler, Make, and OpenSSL development tools. It checks executable
+availability, records versions and OpenSSL flags, then performs the actual CMake
+configure, compiled endpoint/client builds, and production pair checks. Missing
+or unusable tools fail the lane; setup does not silently install alternative
+CMake or Node packages. These image tools are inventoried inputs, not a claim of
+byte-reproducible system libraries.
+
 ## Work and cleanup
 
 The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected
