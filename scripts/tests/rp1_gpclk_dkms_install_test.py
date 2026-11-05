@@ -282,9 +282,13 @@ class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
             changed = dict(good); changed[field] = "wrong"
             runner = self.runner({command: MOD.CommandResult(json.dumps(changed), "", 0)})
             with self.assertRaises(MOD.ContractError): MOD.require_compatible_runtime_source(source, commit, runner)
-        for raw in ("[]", "invalid", '{"runtimeBinding":"wrong","runtimeBinding":"rp1-gpclk-runtime-binding-v3"}'):
+        for raw in ("[]", "invalid"):
             runner = self.runner({command: MOD.CommandResult(raw, "", 0)})
             with self.assertRaises(MOD.ContractError): MOD.require_compatible_runtime_source(source, commit, runner)
+        duplicate = json.dumps(good)[:-1] + ', "runtimeBinding": "' + MOD.RUNTIME_BINDING_CONTRACT + '"}'
+        runner = self.runner({command: MOD.CommandResult(duplicate, "", 0)})
+        with self.assertRaisesRegex(MOD.ContractError, "duplicate fields"):
+            MOD.require_compatible_runtime_source(source, commit, runner)
 
     def test_manifest_and_plan_cannot_cross_repository_authority(self):
         self.select_new()
