@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import fixture_commands
 from fixture_commands import run_shell
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -621,6 +622,32 @@ with open(os.environ['TOKEN_LOG'],'a') as log:
             os.close(read_fd);os.close(write_fd)
             worker.join(timeout=2)
             self.assertFalse(worker.is_alive(),'stage=compiler-cleanup; supervisor remains running')
+
+    def test_timeout_state_is_observed_before_kill_and_failure_is_preserved(self):
+        for diagnostic_failure in (False,True):
+            child = mock.Mock(pid=91234,stdin=None)
+            child.poll.return_value = None
+            child.communicate.side_effect = [subprocess.TimeoutExpired(['archive'],10),('','')]
+            events = []
+            def observe(pid):
+                self.assertEqual(pid,child.pid)
+                events.append('observe')
+                if diagnostic_failure: raise RuntimeError('diagnostic refusal')
+                return 'known-owned-state'
+            with mock.patch.object(fixture_commands.subprocess,'Popen',return_value=child), \
+                    mock.patch.object(fixture_commands,'_owned_state',side_effect=observe), \
+                    mock.patch.object(fixture_commands.os,'killpg',side_effect=lambda *_:events.append('kill')):
+                with self.assertRaises(BaseException) as caught:
+                    run_shell('archive',env=self.env,stage='archive-fixture',watchdog=10)
+            self.assertEqual(events,['observe','kill'])
+            if diagnostic_failure:
+                self.assertIsInstance(caught.exception,BaseExceptionGroup)
+                self.assertIsInstance(caught.exception.exceptions[0],TimeoutError)
+                self.assertIn('diagnostic refusal',str(caught.exception.exceptions[1]))
+            else:
+                self.assertIsInstance(caught.exception,TimeoutError)
+                self.assertIn('known-owned-state',str(caught.exception))
+            child.communicate.assert_has_calls([mock.call(None,timeout=10),mock.call(timeout=2)])
 
     def test_installer_forwards_selected_budget_and_refuses_invalid_counts(self):
         repo = self.root/'installer-repo'

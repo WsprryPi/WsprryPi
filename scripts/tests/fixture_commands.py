@@ -70,6 +70,36 @@ class StrictCommands:
         assert not self.pending, f"required fixture commands not consumed: {list(self.pending)}"
 
 
+def _owned_state(owner):
+    """Bounded Linux metadata for only the timed-out process group; no payloads."""
+    pending,seen,rows = [owner],set(),[]
+    def read(path):
+        descriptor = os.open(path,os.O_RDONLY|os.O_NONBLOCK)
+        try: return os.read(descriptor,1024).decode(errors='replace')
+        finally: os.close(descriptor)
+    while pending and len(seen)<8:
+        pid = pending.pop(0)
+        if pid in seen: continue
+        seen.add(pid)
+        root = f'/proc/{pid}'
+        row = {'pid':pid}
+        try:
+            if os.getpgid(pid)!=owner: continue
+            for field in ('comm','wchan','syscall','stat'):
+                try: row[field] = read(root+'/'+field).strip()
+                except OSError as error: row[field] = type(error).__name__
+            children = read(root+f'/task/{pid}/children').split()
+            pending.extend(int(value) for value in children if value.isdigit())
+            row['fds'] = []
+            with os.scandir(root+'/fd') as descriptors:
+                for index,entry in enumerate(descriptors):
+                    if index>=8: break
+                    row['fds'].append((entry.name,os.readlink(entry.path)[:160]))
+        except OSError as error: row['state'] = type(error).__name__
+        rows.append(row)
+    return repr(rows)[:8192]
+
+
 def run_shell(source, *, env, cwd=None, stage, stdin=False, watchdog=30):
     """Wait for actual shell completion; watchdogs bound hangs and owned cleanup."""
     started = time.monotonic()
@@ -93,6 +123,9 @@ def run_shell(source, *, env, cwd=None, stage, stdin=False, watchdog=30):
                 f"child_exit={child.poll()}; stdout_bytes={len(failure.stdout or b'')}; "
                 f"stderr_bytes={len(failure.stderr or b'')}")
         errors = [primary]
+        if isinstance(failure,subprocess.TimeoutExpired):
+            try: primary.args = (str(primary)+'; owned_state='+_owned_state(child.pid),)
+            except BaseException as diagnostic: errors.append(diagnostic)
         try:
             os.killpg(child.pid, signal.SIGKILL)
         except ProcessLookupError:
