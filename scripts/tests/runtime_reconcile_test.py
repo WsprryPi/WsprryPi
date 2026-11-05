@@ -19,6 +19,10 @@ def digest(value):
     return recovery.installer.sha256_bytes(recovery.installer.canonical(value))
 
 
+def digest_bytes(value):
+    return recovery.installer.sha256_bytes(value)
+
+
 class System:
     def __init__(self, route='gpio4', history=True):
         self.record = {'runtime': {'bindingSha256': 'a'*64, 'artifactSetSha256': 'b'*64,
@@ -89,6 +93,167 @@ class System:
 
 
 class Tests(unittest.TestCase):
+    @contextlib.contextmanager
+    def installed_ownership(self, repository, version):
+        """Real ownership parsing and binding hashes with mapped trusted files."""
+        installer = recovery.installer
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            ownership, binding_path, helper = (root/name for name in ('ownership.json', 'binding.json', 'provider.py'))
+            helper.write_bytes(b'# offline bound helper\n')
+            binding = {'sourceCommit': 'a'*40, 'productVersion': version,
+                       'artifactSetSha256': 'b'*64, 'kernel': installer.platform.release(),
+                       'files': {str(helper): digest_bytes(helper.read_bytes())}, 'externalFiles': {}}
+            binding_path.write_bytes(installer.canonical(binding))
+            record = {
+                'schema': installer.RUNTIME_RECORD_SCHEMA, 'repository': repository,
+                'owner': 'WsprryPi', 'channel': 'development',
+                'installationMethod': 'upstream-development-rollback',
+                'sourceCommit': 'a'*40, 'productVersion': version, 'sourceTree': 'c'*40,
+                'uapiSha256': 'd'*64, 'versionSource': 'include/rp1_gpclk/version.h',
+                'versionSourceSha256': 'e'*64, 'targetKernel': installer.platform.release(),
+                'compatibilityIdentity': installer.development_compatibility(version),
+                'routeActivation': 'disabled', 'output': 'disabled', 'qualificationClaim': False,
+                **{name: 'offline-evidence' for name in (
+                    'upstreamEvidence', 'rollbackRecord', 'rollbackRecordSha256',
+                    'rollbackEntrypoint', 'rollbackEntrypointSha256', 'installedModulePath',
+                    'installedModuleSha256', 'decompressedModuleSha256')},
+                'runtime': {
+                    'readinessContract': installer.RUNTIME_READINESS_CONTRACT,
+                    'bindingSha256': digest_bytes(binding_path.read_bytes()),
+                    'artifactSetSha256': 'b'*64, 'sourceCommit': 'a'*40,
+                    'productVersion': version, 'targetKernel': installer.platform.release(),
+                    'compatibilityIdentities': {r: f'v{version}-rp1-{r}' for r in ('gpio4', 'gpio20')},
+                    'deploymentPlanSha256': 'c'*64, 'activationPlanSha256': 'd'*64,
+                    'activationRequestId': 'offline-request', 'controllerSession': 1,
+                    'controllerGeneration': 0, 'state': 'neutral_ready', 'route': None,
+                    'output': 'disabled',
+                },
+            }
+            ownership.write_bytes(installer.canonical(record))
+            ownership.chmod(0o600)
+            def trusted(path):
+                self.assertIn(path, (ownership, binding_path, helper))
+                return path.read_bytes(), path.stat()
+            with patch.object(recovery, 'OWNERSHIP', ownership), \
+                 patch.object(recovery, 'BINDING', binding_path), \
+                 patch.object(recovery.companion, 'trusted', side_effect=trusted):
+                yield record, ownership, binding_path, helper
+
+    def test_owned_repository_drives_real_startup_validation_and_retries(self):
+        installer = recovery.installer
+        original = (installer.REPOSITORY, installer.REPOSITORY_URL, installer.API_BASE)
+        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),
+                                    (installer.LEGACY_REPOSITORY, '1.0.1')):
+            for route in ('gpio4', 'gpio20'):
+                with self.subTest(repository=repository, route=route), \
+                     self.installed_ownership(repository, version) as (record, path, unused, helper):
+                    system = System(route)
+                    binding_hash = record['runtime']['bindingSha256']
+                    # Bind the existing public-plan fake to the real parsed ownership.
+                    system.record = record
+                    system.plan['bindingSha256'] = binding_hash
+                    system.plan_hash = digest(system.plan)
+                    fake_call = system.call
+                    def call(operation, arguments=()):
+                        value = fake_call(operation, arguments)
+                        if operation == 'inspect':
+                            value['identities']['installedBinding']['sha256'] = binding_hash
+                        if operation == 'route-plan':
+                            plan = value['routePlan']
+                            plan['bindingSha256'] = binding_hash
+                            plan['planSha256'] = digest({k: v for k, v in plan.items() if k != 'planSha256'})
+                        return value
+                    original_bytes = path.read_bytes()
+                    with patch.object(system, 'ownership', side_effect=recovery.Linux().ownership), \
+                         patch.object(system, 'call', side_effect=call):
+                        recovery.prepare(system)
+                        self.assertTrue(system.env)
+                        self.assertFalse(system.calls, 'startup preparation must not contact the provider')
+                        self.assertEqual(recovery.reconcile(system), 'reconciled-idle')
+                        calls = copy.deepcopy(system.calls)
+                        self.assertEqual(recovery.reconcile(system), 'already-complete')
+                        self.assertEqual(system.calls, calls)
+                        self.assertEqual(system.active, route)
+                        self.assertFalse(system.config['transmit'])
+                        helper.write_bytes(b'changed')
+                        with self.assertRaisesRegex(installer.ContractError, 'bound runtime file changed'):
+                            recovery.reconcile(system)
+                        self.assertEqual(system.calls, calls)
+                    self.assertEqual(path.read_bytes(), original_bytes)
+                    self.assertEqual((installer.REPOSITORY, installer.REPOSITORY_URL, installer.API_BASE), original)
+                    default_record, unused, reason = installer.load_ownership_record(path)
+                    if repository == installer.REPOSITORY:
+                        self.assertEqual(default_record, record)
+                    else:
+                        self.assertIsNone(default_record, 'startup must not change installer selection')
+                        self.assertIn('repository differs', reason)
+
+    def test_real_startup_rejects_unknown_authority_versions_and_binding_changes(self):
+        installer = recovery.installer
+        cases = [
+            ('attacker/provider', '0.0.1', None),
+            (installer.MIGRATION_REPOSITORY, '0.99.0', None),
+            (installer.MIGRATION_REPOSITORY, '1.0.1', None),
+            (installer.MIGRATION_REPOSITORY, '1.0.2', None),
+            (installer.LEGACY_REPOSITORY, '0.0.1', None),
+            (installer.MIGRATION_REPOSITORY, '0.0.1', 'productVersion'),
+            (installer.MIGRATION_REPOSITORY, '0.0.1', 'sourceCommit'),
+            (installer.MIGRATION_REPOSITORY, '0.0.1', 'artifactSetSha256'),
+            (installer.MIGRATION_REPOSITORY, '0.0.1', 'kernel'),
+        ]
+        for repository, version, changed in cases:
+            with self.subTest(repository=repository, version=version, changed=changed), \
+                 self.installed_ownership(repository, version) as (record, path, binding, unused):
+                if changed:
+                    value = json.loads(binding.read_bytes())
+                    value[changed] = 'changed'
+                    binding.write_bytes(installer.canonical(value))
+                    record['runtime']['bindingSha256'] = digest_bytes(binding.read_bytes())
+                    path.write_bytes(installer.canonical(record))
+                system = System()
+                original = path.read_bytes()
+                with patch.object(system, 'ownership', side_effect=recovery.Linux().ownership):
+                    recovery.prepare(system)
+                    self.assertTrue(system.env)
+                    with self.assertRaises(installer.ContractError): recovery.reconcile(system)
+                    self.assertFalse(system.calls)
+                    self.assertIsNone(system.saved)
+                self.assertEqual(path.read_bytes(), original)
+
+    def test_startup_refuses_changed_or_duplicate_ownership_before_provider_calls(self):
+        installer = recovery.installer
+        with self.installed_ownership(installer.MIGRATION_REPOSITORY, '0.0.1') as (record, path, unused, helper):
+            changed = copy.deepcopy(record)
+            changed['sourceTree'] = 'f'*40
+            with patch.object(installer, 'load_ownership_record', return_value=(changed, path.stat(), None)):
+                with self.assertRaisesRegex(installer.ContractError, 'ownership changed'):
+                    recovery.Linux().ownership()
+            path.write_text(path.read_text()[:-1] + ',"repository":"attacker/provider"}')
+            with self.assertRaisesRegex(installer.ContractError, 'duplicate JSON key'):
+                recovery.Linux().ownership()
+
+    def test_release_ownership_uses_the_same_repository_version_boundary(self):
+        installer = recovery.installer
+        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),
+                                    (installer.LEGACY_REPOSITORY, '1.0.1')):
+            with self.subTest(repository=repository), \
+                 self.installed_ownership(repository, version) as (development, path, unused, helper):
+                record = {name: development[name] for name in (
+                    'schema', 'repository', 'owner', 'routeActivation', 'output',
+                    'qualificationClaim', 'sourceCommit', 'runtime')}
+                record.update(channel='release', installationMethod='debian-package',
+                              tag='v'+version, manifest={'productVersion': version}, moduleArtifacts=[])
+                path.write_bytes(installer.canonical(record))
+                self.assertEqual(recovery.Linux().ownership(), record)
+                record['manifest']['productVersion'] = '1.0.2'
+                record['runtime']['productVersion'] = '1.0.2'
+                record['runtime']['compatibilityIdentities'] = {
+                    r: f'v1.0.2-rp1-{r}' for r in ('gpio4', 'gpio20')}
+                path.write_bytes(installer.canonical(record))
+                with self.assertRaisesRegex(installer.ContractError, 'not accepted by this WsprryPi'):
+                    recovery.Linux().ownership()
+
     def test_lock_contention_defers_workers_and_bounds_installer_wait(self):
         system = recovery.Linux()
         info = SimpleNamespace(st_mode=0o100600, st_uid=0, st_nlink=1)

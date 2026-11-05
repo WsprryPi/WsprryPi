@@ -69,16 +69,28 @@ class Linux:
     def ownership(self):
         if not OWNERSHIP.exists() and not OWNERSHIP.is_symlink():
             return None
-        strict_json(companion.trusted(OWNERSHIP)[0])
-        record, unused, reason = installer.load_ownership_record(OWNERSHIP)
+        captured = strict_json(companion.trusted(OWNERSHIP)[0])
+        require(isinstance(captured, dict), 'provider ownership is not an object')
+        repository = captured.get('repository')
+        require(repository in installer.SUPPORTED_REPOSITORIES,
+                'provider ownership repository is not allowlisted')
+        # Startup follows existing ownership, never installer defaults or
+        # repository discovery. Keep the installer invocation's authority intact.
+        record, unused, reason = installer.load_ownership_record(OWNERSHIP, repository=repository)
         require(record is not None, 'cannot prove provider ownership: '+str(reason))
+        require(record == captured, 'provider ownership changed during startup inspection')
         if record['schema'] != installer.RUNTIME_RECORD_SCHEMA:
             return None
+        installer.validate_consumer_provider({
+            'channel': record['channel'], 'version': record.get('productVersion'),
+            'manifest': record.get('manifest'),
+        }, repository=repository)
         raw, unused = companion.trusted(BINDING)
         binding = strict_json(raw)
         runtime = record['runtime']
         require(installer.sha256_bytes(raw) == runtime['bindingSha256'] and
                 binding['sourceCommit'] == runtime['sourceCommit'] and
+                binding['productVersion'] == runtime['productVersion'] and
                 binding['artifactSetSha256'] == runtime['artifactSetSha256'] and
                 binding['kernel'] == os.uname().release,
                 'runtime binding differs from application ownership')

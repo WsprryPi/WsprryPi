@@ -423,6 +423,14 @@ or adopted by selecting another repository. Fresh RP1-DKMS history proves its
 runtime protocol declarations and retains capability and source identity checks
 instead of depending on a commit from the predecessor's Git history.
 
+Startup reconciliation uses the repository in the trusted existing ownership
+record. It accepts only the two repositories and their matching consumer
+versions above, verifies the bound runtime files, and preserves disabled output
+while recovering an explicitly saved GPIO4 or GPIO20 route. This does not change
+the installer's default repository or migrate an existing installation. Unknown
+repositories, mismatched versions, changed ownership, or altered runtime files
+block provider administration and keep application startup idle.
+
 This development option does not authorize installation or change production
 selection. Production cutover follows a separately accepted release and user
 decision. Historical qualification bundles remain bound to their original source.

@@ -1009,13 +1009,15 @@ def record_file_identity(path: pathlib.Path) -> os.stat_result:
     return info
 
 
-def load_ownership_record(path: pathlib.Path) -> tuple[dict[str, Any] | None, os.stat_result | None, str | None]:
-    """Return a validated v2 record, or a preservation reason without following unsafe state."""
+def load_ownership_record(path: pathlib.Path, *, repository: str | None = None) -> tuple[dict[str, Any] | None, os.stat_result | None, str | None]:
+    """Validate v2/v3 ownership against one authority without changing invocation defaults."""
     if not path.is_absolute():
         return None, None, "ownership record path is not absolute"
     if not path.exists() and not path.is_symlink():
         return None, None, "no WsprryPi ownership record exists"
     try:
+        authority = REPOSITORY if repository is None else repository
+        require(authority in SUPPORTED_REPOSITORIES, "provider repository is not allowlisted")
         info = record_file_identity(path)
         descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         try:
@@ -1056,7 +1058,7 @@ def load_ownership_record(path: pathlib.Path) -> tuple[dict[str, Any] | None, os
         if schema == RUNTIME_RECORD_SCHEMA:
             required.add("runtime")
         require_exact_keys(value, required, "installation ownership record")
-        require(value["repository"] == REPOSITORY, "installation ownership repository differs")
+        require(value["repository"] == authority, "installation ownership repository differs")
         require(value["owner"] == "WsprryPi", "installation ownership owner differs")
         require(value["routeActivation"] == "disabled" and value["output"] == "disabled", "installation ownership record is not route-neutral")
         require(value["qualificationClaim"] is False, "installation ownership record contains an unsupported qualification claim")
@@ -2281,12 +2283,14 @@ CONSUMER_PROVIDER_VERSION = "1.0.1"
 MIGRATION_PROVIDER_VERSION = "0.0.1"
 
 
-def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:
+def validate_consumer_provider(resolved: Mapping[str, Any], *, repository: str | None = None) -> None:
+    authority = REPOSITORY if repository is None else repository
+    require(authority in SUPPORTED_REPOSITORIES, "provider repository is not allowlisted")
     require(resolved.get("channel") in {"release", "development"}, "prepared source channel is invalid")
     if resolved["channel"] == "release":
         require(isinstance(resolved.get("manifest"), dict), "prepared release manifest is not an object")
     version = runtime_product_version(resolved)
-    expected = MIGRATION_PROVIDER_VERSION if REPOSITORY == MIGRATION_REPOSITORY else CONSUMER_PROVIDER_VERSION
+    expected = MIGRATION_PROVIDER_VERSION if authority == MIGRATION_REPOSITORY else CONSUMER_PROVIDER_VERSION
     require(version == expected,
             f"selected RP1 provider {version} is not accepted by this WsprryPi "
             f"(requires {expected}); update the application/provider "
