@@ -2278,7 +2278,7 @@ def runtime_product_version(resolved: Mapping[str, Any]) -> str:
 
 # Must match Rp1GpclkConsumerContract; checked against the C++ authority in tests.
 CONSUMER_PROVIDER_VERSION = "1.0.1"
-MIGRATION_PROVIDER_VERSION = "0.99.0"
+MIGRATION_PROVIDER_VERSION = "0.0.1"
 
 
 def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:

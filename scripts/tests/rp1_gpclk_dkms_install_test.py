@@ -247,11 +247,16 @@ class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
         self.assertIn('migration_version = "' + MOD.MIGRATION_PROVIDER_VERSION + '"', source)
         self.select_new()
         MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
+        self.assertEqual(MOD.MIGRATION_PROVIDER_VERSION, '0.0.1')
+        for previous in ('0.99.0', '1.0.1', '1.0.2'):
+            with self.assertRaises(MOD.ContractError):
+                MOD.validate_consumer_provider({'channel': 'development', 'version': previous})
         with self.assertRaises(MOD.ContractError):
             MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.CONSUMER_PROVIDER_VERSION})
         MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
         with self.assertRaises(MOD.ContractError):
             MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
+        MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.CONSUMER_PROVIDER_VERSION})
 
     def test_ordinary_releases_and_incomplete_inputs(self):
         self.select_new()

@@ -411,7 +411,7 @@ new repository. Ordinary published non-draft/non-prerelease releases do not
 need a GitHub immutability flag. Exact source, package, checksums, UAPI,
 compatibility, runtime capabilities, and ownership checks remain required.
 
-The new selection accepts development identity `0.99.0`; the original selection
+The new selection accepts development identity `0.0.1`; the original selection
 retains `1.0.1`. The adapter accepts only the matching version and route pair,
 with unchanged UAPI and capability checks.
 

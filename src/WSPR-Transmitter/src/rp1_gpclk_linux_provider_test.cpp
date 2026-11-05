@@ -277,9 +277,9 @@ void test_migration_identity_pairs()
     for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
         Io io;
         io.query.route = io.snapshot.route = route;
-        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.99.0-rp1-gpio4" : "v0.99.0-rp1-gpio20";
-        std::strcpy(io.query.build_id, "0.99.0");
-        std::strcpy(io.snapshot.build_id, "0.99.0");
+        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.0.1-rp1-gpio4" : "v0.0.1-rp1-gpio20";
+        std::strcpy(io.query.build_id, "0.0.1");
+        std::strcpy(io.snapshot.build_id, "0.0.1");
         std::strcpy(io.query.compatibility_id, identity);
         std::strcpy(io.snapshot.compatibility_id, identity);
         wsprrypi::Rp1GpclkLinuxProvider provider(io);
@@ -291,7 +291,10 @@ void test_migration_identity_pairs()
         expect(!provider.query(route, kRequired, true, observed, error),
                "migration route identity cannot be paired with the old module version");
         std::strcpy(io.query.build_id, "0.99.0");
-        std::strcpy(io.query.compatibility_id, route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.99.0-rp1-gpio20" : "v0.99.0-rp1-gpio4");
+        expect(!provider.query(route, kRequired, true, observed, error),
+               "superseded development version cannot use the current route identity");
+        std::strcpy(io.query.build_id, "0.0.1");
+        std::strcpy(io.query.compatibility_id, route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.0.1-rp1-gpio20" : "v0.0.1-rp1-gpio4");
         expect(!provider.query(route, kRequired, true, observed, error),
                "migration route substitution must fail closed");
     }
