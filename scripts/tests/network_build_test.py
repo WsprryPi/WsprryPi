@@ -110,6 +110,15 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
     def reset_log(self):
         (self.root/'commands').unlink(missing_ok=True)
 
+    def archive(self, library, obj):
+        archiver = shutil.which('ar')
+        self.assertIsNotNone(archiver, 'stage=archive-fixture; expected=available archiver')
+        result = run_shell(shlex.join([archiver,'rcs',str(library),str(obj)]),
+            cwd=self.src,env=self.env,stage='archive-fixture:'+archiver,watchdog=10)
+        self.assertEqual(result.returncode,0,'stage=archive-fixture; tool='+archiver+'; '+result.stdout+result.stderr)
+        with library.open('rb') as stream:
+            self.assertEqual(stream.read(8),b'!<arch>\n','stage=archive-publication; expected=complete ar header')
+
     def dirty(self, name):
         path = self.src/name
         path.write_text(path.read_text()+'\n')
@@ -117,7 +126,8 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         stamp = path.stat().st_mtime_ns-2_000_000_000
         for output in (self.src/'build').rglob('*'):
             if output.suffix == '.o' or output.parent.name == 'bin':
-                os.utime(output, ns=(stamp, stamp))
+                output_stamp = min(stamp, output.stat().st_mtime_ns)
+                os.utime(output, ns=(output_stamp, output_stamp))
 
     def test_cold_warm_shared_objects_and_required_execution(self):
         self.passed('-j2', 'wtp-network-tools-build', 'wtp-usb-management-test')
@@ -203,7 +213,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         code.write_text('int fixture_value() { return 1; }\n')
         def archive():
             subprocess.run([shutil.which('c++'),'-c',str(code),'-o',str(obj)],check=True,timeout=30)
-            subprocess.run(['ar','rcs',str(library),str(obj)],check=True,timeout=10)
+            self.archive(library,obj)
         archive()
         flags = 'WTP_NETWORK_LDFLAGS='+str(library)
         self.passed('wtp-network-unit-build', flags)
@@ -218,6 +228,9 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         self.passed('wtp-network-unit-build', flags)
         self.assertTrue(self.commands(), 'changed linked library must invalidate')
         self.assertEqual(sum('-c' in c for c in self.commands()), 0)
+        original_objects = list((self.src/'build').rglob('*.o'))
+        for output in original_objects:
+            os.utime(output, ns=(1_000_000_000,1_000_000_000))
         generated = self.src/'generated.hpp'
         generated.write_text('#define GENERATED_VALUE 0\n')
         (self.src/'shared.hpp').write_text((self.src/'shared.hpp').read_text()+'#include "generated.hpp"\n')
@@ -225,6 +238,8 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         self.passed('wtp-network-unit-build',flags)
         self.reset_log()
         self.dirty('generated.hpp')
+        self.assertTrue(all(output.stat().st_mtime_ns <= 1_000_000_000 for output in original_objects),
+            'dependency ordering must never advance older configuration outputs')
         self.passed('wtp-network-unit-build',flags)
         self.assertTrue(any('-c' in c for c in self.commands()))
         generated.unlink()
@@ -238,7 +253,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         for value in (0,1,0):
             code.write_text(f'int fixture_value() {{ return {value}; }}\n')
             subprocess.run([shutil.which('c++'),'-c',str(code),'-o',str(obj)],check=True,timeout=30)
-            subprocess.run(['ar','rcs',str(library),str(obj)],check=True,timeout=10)
+            self.archive(library,obj)
             result = self.make('wtp-api-cpp-test',flags)
             self.assertEqual(result.returncode == 0, value == 0, result.stdout+result.stderr)
             self.assertEqual(subprocess.run([str(self.src/'build/network/wtp_browser_api_test')],
