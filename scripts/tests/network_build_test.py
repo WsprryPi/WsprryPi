@@ -308,6 +308,19 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         self.assertEqual(before, after)
         self.assertEqual(self.commands(), [])
 
+    def test_dummy_compiler_admission_and_missing_build_outputs_are_distinct(self):
+        result = run_shell(shlex.join(['make','--no-print-directory','ci-change-scope-test',
+            'CXX=true','GPIOD_CPP_HEADER_AVAILABLE=0','BACKENDS=simulated','ANCILLARY_GPIO=0','SUDO=',
+            'BUILD_METADATA_DIR='+str(self.root/'admission-generated'),
+            'BUILD_METADATA_HEADER='+str(self.root/'admission-generated/build_metadata.hpp')]),
+            cwd=ROOT/'src',env=self.env,stage='noncompiler-admission',watchdog=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        result = self.make('wtp-api-cpp-test','CXX=true','CXX_VERSION_LINE=')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('stage=dependency-publication',result.stderr)
+        self.assertFalse((self.src/'build/network/wtp_browser_api_test').exists())
+        self.assertEqual(list((self.src/'build').rglob('*.tmp')),[])
+
     def test_actual_ci_job_budget_and_low_memory_limits(self):
         base = ['make','--no-print-directory','ci-build-budget',
             'BACKENDS=simulated','ANCILLARY_GPIO=0','GUI_CLAMP=0','HOST_OS=Linux',

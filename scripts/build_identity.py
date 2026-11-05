@@ -46,15 +46,18 @@ def main():
         return
     if args.record:
         obj, dependencies, output = map(Path,args.record)
-        if not dependencies.read_text().startswith(str(obj).removesuffix('.tmp')+':'):
-            parser.error('stage=dependency-publication; missing compiler target record')
-        output.write_text(json.dumps(state(obj,dependencies)))
+        try:
+            if not dependencies.read_text().startswith(str(obj).removesuffix('.tmp')+':'):
+                parser.error('stage=dependency-publication; missing compiler target record')
+            output.write_text(json.dumps(state(obj,dependencies)))
+        except OSError as error:
+            parser.error(f'stage=dependency-publication; expected=compiler object and dependencies; {error}')
         return
     if any(value is None for value in (args.compiler,args.version,args.flags,args.link)):
         parser.error('stage=build-identity; missing compiler/flags/link identity')
     command = shlex.split(args.compiler)
-    if not command or not shutil.which(command[0]) or not args.version:
-        parser.error('stage=build-identity; expected=available identified compiler')
+    if not command or not shutil.which(command[0]):
+        parser.error('stage=build-identity; expected=available compiler executable')
     files = [Path(__file__), *map(Path, args.file)]
     flattened = []
     def argument_files(arguments, active=()):
@@ -83,7 +86,7 @@ def main():
             else:
                 compile_arguments.append(argument)
     compiler_arguments(shlex.split(args.flags)+command[1:])
-    conservative = False
+    conservative = not args.version
     skip = False
     search_options = ('-I','-isystem','-iquote','-idirafter')
     for index, argument in enumerate(compile_arguments):
