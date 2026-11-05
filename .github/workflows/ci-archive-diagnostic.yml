@@ -1,0 +1,44 @@
+name: Temporary Phase 6 archive diagnosis
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/ci-review-simplification]
+    paths: [.github/workflows/ci-archive-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  archive-diagnosis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install the same build prerequisites and syscall observer
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev strace
+      - name: Identify selected tools
+        run: |
+          command -v ar c++ python3
+          readlink -f "$(command -v ar)"
+          sha256sum "$(command -v ar)"
+          timeout --signal=KILL 10 ar --version
+          python3 --version
+      - name: Observe the original two archive regressions
+        env:
+          TRACE_PATH: ${{ runner.temp }}/phase6-archive.trace
+        run: |
+          set +e
+          strace -f -tt -T -o "$TRACE_PATH" python3 -B scripts/tests/network_build_test.py NetworkBuild.test_custom_library_search_and_response_files_cannot_hide_changes NetworkBuild.test_library_and_generated_header_changes_invalidate
+          result=$?
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          lines=Path(os.environ['TRACE_PATH']).read_text().splitlines()
+          processes={line.split()[0] for line in lines if re.search(r'execve\("[^" ]*/ar",',line)}
+          print('Observed archiver process IDs:',sorted(processes))
+          for process in sorted(processes):
+              records=[line for line in lines if line.split()[0]==process]
+              print('Archiver',process,'last 60 syscall records:')
+              print('\n'.join(records[-60:]))
+          PY
+          exit "$result"
