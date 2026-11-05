@@ -108,7 +108,7 @@ local scheduler's candidate/committed status fields.
 
 ## Direct PPS disposition and acceptance criteria
 
-**RP1 direct capture is selected; legacy direct capture remains unimplemented.**
+**Direct capture is implemented for RP1; Pi 1–4 use the existing host estimate.**
 The optional [RP1 adapter](../docs/direct-pps-calibration.md) uses one input-only
 PIO state machine to count ten complete GPIO17 PPS periods. It verifies that
 nominal 200 MHz `clk_sys` derives directly from `pll_sys`. It replaces the
@@ -119,14 +119,15 @@ reference identity, and expiry retire it. The public PIO UAPI is pinned and
 vendored with its upstream licenses. This is a measurement of a verified RF
 parent derivative, not software timing of PPS callbacks.
 
-Pi 1–4 transmit from a main-SoC clock parent. Their host and RF clocks can share
-an oscillator, but a portable raw-host-counter/PLLD or oscillator ratio has not
-been established here. The existing host estimate remains available there.
-No Pi 1–4 direct capture implementation or hardware acceptance is implied.
+Pi 1–4 RF parents and host timing share the main SoC oscillator. WsprryPi
+uses Chrony's host-frequency estimate for their RF model; direct GPIO PPS
+capture in the application is not selected or required. Optional GPS/PPS
+belongs to the operating system's time-source configuration and can improve
+Chrony's estimate. Network synchronization is also supported. This preserves
+the existing intrinsic, host-estimate, residual, and manual accounting.
+RP1's separate RF clock retains the direct PIO measurement path.
 
-The following requirements govern acceptance and any later capture adapter.
-The independent RF campaign must satisfy its declared cases before the
-punchlist can mark this feature complete:
+The RP1 capture and independent RF acceptance requirements are:
 
 1. **Reference and capture identity:** exact receiver/GPSDO, lock/status evidence,
    PPS routing/level, RF parent/derivative and divider ratio, counter width,

@@ -16,8 +16,9 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    including desktop and mobile workflows. Record findings and the validation
    required for any resulting changes. This is a new review; prior Beta review
    acceptance remains bound to its recorded implementation.
-2. ⏳ **Direct PPS frequency calibration.** RP1 work is complete; standard
-   GPIO/mailbox backend support remains in progress.
+2. ✅ **Direct PPS frequency calibration.** RP1 direct capture is complete.
+   Pi 1–4 use the existing Chrony host-frequency estimate; optional GPS/PPS
+   improves that estimate at the OS level, without application PPS capture.
    Optional Pi 5/RP1 input-only
    GPIO17 capture replaces the host-rate proxy, with bounded qualification,
    per-job correction, residual adjustment, and manual fallback. Thirty
@@ -80,17 +81,14 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    covers independent valid-field saves, incomplete progress, explicit
    application, and uncertain-save recovery. The historical P15.14
    documentation reference was superseded by P15.20 numbering.
-10. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
+10. ⏳ **Review and Streamline CI.**
+11. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
-11. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
+12. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
+   published RP1-GPCLK-DKMS release, update the pinned consumer integration
+   where needed, and validate the selected release before the next WsprryPi beta.
+13. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
-12. ▧ **Post-4.0: [#333 — Research Spike: Advanced Scheduling](https://github.com/WsprryPi/WsprryPi/issues/333).**
-   Follows #419.
-13. ▧ **Post-4.0: [#444 — Track Standard Feld-Hell implementation and qualification](https://github.com/WsprryPi/WsprryPi/issues/444).**
-    Follows #333. Includes its separate Si5351 implementation and qualification
-    phase and two optional test cleanups.
-14. ▧ **Deferred beyond 4.0: Custom-domain TLS.** Address the separate
-    documentation custom-domain TLS follow-up.
 
 ## Final 4.0 stable release gate
 

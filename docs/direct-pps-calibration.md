@@ -6,6 +6,22 @@ host-frequency estimate. Chrony remains the UTC authority. Pi 1–4, Si5351,
 outbound WTP, symbol timing, alternative parents, and new GPIO routing are
 outside this adapter's measurement scope.
 
+## Pi 1–4 host-clock calibration
+
+Pi 1–4 GPIO RF parents derive from the main SoC oscillator shared with host
+timing. The existing system-clock estimate applies Chrony's measured host-rate
+error to the RF frequency model. WsprryPi does not implement direct GPIO PPS
+capture for these hosts, and PPS hardware is not required for this mechanism.
+
+GPS/PPS can improve the operating system's reference. Linux/GPS services and
+Chrony own its capture, configuration, and clock discipline; WsprryPi consumes
+Chrony's frequency estimate when **System clock estimate** is enabled. Chrony
+can also use network time sources. UTC synchronization and RF correction remain
+separate: WsprryPi applies the estimate to its RF model, rather than relying on
+Chrony to adjust the RF output. Residual and manual correction retain their
+existing meanings. RP1's separate RF clock requires its own optional direct
+measurement, described below.
+
 ## Reference and clock identity
 
 The implemented input is Linux `pps0`, named `pps@11.-1`, on GPIO17. The
