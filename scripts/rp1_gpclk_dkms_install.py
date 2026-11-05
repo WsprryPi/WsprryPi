@@ -34,7 +34,10 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
 
-REPOSITORY = "WsprryPi/RP1-GPCLK-DKMS"
+LEGACY_REPOSITORY = "WsprryPi/RP1-GPCLK-DKMS"
+MIGRATION_REPOSITORY = "WsprryPi/RP1-DKMS"
+SUPPORTED_REPOSITORIES = (LEGACY_REPOSITORY, MIGRATION_REPOSITORY)
+REPOSITORY = LEGACY_REPOSITORY
 REPOSITORY_URL = "https://github.com/WsprryPi/RP1-GPCLK-DKMS.git"
 API_BASE = f"https://api.github.com/repos/{REPOSITORY}"
 MANIFEST_NAME = "rp1-gpclk-dkms-installation-manifest-v1.json"
@@ -152,16 +155,25 @@ def json_result(result: CommandResult, operation: str) -> dict[str, Any]:
 def parse_semver(tag: str) -> tuple[int, int, int]:
     match = SEMVER.fullmatch(tag)
     if not match:
-        raise ContractError(f"release tag is not an immutable semantic version: {tag!r}")
+        raise ContractError(f"release tag is not a semantic version: {tag!r}")
     return tuple(int(match.group(index)) for index in range(1, 4))
+
+
+def configure_provider_repository(repository: str) -> None:
+    """Select one explicit authority for this invocation; never fall back."""
+    require(repository in SUPPORTED_REPOSITORIES, "provider repository is not allowlisted")
+    global REPOSITORY, REPOSITORY_URL, API_BASE
+    REPOSITORY = repository
+    REPOSITORY_URL = f"https://github.com/{repository}.git"
+    API_BASE = f"https://api.github.com/repos/{repository}"
 
 
 def normalize_repository_url(url: str) -> str:
     if url in {
         REPOSITORY_URL,
-        "https://github.com/WsprryPi/RP1-GPCLK-DKMS",
-        "git@github.com:WsprryPi/RP1-GPCLK-DKMS.git",
-        "ssh://git@github.com/WsprryPi/RP1-GPCLK-DKMS.git",
+        f"https://github.com/{REPOSITORY}",
+        f"git@github.com:{REPOSITORY}.git",
+        f"ssh://git@github.com/{REPOSITORY}.git",
     }:
         return REPOSITORY_URL
     return url
@@ -322,8 +334,6 @@ def release_assets(release: Mapping[str, Any]) -> dict[str, str]:
 def release_candidate(release: Mapping[str, Any]) -> bool:
     if release.get("draft") is not False or release.get("prerelease") is not False:
         return False
-    if release.get("immutable") is not True:
-        return False
     if not isinstance(release.get("published_at"), str) or not release.get("published_at"):
         return False
     tag = release.get("tag_name")
@@ -377,7 +387,7 @@ def validate_manifest(manifest: Any, *, tag: str, tag_commit: str) -> dict[str, 
     require(manifest["schema"] == MANIFEST_SCHEMA and type(manifest["schemaVersion"]) is int and manifest["schemaVersion"] == 1, "unsupported installation manifest schema")
     require(manifest["repository"] == REPOSITORY, "installation manifest repository substitution")
     require(manifest["releaseTag"] == tag, "manifest release tag differs from selected release")
-    require(manifest["sourceCommit"] == tag_commit and SHA40.fullmatch(tag_commit) is not None, "manifest source commit differs from immutable tag commit")
+    require(manifest["sourceCommit"] == tag_commit and SHA40.fullmatch(tag_commit) is not None, "manifest source commit differs from resolved tag commit")
     version = tag.removeprefix("v")
     require(manifest["productVersion"] == version, "manifest product version differs from release tag")
     require(isinstance(manifest["debianVersion"], str) and SAFE_VERSION.fullmatch(manifest["debianVersion"]), "manifest Debian version is invalid")
@@ -686,6 +696,29 @@ def require_compatible_runtime_source(
     source: pathlib.Path, commit: str, runner: Runner
 ) -> None:
     require(SHA40.fullmatch(commit) is not None, "selected runtime source commit is invalid")
+    if REPOSITORY == MIGRATION_REPOSITORY:
+        # Fresh provider history cannot contain the predecessor's ancestry gate.
+        # Bind the declared protocols to the selected exact commit, then retain
+        # the existing source inventory, capability, and runtime identity checks.
+        raw = git_output(runner, source, "show", commit + ":release/wsprrypi-consumer-contract.json")
+        require(len(raw.encode("utf-8")) <= MAX_METADATA_BYTES, "provider contract exceeds bound")
+        def unique_fields(pairs):
+            result = {}
+            for key, value in pairs:
+                require(key not in result, "provider consumer contract has duplicate fields")
+                result[key] = value
+            return result
+        try:
+            contract = json.loads(raw, object_pairs_hook=unique_fields)
+        except (ValueError, TypeError) as error:
+            raise ContractError("provider consumer contract is malformed") from error
+        require(isinstance(contract, dict) and
+                contract.get("providerRepository") == MIGRATION_REPOSITORY and
+                contract.get("runtimeBinding") == RUNTIME_BINDING_CONTRACT and
+                contract.get("runtimeReadiness") == RUNTIME_READINESS_CONTRACT and
+                contract.get("runtimeUpdate") == RUNTIME_UPDATE_CONTRACT,
+                "provider consumer runtime contract differs")
+        return
     available = runner.run(
         ["git", "-C", str(source), "cat-file", "-e", f"{CORRECTED_RUNTIME_COMMIT}^{{commit}}"],
         check=False,
@@ -1168,6 +1201,7 @@ def recover_pending_removal(path: pathlib.Path) -> bool:
 
 def render_plan(plan: Mapping[str, Any]) -> None:
     print("RP1-GPCLK-DKMS installation plan")
+    print(f"  Provider repository: {REPOSITORY}")
     print(f"  WsprryPi source channel: {plan['wsprryChannel']}")
     print(f"  Installation decision: {'install' if plan['decision']['install'] else 'skip'} ({plan['decision']['reason']})")
     print(f"  Detected platform: {plan['platform']['model']} [{plan['platform']['classification']}]")
@@ -1208,6 +1242,8 @@ def prepare(args: argparse.Namespace, runner: Runner) -> dict[str, Any]:
         "platform": detected, "decision": decision, "requestedSource": args.source,
         "resolved": None, "dryRun": args.dry_run,
     }
+    if REPOSITORY != LEGACY_REPOSITORY:
+        plan["providerRepository"] = REPOSITORY
     if decision["install"]:
         residue = runtime_residue_inventory(pathlib.Path("/"))
         if residue:
@@ -2226,6 +2262,8 @@ def load_plan(state_dir: pathlib.Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as error:
         raise ContractError("prepared plan is unreadable") from error
     require(isinstance(plan, dict) and plan.get("schema") == STATE_SCHEMA, "prepared plan schema is invalid")
+    require(plan.get("providerRepository", LEGACY_REPOSITORY) == REPOSITORY,
+            "prepared plan provider repository differs from the explicit selection")
     return plan
 
 
@@ -2240,6 +2278,7 @@ def runtime_product_version(resolved: Mapping[str, Any]) -> str:
 
 # Must match Rp1GpclkConsumerContract; checked against the C++ authority in tests.
 CONSUMER_PROVIDER_VERSION = "1.0.1"
+MIGRATION_PROVIDER_VERSION = "0.99.0"
 
 
 def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:
@@ -2247,9 +2286,10 @@ def validate_consumer_provider(resolved: Mapping[str, Any]) -> None:
     if resolved["channel"] == "release":
         require(isinstance(resolved.get("manifest"), dict), "prepared release manifest is not an object")
     version = runtime_product_version(resolved)
-    require(version == CONSUMER_PROVIDER_VERSION,
+    expected = MIGRATION_PROVIDER_VERSION if REPOSITORY == MIGRATION_REPOSITORY else CONSUMER_PROVIDER_VERSION
+    require(version == expected,
             f"selected RP1 provider {version} is not accepted by this WsprryPi "
-            f"(requires {CONSUMER_PROVIDER_VERSION}); update the application/provider "
+            f"(requires {expected}); update the application/provider "
             "selection before changing the installed runtime")
 
 
@@ -2848,6 +2888,9 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
+    result.add_argument("--provider-repository", choices=SUPPORTED_REPOSITORIES,
+                        default=LEGACY_REPOSITORY,
+                        help="explicit provider authority; RP1-DKMS is opt-in development support")
     sub = result.add_subparsers(dest="command", required=True)
     prepare_parser = sub.add_parser("prepare")
     prepare_parser.add_argument("--state-dir", type=pathlib.Path, required=True)
@@ -2885,7 +2928,9 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
+    previous_repository = REPOSITORY
     try:
+        configure_provider_repository(args.provider_repository)
         if args.command == "prepare":
             prepare(args, Runner(args.debug))
         elif args.command == "apply":
@@ -2899,6 +2944,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ContractError as error:
         print(f"RP1-GPCLK-DKMS operation refused: {error}", file=sys.stderr)
         return 1
+    finally:
+        configure_provider_repository(previous_repository)
     return 0
 
 

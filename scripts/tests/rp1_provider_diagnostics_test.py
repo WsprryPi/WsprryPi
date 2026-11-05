@@ -41,6 +41,10 @@ class Tests(unittest.TestCase):
                                 value['compatibilityIdentities']['gpio20'])
 
     def test_invalid_identity_never_becomes_free_text(self):
+        value = self.record(); value['repository'] = 'WsprryPi/RP1-DKMS'
+        self.assertEqual(scope['summarize'](value)['status'], 'recorded-only')
+        value['repository'] = 'attacker/provider'
+        with self.assertRaises(ValueError): scope['summarize'](value)
         for field, bad in (('sourceCommit', 'NEVER EXPOSE'), ('qualificationClaim', True),
                            ('channel', 'candidate'), ('manifest', [])):
             value = self.record(); value[field] = bad

@@ -360,7 +360,7 @@ def pairs(items):
 
 def summarize(value):
     if (not isinstance(value, dict) or value.get('owner') != 'WsprryPi' or
-        value.get('repository') != 'WsprryPi/RP1-GPCLK-DKMS' or
+        value.get('repository') not in ('WsprryPi/RP1-GPCLK-DKMS', 'WsprryPi/RP1-DKMS') or
         value.get('schema') not in ('wsprrypi-rp1-gpclk-dkms-ownership-v2',
                                    'wsprrypi-rp1-gpclk-dkms-ownership-v3') or
         value.get('channel') not in ('development', 'release') or

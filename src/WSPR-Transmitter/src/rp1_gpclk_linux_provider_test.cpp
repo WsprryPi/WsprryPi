@@ -272,6 +272,31 @@ void test_acquire_submit_state_stop_release()
         "release must expose closed local endpoint and cleared local lease");
 }
 
+void test_migration_identity_pairs()
+{
+    for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
+        Io io;
+        io.query.route = io.snapshot.route = route;
+        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.99.0-rp1-gpio4" : "v0.99.0-rp1-gpio20";
+        std::strcpy(io.query.build_id, "0.99.0");
+        std::strcpy(io.snapshot.build_id, "0.99.0");
+        std::strcpy(io.query.compatibility_id, identity);
+        std::strcpy(io.snapshot.compatibility_id, identity);
+        wsprrypi::Rp1GpclkLinuxProvider provider(io);
+        wsprrypi::Rp1GpclkProviderIdentity observed;
+        std::string error;
+        expect(provider.query(route, kRequired, true, observed, error),
+               "explicit migration identity must retain canonical UAPI behavior on each route");
+        std::strcpy(io.query.build_id, "1.0.1");
+        expect(!provider.query(route, kRequired, true, observed, error),
+               "migration route identity cannot be paired with the old module version");
+        std::strcpy(io.query.build_id, "0.99.0");
+        std::strcpy(io.query.compatibility_id, route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.99.0-rp1-gpio20" : "v0.99.0-rp1-gpio4");
+        expect(!provider.query(route, kRequired, true, observed, error),
+               "migration route substitution must fail closed");
+    }
+}
+
 void test_exact_route_version_and_state_rejections()
 {
     for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
@@ -346,6 +371,7 @@ int main()
 {
     test_query_and_readiness();
     test_acquire_submit_state_stop_release();
+    test_migration_identity_pairs();
     test_exact_route_version_and_state_rejections();
     test_fail_closed_acquire_and_snapshot();
     if (failures) return 1;

@@ -164,8 +164,14 @@ class Tests(unittest.TestCase):
         self.assertTrue(result['publicationVerified'])
         self.assertTrue(result['productionSelectable'])
         client.json.assert_called_once_with(A.installer.API_BASE + '/releases/tags/v1.0.1')
+        for flag in (False, None):
+            ordinary = self.publication()
+            if flag is None: ordinary.pop('immutable')
+            else: ordinary['immutable'] = flag
+            client.json.return_value = ordinary
+            self.assertTrue(A.validate_publication(client, self.lock)['publicationVerified'])
         mutations = [lambda x: x.update(draft=True), lambda x: x.update(prerelease=True),
-            lambda x: x.update(immutable=False), lambda x: x.update(published_at=None),
+            lambda x: x.update(published_at=None),
             lambda x: x.update(tag_name='v1.0.0'), lambda x: x.update(html_url='https://example.invalid'),
             lambda x: x['assets'].pop(),
             lambda x: x['assets'][0].update(digest='sha256:' + '0'*64),

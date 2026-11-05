@@ -157,9 +157,9 @@ bool Rp1GpclkLinuxProvider::queryOpen(
     {
         error = "RP1 GPCLK provider returned an empty or unterminated identity."; return false;
     }
+    const auto compatibility = Rp1GpclkConsumerContract::compatibility(identity.route, identity.build_id);
     if (identity.module_id != Rp1GpclkConsumerContract::module ||
-        identity.build_id != Rp1GpclkConsumerContract::version ||
-        identity.compatibility_id != Rp1GpclkConsumerContract::compatibility(identity.route)) {
+        compatibility.empty() || identity.compatibility_id != compatibility) {
         error = "RP1 GPCLK module/version/route compatibility identity is not accepted.";
         return false;
     }

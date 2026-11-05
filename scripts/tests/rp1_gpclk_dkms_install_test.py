@@ -213,6 +213,96 @@ class PlatformAndSelectionTests(RunnerFixtures, unittest.TestCase):
                 MOD.Runner().run(["apt-get", "install"], passthrough=True)
 
 
+class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
+    def setUp(self):
+        previous = MOD.REPOSITORY
+        self.addCleanup(MOD.configure_provider_repository, previous)
+
+    def select_new(self):
+        MOD.configure_provider_repository(MOD.MIGRATION_REPOSITORY)
+
+    def test_default_and_explicit_authority_are_separate(self):
+        parsed = MOD.parser().parse_args(["remove"])
+        self.assertEqual(parsed.provider_repository, MOD.LEGACY_REPOSITORY)
+        self.select_new()
+        self.assertEqual(MOD.normalize_repository_url("git@github.com:WsprryPi/RP1-DKMS.git"), MOD.REPOSITORY_URL)
+        self.assertNotEqual(MOD.normalize_repository_url("git@github.com:WsprryPi/RP1-GPCLK-DKMS.git"), MOD.REPOSITORY_URL)
+        with self.assertRaises(MOD.ContractError): MOD.configure_provider_repository("attacker/provider")
+
+    def test_original_ownership_is_preserved_under_new_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory).resolve()/"ownership.json"
+            record = development_record()
+            write_record(path, record)
+            original = path.read_bytes()
+            self.select_new()
+            value, identity, reason = MOD.load_ownership_record(path)
+            self.assertIsNone(value)
+            self.assertIsNone(identity)
+            self.assertIn("repository differs", reason)
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_version_selection_matches_both_cpp_identity_pairs(self):
+        source = (ROOT / 'src/WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp').read_text()
+        self.assertIn('migration_version = "' + MOD.MIGRATION_PROVIDER_VERSION + '"', source)
+        self.select_new()
+        MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
+        with self.assertRaises(MOD.ContractError):
+            MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.CONSUMER_PROVIDER_VERSION})
+        MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
+        with self.assertRaises(MOD.ContractError):
+            MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
+
+    def test_ordinary_releases_and_incomplete_inputs(self):
+        self.select_new()
+        for value in (None, False, True):
+            item = release("v1.0.0")
+            if value is None: item.pop("immutable")
+            else: item["immutable"] = value
+            self.assertTrue(MOD.release_candidate(item))
+        for item in (release("v1.0.0", draft=True), release("v1.0.0", prerelease=True),
+                     release("v1.0.0", complete=False)):
+            self.assertFalse(MOD.release_candidate(item))
+        with self.assertRaises(MOD.ContractError): MOD.select_release([])
+        duplicate = release("v1.0.0")
+        duplicate["assets"].append(duplicate["assets"][0])
+        with self.assertRaises(MOD.ContractError): MOD.release_candidate(duplicate)
+
+    def test_contract_replaces_old_ancestry_without_fallback(self):
+        self.select_new()
+        source = pathlib.Path("/fixture/source"); commit = "a"*40
+        command = ("git", "-C", str(source), "show", commit+":release/wsprrypi-consumer-contract.json")
+        good = {"providerRepository": MOD.MIGRATION_REPOSITORY,
+                "runtimeBinding": MOD.RUNTIME_BINDING_CONTRACT,
+                "runtimeReadiness": MOD.RUNTIME_READINESS_CONTRACT,
+                "runtimeUpdate": MOD.RUNTIME_UPDATE_CONTRACT}
+        runner = self.runner({command: MOD.CommandResult(json.dumps(good), "", 0)})
+        MOD.require_compatible_runtime_source(source, commit, runner)
+        for field in good:
+            changed = dict(good); changed[field] = "wrong"
+            runner = self.runner({command: MOD.CommandResult(json.dumps(changed), "", 0)})
+            with self.assertRaises(MOD.ContractError): MOD.require_compatible_runtime_source(source, commit, runner)
+        for raw in ("[]", "invalid", '{"runtimeBinding":"wrong","runtimeBinding":"rp1-gpclk-runtime-binding-v3"}'):
+            runner = self.runner({command: MOD.CommandResult(raw, "", 0)})
+            with self.assertRaises(MOD.ContractError): MOD.require_compatible_runtime_source(source, commit, runner)
+
+    def test_manifest_and_plan_cannot_cross_repository_authority(self):
+        self.select_new()
+        manifest = valid_manifest()
+        MOD.validate_manifest(manifest, tag="v2.1.0", tag_commit="a"*40)
+        manifest["repository"] = MOD.LEGACY_REPOSITORY
+        with self.assertRaises(MOD.ContractError): MOD.validate_manifest(manifest, tag="v2.1.0", tag_commit="a"*40)
+        with tempfile.TemporaryDirectory() as directory:
+            state = pathlib.Path(directory)
+            plan = {"schema": MOD.STATE_SCHEMA, "providerRepository": MOD.MIGRATION_REPOSITORY}
+            (state/"plan.json").write_text(json.dumps(plan))
+            self.assertEqual(MOD.load_plan(state), plan)
+            MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
+            with self.assertRaises(MOD.ContractError): MOD.load_plan(state)
+            plan.pop("providerRepository"); (state/"plan.json").write_text(json.dumps(plan))
+            self.assertEqual(MOD.load_plan(state), plan)
+
+
 class ReleaseTests(RunnerFixtures, unittest.TestCase):
     def test_release_resolution_binds_exact_runtime_source_checkout(self):
         package = b"fixture package"

@@ -79,18 +79,21 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 ## Published releases
 
-The immutable [RP1-GPCLK-DKMS v1.0.1 release](https://github.com/WsprryPi/RP1-GPCLK-DKMS/releases/tag/v1.0.1) is published at commit `b52ab7b796e44d8690b2a91bccb21ae5d8b670df` (module/DKMS `1.0.1`, Debian `1.0.1-1`). The transmitter adapter accepts its exact GPIO4/GPIO20 compatibility identities. Automatic selection consumes the newest eligible published release on every application branch. Explicit development selectors remain available for provider development. The selected module version and runtime compatibility identities must match the application consumer contract before installed runtime state is changed. An unavailable, incompatible, or corrupt selection fails closed without fallback.
-
-The [release lock and acceptance workflow](rp1-provider-acceptance.md) bind the published bytes. The compatibility manifest defaults to `Unavailable` with no qualified target entries. The application-bundled [qualification evidence](rp1-qualification-metadata.md) remains bound to `v1.0.0` and does not qualify this patch. Publication, reproducibility, and successful DKMS builds do not grant live eligibility or transmission authorization. Historical [application acceptance](../release_tools/4.0-Beta-1-Release-Evidence.md#october-19-item-10-reuse-matrix-and-remaining-gates) does not establish target installation/runtime acceptance for `v1.0.1`.
+The normal installer selects the newest eligible published release from
+`WsprryPi/RP1-GPCLK-DKMS`, subject to exact application compatibility. Explicit
+development source selection remains available. Ordinary releases do not require
+GitHub immutability. An unavailable, incompatible, or corrupt selection fails
+closed without fallback. Publication and builds establish no live eligibility.
+Existing application-bundled evidence remains bound to its original software.
 
 The normal installer migrates an attributable, unchanged predecessor through its owning cleanup-first workflow, including release version changes and changes between release and development providers. It verifies the candidate and retains the predecessor ownership record and exact recovery inputs under `/var/lib/wsprrypi/rp1-provider-migration.*` before runtime teardown. Release recovery includes the checksummed original Debian package; development recovery retains immutable copies of the original rollback receipt and entrypoint, alongside the retained upstream source evidence. The owning rollback may update its live receipt on completion; retry checks use the saved original. The installer removes the owned predecessor, verifies complete absence, then installs the selected candidate. It never replaces a different provider in place. Foreign files, modified ownership, an unavailable recovery package, or a failed cleanup stop migration. Only an empty runtime-owned service drop-in directory is retired after successful owning cleanup; foreign content is preserved. If interruption occurs after predecessor removal, a repeated installation revalidates the bound retained inputs and provider absence before retiring that empty directory and continuing. See the [RP1 dependency order](../release_tools/Release%20Punchlist.md#rp1-dependency-order).
 
-Release selection enumerates published, immutable, non-draft, non-prerelease
+Release selection enumerates published, non-draft, non-prerelease
 semantic versions rather than following a `latest` redirect. A candidate must provide
 exactly one Debian package plus `SHA256SUMS` and
 `rp1-gpclk-dkms-installation-manifest-v1.json`. The selected manifest binds:
 
-- repository, release tag, immutable tag commit, product and Debian versions,
+- repository, release tag, resolved tag commit, product and Debian versions,
   and release-channel classification;
 - package filename, package/DKMS/kernel-module identities, and package SHA-256;
 - installed UAPI path and SHA-256;
@@ -131,16 +134,16 @@ or supply a version to the upstream installer.
 
 The maintained exact-source installer must provide the explicit `runtime-controller` DKMS profile through a route-neutral installation without loading either module. A single DKMS instance owns the consumer and controller; WsprryPi verifies the returned exact commit, canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes, null route, and quiescent unowned state before recording success. Development provenance records version-derived GPIO4 and GPIO20 compatibility identities separately. The `1.0.1` identities are `v1.0.1-rp1-gpio4` and `v1.0.1-rp1-gpio20`. The historical `v0.9.0-pi5` value is accepted only as captured `0.9.0` predecessor removal authority. Exact commit, kernel, route, hashes, enrollment, and qualification remain separate facts.
 
-Runtime-capable source selection additionally requires commit
+Runtime-capable source from the legacy repository additionally requires commit
 `817f3dc6a194f4a92a7f94acf10147169e6439d6`, which provides the single-owner
 DKMS runtime-controller profile, binding version 3, and authenticated passive
 package preservation, interrupted inverse-deployment recovery, and owner/lease
 revocation after a successful owner-close drain, or a selected commit/tag
-whose Git history contains it. A development checkout or immutable release that
+whose Git history contains it. A legacy-repository development checkout or release that
 cannot prove that ancestry is rejected before provider mutation or runtime bundle
 creation.
 
-An upstream `devel` tip predating that minimum is refused. The published `1.0.1` source includes that lifecycle prerequisite; its immutable source and asset identities are selected independently. The separate [published-provider verification](rp1-provider-acceptance.md) command never installs a package or changes ordinary source selection.
+A legacy-repository `devel` tip predating that minimum is refused. Fresh RP1-DKMS history instead binds the supported runtime contracts to its selected source commit and retains independent inventory, identity, and capability checks. The separate [published-provider verification](rp1-provider-acceptance.md) command never installs a package or changes ordinary source selection.
 
 A repeated development installation is a no-op only when WsprryPi's existing
 v2 ownership record and the complete inactive provider inventory still match
@@ -398,3 +401,28 @@ sudo ACTION=uninstall REMOVE_RP1_GPCLK_DKMS=false ./scripts/install.sh
 standard command wrapper, does not start Python, and does not inspect or mutate
 provider or ownership state. Debug mode displays the exact `remove --debug`
 argv. No failure selects a fallback backend.
+
+## Explicit RP1-DKMS development authority
+
+The helper accepts `--provider-repository WsprryPi/RP1-DKMS` before its
+subcommand for explicit maintainer selection. The normal installer continues
+to select `WsprryPi/RP1-GPCLK-DKMS`; it does not discover or fall back to the
+new repository. Ordinary published non-draft/non-prerelease releases do not
+need a GitHub immutability flag. Exact source, package, checksums, UAPI,
+compatibility, runtime capabilities, and ownership checks remain required.
+
+The new selection accepts development identity `0.99.0`; the original selection
+retains `1.0.1`. The adapter accepts only the matching version and route pair,
+with unchanged UAPI and capability checks.
+
+Use the same explicit provider argument for every operation on a new-provider
+plan or ownership record. A plan prepared for one repository cannot be applied
+under the other selection. Existing ownership records retain their original
+repository and require their owning cleanup/removal; they are never renamed
+or adopted by selecting another repository. Fresh RP1-DKMS history proves its
+runtime protocol declarations and retains capability and source identity checks
+instead of depending on a commit from the predecessor's Git history.
+
+This development option does not authorize installation or change production
+selection. Production cutover follows a separately accepted release and user
+decision. Historical qualification bundles remain bound to their original source.
