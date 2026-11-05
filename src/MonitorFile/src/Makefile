@@ -30,13 +30,6 @@ DEPFILES := $(wildcard $(DEP_DIR)/**/*.d)
 # Compiler Executables
 CXX = g++
 
-# Allow threading using all available processors unless the caller already
-# supplied or inherited a parallel job setting.
-NPROCS := $(shell n=$$(getconf _NPROCESSORS_ONLN 2>/dev/null); if [ "$$n" -ge 1 ] 2>/dev/null; then echo "$$n"; else echo 1; fi)
-ifeq ($(filter -j%,$(MAKEFLAGS)),)
-MAKEFLAGS += -j$(NPROCS)
-endif
-
 # Compiler Flags
 #
 # Common flags for both C and C++ compilers

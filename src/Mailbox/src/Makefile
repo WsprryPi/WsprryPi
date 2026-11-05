@@ -93,13 +93,6 @@ DEPFILES := $(wildcard $(DEP_DIR)/**/*.d)
 CXX = g++
 CC = gcc
 
-# Allow threading using all available processors unless the caller already
-# supplied or inherited a parallel job setting.
-NPROCS := $(shell n=$$(getconf _NPROCESSORS_ONLN 2>/dev/null); if [ "$$n" -ge 1 ] 2>/dev/null; then echo "$$n"; else echo 1; fi)
-ifeq ($(filter -j%,$(MAKEFLAGS)),)
-MAKEFLAGS += -j$(NPROCS)
-endif
-
 # Detect compiler
 COMPILER := $(shell $(CXX) -v 2>&1 | grep -q "gcc" && echo gcc || echo clang)
 # Detect version of gcc

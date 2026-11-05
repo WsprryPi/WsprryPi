@@ -524,6 +524,9 @@ GPIOD_CPP_HEADER_AVAILABLE ?= $(shell printf '%s\n' '\#include <gpiod.hpp>' | $(
 # - Do not override an explicit -j passed to make
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Select a budget only at the CI boundary; ordinary builds leave GNU Make's
+# explicit/inherited jobserver intact and use its standard serial default.
+ifneq ($(filter ci-build-budget,$(MAKECMDGOALS)),)
 # Keep Linux's memory-aware sizing policy, but do not run Linux-only probes on
 # other hosts. Darwin supplies its logical CPU count through sysctl; unknown
 # hosts use the POSIX getconf interface when available. All non-Linux paths
@@ -564,6 +567,17 @@ else
 	JOBS_COMPUTED := $(NPROCS)
 endif
 
+# Bound automatic sizing even on hosts exposing many CPUs. Existing low-memory
+# limits still apply; explicit JOBS or command-line -j remain caller decisions.
+BUILD_JOB_LIMIT ?= 4
+ifneq ($(words $(BUILD_JOB_LIMIT)),1)
+$(error BUILD_JOB_LIMIT must be one integer from 1 through 4)
+endif
+ifneq ($(filter 1 2 3 4,$(BUILD_JOB_LIMIT)),$(BUILD_JOB_LIMIT))
+$(error BUILD_JOB_LIMIT must be one integer from 1 through 4)
+endif
+JOBS_COMPUTED := $(shell j=$(JOBS_COMPUTED); if [ $$j -gt $(BUILD_JOB_LIMIT) ]; then echo $(BUILD_JOB_LIMIT); else echo $$j; fi)
+
 # Allow users to override: JOBS=1 make ...
 JOBS ?= $(JOBS_COMPUTED)
 
@@ -591,12 +605,14 @@ ifeq ($(GUI_ACTIVE),yes)
 endif
 endif
 
-# Apply -j only if the user did not already specify one (e.g., make -j1).
-ifneq ($(filter -j%,$(MAKEFLAGS)),)
-# User already set -j in MAKEFLAGS/command line. Do not override.
-else
-MAKEFLAGS += -j$(JOBS)
 endif
+
+.PHONY: ci-build-budget
+ci-build-budget:
+	$(Q)test -n "$$GITHUB_ENV" || { echo "stage=build-budget; GITHUB_ENV is required" >&2; exit 1; }
+	$(Q)set -e; case $(call shell_quote,$(JOBS)) in 1|2|3|4) ;; *) echo "stage=build-budget; jobs must be 1 through 4" >&2; exit 1;; esac; \
+		printf 'MAKEFLAGS=-j%s\n' $(call shell_quote,$(JOBS)) >> "$$GITHUB_ENV"; \
+		printf 'CI build jobs: %s; processors: %s; available KiB: %s\n' $(call shell_quote,$(JOBS)) $(call shell_quote,$(NPROCS)) $(call shell_quote,$(MEM_AVAIL_KB))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # libgpiod flags and version detection (build-time define)
@@ -2040,26 +2056,34 @@ WTP_NETWORK_BUILD_DIR ?= build/wtp-network
 WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
 WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include -IWTP-Client/src $(OPENSSL_CFLAGS)
+include ../scripts/network_build_rules.mk
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
-wtp-config-cpp-test:
-	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_configuration_test.cpp WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
+wtp-config-cpp-test: $(NETWORK_BIN_DIR)/wtp_configuration_test
+	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
 
 wtp-config-test: wtp-config-cpp-test wtp-management-ui-test
 wtp-network-process-test:
 	$(Q)python3 -B tests/wtp_network_process_test.py
-wtp-api-cpp-test:
-	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_browser_api_test.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
+wtp-api-cpp-test: $(NETWORK_BIN_DIR)/wtp_browser_api_test
+	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_browser_api_test"
 
 wtp-api-test: wtp-api-cpp-test wtp-ui-test
-wtp-tls-build:
+wtp-tls-build: wtp-tls-probe-build wtp-network-client-build
+
+.PHONY: wtp-tls-probe-build wtp-network-client-build
+wtp-tls-probe-build: $(NETWORK_BIN_DIR)/wtp_tls_probe
 	$(Q)pkg-config --atleast-version=3.0 openssl || { echo "OpenSSL 3 development headers/libraries and pkg-config are required" >&2; exit 1; }
+	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_probe.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_probe.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_probe"
+
+wtp-network-client-build:
+	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_tls_probe.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_probe"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_network_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
 		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
@@ -2097,14 +2121,15 @@ wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)python3 -B tests/wtp_network_interop_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 
 .PHONY: wtp-tls-test
-wtp-tls-test: wtp-tls-build
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_tls_contract_test.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test"
+wtp-tls-test: wtp-tls-probe-build $(NETWORK_BIN_DIR)/wtp_tls_contract_test
+	$(Q)cp "$(NETWORK_BIN_DIR)/wtp_tls_contract_test" "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test"
 	$(Q)python3 -B tests/wtp_tls_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 
 .PHONY: wtp-plain-tcp-test
-wtp-plain-tcp-test:
-	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_plain_tcp_test.cpp wtp_integration/plain_tcp.cpp wtp_integration/tls.cpp $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test"
+wtp-plain-tcp-test: $(NETWORK_BIN_DIR)/wtp_plain_tcp_test
+	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test"
 
 .PHONY: wtp-network-runtime-test
@@ -2155,9 +2180,9 @@ test-tone-lifecycle-test: $(BIN_DIR)/test_tone_lifecycle_test
 	$(Q)python3 -c 'import subprocess; subprocess.run(["./$(BIN_DIR)/test_tone_lifecycle_test"], check=True, timeout=30)'
 
 .PHONY: wtp-usb-management-test
-wtp-usb-management-test:
-	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_usb_management_test.cpp wtp_integration/usb_management.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
+wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
+	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp"
+	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
 WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp

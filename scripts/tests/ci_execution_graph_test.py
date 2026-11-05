@@ -83,7 +83,7 @@ def make_goals(job):
             if words and words[0] == 'strace' and 'make' in words:
                 words = words[words.index('make'):]
             if words and words[0] == 'make':
-                goals += [word for word in words[1:] if word.endswith('-test') and '=' not in word]
+                goals += [word for word in words[1:] if (word.endswith('-test') or word == 'ci-build-budget') and '=' not in word]
     return collections.Counter(goals)
 
 
@@ -242,6 +242,12 @@ class SourceIdentityTests(unittest.TestCase):
                 self.assertNotIn('if', step, 'admitted carrier source gates must be unconditional')
                 self.assertFalse(step.get('continue-on-error', False))
             self.assertFalse(steps[checkout].get('continue-on-error', False))
+        for name in ('wtp-network-loopback','wtp-usb-management-pair','strict-i2c-profile',
+                     'ubuntu-gcc13-release','non-hardware-validation'):
+            self.assertEqual(make_goals(jobs[name])['ci-build-budget'],1,name)
+        for name in ('macos-simulated-profile','macos-si5351-profile'):
+            self.assertIn(shlex.split(jobs[name]['env']['MAKEFLAGS']),
+                [['-j2'],['-j','2'],['--jobs=2'],['--jobs','2']])
         goals = make_goals(jobs['non-hardware-validation'])
         for required in ('wtp-plan-test', 'wtp-fleet-test', 'wtp-production-cpp-test', 'wtp-api-cpp-test',
                          'wtp-config-cpp-test', 'ci-focused-state-test', 'ci-network-policy-test',
@@ -322,7 +328,10 @@ name.chmod(0o755)
         spy.chmod(0o755)
         for program in ('python3', 'bash'):
             (root / 'bin' / program).symlink_to(spy.name)
-        (root / 'Makefile').write_text('Q := @\nBIN_DIR := build/bin\nWTP_NETWORK_BUILD_DIR := build/network\nCXX := '+sys.executable+' '+str(spy)+' compiler\n'+phony+'\n'+rules)
+        # Only dispatch is replaced here; incremental compilation is independently
+        # exercised through the included production rules by network_build_test.py.
+        build = '\n$(NETWORK_BIN_DIR)/%:\n\t$(CXX) -o $@\n'
+        (root / 'Makefile').write_text('Q := @\nBIN_DIR := build/bin\nNETWORK_BIN_DIR := build/network/incremental/test/bin\nWTP_NETWORK_BUILD_DIR := build/network\nCXX := '+sys.executable+' '+str(spy)+' compiler\n'+phony+'\n'+rules+build)
         for target in targets[1:]: (root / target).touch()  # Existing same-name files cannot suppress public suites.
 
     def dispatch(self, goals, expected, **env):

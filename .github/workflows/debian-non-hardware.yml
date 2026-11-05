@@ -43,10 +43,12 @@ jobs:
       - name: Inspect the complete Git comparison
         id: classify
         run: python3 -B scripts/ci/change_scope.py
-      - name: Install workflow validation dependency
-        run: sudo apt-get update && sudo apt-get install -y python3-yaml
+      - name: Install workflow validation dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3-yaml build-essential pkg-config libssl-dev
       - name: Verify execution owners and source-selection refusals
         run: python3 -B scripts/tests/ci_execution_graph_test.py
+      - name: Verify incremental compilation and build failure recovery
+        run: python3 -B scripts/tests/network_build_test.py
       - name: Validate requested Pico ref
         if: steps.classify.outputs.run_full_ci != 'false' && github.event_name == 'workflow_dispatch'
         env:
@@ -67,6 +69,7 @@ jobs:
 
   macos-simulated-profile:
     env:
+      MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
@@ -125,6 +128,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     env:
+      MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
@@ -134,7 +138,7 @@ jobs:
           brew install openssl@4
           echo "PKG_CONFIG_PATH=$(brew --prefix openssl@4)/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: Build the explicit native physical profile without opening hardware
-        run: make -C src release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
+        run: make -j2 -C src release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
       - name: Exercise transport selection and scripted HID failures
         run: |
           python3 scripts/tests/si5351_transport_make_test.py
@@ -186,14 +190,18 @@ jobs:
           ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
           path: src/build/network-reference/mbedtls
           submodules: recursive
+      - name: Select bounded build budget
+        run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Parent TLS, shared API and actual Pico interoperability
         working-directory: src
         run: |
           make udp-logging-worker udp-logging-test SUDO=
           python3 -B ../scripts/tests/udp_log_control_test.py
+          make debug BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make production-browser-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= TEST_NETNS_RUNNER="sudo unshare --net"
           make tls-observer-test SUDO=
           make wtp-catalog-test SUDO=
+          make -j2 wtp-network-tools-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
@@ -263,6 +271,8 @@ jobs:
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/usb-reference/pico --check
+      - name: Select bounded build budget
+        run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Build actual production Pico USB endpoint without SDK or network
         run: |
           cmake -S src/build/usb-reference/pico -B src/build/usb-reference/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -296,6 +306,8 @@ jobs:
       - name: Trust checkout ownership
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Select bounded build budget
+        run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Build and audit strict Si5351 profile
         working-directory: src
         run: |
@@ -323,6 +335,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Select bounded build budget
+        run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Verify GCC 13 toolchain
         run: test "$(g++ -dumpversion | cut -d. -f1)" = 13
 
@@ -377,6 +391,8 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Select bounded build budget
+        run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Check bounded USB logging parser and policy
         working-directory: src
         run: make usb-logging-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -403,6 +419,7 @@ jobs:
         run: |
           make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test SUDO=
           make band-lookup-correlation-test wspr-band-catalog-test wspr-preset-catalog-response-test SUDO=
+          make -j2 wtp-network-unit-build SUDO=
           make wspr-tone-regression-test qrss-execution-regression-test wtp-config-cpp-test wtp-api-cpp-test SUDO=
       - name: Run parent semantics and cleanup lifecycle tests
         working-directory: src
@@ -499,12 +516,12 @@ jobs:
       - name: Run transmitter component contract regressions
         working-directory: src/WSPR-Transmitter/src
         run: |
-          make simulated-backend-test
-          make build/bin/simulated_transmit_backend_realtime_test
+          make -j2 simulated-backend-test
+          make -j2 build/bin/simulated_transmit_backend_realtime_test
           timeout 5s ./build/bin/simulated_transmit_backend_realtime_test
-          make transmission-controller-contract-test
-          make startup-quiesce-test
-          make si5351-transition-test
+          make -j2 transmission-controller-contract-test
+          make -j2 startup-quiesce-test
+          make -j2 si5351-transition-test
 
       - name: Build and test WSPR reference component
         working-directory: src/WSPR-Reference

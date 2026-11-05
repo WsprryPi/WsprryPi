@@ -6,8 +6,9 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
-import time
+import shlex
 from pathlib import Path
+from fixture_commands import run_shell
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,13 +27,8 @@ def run(*arguments: str, cwd: Path, expect: int = 0) -> subprocess.CompletedProc
     environment.pop("MAKELEVEL", None)
     environment.pop("BACKENDS", None)
     environment.pop("ANCILLARY_GPIO", None)
-    result = subprocess.run(
-        arguments,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        env=environment,
-    )
+    result = run_shell(shlex.join(arguments), cwd=cwd, env=environment,
+                       stage='backend-capability-build', watchdog=30)
     if result.returncode != expect:
         raise AssertionError(
             f"{' '.join(arguments)} returned {result.returncode}, expected {expect}; "
@@ -70,6 +66,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="wsprrypi-backend-make-") as temporary:
         fixture = Path(temporary)
         (fixture / "fixture.cpp").write_text("fixture\n", encoding="utf-8")
+        source_time = (fixture / "fixture.cpp").stat().st_mtime_ns-3_600_000_000_000
+        os.utime(fixture / "fixture.cpp", ns=(source_time,source_time))
         (fixture / "Makefile").write_text(makefile(), encoding="utf-8")
 
         first = run("make", "release", cwd=fixture)
@@ -84,12 +82,13 @@ def main() -> int:
         assert "compiled" not in same.stdout, same.stdout
         assert obj.stat().st_mtime_ns == first_object_time
 
-        time.sleep(1.1)
         header.touch()
+        old_object_time = header.stat().st_mtime_ns-2_000_000_000
+        os.utime(obj, ns=(old_object_time,old_object_time))
         refreshed = run("make", "release", cwd=fixture)
         assert "backend capabilities unchanged" in refreshed.stdout, refreshed.stdout
         assert "compiled" in refreshed.stdout, refreshed.stdout
-        assert obj.stat().st_mtime_ns > first_object_time
+        assert obj.stat().st_mtime_ns > old_object_time
 
         selected = run("make", "release", "BACKENDS=si5351", cwd=fixture)
         assert "backend capabilities updated" in selected.stdout, selected.stdout

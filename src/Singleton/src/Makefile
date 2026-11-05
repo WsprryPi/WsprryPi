@@ -33,9 +33,6 @@ TEST_DEP    = $(TEST_OBJ:.o=.d)
 # Define RM if not already set
 RM ?= rm -f
 
-# Ensure parallel compilation
-MAKEFLAGS += -j$(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
-
 # Build the test executable (Only compiles main.cpp)
 test: $(TEST_NAME)
 	@echo "Running $(TEST_NAME) with an available loopback UDP port."

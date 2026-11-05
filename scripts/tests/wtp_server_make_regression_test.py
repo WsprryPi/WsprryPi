@@ -4,7 +4,11 @@
 
 import os
 from pathlib import Path
-import subprocess
+import select
+import shlex
+import time
+from concurrent.futures import ThreadPoolExecutor
+from fixture_commands import run_shell
 import sys
 import tempfile
 
@@ -25,6 +29,8 @@ for target in (*targets, *builders):
 # an exclusive writer detects the concurrent archive replacement seen in CI.
 helper = r"""#!/usr/bin/env python3
 from pathlib import Path
+import os
+import select
 import sys
 import time
 root = Path(__file__).resolve().parent
@@ -42,7 +48,14 @@ if sys.argv[1] == 'archive':
     try:
         with (root / ('archive-builds-' + component)).open('a') as log:
             log.write('build\n')
-        time.sleep(0.2)
+        with open(os.environ['ARCHIVE_READY'], 'w') as ready:
+            ready.write(component+'\n')
+        started = time.monotonic()
+        with open(os.environ['ARCHIVE_RELEASE_'+component.upper()]) as release:
+            assert select.select([release], [], [], 20)[0], (
+                f'stage=archive-release; expected=controller acknowledgment; '
+                f'elapsed={time.monotonic()-started:.3f}s; hang_guard=20s')
+            assert release.read(1) == 'x', 'stage=archive-release; invalid acknowledgment'
         library.parent.mkdir(parents=True, exist_ok=True)
         library.write_text('complete')
     finally:
@@ -94,9 +107,48 @@ build/libwtp_{component}.a:
                     library.parent.mkdir(parents=True, exist_ok=True)
                     library.write_text("complete")
             for repeat in range(2):
-                result = subprocess.run(["make", f"-j{jobs}", *goals], cwd=root,
-                                        env=env, capture_output=True, text=True, timeout=20)
-                assert result.returncode == 0, (result.stdout, result.stderr)
+                ready = root/'ready'
+                ready.unlink(missing_ok=True)
+                os.mkfifo(ready)
+                rfd = os.open(ready,os.O_RDWR|os.O_NONBLOCK)
+                releases = {}
+                environment = env | {'ARCHIVE_READY':str(ready)}
+                for component in ('client','server'):
+                    release = root/('release-'+component)
+                    release.unlink(missing_ok=True)
+                    os.mkfifo(release)
+                    releases[component] = os.open(release,os.O_RDWR)
+                    environment['ARCHIVE_RELEASE_'+component.upper()] = str(release)
+                errors = []
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(run_shell, shlex.join(['make',f'-j{jobs}',*goals]),
+                        cwd=root,env=environment,stage='archive-build-and-consumers',watchdog=20)
+                    try:
+                        expected = set(('client','server'))-set(prebuilt) if repeat == 0 else set()
+                        entered = set()
+                        deadline = time.monotonic()+20
+                        while entered != expected:
+                            remaining = deadline-time.monotonic()
+                            assert remaining > 0 and select.select([rfd],[],[],remaining)[0], (
+                                f'stage=archive-entry; expected={expected}; entered={entered}; hang_guard=20s')
+                            observed = os.read(rfd,4096).decode().splitlines()
+                            assert not entered.intersection(observed), 'duplicate active archive writer'
+                            entered.update(observed)
+                            assert entered <= expected, ('unexpected archive build',entered,expected)
+                    except BaseException as error:
+                        errors.append(error)
+                    finally:
+                        for fd in releases.values(): os.write(fd,b'x')
+                    try:
+                        result = future.result(timeout=25)
+                        assert result.returncode == 0, (result.stdout,result.stderr)
+                    except BaseException as error:
+                        errors.append(error)
+                    finally:
+                        os.close(rfd)
+                        for fd in releases.values(): os.close(fd)
+                if errors:
+                    raise BaseExceptionGroup('archive fixture coordination/build failed',errors)
                 for component in ("client", "server"):
                     log = root / ("archive-builds-" + component)
                     builds = log.read_text().splitlines() if log.exists() else []
