@@ -48,6 +48,7 @@ class PreprocessedInput:
         except (ValueError,UnicodeError):
             self.qualified = False
             return
+        if name==str(Path.cwd())+'//': return  # GCC -g working-directory marker, not a header.
         if name in ('<built-in>','<command-line>','<command line>'):
             self.qualified = self.qualified and not Path(name).exists()
         elif len(self.files)<10000: self.files.add(name)

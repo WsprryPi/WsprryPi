@@ -1,0 +1,90 @@
+name: Temporary Phase 6 archive observation
+on:
+  push:
+    branches: [codex/ci-review-simplification]
+    paths: [.github/workflows/ci-archive-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  archive-observation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install the same build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+      - name: Identify selected tools
+        run: |
+          command -v ar c++ python3
+          readlink -f "$(command -v ar)"
+          sha256sum "$(command -v ar)"
+          timeout --signal=KILL 10 ar --version
+          c++ --version
+          python3 --version
+      - name: Observe existing archive timeout without tracing or retries
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import shlex
+          import subprocess
+          import sys
+          import unittest
+          sys.path.insert(0,'scripts/tests')
+          import network_build_test
+          original = subprocess.Popen
+          
+          def read(path, limit=4096):
+              descriptor = os.open(path,os.O_RDONLY|os.O_NONBLOCK)
+              try: return os.read(descriptor,limit).decode(errors='replace')
+              finally: os.close(descriptor)
+          
+          def snapshot(pid):
+              print('ARCHIVE_TIMEOUT_SNAPSHOT',pid,flush=True)
+              pending,seen = [pid],set()
+              while pending and len(seen)<16:
+                  current = pending.pop(0)
+                  if current in seen: continue
+                  seen.add(current)
+                  root = Path('/proc')/str(current)
+                  for name in ('comm','wchan','syscall','stat','cmdline'):
+                      try: print(current,name,read(root/name).replace('\0',' '),flush=True)
+                      except OSError as error: print(current,name,type(error).__name__,flush=True)
+                  try:
+                      status = read(root/'status')
+                      print(current,'status','; '.join(line for line in status.splitlines() if line.split(':')[0] in
+                          ('Name','State','Pid','PPid','Threads','SigPnd','ShdPnd','SigBlk','SigIgn','SigCgt')),flush=True)
+                      children = read(root/'task'/str(current)/'children')
+                      print(current,'children',children,flush=True)
+                      pending.extend(int(value) for value in children.split())
+                      print(current,'exe',os.readlink(root/'exe'),flush=True)
+                      for entry in sorted((root/'fd').iterdir(),key=lambda value:int(value.name))[:12]:
+                          print(current,'fd',entry.name,os.readlink(entry),flush=True)
+                      plugins = sorted({line.rsplit(None,1)[-1] for line in read(root/'maps',65536).splitlines()
+                          if any(word in line.lower() for word in ('bfd','llvm','gold','debuginfod','curl','lto'))})
+                      print(current,'plugins',plugins,flush=True)
+                  except OSError as error: print(current,'details',type(error).__name__,flush=True)
+          
+          class Observed:
+              def __init__(self, child): self.child = child
+              def __getattr__(self, name): return getattr(self.child,name)
+              def communicate(self,*args,**kwargs):
+                  try: return self.child.communicate(*args,**kwargs)
+                  except subprocess.TimeoutExpired:
+                      try: snapshot(self.child.pid)
+                      except BaseException as error: print('snapshot-error',type(error).__name__,flush=True)
+                      raise
+          
+          def launch(command,*args,**kwargs):
+              child = original(command,*args,**kwargs)
+              if isinstance(command,list) and command[:2]==['bash','-c']:
+                  words = shlex.split(command[2])
+                  if words and Path(words[0]).name=='ar': return Observed(child)
+              return child
+          
+          subprocess.Popen = launch
+          result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(network_build_test))
+          raise SystemExit(not result.wasSuccessful())
+          PY
