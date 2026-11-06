@@ -83,13 +83,13 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    documentation reference was superseded by P15.20 numbering.
 10. ✅ **Review and Streamline CI.** Required software coverage is retained; the 50% reduction objective was not achieved.
 11. ✅ **Review and Streamline Pico CI.**
-12. ✅ **Publish new RP1 beta.**
-13. ✅ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
-   beta under separate release authorization.
-14. ▧ **Ensure WsprryPi consumes the latest RP1 beta.** Verify the latest
-   published RP1-GPIO-CLK-DKMS beta, update the pinned consumer integration
-   where needed, and validate the selected beta before the next WsprryPi beta.
-15. ▧ **Ensure WsprryPi consumes the latest Pico devel.**
+12. ✅ **Publish new RP1 RC.**
+13. ✅ **Publish new Pico RC.** Prepare, validate, and publish the next Pico
+   RC under separate release authorization.
+14. ✅ **Ensure WsprryPi consumes the latest RP1 RC.** Verify the latest
+   published RP1-GPIO-CLK-DKMS RC, update the pinned consumer integration
+   where needed, and validate the selected RC before the next WsprryPi beta.
+15. ✅ **Ensure WsprryPi consumes the latest Pico devel.**
 16. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
 
