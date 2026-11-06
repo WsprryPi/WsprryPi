@@ -143,8 +143,7 @@ class Tests(unittest.TestCase):
     def test_owned_repository_drives_real_startup_validation_and_retries(self):
         installer = recovery.installer
         original = (installer.REPOSITORY, installer.REPOSITORY_URL, installer.API_BASE)
-        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),
-                                    (installer.LEGACY_REPOSITORY, '1.0.1')):
+        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),):
             for route in ('gpio4', 'gpio20'):
                 with self.subTest(repository=repository, route=route), \
                      self.installed_ownership(repository, version) as (record, path, unused, helper):
@@ -193,6 +192,7 @@ class Tests(unittest.TestCase):
         installer = recovery.installer
         cases = [
             ('attacker/provider', '0.0.1', None),
+            (installer.LEGACY_REPOSITORY, '1.0.1', None),
             (installer.MIGRATION_REPOSITORY, '0.99.0', None),
             (installer.MIGRATION_REPOSITORY, '1.0.1', None),
             (installer.MIGRATION_REPOSITORY, '1.0.2', None),
@@ -235,8 +235,7 @@ class Tests(unittest.TestCase):
 
     def test_release_ownership_uses_the_same_repository_version_boundary(self):
         installer = recovery.installer
-        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),
-                                    (installer.LEGACY_REPOSITORY, '1.0.1')):
+        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),):
             with self.subTest(repository=repository), \
                  self.installed_ownership(repository, version) as (development, path, unused, helper):
                 record = {name: development[name] for name in (

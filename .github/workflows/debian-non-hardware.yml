@@ -471,11 +471,11 @@ jobs:
           strace -f -e trace=openat,open -o /tmp/wsprrypi-installer.strace \
             make ci-installer-offline-test php2shell-test SUDO=
 
-      - name: Read-only published RP1 1.0.1 provider reference
+      - name: Read-only RP1-DKMS development reference
         uses: actions/checkout@v7
         with:
-          repository: WsprryPi/RP1-GPCLK-DKMS
-          ref: b52ab7b796e44d8690b2a91bccb21ae5d8b670df
+          repository: WsprryPi/RP1-DKMS
+          ref: 4509b48c1e17a2ce2e6296dc95cd3202b0bfe353
           path: src/build/rp1-provider-reference
           persist-credentials: false
 

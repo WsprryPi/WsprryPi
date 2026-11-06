@@ -43,8 +43,8 @@ struct Io final : wsprrypi::Rp1GpclkIo
         query.max_request_duration_ns = RP1_GPCLK_REQUEST_DURATION_NS_MAX;
         query.dma_chunk_duration_ns = RP1_GPCLK_DMA_CHUNK_DURATION_NS;
         std::strcpy(query.module_id, "rp1-gpclk-dkms");
-        std::strcpy(query.build_id, "1.0.1");
-        std::strcpy(query.compatibility_id, "v1.0.1-rp1-gpio4");
+        std::strcpy(query.build_id, "0.0.1");
+        std::strcpy(query.compatibility_id, "v0.0.1-rp1-gpio4");
 
         snapshot.header.size = sizeof(snapshot);
         snapshot.route = query.route;
@@ -272,7 +272,7 @@ void test_acquire_submit_state_stop_release()
         "release must expose closed local endpoint and cleared local lease");
 }
 
-void test_migration_identity_pairs()
+void test_current_identity_pairs()
 {
     for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
         Io io;
@@ -286,17 +286,22 @@ void test_migration_identity_pairs()
         wsprrypi::Rp1GpclkProviderIdentity observed;
         std::string error;
         expect(provider.query(route, kRequired, true, observed, error),
-               "explicit migration identity must retain canonical UAPI behavior on each route");
+               "current provider identity must retain canonical UAPI behavior on each route");
         std::strcpy(io.query.build_id, "1.0.1");
+        std::strcpy(io.query.compatibility_id,
+            route == RP1_GPCLK_ROUTE_GPIO4 ? "v1.0.1-rp1-gpio4" : "v1.0.1-rp1-gpio20");
         expect(!provider.query(route, kRequired, true, observed, error),
-               "migration route identity cannot be paired with the old module version");
+               "matching old module and route identities must still be rejected");
+        std::strcpy(io.query.compatibility_id, identity);
+        expect(!provider.query(route, kRequired, true, observed, error),
+               "current route identity cannot be paired with the old module version");
         std::strcpy(io.query.build_id, "0.99.0");
         expect(!provider.query(route, kRequired, true, observed, error),
                "superseded development version cannot use the current route identity");
         std::strcpy(io.query.build_id, "0.0.1");
         std::strcpy(io.query.compatibility_id, route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.0.1-rp1-gpio20" : "v0.0.1-rp1-gpio4");
         expect(!provider.query(route, kRequired, true, observed, error),
-               "migration route substitution must fail closed");
+               "current route substitution must fail closed");
     }
 }
 
@@ -305,7 +310,7 @@ void test_exact_route_version_and_state_rejections()
     for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
         Io io;
         io.query.route = io.snapshot.route = route;
-        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v1.0.1-rp1-gpio4" : "v1.0.1-rp1-gpio20";
+        const char* identity = route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.0.1-rp1-gpio4" : "v0.0.1-rp1-gpio20";
         std::strcpy(io.query.compatibility_id, identity);
         std::strcpy(io.snapshot.compatibility_id, identity);
         wsprrypi::Rp1GpclkLinuxProvider provider(io);
@@ -319,11 +324,11 @@ void test_exact_route_version_and_state_rejections()
             expect(!provider.query(route, kRequired, true, observed, error), "legacy or substituted route identity must be rejected");
         }
         std::strcpy(io.query.compatibility_id, identity);
-        for (const auto wrong : {"0.9.0", "1.0.0", "1.0.2"}) {
+        for (const auto wrong : {"0.9.0", "1.0.0", "1.0.1", "1.0.2"}) {
             std::strcpy(io.query.build_id, wrong);
             expect(!provider.query(route, kRequired, true, observed, error), "unselected module version must be rejected");
         }
-        std::strcpy(io.query.build_id, "1.0.1");
+        std::strcpy(io.query.build_id, "0.0.1");
         expect(provider.acquire(route, kRequired, error), "exact version and route restore acquisition");
         auto program = oneSecondProgram();
         expect(provider.submitEvents(program, error), "state rejection fixture submits");
@@ -374,7 +379,7 @@ int main()
 {
     test_query_and_readiness();
     test_acquire_submit_state_stop_release();
-    test_migration_identity_pairs();
+    test_current_identity_pairs();
     test_exact_route_version_and_state_rejections();
     test_fail_closed_acquire_and_snapshot();
     if (failures) return 1;

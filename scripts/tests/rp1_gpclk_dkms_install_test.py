@@ -90,6 +90,12 @@ def release(tag: str, *, draft: bool = False, prerelease: bool = False, complete
 
 
 class RunnerFixtures:
+    def setUp(self):
+        super().setUp()
+        # Historical fixtures explicitly select their recorded authority.
+        self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
+        MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
+
     def runner(self, responses=None, *, steps=()):
         runner = StrictCommands({key: value for key, value in (responses or {}).items()
                                  if (key.argv if isinstance(key, Command) else key) not in {step.argv for step in steps}},
@@ -215,6 +221,7 @@ class PlatformAndSelectionTests(RunnerFixtures, unittest.TestCase):
 
 class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         previous = MOD.REPOSITORY
         self.addCleanup(MOD.configure_provider_repository, previous)
 
@@ -223,7 +230,7 @@ class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
 
     def test_default_and_explicit_authority_are_separate(self):
         parsed = MOD.parser().parse_args(["remove"])
-        self.assertEqual(parsed.provider_repository, MOD.LEGACY_REPOSITORY)
+        self.assertEqual(parsed.provider_repository, MOD.MIGRATION_REPOSITORY)
         self.select_new()
         self.assertEqual(MOD.normalize_repository_url("git@github.com:WsprryPi/RP1-DKMS.git"), MOD.REPOSITORY_URL)
         self.assertNotEqual(MOD.normalize_repository_url("git@github.com:WsprryPi/RP1-GPCLK-DKMS.git"), MOD.REPOSITORY_URL)
@@ -242,21 +249,14 @@ class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
             self.assertIn("repository differs", reason)
             self.assertEqual(path.read_bytes(), original)
 
-    def test_version_selection_matches_both_cpp_identity_pairs(self):
+    def test_current_version_matches_cpp_and_rejects_previous_versions(self):
         source = (ROOT / 'src/WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp').read_text()
-        self.assertIn('migration_version = "' + MOD.MIGRATION_PROVIDER_VERSION + '"', source)
+        self.assertIn('version = "' + MOD.CONSUMER_PROVIDER_VERSION + '"', source)
         self.select_new()
-        MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
-        self.assertEqual(MOD.MIGRATION_PROVIDER_VERSION, '0.0.1')
+        MOD.validate_consumer_provider({'channel': 'development', 'version': '0.0.1'})
         for previous in ('0.99.0', '1.0.1', '1.0.2'):
             with self.assertRaises(MOD.ContractError):
                 MOD.validate_consumer_provider({'channel': 'development', 'version': previous})
-        with self.assertRaises(MOD.ContractError):
-            MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.CONSUMER_PROVIDER_VERSION})
-        MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
-        with self.assertRaises(MOD.ContractError):
-            MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.MIGRATION_PROVIDER_VERSION})
-        MOD.validate_consumer_provider({'channel': 'development', 'version': MOD.CONSUMER_PROVIDER_VERSION})
 
     def test_ordinary_releases_and_incomplete_inputs(self):
         self.select_new()
@@ -310,6 +310,68 @@ class MigrationRepositoryTests(RunnerFixtures, unittest.TestCase):
             with self.assertRaises(MOD.ContractError): MOD.load_plan(state)
             plan.pop("providerRepository"); (state/"plan.json").write_text(json.dumps(plan))
             self.assertEqual(MOD.load_plan(state), plan)
+
+
+class CurrentDefaultTests(unittest.TestCase):
+    def test_operational_cli_refuses_old_repository(self):
+        with mock.patch.object(MOD.sys, 'stderr', io.StringIO()), self.assertRaises(SystemExit) as stopped:
+            MOD.parser().parse_args(['--provider-repository', MOD.LEGACY_REPOSITORY, 'remove'])
+        self.assertEqual(stopped.exception.code, 2)
+
+    def test_default_development_install_resolves_new_repository_without_overrides(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state = pathlib.Path(raw).resolve()
+            state.chmod(0o700)
+            selected = {'channel': 'development', 'commit': 'a'*40, 'version': '0.0.1'}
+            with mock.patch.object(MOD, 'detect_platform', return_value={'automaticEligible': True}), \
+                 mock.patch.object(MOD, 'runtime_residue_inventory', return_value=[]), \
+                 mock.patch.object(MOD, 'prepare_development', return_value=selected) as source, \
+                 mock.patch.object(MOD, 'download_release') as release_download, \
+                 mock.patch.object(MOD, 'render_plan'):
+                self.assertEqual(MOD.main(['prepare', '--state-dir', str(state),
+                    '--wsprry-source', 'devel', '--install', 'true']), 0)
+            source.assert_called_once()
+            self.assertEqual(source.call_args.args[1:3], ('devel', None))
+            release_download.assert_not_called()
+            plan = MOD.load_plan(state)
+            self.assertEqual(plan['providerRepository'], MOD.MIGRATION_REPOSITORY)
+            self.assertEqual(plan['resolved'], selected)
+            self.assertEqual(MOD.REPOSITORY, MOD.MIGRATION_REPOSITORY)
+            self.assertEqual(MOD.REPOSITORY_URL, 'https://github.com/WsprryPi/RP1-DKMS.git')
+            self.assertEqual(MOD.source_selector('auto', 'production'), ('release', None))
+
+    def test_missing_production_release_does_not_fall_back_to_development(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state = pathlib.Path(raw).resolve()
+            state.chmod(0o700)
+            with mock.patch.object(MOD, 'detect_platform', return_value={'automaticEligible': True}), \
+                 mock.patch.object(MOD, 'runtime_residue_inventory', return_value=[]), \
+                 mock.patch.object(MOD, 'download_release', side_effect=MOD.ContractError('no eligible release')), \
+                 mock.patch.object(MOD, 'prepare_development') as source:
+                self.assertEqual(MOD.main(['prepare', '--state-dir', str(state),
+                    '--wsprry-source', 'main', '--install', 'true']), 1)
+            source.assert_not_called()
+            self.assertFalse((state/'plan.json').exists())
+
+    def test_old_provider_requires_manual_removal_without_adoption_or_recovery_retention(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state = pathlib.Path(raw).resolve()
+            state.chmod(0o700)
+            record = state/'old-ownership.json'
+            old = development_record('1.0.1')
+            old['repository'] = MOD.LEGACY_REPOSITORY
+            write_record(record, old)
+            original = record.read_bytes()
+            with mock.patch.object(MOD, 'detect_platform', return_value={'automaticEligible': True}), \
+                 mock.patch.object(MOD, 'runtime_residue_inventory', return_value=['old runtime']), \
+                 mock.patch.object(MOD, 'prepare_development') as source, \
+                 mock.patch.object(MOD, 'retain_provider_migration') as retain:
+                self.assertEqual(MOD.main(['prepare', '--state-dir', str(state),
+                    '--record', str(record), '--wsprry-source', 'devel', '--install', 'true']), 1)
+            source.assert_not_called()
+            retain.assert_not_called()
+            self.assertEqual(record.read_bytes(), original)
+            self.assertEqual(set(state.iterdir()), {record})
 
 
 class ReleaseTests(RunnerFixtures, unittest.TestCase):
@@ -499,6 +561,7 @@ class ArchiveTests(RunnerFixtures, unittest.TestCase):
 
 class CheckoutTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = pathlib.Path(self.temp.name).resolve() / "repo"
@@ -587,6 +650,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
         return root
 
     def setUp(self):
+        super().setUp()
         self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
         MOD.configure_provider_repository(MOD.MIGRATION_REPOSITORY)
         self.temp = tempfile.TemporaryDirectory()
@@ -1289,6 +1353,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
 
 class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = pathlib.Path(self.temp.name).resolve()
@@ -1892,8 +1957,8 @@ cleanup_rp1_gpclk_dkms_state
 [[ -z "$RP1_GPCLK_DKMS_STATE_DIR" && -z "$RP1_GPCLK_DKMS_HELPER" ]]
 '''
         for selector, branch, repository in (
-            ("release", "main", MOD.LEGACY_REPOSITORY),
-            ("devel", "codex/issue-412-test", MOD.LEGACY_REPOSITORY),
+            ("release", "main", MOD.MIGRATION_REPOSITORY),
+            ("devel", "codex/issue-412-test", MOD.MIGRATION_REPOSITORY),
             ("commit:" + "a"*40, "devel", MOD.MIGRATION_REPOSITORY),
         ):
             sentinel = self.root / f"{selector}.invoked"
@@ -2209,23 +2274,28 @@ ACTION=uninstall
 prepare_owned_rp1_gpclk_runtime_removal debug
 remove_owned_rp1_gpclk_dkms_provider debug
 '''
-        for repository in MOD.SUPPORTED_REPOSITORIES:
+        for repository in (None, MOD.MIGRATION_REPOSITORY):
             with self.subTest(repository=repository):
                 capture = self.root / 'repository-argv.txt'
                 capture.unlink(missing_ok=True)
+                environment = {**os.environ, 'INSTALL_SCRIPT': str(ROOT/'scripts/install.sh'),
+                               'CAPTURE': str(capture)}
+                if repository is None:
+                    environment.pop('RP1_GPCLK_DKMS_REPOSITORY', None)
+                else:
+                    environment['RP1_GPCLK_DKMS_REPOSITORY'] = repository
                 result = subprocess.run(['bash', '-c', shell], text=True, capture_output=True,
-                    env={**os.environ, 'INSTALL_SCRIPT': str(ROOT/'scripts/install.sh'),
-                         'CAPTURE': str(capture), 'RP1_GPCLK_DKMS_REPOSITORY': repository})
+                                        env=environment)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 calls = [line.split() for line in capture.read_text().splitlines()]
                 helpers = [args for args in calls if args[0].endswith('rp1_gpclk_dkms_install.py')]
                 self.assertEqual(len(helpers), 10)
                 for args in helpers:
-                    self.assertEqual(args[1:3], ['--provider-repository', repository])
+                    self.assertEqual(args[1:3], ['--provider-repository', MOD.MIGRATION_REPOSITORY])
                     self.assertIn('--debug', args)
                     # Parse actual shell arguments with the real helper CLI.
                     parsed = MOD.parser().parse_args(args[1:])
-                    self.assertEqual(parsed.provider_repository, repository)
+                    self.assertEqual(parsed.provider_repository, MOD.MIGRATION_REPOSITORY)
                 self.assertEqual([args[3] for args in helpers],
                     ['prepare', 'prepare-runtime-update', 'apply', 'activate-runtime']*2 +
                     ['prepare-runtime-removal', 'remove'])
@@ -2248,7 +2318,7 @@ ACTION=install DRY_RUN=false INSTALL_RP1_GPCLK_DKMS=true
             'prepare_rp1_gpclk_runtime_update', 'apply_rp1_gpclk_dkms_installation',
             'activate_rp1_gpclk_runtime_administration', 'prepare_owned_rp1_gpclk_runtime_removal',
             'remove_owned_rp1_gpclk_dkms_provider')
-        for repository in ('', 'attacker/provider', 'WsprryPi/RP1-DKMS;false'):
+        for repository in ('', MOD.LEGACY_REPOSITORY, 'attacker/provider', 'WsprryPi/RP1-DKMS;false'):
             for operation in operations:
                 with self.subTest(repository=repository, operation=operation):
                     capture = self.root / 'invalid-repository-effects'
@@ -2291,7 +2361,7 @@ cleanup_rp1_gpclk_dkms_state
         self.assertLessEqual(max(map(len, result.stdout.splitlines())), 80)
         helper = install_script.parent / "rp1_gpclk_dkms_install.py"
         self.assertIn(
-            f"Command: python3 {helper} --provider-repository WsprryPi/RP1-GPCLK-DKMS remove --remove auto --debug",
+            f"Command: python3 {helper} --provider-repository WsprryPi/RP1-DKMS remove --remove auto --debug",
             result.stderr,
         )
 
@@ -2662,6 +2732,7 @@ def release_record() -> dict[str, object]:
 
 class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.root = temporary_root(self, "rp1-removal-").resolve()
         self.record = self.root / "ownership.json"
 
@@ -2974,6 +3045,7 @@ class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
     # Reuse the existing strict ownership fixtures, not alternate production views.
 
     def setUp(self):
+        super().setUp()
         self.root = temporary_root(self, "rp1-migration-").resolve()
         self.record = self.root / "ownership.json"
         self.state = self.root / 'state'; self.state.mkdir(mode=0o700)
@@ -2991,11 +3063,10 @@ class InstallerMigrationTests(RunnerFixtures, unittest.TestCase):
         return MOD.parser().parse_args(['apply', '--state-dir', str(self.state),
                                       '--record', str(self.record), '--root', str(self.root)])
 
-    def test_consumer_version_matches_cpp_and_published_reference(self):
+    def test_consumer_version_matches_cpp_and_current_source(self):
         source = (ROOT / 'src/WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp').read_text()
         self.assertIn('version = "' + MOD.CONSUMER_PROVIDER_VERSION + '"', source)
-        lock = json.loads((ROOT / 'scripts/tests/fixtures/rp1-release-1.0.1.json').read_text())
-        self.assertEqual(lock['productVersion'], MOD.CONSUMER_PROVIDER_VERSION)
+        self.assertEqual(MOD.CONSUMER_PROVIDER_VERSION, '0.0.1')
 
     def test_explicit_development_remains_explicit(self):
         self.assertEqual(MOD.source_selector('auto', 'development'), ('release', None))

@@ -37,7 +37,7 @@ verify both advertisement and discovery after deployment.
 ## Route and startup lifecycle
 
 This companion implementation consumes the explicit
-`rp1-gpclk-route-manager-runtime` profile from RP1-GPCLK-DKMS. The
+`rp1-gpclk-route-manager-runtime` profile from RP1-DKMS. The
 packaged/source-development protocol remains separate. Unknown contracts fail
 closed; discovery of the runtime profile asserts the transmission inhibit. Explicit
 `idle` and `reconcile-output` requests establish runtime route readiness for

@@ -26,6 +26,8 @@ spec = importlib.util.spec_from_file_location("rp1_installer", ROOT / "scripts/r
 installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
 spec.loader.exec_module(installer)
+# This read-only fixture verifier remains bound to its recorded repository.
+installer.configure_provider_repository(installer.LEGACY_REPOSITORY)
 require = installer.require
 
 

@@ -47,9 +47,9 @@ public:
         identity.route=route;
         identity.compatibility_state=RP1_GPCLK_COMPAT_EXPERIMENTAL;
         identity.capabilities=capabilities; identity.module_id="rp1-gpclk-dkms";
-        identity.build_id="1.0.1";
+        identity.build_id="0.0.1";
         identity.compatibility_id=route==RP1_GPCLK_ROUTE_GPIO20
-            ? "v1.0.1-rp1-gpio20" : "v1.0.1-rp1-gpio4";
+            ? "v0.0.1-rp1-gpio20" : "v0.0.1-rp1-gpio4";
         return true;
     }
     bool acquire(std::uint32_t route, std::uint64_t capabilities,
@@ -137,9 +137,9 @@ wsprrypi::BackendExecutionInputs developmentInputs(int drive=2, int gpio=4)
         RP1_GPCLK_CAP_ROUTE_IDENTITY | RP1_GPCLK_CAP_COMPAT_IDENTITY |
         RP1_GPCLK_CAP_CLEANUP_FAULT_LATCH | RP1_GPCLK_CAP_OUTPUT_INHIBIT |
         RP1_GPCLK_CAP_PASSIVE_SNAPSHOT | RP1_GPCLK_CAP_BOUNDED_DMA_CHUNKS;
-    identity.module_id="rp1-gpclk-dkms"; identity.build_id="1.0.1";
+    identity.module_id="rp1-gpclk-dkms"; identity.build_id="0.0.1";
     identity.compatibility_id=gpio==20
-        ? "v1.0.1-rp1-gpio20" : "v1.0.1-rp1-gpio4";
+        ? "v0.0.1-rp1-gpio20" : "v0.0.1-rp1-gpio4";
     return inputs;
 }
 
@@ -709,7 +709,7 @@ int main()
     const auto operation_record=wsprrypi::rp1GpclkOperationRecordSnapshot();
     expect(operation_record.schema_version==2, "operation record schema must expose failure detail");
     expect(operation_record.operation_id=="test-operation", "operation record must preserve operation identity");
-    expect(operation_record.module_version=="1.0.1", "operation record must preserve module version");
+    expect(operation_record.module_version=="0.0.1", "operation record must preserve module version");
     expect(operation_record.route==RP1_GPCLK_ROUTE_GPIO4, "operation record must preserve route");
     expect(operation_record.generation==1, "operation record must preserve generation");
     expect(operation_record.state=="complete", "operation record must preserve terminal completion");

@@ -37,8 +37,8 @@ from typing import Any, Iterable, Mapping, Sequence
 LEGACY_REPOSITORY = "WsprryPi/RP1-GPCLK-DKMS"
 MIGRATION_REPOSITORY = "WsprryPi/RP1-DKMS"
 SUPPORTED_REPOSITORIES = (LEGACY_REPOSITORY, MIGRATION_REPOSITORY)
-REPOSITORY = LEGACY_REPOSITORY
-REPOSITORY_URL = "https://github.com/WsprryPi/RP1-GPCLK-DKMS.git"
+REPOSITORY = MIGRATION_REPOSITORY
+REPOSITORY_URL = f"https://github.com/{REPOSITORY}.git"
 API_BASE = f"https://api.github.com/repos/{REPOSITORY}"
 MANIFEST_NAME = "rp1-gpclk-dkms-installation-manifest-v1.json"
 CHECKSUMS_NAME = "SHA256SUMS"
@@ -305,6 +305,8 @@ def wsprry_channel(source: str) -> str:
 
 def source_selector(requested: str, channel: str) -> tuple[str, str | None]:
     if requested == "auto":
+        if REPOSITORY == MIGRATION_REPOSITORY and channel == "development":
+            return "devel", None
         return "release", None
     if requested in {"release", "devel"}:
         return requested, None
@@ -2279,8 +2281,7 @@ def runtime_product_version(resolved: Mapping[str, Any]) -> str:
 
 
 # Must match Rp1GpclkConsumerContract; checked against the C++ authority in tests.
-CONSUMER_PROVIDER_VERSION = "1.0.1"
-MIGRATION_PROVIDER_VERSION = "0.0.1"
+CONSUMER_PROVIDER_VERSION = "0.0.1"
 
 
 def validate_consumer_provider(resolved: Mapping[str, Any], *, repository: str | None = None) -> None:
@@ -2290,7 +2291,7 @@ def validate_consumer_provider(resolved: Mapping[str, Any], *, repository: str |
     if resolved["channel"] == "release":
         require(isinstance(resolved.get("manifest"), dict), "prepared release manifest is not an object")
     version = runtime_product_version(resolved)
-    expected = MIGRATION_PROVIDER_VERSION if authority == MIGRATION_REPOSITORY else CONSUMER_PROVIDER_VERSION
+    expected = CONSUMER_PROVIDER_VERSION
     require(version == expected,
             f"selected RP1 provider {version} is not accepted by this WsprryPi "
             f"(requires {expected}); update the application/provider "
@@ -2892,9 +2893,9 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("--provider-repository", choices=SUPPORTED_REPOSITORIES,
-                        default=LEGACY_REPOSITORY,
-                        help="explicit provider authority; RP1-DKMS is opt-in development support")
+    result.add_argument("--provider-repository", choices=(MIGRATION_REPOSITORY,),
+                        default=MIGRATION_REPOSITORY,
+                        help="provider authority; defaults to WsprryPi/RP1-DKMS")
     sub = result.add_subparsers(dest="command", required=True)
     prepare_parser = sub.add_parser("prepare")
     prepare_parser.add_argument("--state-dir", type=pathlib.Path, required=True)

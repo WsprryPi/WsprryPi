@@ -249,7 +249,7 @@ declare UI_PUBLICATION_REPORTED="false"
 declare UI_PUBLICATION_RESULT_FILE=""
 declare INSTALL_RP1_GPCLK_DKMS="${INSTALL_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_SOURCE="${RP1_GPCLK_DKMS_SOURCE:-auto}"
-declare RP1_GPCLK_DKMS_REPOSITORY="${RP1_GPCLK_DKMS_REPOSITORY-WsprryPi/RP1-GPCLK-DKMS}"
+declare RP1_GPCLK_DKMS_REPOSITORY="${RP1_GPCLK_DKMS_REPOSITORY-WsprryPi/RP1-DKMS}"
 declare REMOVE_RP1_GPCLK_DKMS="${REMOVE_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_STATE_DIR=""
 declare RP1_GPCLK_DKMS_HELPER=""
@@ -2432,9 +2432,9 @@ rp1_gpclk_dkms_installation_selected() {
 # Source selection remains independent; no alternate repository is discovered.
 validate_rp1_gpclk_repository() {
     case "$RP1_GPCLK_DKMS_REPOSITORY" in
-        WsprryPi/RP1-GPCLK-DKMS|WsprryPi/RP1-DKMS) return 0 ;;
+        WsprryPi/RP1-DKMS) return 0 ;;
         *)
-            warn "RP1_GPCLK_DKMS_REPOSITORY must be WsprryPi/RP1-GPCLK-DKMS or WsprryPi/RP1-DKMS."
+            warn "RP1_GPCLK_DKMS_REPOSITORY must be WsprryPi/RP1-DKMS."
             return 1
             ;;
     esac
