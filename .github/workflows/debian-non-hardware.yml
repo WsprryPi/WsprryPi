@@ -5,7 +5,7 @@ on:
     inputs:
       pico_ref:
         description: Pico source ref (defaults to the validated companion commit)
-        default: 4f3af134f128185ea199fad69ae8beb57be93984
+        default: 5b710871e9e3d991e435fea1c76e0540f6d0a278
         type: string
   pull_request:
     branches: [devel, main]
@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || '4f3af134f128185ea199fad69ae8beb57be93984' }}
+          ref: ${{ inputs.pico_ref || '5b710871e9e3d991e435fea1c76e0540f6d0a278' }}
           path: src/build/selected-pico
           persist-credentials: false
       - name: Record immutable Pico source
