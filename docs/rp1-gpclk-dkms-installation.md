@@ -344,6 +344,13 @@ completes and runtime readiness is reconciled.
 
 ## Ownership-aware uninstall
 
+When only a valid WsprryPi ownership record remains, uninstall verifies that
+the provider package, DKMS registration, modules, runtime files, overlays,
+and route configuration are absent, then retires the unchanged stale record.
+This requires neither the removed provider's runtime interface nor a manual
+RP1-removal override. Residual or uncertain provider state still requires the
+owning recovery workflow.
+
 Before WsprryPi application and service teardown, uninstall recovers an exact
 v3 neutral runtime while the recorded application instance still exists. If
 that pre-teardown recovery fails, uninstall stops before changing the

@@ -1311,14 +1311,18 @@ def runtime_residue_inventory(root: pathlib.Path) -> list[str]:
     return sorted(set(residue))
 
 
-def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
+def existing_inventory(root: pathlib.Path, runner: Runner, *, strict: bool = False) -> dict[str, Any]:
     package = runner.run(["dpkg-query", "-W", "-f=${Status}\n${Version}\n", PACKAGE_NAME], check=False)
+    if strict:
+        require(package.returncode in {0, 1}, "package inventory is unavailable")
     package_version = None
     if package.returncode == 0:
         lines = package.stdout.splitlines()
         require(len(lines) >= 2 and lines[0] == "install ok installed", "existing package state is ambiguous")
         package_version = lines[1]
     dkms = runner.run(["dkms", "status", "-m", DKMS_NAME], check=False)
+    if strict:
+        require(dkms.returncode == 0, "DKMS inventory is unavailable")
     modules_file = root_path(root, "/proc/modules")
     active = False
     active_controller = False
@@ -1334,8 +1338,10 @@ def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
     if modules_base.exists():
         module_candidates = sorted(str(path) for path in modules_base.glob("*/updates/dkms/rp1_gpclk_dkms.ko*"))
         controller_candidates = sorted(str(path) for path in modules_base.glob("*/updates/dkms/rp1_route_controller.ko*"))
-    enrollment = root_path(root, "/etc/rp1-gpclk-dkms/enrollment.json").exists()
-    manager = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d/90-source-development.conf").exists()
+    enrollment_path = root_path(root, "/etc/rp1-gpclk-dkms/enrollment.json")
+    enrollment = enrollment_path.exists() or enrollment_path.is_symlink()
+    manager_path = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d/90-source-development.conf")
+    manager = manager_path.exists() or manager_path.is_symlink()
     overlay_paths = [
         root_path(root, "/boot/firmware/overlays/rp1-gpclk-gpio4.dtbo"),
         root_path(root, "/boot/firmware/overlays/rp1-gpclk-gpio20.dtbo"),
@@ -1345,6 +1351,8 @@ def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
     overlays = sorted(str(path) for path in overlay_paths if path.exists() or path.is_symlink())
     configured = False
     for config in (root_path(root, "/boot/firmware/config.txt"), root_path(root, "/boot/config.txt")):
+        if strict:
+            require(not config.is_symlink(), "boot configuration inventory is ambiguous")
         if config.is_file() and not config.is_symlink():
             configured = configured or "dtoverlay=rp1-gpclk-" in config.read_text(errors="replace")
     return {
@@ -2148,7 +2156,7 @@ def validate_development_removal(
 
 
 def verify_provider_absent(root: pathlib.Path, runner: Runner) -> None:
-    inventory = existing_inventory(root, runner)
+    inventory = existing_inventory(root, runner, strict=True)
     require_no_runtime_residue(inventory, "provider absence verification")
     require(
         inventory["packageVersion"] is None
@@ -2770,6 +2778,19 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
     if record.get("schema") not in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}:
         print("No owned runtime administration requires preparation.")
         return
+    if args.command == "prepare-runtime-removal":
+        # A retained record alone does not prove that the provider still exists.
+        # Do not require its runtime API or saved rollback inputs to retire a
+        # record after complete absence has been independently verified.
+        try:
+            verify_provider_absent(args.root.resolve(strict=True), runner)
+        except (OSError, ContractError):
+            pass  # Partial or uncertain state still requires owning recovery.
+        else:
+            require_unchanged_ownership(args.record, record, identity, "stale ownership retirement")
+            remove_ownership_record(args.record, identity)
+            print("RP1-GPCLK-DKMS absent: stale ownership record retired; no runtime removal was required.")
+            return
     if resolved is not None:
         retain_provider_migration(args.record, record, resolved, runner)
     # v2 includes the interrupted window before the application recorded a
@@ -2916,6 +2937,7 @@ def parser() -> argparse.ArgumentParser:
     update_parser.add_argument("--record", type=pathlib.Path, default=pathlib.Path("/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"))
     update_parser.add_argument("--debug", action="store_true")
     removal_update_parser = sub.add_parser("prepare-runtime-removal")
+    removal_update_parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path("/"))
     removal_update_parser.add_argument("--record", type=pathlib.Path, default=pathlib.Path("/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"))
     removal_update_parser.add_argument("--debug", action="store_true")
     runtime_parser = sub.add_parser("activate-runtime")

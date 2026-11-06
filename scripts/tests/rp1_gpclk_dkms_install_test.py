@@ -2669,6 +2669,121 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
     def args(self):
         return MOD.parser().parse_args(["remove", "--record", str(self.record), "--root", str(self.root)])
 
+    def preparation_args(self):
+        return MOD.parser().parse_args([
+            "prepare-runtime-removal", "--record", str(self.record),
+            "--root", str(self.root),
+        ])
+
+    def absent_runner(self, *, package=None, dkms=None):
+        return self.runner({
+            ("dpkg-query", "-W", "-f=${Status}\n${Version}\n", MOD.PACKAGE_NAME):
+                package or MOD.CommandResult("", "not installed", 1),
+            ("dkms", "status", "-m", MOD.DKMS_NAME):
+                dkms or MOD.CommandResult("", "", 0),
+        })
+
+    def test_stale_owned_records_allow_both_uninstall_steps_without_provider(self):
+        for channel in ("release", "development"):
+            for schema in (MOD.RECORD_SCHEMA, MOD.RUNTIME_RECORD_SCHEMA):
+                with self.subTest(channel=channel, schema=schema):
+                    record = release_record() if channel == "release" else development_record()
+                    record["schema"] = schema
+                    if schema == MOD.RUNTIME_RECORD_SCHEMA:
+                        record["runtime"] = ApplyPolicyTests.runtime_update_record(self)["runtime"]
+                        record["runtime"]["productVersion"] = (
+                            record["manifest"]["productVersion"] if channel == "release"
+                            else record["productVersion"])
+                        version = record["runtime"]["productVersion"]
+                        record["runtime"]["compatibilityIdentities"] = {
+                            route: f"v{version}-rp1-{route}" for route in ("gpio4", "gpio20")
+                        }
+                    write_record(self.record, record)
+                    runner = self.absent_runner()
+                    output = io.StringIO()
+                    with mock.patch.object(MOD.sys, "stdout", output), \
+                         mock.patch.object(MOD, "remove_owned_runtime_for_fresh_activation") as runtime:
+                        MOD.prepare_runtime_update(self.preparation_args(), runner)
+                        self.assertFalse(self.record.exists())
+                        MOD.remove_owned_provider(self.args(), runner)
+                    runtime.assert_not_called()
+                    self.assertIn("stale ownership record retired", output.getvalue())
+                    self.assertIn("absent: no provider removal was required", output.getvalue())
+                    self.assertEqual(runner.passthrough_calls, [])
+
+    def test_partial_or_uncertain_provider_cannot_retire_stale_record(self):
+        cases = {
+            "package": {"package": MOD.CommandResult("install ok installed\n1.0.0\n", "", 0)},
+            "dkms": {"dkms": MOD.CommandResult("rp1-gpclk-dkms/1.0.0: added\n", "", 0)},
+            "package-error": {"package": MOD.CommandResult("", "query failed", 2)},
+            "dkms-error": {"dkms": MOD.CommandResult("", "query failed", 1)},
+        }
+        paths = (
+            "usr/lib/rp1-gpclk-dkms/runtime_provider.py",
+            "usr/src/rp1-gpclk-dkms-1.0.0/dkms.conf",
+            "lib/modules/fixture/updates/dkms/rp1_gpclk_dkms.ko",
+            "lib/modules/fixture/updates/dkms/rp1_route_controller.ko",
+            "boot/firmware/overlays/rp1-gpclk-gpio4.dtbo",
+            "boot/firmware/config.txt",
+            "etc/rp1-gpclk-dkms/enrollment.json",
+            "proc/modules",
+        )
+        cases.update({path: {} for path in paths})
+        for case, replies in cases.items():
+            with self.subTest(case=case):
+                path = self.root / case if case in paths else None
+                if path is not None:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("dtoverlay=rp1-gpclk-gpio4\nrp1_route_controller 0 0 - Live 0\n")
+                write_record(self.record, release_record())
+                original = self.record.read_bytes()
+                with mock.patch.object(MOD, "remove_owned_runtime_for_fresh_activation",
+                                       side_effect=MOD.ContractError("owning recovery required")) as runtime:
+                    with self.assertRaisesRegex(MOD.ContractError, "owning recovery required"):
+                        MOD.prepare_runtime_update(self.preparation_args(), self.absent_runner(**replies))
+                runtime.assert_called_once()
+                self.assertEqual(self.record.read_bytes(), original)
+                if path is not None:
+                    path.unlink()
+                    # Empty provider source directories also count as residue.
+                    if case.startswith("usr/src/"):
+                        path.parent.rmdir()
+
+    def test_stale_record_retirement_refuses_concurrent_ownership_change(self):
+        write_record(self.record, release_record())
+        changed = release_record()
+        changed["sourceCommit"] = "b" * 40
+        verify = MOD.verify_provider_absent
+
+        def replace_after_inventory(root, runner):
+            verify(root, runner)
+            write_record(self.record, changed)
+
+        with mock.patch.object(MOD, "verify_provider_absent", side_effect=replace_after_inventory):
+            with self.assertRaisesRegex(MOD.ContractError, "ownership changed"):
+                MOD.prepare_runtime_update(self.preparation_args(), self.absent_runner())
+        self.assertEqual(json.loads(self.record.read_bytes()), changed)
+
+    def test_dangling_provider_links_do_not_prove_absence(self):
+        for relative in (
+            "etc/rp1-gpclk-dkms/enrollment.json",
+            "etc/systemd/system/rp1-gpclk-route-manager@.service.d/90-source-development.conf",
+            "usr/lib/rp1-gpclk-dkms/runtime_provider.py",
+            "boot/firmware/config.txt",
+        ):
+            with self.subTest(path=relative):
+                path = self.root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.symlink_to("missing-target")
+                write_record(self.record, release_record())
+                with mock.patch.object(MOD, "remove_owned_runtime_for_fresh_activation",
+                                       side_effect=MOD.ContractError("owning recovery required")):
+                    with self.assertRaisesRegex(MOD.ContractError, "owning recovery required"):
+                        MOD.prepare_runtime_update(self.preparation_args(), self.absent_runner())
+                self.assertTrue(self.record.exists())
+                self.assertTrue(path.is_symlink())
+                path.unlink()
+
     def test_merged_usr_module_inventory_only_accepts_the_standard_alias(self):
         modules = self.root / "usr/lib/modules/fixture/updates/dkms"
         modules.mkdir(parents=True)
