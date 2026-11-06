@@ -120,6 +120,24 @@ class Tests(unittest.TestCase):
         for forbidden in ['runtime_source_identity','CONSUMER_PROVIDER_VERSION','def apply_development','def retain_provider_migration','ast.literal_eval']:
             self.assertNotIn(forbidden,source)
 
+    def test_canonical_repository_accepts_https_and_ssh_without_other_authorities(self):
+        for prefix in ['https://github.com/','ssh://git@github.com/','git@github.com:']:
+            for suffix in ['', '.git', '.git/']:
+                self.assertEqual(client.canonical_origin(prefix+client.REPOSITORY+suffix),client.REPOSITORY_URL)
+        for value in ['https://attacker.example/'+client.REPOSITORY,'git@github.com:foreign/RP1-DKMS.git',
+                      'https://github.com/'+client.REPOSITORY+'.git?redirect=evil','http://github.com/'+client.REPOSITORY]:
+            with self.assertRaises(client.ContractError):client.canonical_origin(value)
+
+    def test_actual_clean_ssh_origin_checkout_bootstraps_without_network(self):
+        provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-DKMS'))
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw).resolve();root.chmod(0o700);source=root/'source';state=root/'state';state.mkdir(mode=0o700)
+            subprocess.run(['git','clone','--no-local',str(provider),str(source)],check=True,capture_output=True)
+            subprocess.run(['git','-C',str(source),'remote','set-url','origin','git@github.com:'+client.REPOSITORY+'.git'],check=True)
+            entrypoint,selected=client.bootstrap(state,'checkout:'+str(source),'explicit-source')
+            self.assertTrue(entrypoint.is_file());self.assertEqual(selected,'checkout:'+str(state/'provider-source'))
+            self.assertEqual(client.run_git(source,'remote','get-url','origin'),'git@github.com:'+client.REPOSITORY+'.git')
+
     def test_real_provider_public_identity_satisfies_compiled_consumer(self):
         provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-DKMS'))
         p=subprocess.run([sys.executable,str(provider/'scripts/provider_lifecycle.py'),'identity'],capture_output=True,text=True,check=True)

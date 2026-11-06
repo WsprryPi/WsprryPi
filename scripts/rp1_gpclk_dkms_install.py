@@ -349,6 +349,15 @@ def fetch_json(url):
     return strict_json(data)
 
 
+def canonical_origin(value):
+    for prefix in ['https://github.com/','ssh://git@github.com/','git@github.com:']:
+        if value.startswith(prefix):
+            path=value[len(prefix):].removesuffix('/').removesuffix('.git')
+            require(path==REPOSITORY,'provider checkout authority differs')
+            return REPOSITORY_URL
+    raise ContractError('provider checkout authority differs')
+
+
 def bootstrap(state, selector, policy):
     if selector=='auto': selector='release' if policy=='production' else 'devel'
     selected=selector
@@ -373,7 +382,7 @@ def bootstrap(state, selector, policy):
     elif selector.startswith('checkout:'):
         source=pathlib.Path(selector[9:])
         require(source.is_absolute() and source.resolve()==source,'provider checkout must be canonical and absolute')
-        require(run_git(source,'remote','get-url','origin') in {REPOSITORY_URL,REPOSITORY_URL[:-4]},'provider checkout authority differs')
+        canonical_origin(run_git(source,'remote','get-url','origin'))
         require(not run_git(source,'status','--porcelain=v1','--untracked-files=all'),'provider checkout is dirty')
         require(not any(line and line[0] not in {'H','?'} for line in run_git(source,'ls-files','-v').splitlines()),
                 'provider checkout has hidden tracked-file state')
