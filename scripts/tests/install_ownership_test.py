@@ -24,7 +24,7 @@ class Tests(unittest.TestCase):
         owner.begin(self.root,self.source)
         self.write(owner.CODE,b'# new companion\n')
         self.write('/usr/local/etc/wsprrypi.ini',b'default')
-        self.write('/usr/local/etc/wsprrypi.ini.wtp-devices.json',b'{"version":1,"assignments":[],"removals":[]}')
+        self.write('/usr/local/etc/wsprrypi.ini.wtp-devices.json',b'{"version":1,"profiles":[]}')
         owner.complete(self.root)
     def test_fresh_then_repeat_then_remove_retires_owned_companion_and_sidecars(self):
         self.install();owner.begin(self.root,self.source)

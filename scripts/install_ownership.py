@@ -149,7 +149,7 @@ def remove(root):
         if item['kind']=='code' and modified:raise ValueError('modified application code retained: '+name)
         preserve=item['preserve'] or modified or (item['kind']=='backup' and value['protectBackups'])
         if item['kind']=='fleet':
-            try:preserve=preserve or json.loads(raw)!={'version':1,'assignments':[],'removals':[]}
+            try:preserve=preserve or json.loads(raw)!={'version':1,'profiles':[]}
             except ValueError:preserve=True
         if name=='/usr/local/lib/wsprrypi/.pico-usb.lock' and not preserve:
             # A held maintenance inode must remain stable for its other clients.
