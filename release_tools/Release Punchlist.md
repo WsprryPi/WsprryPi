@@ -90,7 +90,7 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    published RP1-GPIO-CLK-DKMS RC, update the pinned consumer integration
    where needed, and validate the selected RC before the next WsprryPi beta.
 15. ✅ **Ensure WsprryPi consumes the latest Pico devel.**
-16. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
+16. ⏳ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
 
 ## Final 4.0 stable release gate
