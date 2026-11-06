@@ -24,14 +24,9 @@ static tcp_pcb* listener;
 static std::vector<tcp_pcb*> clients;
 std::uint64_t time_us_64() {
     static const auto origin = std::chrono::steady_clock::now();
-    static const auto scale =
-        std::getenv("WSPRRY_NETWORK_TEST_TIME_SCALE")
-            ? std::strtoul(std::getenv("WSPRRY_NETWORK_TEST_TIME_SCALE"), nullptr, 10)
-            : 1;
     return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() -
                                                                  origin)
-               .count() *
-           scale;
+               .count();
 }
 extern "C" int mbedtls_hardware_poll(void*, unsigned char* output, std::size_t count,
                                      std::size_t* used) {

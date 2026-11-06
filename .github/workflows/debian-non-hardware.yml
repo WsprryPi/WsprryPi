@@ -253,8 +253,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: USB host-only build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential libssl-dev pkg-config cmake python3 nodejs
+      - name: Verify image-provided USB host tools
+        # The named hosted image provides CMake/Node outside dpkg. Installing
+        # duplicate distribution packages adds downloads without selecting them.
+        # Actual CMake/OpenSSL compilation and production tests remain below.
+        run: |
+          set -euo pipefail
+          for tool in cmake python3 node c++ make pkg-config; do
+            command -v "$tool"
+          done
+          cmake --version
+          python3 --version
+          node --version
+          c++ --version
+          make --version
+          pkg-config --modversion openssl
+          pkg-config --cflags --libs openssl
       - name: Require immutable Pico selection
         env:
           PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
