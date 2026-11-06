@@ -168,7 +168,7 @@ Use an identified Linux environment for C++ builds. The actual-pair runner build
 node WsprryPi-UI/tests/wtp_usb_pair_test.js   src/build/wtp-network/wtp_usb_pair_client /absolute/path/to/usb_management_driver
 ```
 
-This qualifies software interoperability, not Linux USB topology, electrical behavior, physical unplug/re-enumeration, AP advertising, RF or target timing. USB CI selects current Pico `devel` sources by default and accepts the explicit `pico_ref` dispatch override. The host-only endpoint build consumes that selected checkout; source revision and dirty state are diagnostic.
+This qualifies software interoperability, not Linux USB topology, electrical behavior, physical unplug/re-enumeration, AP advertising, RF or target timing. USB CI selects the validated Pico commit `4f3af134f128185ea199fad69ae8beb57be93984` by default and accepts the explicit `pico_ref` dispatch override. The host-only endpoint build consumes that selected checkout; source revision and dirty state are diagnostic.
 
 ## Related configuration
 
