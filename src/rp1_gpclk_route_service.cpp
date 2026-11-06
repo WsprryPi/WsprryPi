@@ -60,7 +60,7 @@ std::string ownedRuntimeBinding() {
   const auto record = nlohmann::json::parse(payload);
   if (!record.is_object() ||
       record.value("schema", std::string{}) !=
-          "wsprrypi-rp1-gpclk-dkms-ownership-v3" ||
+          "wsprrypi-rp1-gpclk-dkms-ownership-v1" ||
       record.value("repository", std::string{}) !=
           "WsprryPi/RP1-GPCLK-DKMS" ||
       record.value("owner", std::string{}) != "WsprryPi" ||

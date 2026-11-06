@@ -17,7 +17,7 @@ scope['OWNER_UID'] = os.geteuid()  # Internal fixture only, never a collector co
 
 class Tests(unittest.TestCase):
     def record(self, channel='development'):
-        return {'schema': 'wsprrypi-rp1-gpclk-dkms-ownership-v3',
+        return {'schema': 'wsprrypi-rp1-gpclk-dkms-ownership-v1',
                 'owner': 'WsprryPi', 'repository': 'WsprryPi/RP1-GPCLK-DKMS',
                 'channel': channel, 'sourceCommit': 'a'*40, 'productVersion': '1.0.0',
                 'sourceTree': 'b'*40, 'uapiSha256': 'c'*64, 'qualificationClaim': False,
@@ -45,7 +45,9 @@ class Tests(unittest.TestCase):
         self.assertEqual(scope['summarize'](value)['status'], 'recorded-only')
         value['repository'] = 'attacker/provider'
         with self.assertRaises(ValueError): scope['summarize'](value)
-        for field, bad in (('sourceCommit', 'NEVER EXPOSE'), ('qualificationClaim', True),
+        for field, bad in (('schema', 'wsprrypi-rp1-gpclk-dkms-ownership-v2'),
+                           ('schema', 'wsprrypi-rp1-gpclk-dkms-ownership-v3'),
+                           ('sourceCommit', 'NEVER EXPOSE'), ('qualificationClaim', True),
                            ('channel', 'candidate'), ('manifest', [])):
             value = self.record(); value[field] = bad
             with self.assertRaises(ValueError): scope['summarize'](value)

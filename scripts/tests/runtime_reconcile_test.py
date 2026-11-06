@@ -106,7 +106,7 @@ class Tests(unittest.TestCase):
                        'files': {str(helper): digest_bytes(helper.read_bytes())}, 'externalFiles': {}}
             binding_path.write_bytes(installer.canonical(binding))
             record = {
-                'schema': installer.RUNTIME_RECORD_SCHEMA, 'repository': repository,
+                'schema': installer.RECORD_SCHEMA, 'repository': repository,
                 'owner': 'WsprryPi', 'channel': 'development',
                 'installationMethod': 'upstream-development-rollback',
                 'sourceCommit': 'a'*40, 'productVersion': version, 'sourceTree': 'c'*40,

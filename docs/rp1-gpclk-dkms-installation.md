@@ -148,7 +148,7 @@ creation.
 A legacy-repository `devel` tip predating that minimum is refused. Fresh RP1-DKMS history instead binds the supported runtime contracts to its selected source commit and retains independent inventory, identity, and capability checks. The separate [published-provider verification](rp1-provider-acceptance.md) command never installs a package or changes ordinary source selection.
 
 A repeated development installation is a no-op only when WsprryPi's existing
-v2 ownership record and the complete inactive provider inventory still match
+v1 ownership record and the complete inactive provider inventory still match
 the newly resolved commit, source tree, version source, UAPI, compatibility
 identity, running kernel, DKMS registration, source destination, module bytes,
 and retained upstream rollback tools. The installer revalidates the ownership
@@ -166,9 +166,9 @@ residue.
 Foreign or unowned residue is preserved and blocks installation. Exact state
 already recorded by WsprryPi is revalidated rather than silently adopted. If
 neutral runtime deployment is interrupted after the exact provider has a valid
-WsprryPi v2 ownership record, a repeated installation may enter the same bound
+WsprryPi v1 ownership record, a repeated installation may enter the same bound
 deployment and recovery workflow; it does not treat that partial state as a
-foreign installation or publish v3 readiness before final neutral proof.
+foreign installation or publish runtime readiness before final neutral proof.
 The selected immutable source must advertise `rp1-gpclk-runtime-update-v1`
 during read-only source resolution, after APT dependencies but before application
 or provider mutation. An unsupported source fails with an instruction to select a compatible
@@ -208,9 +208,12 @@ removed. The same bounded diagnostic capture applies to pre-update runtime
 recovery and final neutral activation failures.
 
 Only when WsprryPi actually mutates an empty provider state and then verifies
-the result does it atomically create the root-owned, mode-0600 v2 ownership
-record at
-`/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json`. A release record embeds
+the result does it atomically create the root-owned, mode-0600 v1 ownership
+record (`wsprrypi-rp1-gpclk-dkms-ownership-v1`) at
+`/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json`. The same v1 format
+represents installation ownership with or without a validated `runtime` receipt.
+Unsupported ownership formats are rejected; existing records are not rewritten
+or adopted automatically. A release record embeds
 the validated release manifest and hashes every DKMS module artifact present at
 ownership creation. Later DKMS artifacts for additional kernels are accepted
 only at canonical module paths with the same recorded module version; every
@@ -273,8 +276,8 @@ is not rewritten during installation. Only an explicit GPIO route selection
 changes the backend to `rp1-gpclk`, selects its saved pin, and forces
 transmission off.
 
-Only after that proof is the provider record upgraded to v3 with the readiness
-contract, binding and artifact-set digests, source commit,
+Only after that proof is the provider record extended with the validated runtime
+receipt: the readiness contract, binding and artifact-set digests, source commit,
 product/kernel/compatibility identities, reviewed deployment and activation
 plan digests, activation request ID, controller session and zero generation,
 neutral state, null route, and disabled-output state. This records WsprryPi
@@ -351,8 +354,8 @@ This requires neither the removed provider's runtime interface nor a manual
 RP1-removal override. Residual or uncertain provider state still requires the
 owning recovery workflow.
 
-Before WsprryPi application and service teardown, uninstall recovers an exact
-v3 neutral runtime while the recorded application instance still exists. If
+Before WsprryPi application and service teardown, uninstall recovers the exact
+recorded neutral runtime while the recorded application instance still exists. If
 that pre-teardown recovery fails, uninstall stops before changing the
 application. The exact route, activation, and deployment recovery sequence then
 removes runtime residue and the owned provider while the captured application
@@ -394,7 +397,7 @@ a later installation.
 
 `REMOVE_RP1_GPCLK_DKMS` accepts exactly:
 
-- `auto` (default): remove only a matching, inactive provider proven by the v2
+- `auto` (default): remove only a matching, inactive provider proven by the v1
   ownership record;
 - `true`: explicitly request the same ownership-aware removal; it does not
   bypass any provenance, identity, inactivity, or upstream lifecycle check; or

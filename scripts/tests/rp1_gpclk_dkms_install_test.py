@@ -809,7 +809,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "runtimeResidue": ["/var/lib/rp1-gpclk-dkms/runtime-admin"],
         }
         owned = {
-            "schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "development",
+            "schema": MOD.RECORD_SCHEMA, "runtime": {}, "channel": "development",
             "sourceCommit": resolved["commit"],
             "productVersion": resolved["version"],
             "sourceTree": resolved["sourceTree"],
@@ -913,7 +913,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             )
         self.assertEqual(validate.call_count, 2)
         self.assertEqual(replace.call_count, 1)
-        self.assertEqual(replace.call_args.args[3]["schema"], MOD.RUNTIME_RECORD_SCHEMA)
+        self.assertEqual(replace.call_args.args[3]["schema"], MOD.RECORD_SCHEMA)
         self.assertEqual(replace.call_args.args[3]["runtime"], runtime)
         self.assertEqual(runner.passthrough_calls, [])
 
@@ -1019,7 +1019,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
                        "controllerCandidates": [],
                        "runtimeResidue": []})
         owned = {
-            "schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "development",
+            "schema": MOD.RECORD_SCHEMA, "runtime": {}, "channel": "development",
             "sourceCommit": "e" * 40, "productVersion": resolved["version"],
             "sourceTree": resolved["sourceTree"], "uapiSha256": resolved["uapiSha256"],
             "versionSource": "include/rp1_gpclk/version.h",
@@ -1083,7 +1083,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "runtimeResidue": ["/var/lib/rp1-gpclk-dkms/runtime-admin"],
         }
         owned = {
-            "schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "development",
+            "schema": MOD.RECORD_SCHEMA, "runtime": {}, "channel": "development",
             "sourceCommit": resolved["commit"],
             "productVersion": resolved["version"],
             "sourceTree": resolved["sourceTree"],
@@ -1215,7 +1215,7 @@ class DevelopmentInterfaceTests(RunnerFixtures, unittest.TestCase):
             "enrollment": False, "developmentManager": False,
             "runtimeResidue": [],
         }
-        owned = {"schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "development"}
+        owned = {"schema": MOD.RECORD_SCHEMA, "runtime": {}, "channel": "development"}
         identity = mock.Mock(st_dev=1, st_ino=2)
         record = pathlib.Path(self.temp.name) / "record.json"
         events = []
@@ -1316,7 +1316,7 @@ class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
 
     def runtime_update_record(self):
         return {
-            "schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "development",
+            "schema": MOD.RECORD_SCHEMA, "channel": "development",
             "sourceCommit": "a" * 40, "productVersion": "1.0.0",
             "runtime": {
                 "readinessContract": MOD.RUNTIME_READINESS_CONTRACT,
@@ -1569,7 +1569,7 @@ class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
         with mock.patch.object(MOD, "validate_package"):
             with self.assertRaisesRegex(MOD.ContractError, "module/controller"):
                 MOD.apply_release(self.state, self.resolved, self.record, self.root, runner)
-        owned = {"schema": MOD.RUNTIME_RECORD_SCHEMA, "channel": "release",
+        owned = {"schema": MOD.RECORD_SCHEMA, "runtime": {}, "channel": "release",
                  "sourceCommit": self.resolved["commit"], "tag": self.resolved["tag"],
                  "manifest": self.manifest}
         with mock.patch.object(MOD, "validate_package"), \
@@ -1856,7 +1856,7 @@ class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
              mock.patch.object(MOD, "replace_owned_record", side_effect=replace):
             MOD.activate_runtime(args, self.runner())
         self.assertEqual(calls.call_count, 7)
-        self.assertEqual(captured["schema"], MOD.RUNTIME_RECORD_SCHEMA)
+        self.assertEqual(captured["schema"], MOD.RECORD_SCHEMA)
         runtime = captured["runtime"]
         self.assertEqual(runtime["deploymentPlanSha256"], "d" * 64)
         self.assertEqual(runtime["activationPlanSha256"], "e" * 64)
@@ -2660,6 +2660,62 @@ def release_record() -> dict[str, object]:
         "qualificationClaim": False,
     }
 
+class OwnershipFormatTests(unittest.TestCase):
+    def setUp(self):
+        self.root = temporary_root(self, "rp1-ownership-v1-").resolve()
+        self.record = self.root / "ownership.json"
+
+    def owned(self, channel, with_runtime):
+        record = release_record() if channel == "release" else development_record()
+        if with_runtime:
+            runtime = ApplyPolicyTests.runtime_update_record(self)["runtime"]
+            version = (record["manifest"]["productVersion"] if channel == "release"
+                       else record["productVersion"])
+            runtime["productVersion"] = version
+            runtime["compatibilityIdentities"] = {
+                route: f"v{version}-rp1-{route}" for route in ("gpio4", "gpio20")
+            }
+            record["runtime"] = runtime
+        return record
+
+    def test_one_v1_format_preserves_both_channels_and_receipt_states(self):
+        self.assertEqual(MOD.RECORD_SCHEMA, "wsprrypi-rp1-gpclk-dkms-ownership-v1")
+        for channel in ("release", "development"):
+            for with_runtime in (False, True):
+                with self.subTest(channel=channel, with_runtime=with_runtime):
+                    record = self.owned(channel, with_runtime)
+                    write_record(self.record, record)
+                    original = self.record.read_bytes()
+                    loaded, identity, reason = MOD.load_ownership_record(self.record)
+                    self.assertEqual(loaded, record)
+                    self.assertIsNotNone(identity)
+                    self.assertIsNone(reason)
+                    self.assertEqual(self.record.read_bytes(), original)
+
+    def test_superseded_formats_and_invalid_receipts_are_rejected_unchanged(self):
+        for channel in ("release", "development"):
+            valid = self.owned(channel, True)
+            invalid = []
+            for schema in ("wsprrypi-rp1-gpclk-dkms-ownership-v2",
+                           "wsprrypi-rp1-gpclk-dkms-ownership-v3",
+                           "wsprrypi-rp1-gpclk-dkms-installation-v1"):
+                invalid.append({**valid, "schema": schema})
+            invalid.extend({**valid, "runtime": runtime} for runtime in (None, {}, []))
+            invalid.append({**valid, "unexpected": True})
+            changed = copy.deepcopy(valid)
+            changed["runtime"]["sourceCommit"] = "0" * 40
+            invalid.append(changed)
+            for record in invalid:
+                with self.subTest(channel=channel, record=record):
+                    write_record(self.record, record)
+                    original = self.record.read_bytes()
+                    loaded, identity, reason = MOD.load_ownership_record(self.record)
+                    self.assertIsNone(loaded)
+                    self.assertIsNone(identity)
+                    self.assertIsNotNone(reason)
+                    self.assertEqual(self.record.read_bytes(), original)
+
+
 class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
     def setUp(self):
         self.root = temporary_root(self, "rp1-removal-").resolve()
@@ -2685,11 +2741,10 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
 
     def test_stale_owned_records_allow_both_uninstall_steps_without_provider(self):
         for channel in ("release", "development"):
-            for schema in (MOD.RECORD_SCHEMA, MOD.RUNTIME_RECORD_SCHEMA):
-                with self.subTest(channel=channel, schema=schema):
+            for with_runtime in (False, True):
+                with self.subTest(channel=channel, with_runtime=with_runtime):
                     record = release_record() if channel == "release" else development_record()
-                    record["schema"] = schema
-                    if schema == MOD.RUNTIME_RECORD_SCHEMA:
+                    if with_runtime:
                         record["runtime"] = ApplyPolicyTests.runtime_update_record(self)["runtime"]
                         record["runtime"]["productVersion"] = (
                             record["manifest"]["productVersion"] if channel == "release"
@@ -2832,7 +2887,7 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
         self.assertIn("absent", stdout.getvalue())
 
         for value in (
-            {"schema": MOD.LEGACY_RECORD_SCHEMA},
+            {"schema": "wsprrypi-rp1-gpclk-dkms-installation-v1"},
             {"schema": MOD.RECORD_SCHEMA, "owner": "attacker"},
             {**release_record(), "tag": 210},
         ):
@@ -2896,7 +2951,12 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
 
     def test_passive_packaged_units_do_not_repeat_runtime_removal(self):
         record = release_record()
-        record["schema"] = MOD.RUNTIME_RECORD_SCHEMA
+        record["runtime"] = ApplyPolicyTests.runtime_update_record(self)["runtime"]
+        version = record["manifest"]["productVersion"]
+        record["runtime"]["productVersion"] = version
+        record["runtime"]["compatibilityIdentities"] = {
+            route: f"v{version}-rp1-{route}" for route in ("gpio4", "gpio20")
+        }
         residue = []
         for name in ("rp1-gpclk-route-manager.socket", "rp1-gpclk-route-manager@.service"):
             relative = "usr/lib/systemd/system/" + name
@@ -3035,7 +3095,7 @@ class RemovalPolicyTests(RunnerFixtures, unittest.TestCase):
 
     def test_owned_runtime_uninstall_recovers_before_dkms_rollback(self):
         record = development_record()
-        record["schema"] = MOD.RUNTIME_RECORD_SCHEMA
+        record["schema"] = MOD.RECORD_SCHEMA
         record["runtime"] = {
             "readinessContract": MOD.RUNTIME_READINESS_CONTRACT,
             "bindingSha256": "3" * 64, "artifactSetSha256": "4" * 64,

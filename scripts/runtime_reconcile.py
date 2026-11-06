@@ -79,7 +79,7 @@ class Linux:
         record, unused, reason = installer.load_ownership_record(OWNERSHIP, repository=repository)
         require(record is not None, 'cannot prove provider ownership: '+str(reason))
         require(record == captured, 'provider ownership changed during startup inspection')
-        if record['schema'] != installer.RUNTIME_RECORD_SCHEMA:
+        if 'runtime' not in record:
             return None
         installer.validate_consumer_provider({
             'channel': record['channel'], 'version': record.get('productVersion'),
