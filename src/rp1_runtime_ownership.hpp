@@ -60,10 +60,11 @@ inline std::string readRp1RuntimeOwnership(const char *path,
       });
   if (!record.is_object() ||
       record.value("schema", std::string{}) !=
-          "wsprrypi-rp1-gpclk-dkms-ownership-v1" ||
+          "rp1-gpclk-dkms-provider-installation-v1" ||
       record.value("repository", std::string{}) !=
           Rp1GpclkConsumerContract::repository ||
-      record.value("owner", std::string{}) != "WsprryPi" ||
+      record.value("owner", std::string{}) != "RP1-DKMS" ||
+      record.value("client", std::string{}) != "WsprryPi/WsprryPi" ||
       !record.contains("runtime") || !record["runtime"].is_object())
     throw std::runtime_error("WsprryPi runtime ownership contract differs.");
   const auto &runtime = record["runtime"];
@@ -73,8 +74,11 @@ inline std::string readRp1RuntimeOwnership(const char *path,
                           : std::string{};
   if (runtime.value("readinessContract", std::string{}) !=
           "rp1-gpclk-runtime-readiness-v1" ||
+      !Rp1GpclkConsumerContract::validProduct(runtime.value("productVersion", std::string{})) ||
       runtime.value("productVersion", std::string{}) !=
-          Rp1GpclkConsumerContract::version ||
+          (record.value("channel", std::string{}) == "development" ?
+               record.value("productVersion", std::string{}) :
+               record.value("manifest", nlohmann::json::object()).value("productVersion", std::string{})) ||
       runtime.value("state", std::string{}) != "neutral_ready" ||
       !runtime.contains("route") || !runtime["route"].is_null() ||
       runtime.value("output", std::string{}) != "disabled" ||

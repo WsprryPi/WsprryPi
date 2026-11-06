@@ -21,7 +21,7 @@ BUNDLE_NAME = 'rp1-qualification'
 HELPER_FILES = {'rp1_qualification.py', 'rp1-qualification-lock.json'}
 INSTALLED_FILES = HELPER_FILES | {BUNDLE_NAME + '/' + name for name in ASSETS}
 RUNTIME = Path('/usr/local/lib/wsprrypi')
-OWNERSHIP = Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
+OWNERSHIP = Path('/var/lib/rp1-gpclk-dkms/provider-installation.json')
 PROVIDER = Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
 OWNER_UID = 0
 

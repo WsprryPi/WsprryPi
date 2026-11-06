@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "rp1_gpclk_linux_provider.hpp"
+#include "rp1_gpclk_consumer_contract.hpp"
 #include "rp1_gpclk_uapi.h"
 
 #include <cerrno>
@@ -290,8 +291,10 @@ void test_current_identity_pairs()
         std::strcpy(io.query.build_id, "1.0.1");
         std::strcpy(io.query.compatibility_id,
             route == RP1_GPCLK_ROUTE_GPIO4 ? "v1.0.1-rp1-gpio4" : "v1.0.1-rp1-gpio20");
-        expect(!provider.query(route, kRequired, true, observed, error),
-               "matching old module and route identities must still be rejected");
+        std::strcpy(io.snapshot.build_id, "1.0.1");
+        std::strcpy(io.snapshot.compatibility_id, io.query.compatibility_id);
+        expect(provider.query(route, kRequired, true, observed, error),
+               "a later product with the same UAPI, limits and capabilities must be accepted");
         std::strcpy(io.query.compatibility_id, identity);
         expect(!provider.query(route, kRequired, true, observed, error),
                "current route identity cannot be paired with the old module version");
@@ -299,6 +302,8 @@ void test_current_identity_pairs()
         expect(!provider.query(route, kRequired, true, observed, error),
                "superseded development version cannot use the current route identity");
         std::strcpy(io.query.build_id, "0.0.1");
+        std::strcpy(io.snapshot.build_id, "0.0.1");
+        std::strcpy(io.snapshot.compatibility_id, identity);
         std::strcpy(io.query.compatibility_id, route == RP1_GPCLK_ROUTE_GPIO4 ? "v0.0.1-rp1-gpio20" : "v0.0.1-rp1-gpio4");
         expect(!provider.query(route, kRequired, true, observed, error),
                "current route substitution must fail closed");
@@ -323,8 +328,18 @@ void test_exact_route_version_and_state_rejections()
             std::strcpy(io.query.compatibility_id, wrong);
             expect(!provider.query(route, kRequired, true, observed, error), "legacy or substituted route identity must be rejected");
         }
+        for (const auto product : {"12.34.56", "2.0.0-rc.12+developer.7", "0.0.1+changed"}) {
+            const auto compatible = wsprrypi::Rp1GpclkConsumerContract::compatibility(route, product);
+            std::strcpy(io.query.build_id, product);
+            std::strcpy(io.snapshot.build_id, product);
+            std::strcpy(io.query.compatibility_id, compatible.c_str());
+            std::strcpy(io.snapshot.compatibility_id, compatible.c_str());
+            expect(provider.query(route, kRequired, true, observed, error), "interface-compatible future/prerelease products are data");
+        }
         std::strcpy(io.query.compatibility_id, identity);
-        for (const auto wrong : {"0.9.0", "1.0.0", "1.0.1", "1.0.2"}) {
+        std::strcpy(io.snapshot.compatibility_id, identity);
+        std::strcpy(io.snapshot.build_id, "0.0.1");
+        for (const auto wrong : {"01.0.0", "1.0", "1.0.0-01", "1.0.0+", "1.0.0/foreign"}) {
             std::strcpy(io.query.build_id, wrong);
             expect(!provider.query(route, kRequired, true, observed, error), "unselected module version must be rejected");
         }

@@ -20,7 +20,7 @@ RP1_PYTHON="/usr/bin/python3"
 RP1_TIMEOUT="/usr/bin/timeout"
 RP1_RUNTIME_PROVIDER="/usr/lib/rp1-gpclk-dkms/runtime_provider.py"
 RP1_QUALIFICATION="/usr/local/lib/wsprrypi/rp1_qualification.py"
-RP1_INSTALLATION_RECORD="/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"
+RP1_INSTALLATION_RECORD="/var/lib/rp1-gpclk-dkms/provider-installation.json"
 
 STAMP="$(date -u +"%Y%m%dT%H%M%SZ")"
 HOST="$(hostname -s 2>/dev/null || echo raspberrypi)"
@@ -359,9 +359,9 @@ def pairs(items):
     return value
 
 def summarize(value):
-    if (not isinstance(value, dict) or value.get('owner') != 'WsprryPi' or
-        value.get('repository') not in ('WsprryPi/RP1-GPCLK-DKMS', 'WsprryPi/RP1-DKMS') or
-        value.get('schema') != 'wsprrypi-rp1-gpclk-dkms-ownership-v1' or
+    if (not isinstance(value, dict) or value.get('owner') != 'RP1-DKMS' or value.get('client') != 'WsprryPi/WsprryPi' or
+        value.get('repository') not in ('WsprryPi/RP1-DKMS',) or
+        value.get('schema') != 'rp1-gpclk-dkms-provider-installation-v1' or
         value.get('channel') not in ('development', 'release') or
         value.get('qualificationClaim') is not False):
         raise ValueError('untrusted record')
@@ -372,7 +372,7 @@ def summarize(value):
               'publicationVerified': False}
     fields = {'sourceCommit': (value.get('sourceCommit'), '[0-9a-f]{40}'),
               'sourceTree': (value.get('sourceTree'), '[0-9a-f]{40}'),
-              'productVersion': (value.get('productVersion', manifest.get('productVersion')), r'[0-9]+\.[0-9]+\.[0-9]+'),
+              'productVersion': (value.get('productVersion', manifest.get('productVersion')), r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?'),
               'debianVersion': (manifest.get('debianVersion'), r'[0-9]+\.[0-9]+\.[0-9]+-[0-9]+'),
               'recordedReleaseTag': (value.get('tag'), r'v[0-9]+\.[0-9]+\.[0-9]+'),
               'consumerUapiSha256': (value.get('uapiSha256', manifest.get('uapi', {}).get('sha256'))

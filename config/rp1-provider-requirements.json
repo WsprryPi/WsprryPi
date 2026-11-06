@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "interfaces": {
+    "binding": "rp1-gpclk-runtime-binding-v1",
+    "readiness": "rp1-gpclk-runtime-readiness-v1",
+    "update": "rp1-gpclk-runtime-update-v1",
+    "lifecycle": "rp1-gpclk-provider-lifecycle-v1"
+  },
+  "capabilities": [
+    "route-neutral-install",
+    "identical-repeat",
+    "same-version-replace",
+    "semantic-upgrade",
+    "owned-remove",
+    "runtime-update",
+    "neutral-activation"
+  ],
+  "uapiSha256": {
+    "consumer": "4af14cdf60471ac4b318b10d7d70824a63c74029c2934e86bbdcd1b7f06cf633",
+    "controller": "52f34e567f06350eb3231049c1a456b30b92cc7d37bbb13ff948d1471aee926e"
+  }
+}

@@ -28,7 +28,7 @@ constexpr const char *kContract = "rp1-gpclk-route-manager";
 #ifndef WSPRRYPI_ROUTE_SERVICE_TEST
 std::string ownedRuntimeBinding() {
   return readRp1RuntimeOwnership(
-      "/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json");
+      "/var/lib/rp1-gpclk-dkms/provider-installation.json");
 }
 
 nlohmann::json providerCommand(const std::string &operation,

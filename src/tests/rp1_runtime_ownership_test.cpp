@@ -41,11 +41,12 @@ struct Fixture {
   }
 };
 nlohmann::json owned() {
-  return {{"schema", "wsprrypi-rp1-gpclk-dkms-ownership-v1"},
+  return {{"schema", "rp1-gpclk-dkms-provider-installation-v1"},
           {"repository", wsprrypi::Rp1GpclkConsumerContract::repository},
-          {"owner", "WsprryPi"},
+          {"owner", "RP1-DKMS"}, {"client", "WsprryPi/WsprryPi"},
+          {"channel", "development"}, {"productVersion", "12.34.56"},
           {"runtime", {{"readinessContract", "rp1-gpclk-runtime-readiness-v1"},
-                       {"productVersion", wsprrypi::Rp1GpclkConsumerContract::version},
+                       {"productVersion", "12.34.56"},
                        {"state", "neutral_ready"}, {"route", nullptr},
                        {"output", "disabled"}, {"bindingSha256", std::string(64, 'a')}}}};
 }

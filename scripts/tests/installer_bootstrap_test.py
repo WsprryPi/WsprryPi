@@ -31,6 +31,7 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
     manage_service manage_udp_logging activate_rp1_gpclk_runtime_administration manage_web \
     manage_apache validate_wsprrypi_runtime manage_sound \
     cleanup_files_in_directories restore_daemon_state flag_need_reboot \
+    begin_application_ownership complete_application_ownership remove_application_ownership \
     finish_script egress; do
     eval "$step() { :; }"
 done
@@ -99,7 +100,8 @@ runuser() {
     [[ "$FAIL_AT" != clone ]] || return 18
     command -v git >/dev/null || return 94
     [[ ! -e "$LOCAL_REPO_DIR" ]] || return 91
-    mkdir -p "$LOCAL_REPO_DIR/scripts"
+    mkdir -p "$LOCAL_REPO_DIR/scripts" "$LOCAL_REPO_DIR/config"
+    cp "$SOURCE_ROOT/config/rp1-provider-requirements.json" "$LOCAL_REPO_DIR/config/"
     cp "$AGE_HELPER" "$LOCAL_REPO_DIR/scripts/support_bundle_age_dependency.sh"
     # Use the helper's existing filesystem-fixture seam, including its actual
     # owner/mode/type checks, instead of depending on host /usr/bin/age.
@@ -135,7 +137,7 @@ if [[ "$ACTION" == uninstall ]]; then
         mkdir -p "$9/scripts" "$9/config"
         cp "$SOURCE_ROOT"/scripts/*.py "$9/scripts/"
         cp "$SOURCE_ROOT"/scripts/*runtime_install.sh "$9/scripts/"
-        cp "$SOURCE_ROOT/config/pico-usb-installer.json" "$9/config/"
+        cp "$SOURCE_ROOT/config/pico-usb-installer.json" "$SOURCE_ROOT/config/rp1-provider-requirements.json" "$9/config/"
         case "$FAIL_AT" in
             missing) rm "$9/scripts/$BROKEN_INPUT";;
             symlink) rm "$9/scripts/$BROKEN_INPUT"; ln -s "$SOURCE_ROOT/scripts/$BROKEN_INPUT" "$9/scripts/$BROKEN_INPUT";;
@@ -168,7 +170,7 @@ class InstallerBootstrapTest(unittest.TestCase):
         # until the mocked APT transaction installs it; host Git cannot mask it.
         for name in ("bash", "python3", "dirname", "basename", "realpath", "uname",
                      "whoami", "tr", "sed", "grep", "awk", "cut", "cat", "cp",
-                     "chmod", "mkdir", "mktemp", "rm", "tail", "tee", "sleep", "stat", "ln"):
+                     "chmod", "install", "mkdir", "mktemp", "rm", "tail", "tee", "sleep", "stat", "ln"):
             tool = shutil.which(name)
             self.assertIsNotNone(tool, name)
             (self.bin / name).symlink_to(tool)
@@ -241,7 +243,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
                 result = self.run_installer(USER_HOME=str(home), REPO_BRANCH=branch)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.recorded_events(), [
-                    *self.package_events(), "neutral-runtime", "clone", "age-validation",
+                    *self.package_events(), "clone", "neutral-runtime", "age-validation",
                     "picotool", "rp1-dependencies", "provider", "application",
                 ])
                 self.assertIn("Complete: Validate support-bundle encryption tools.", result.stdout)
@@ -310,7 +312,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
     def test_clone_failure_stops_before_validation_and_provider_changes(self) -> None:
         result = self.run_installer(FAIL_AT="clone")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.recorded_events(), [*self.package_events(), "neutral-runtime", "clone"])
+        self.assertEqual(self.recorded_events(), [*self.package_events(), "clone"])
         self.assertFalse(self.checkout.exists())
 
     def test_package_failure_does_not_clone_or_load_helper(self) -> None:
@@ -324,7 +326,7 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
         result = self.run_installer()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.recorded_events(), [
-            *self.package_events(), "neutral-runtime", "clone", "age-validation",
+            *self.package_events(), "clone", "neutral-runtime", "age-validation",
         ])
         self.assertIn("Failed: Validate support-bundle encryption tools.", result.stdout)
 
@@ -419,6 +421,7 @@ support_bundle_validate_age_dependency() {
         shutil.copytree(ROOT / "scripts", checkout / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
         (checkout / "config").mkdir()
         shutil.copyfile(ROOT / "config/pico-usb-installer.json", checkout / "config/pico-usb-installer.json")
+        shutil.copyfile(ROOT / "config/rp1-provider-requirements.json", checkout / "config/rp1-provider-requirements.json")
         result = run_fixture_shell(r'''
 source "$INSTALLER"
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
@@ -474,7 +477,7 @@ manage_pico_usb_runtime
         result = self.run_installer(REPO_BRANCH="devel", RP1_SELECTED="true")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.recorded_events(), [
-            *self.package_events(), "rp1-plan", "neutral-runtime", "clone", "age-validation",
+            *self.package_events(), "clone", "rp1-plan", "neutral-runtime", "age-validation",
             "picotool", "rp1-dependencies", "provider", "application",
         ])
 
@@ -501,7 +504,7 @@ manage_pico_usb_runtime
     def test_planning_failure_reports_helper_diagnostic_and_stops_installation(self) -> None:
         result = self.run_installer(FAIL_AT="plan", RP1_SELECTED="true")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.recorded_events(), [*self.package_events(), "rp1-plan"])
+        self.assertEqual(self.recorded_events(), [*self.package_events(), "clone", "rp1-plan"])
         self.assertIn("RP1-DKMS operation refused: fixture source rejected", result.stderr)
         self.assertIn("Failed: Resolve RP1-DKMS installation plan.", result.stderr)
         self.assertNotIn("Complete: Resolve RP1-DKMS installation plan.", result.stdout)
@@ -530,6 +533,7 @@ manage_pico_usb_runtime
         result = subprocess.run(
             ["bash", "-c", r'''
 source "$INSTALLER"
+LOCAL_REPO_DIR="$(dirname "$(dirname "$INSTALLER")")"
 init_log() { :; }
 setup_log
 rp1_gpclk_dkms_installation_selected() { return 0; }

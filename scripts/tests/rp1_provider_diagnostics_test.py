@@ -17,8 +17,8 @@ scope['OWNER_UID'] = os.geteuid()  # Internal fixture only, never a collector co
 
 class Tests(unittest.TestCase):
     def record(self, channel='development'):
-        return {'schema': 'wsprrypi-rp1-gpclk-dkms-ownership-v1',
-                'owner': 'WsprryPi', 'repository': 'WsprryPi/RP1-GPCLK-DKMS',
+        return {'schema': 'rp1-gpclk-dkms-provider-installation-v1',
+                'owner': 'RP1-DKMS', 'client':'WsprryPi/WsprryPi', 'repository': 'WsprryPi/RP1-DKMS',
                 'channel': channel, 'sourceCommit': 'a'*40, 'productVersion': '1.0.0',
                 'sourceTree': 'b'*40, 'uapiSha256': 'c'*64, 'qualificationClaim': False,
                 'runtime': {'bindingSha256': 'd'*64, 'artifactSetSha256': 'e'*64,

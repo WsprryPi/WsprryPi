@@ -101,18 +101,19 @@ class Tests(unittest.TestCase):
             root = Path(directory).resolve()
             ownership, binding_path, helper = (root/name for name in ('ownership.json', 'binding.json', 'provider.py'))
             helper.write_bytes(b'# offline bound helper\n')
-            binding = {'sourceCommit': 'a'*40, 'productVersion': version,
+            requirements=json.loads(installer.requirements_path().read_bytes())
+            binding = {'uapiSha256':requirements['uapiSha256'],'sourceCommit': 'a'*40, 'productVersion': version,
                        'artifactSetSha256': 'b'*64, 'kernel': installer.platform.release(),
                        'files': {str(helper): digest_bytes(helper.read_bytes())}, 'externalFiles': {}}
             binding_path.write_bytes(installer.canonical(binding))
             record = {
                 'schema': installer.RECORD_SCHEMA, 'repository': repository,
-                'owner': 'WsprryPi', 'channel': 'development',
+                'owner': 'RP1-DKMS', 'client':'WsprryPi/WsprryPi', 'channel': 'development',
                 'installationMethod': 'upstream-development-rollback',
                 'sourceCommit': 'a'*40, 'productVersion': version, 'sourceTree': 'c'*40,
                 'uapiSha256': 'd'*64, 'versionSource': 'include/rp1_gpclk/version.h',
                 'versionSourceSha256': 'e'*64, 'targetKernel': installer.platform.release(),
-                'compatibilityIdentity': installer.development_compatibility(version),
+                'compatibilityIdentity': 'v'+version+'-rp1-development',
                 'routeActivation': 'disabled', 'output': 'disabled', 'qualificationClaim': False,
                 **{name: 'offline-evidence' for name in (
                     'upstreamEvidence', 'rollbackRecord', 'rollbackRecordSha256',
@@ -135,15 +136,28 @@ class Tests(unittest.TestCase):
             def trusted(path):
                 self.assertIn(path, (ownership, binding_path, helper))
                 return path.read_bytes(), path.stat()
-            with patch.object(recovery, 'OWNERSHIP', ownership), \
+            requirements = json.loads(installer.requirements_path().read_bytes())
+            metadata = {'schemaVersion':1,'contract':'rp1-gpclk-provider-identity-v1',
+                        'repository':repository,'module':'rp1-gpclk-dkms','productVersion':version,
+                        'debianVersion':version+'-1', 'interfaces':requirements['interfaces'],
+                        'capabilities':requirements['capabilities'],'uapiSha256':requirements['uapiSha256'],
+                        'compatibilityIdentities':{r:'v'+version+'-rp1-'+r for r in ('gpio4','gpio20')}}
+            def public_call(entrypoint, operation, *arguments):
+                if operation == 'identity':return {'providerIdentity':metadata}
+                if operation == 'status':return {'receipt':json.loads(ownership.read_bytes()),
+                                                'recordSha256':digest_bytes(ownership.read_bytes())}
+                raise AssertionError('unexpected provider effect: '+operation)
+            with patch.object(installer,'retained_facade',return_value=helper), \
+                 patch.object(installer,'invoke',side_effect=public_call), \
+                 patch.object(recovery, 'OWNERSHIP', ownership), \
                  patch.object(recovery, 'BINDING', binding_path), \
                  patch.object(recovery.companion, 'trusted', side_effect=trusted):
                 yield record, ownership, binding_path, helper
 
     def test_owned_repository_drives_real_startup_validation_and_retries(self):
         installer = recovery.installer
-        original = (installer.REPOSITORY, installer.REPOSITORY_URL, installer.API_BASE)
-        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),):
+        original = (installer.REPOSITORY, installer.REPOSITORY_URL, installer.REPOSITORY_URL)
+        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),(installer.MIGRATION_REPOSITORY,'12.34.56-rc.2+build')):
             for route in ('gpio4', 'gpio20'):
                 with self.subTest(repository=repository, route=route), \
                      self.installed_ownership(repository, version) as (record, path, unused, helper):
@@ -180,7 +194,7 @@ class Tests(unittest.TestCase):
                             recovery.reconcile(system)
                         self.assertEqual(system.calls, calls)
                     self.assertEqual(path.read_bytes(), original_bytes)
-                    self.assertEqual((installer.REPOSITORY, installer.REPOSITORY_URL, installer.API_BASE), original)
+                    self.assertEqual((installer.REPOSITORY, installer.REPOSITORY_URL, installer.REPOSITORY_URL), original)
                     default_record, unused, reason = installer.load_ownership_record(path)
                     if repository == installer.REPOSITORY:
                         self.assertEqual(default_record, record)
@@ -192,11 +206,8 @@ class Tests(unittest.TestCase):
         installer = recovery.installer
         cases = [
             ('attacker/provider', '0.0.1', None),
-            (installer.LEGACY_REPOSITORY, '1.0.1', None),
-            (installer.MIGRATION_REPOSITORY, '0.99.0', None),
-            (installer.MIGRATION_REPOSITORY, '1.0.1', None),
-            (installer.MIGRATION_REPOSITORY, '1.0.2', None),
-            (installer.LEGACY_REPOSITORY, '0.0.1', None),
+            ('WsprryPi/RP1-GPCLK-DKMS', '1.0.1', None),
+            ('WsprryPi/RP1-GPCLK-DKMS', '0.0.1', None),
             (installer.MIGRATION_REPOSITORY, '0.0.1', 'productVersion'),
             (installer.MIGRATION_REPOSITORY, '0.0.1', 'sourceCommit'),
             (installer.MIGRATION_REPOSITORY, '0.0.1', 'artifactSetSha256'),
@@ -239,7 +250,7 @@ class Tests(unittest.TestCase):
             with self.subTest(repository=repository), \
                  self.installed_ownership(repository, version) as (development, path, unused, helper):
                 record = {name: development[name] for name in (
-                    'schema', 'repository', 'owner', 'routeActivation', 'output',
+                    'schema', 'repository', 'owner', 'client', 'routeActivation', 'output',
                     'qualificationClaim', 'sourceCommit', 'runtime')}
                 record.update(channel='release', installationMethod='debian-package',
                               tag='v'+version, manifest={'productVersion': version}, moduleArtifacts=[])
@@ -250,7 +261,7 @@ class Tests(unittest.TestCase):
                 record['runtime']['compatibilityIdentities'] = {
                     r: f'v1.0.2-rp1-{r}' for r in ('gpio4', 'gpio20')}
                 path.write_bytes(installer.canonical(record))
-                with self.assertRaisesRegex(installer.ContractError, 'not accepted by this WsprryPi'):
+                with self.assertRaisesRegex(installer.ContractError, 'runtime binding differs'):
                     recovery.Linux().ownership()
 
     def test_lock_contention_defers_workers_and_bounds_installer_wait(self):
@@ -545,7 +556,8 @@ class Tests(unittest.TestCase):
                     installation.apply(remove=True)
                     installation.apply(remove=True)
                     self.assertTrue(all(not Path(p).exists() for p in targets))
-                    self.assertTrue(all(call.args[0] == ['/usr/bin/systemctl', 'daemon-reload'] for call in command.call_args_list))
+                    self.assertTrue(all(call.args[0] in (['/usr/bin/systemctl', 'daemon-reload'], ['/usr/bin/systemctl','is-failed','--quiet','wsprrypi-rp1-reconcile.service']) for call in command.call_args_list))
+                    self.assertFalse(state.exists())
 
     def test_provider_replacement_or_conflict_starts_diagnostics_idle_without_administration(self):
         for error in (FileNotFoundError('binding retired'), recovery.installer.ContractError('ownership differs')):

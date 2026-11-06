@@ -458,6 +458,14 @@ jobs:
         working-directory: WsprryPi-UI
         run: npm run test:browser
 
+      - name: Read-only RP1-DKMS development reference
+        uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/RP1-DKMS
+          ref: 6b0ceb62ada56de15fa15be9e9412c833a69ff75
+          path: src/build/rp1-provider-reference
+          persist-credentials: false
+
       - name: Run RP1 non-hardware regression
         working-directory: src
         run: |
@@ -479,24 +487,20 @@ jobs:
           strace -f -e trace=openat,open -o /tmp/wsprrypi-focused.strace \
             make ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test SUDO=
       - name: Execute offline installer and maintenance obligations
+        env:
+          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
         working-directory: src
         run: |
           command -v shellcheck
           strace -f -e trace=openat,open -o /tmp/wsprrypi-installer.strace \
             make ci-installer-offline-test php2shell-test SUDO=
 
-      - name: Read-only RP1-DKMS development reference
-        uses: actions/checkout@v7
-        with:
-          repository: WsprryPi/RP1-DKMS
-          ref: 26399421e86524b227b9e27f709ead87f7a3485c
-          path: src/build/rp1-provider-reference
-          persist-credentials: false
-
       - name: Validate actual provider update and bootstrap boundary
         run: python3 -B scripts/tests/rp1_gpclk_update_contract_test.py src/build/rp1-provider-reference
 
       - name: Qualify support-bundle age round trip
+        env:
+          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
         working-directory: src
         run: |
           make support-bundle-job-manager-test support-bundle-http-test SUDO=

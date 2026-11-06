@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE = Path('/var/lib/wsprrypi/rp1-startup-files.json')
 OWNER_UID = 0
 FILES = {
+    '/usr/local/lib/wsprrypi/rp1-provider-requirements.json': ('config/rp1-provider-requirements.json', 0o644),
     '/usr/local/lib/wsprrypi/runtime_reconcile.py': ('scripts/runtime_reconcile.py', 0o755),
     '/usr/local/lib/wsprrypi/rp1_gpclk_dkms_install.py': ('scripts/rp1_gpclk_dkms_install.py', 0o755),
     '/etc/systemd/system/wsprrypi-rp1-reconcile.service': ('systemd/wsprrypi-rp1-reconcile.service', 0o644),
@@ -94,6 +95,12 @@ def apply(remove=False):
     subprocess.run(['/usr/bin/systemctl', 'daemon-reload'], check=True)
     installer.atomic_json(STATE, {'version': 1, 'phase': 'complete',
                                   'before': target, 'after': target})
+    if remove:
+        failed = subprocess.run(['/usr/bin/systemctl','is-failed','--quiet','wsprrypi-rp1-reconcile.service'],check=False)
+        if failed.returncode == 0:
+            subprocess.run(['/usr/bin/systemctl','reset-failed','wsprrypi-rp1-reconcile.service'],check=True)
+        STATE.unlink()
+
 
 
 def install(remove=False):

@@ -1034,6 +1034,12 @@ egress() {
     cleanup_precompiled_executable
     report_ui_publication_result
     cleanup_rp1_gpclk_dkms_state
+    if [[ -n "$UI_PUBLICATION_RESULT_FILE" ]]; then
+        if [[ -L "$UI_PUBLICATION_RESULT_FILE" ]] || ! rm -f -- "$UI_PUBLICATION_RESULT_FILE"; then
+            warn "Unable to retire owned UI publication result."
+            status=1
+        fi
+    fi
     if ! cleanup_temp_build_swap; then
         if [[ "$status" -eq 0 ]]; then
             status=1
@@ -2617,6 +2623,9 @@ prepare_rp1_gpclk_dkms_installation() {
         local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
     fi
 
+    if [[ -n "${LOCAL_REPO_DIR:-}" && -f "$LOCAL_REPO_DIR/scripts/rp1_gpclk_dkms_install.py" ]]; then
+        local_helper="$LOCAL_REPO_DIR/scripts/rp1_gpclk_dkms_install.py"
+    fi
     if [[ "$DRY_RUN" == "true" ]]; then
         # Use stable display-only paths. exec_command() deliberately does not
         # execute Python in dry-run mode, so no helper download, temporary
@@ -2642,6 +2651,11 @@ prepare_rp1_gpclk_dkms_installation() {
         fi
     fi
 
+    if [[ "$DRY_RUN" != "true" ]]; then
+        exec_command "Stage consumer interface requirements" install -m 0600 \
+            "$LOCAL_REPO_DIR/config/rp1-provider-requirements.json" \
+            "$RP1_GPCLK_DKMS_STATE_DIR/rp1-provider-requirements.json" "$debug" || return 1
+    fi
     local prepare_args=(
         --provider-repository "$RP1_GPCLK_DKMS_REPOSITORY"
         prepare
@@ -5498,12 +5512,12 @@ validate_uninstall_helpers() {
     local scripts="$LOCAL_REPO_DIR/scripts" name path
     local python_helpers=(
         udp_log_control.py rp1_qualification.py install_runtime_reconcile.py
-        runtime_reconcile.py route_application.py rp1_gpclk_dkms_install.py
+        runtime_reconcile.py route_application.py rp1_gpclk_dkms_install.py install_ownership.py
         pico_usb_deploy.py pico_usb_bundle.py
     )
     local shell_helpers=(support_bundle_runtime_install.sh pico_usb_runtime_install.sh)
     local python_paths=()
-    for name in "${python_helpers[@]}" "${shell_helpers[@]}" ../config/pico-usb-installer.json; do
+    for name in "${python_helpers[@]}" "${shell_helpers[@]}" ../config/pico-usb-installer.json ../config/rp1-provider-requirements.json; do
         path="$scripts/$name"
         if [[ -L "$path" || ! -f "$path" || ! -r "$path" || ! -s "$path" ]]; then
             printf 'Missing or unsafe uninstall helper input: %s\n' "$path" >&2
@@ -5608,6 +5622,7 @@ git_clone() {
         return 1
     }
 
+    [[ "$DRY_RUN" == "true" ]] || IS_REPO="true"
     debug_end "$debug"
     return "$retval"
 }
@@ -7504,6 +7519,28 @@ manage_pico_usb_runtime() {
 }
 
 # Install the application-owned route companion from the selected checkout.
+begin_application_ownership() {
+    [[ "$DRY_RUN" == "true" ]] && return 0
+    exec_command "Record application installation ownership" python3 \
+        "$LOCAL_REPO_DIR/scripts/install_ownership.py" begin --source "$LOCAL_REPO_DIR" "$@"
+}
+
+complete_application_ownership() {
+    [[ "$DRY_RUN" == "true" ]] && return 0
+    exec_command "Commit application installation ownership" python3 \
+        "$LOCAL_REPO_DIR/scripts/install_ownership.py" complete "$@"
+}
+
+remove_application_ownership() {
+    [[ "$DRY_RUN" == "true" ]] && return 0
+    if systemctl is-active --quiet "${WSPR_SERVICE}.service"; then
+        logE "Application is still active; owned file retirement refused."
+        return 1
+    fi
+    exec_command "Retire attributable application sidecars and companion" python3 \
+        "$LOCAL_REPO_DIR/scripts/install_ownership.py" remove "$@"
+}
+
 manage_route_application() {
     if [[ "$ACTION" == "install" ]]; then
         exec_command "Create route-runtime directory" \
@@ -10012,11 +10049,13 @@ manage_wsprry_pi() {
         "manage_sound"
         "cleanup_files_in_directories"
         "restore_daemon_state"
+        "complete_application_ownership"
     )
 
     # Define functions to skip on uninstall using an indexed array
     local skip_on_uninstall=(
         "capture_install_sem_ver"
+        "complete_application_ownership"
         "prepare_install_executable"
         "cleanup_files_in_directories"
         "remove_legacy_services"
@@ -10071,7 +10110,7 @@ manage_wsprry_pi() {
             "${group_to_execute[@]}"
         )
         # Re-add manage_sound at the very end
-        group_to_execute+=("manage_sound")
+        group_to_execute+=("manage_sound" "remove_application_ownership")
         ;;
     *)
         die 1 "Invalid action: '$ACTION'. Use 'install' or 'uninstall'."
@@ -10270,16 +10309,13 @@ _main() {
         # All informational output precedes resource and installation commands.
         apply_build_resource_plan || return 1
         handle_apt_packages "$debug" || return 1
+        git_clone "$debug" || return 1
         prepare_rp1_gpclk_dkms_installation "$debug" || return 1
         prepare_precompiled_executable "$debug" || return 1
+        begin_application_ownership "$debug" || return 1
         prepare_rp1_gpclk_runtime_update "$debug" || return 1
         if [[ "$BINARY_SOURCE" != "build" ]]; then
             handle_apt_packages precompiled-runtime "$debug" || return 1
-        fi
-        # Source builds need the checkout before loading its validation helper.
-        # Precompiled preparation has already cloned the selected source.
-        if [[ "$BINARY_SOURCE" == "build" ]]; then
-            git_clone "$debug" || return 1
         fi
         validate_support_bundle_age_dependency "$debug" || return 1
         ensure_picotool "$debug" || return 1

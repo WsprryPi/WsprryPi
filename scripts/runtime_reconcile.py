@@ -20,7 +20,7 @@ import uuid
 import route_application as companion
 import rp1_gpclk_dkms_install as installer
 
-OWNERSHIP = Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
+OWNERSHIP = Path('/var/lib/rp1-gpclk-dkms/provider-installation.json')
 CHECKPOINT = Path('/var/lib/wsprrypi/rp1-runtime-reconcile.json')
 ENVIRONMENT = Path('/run/wsprrypi-rp1/startup.env')
 LOCK = Path('/run/lock/wsprrypi-rp1-reconcile.lock')
@@ -81,13 +81,16 @@ class Linux:
         require(record == captured, 'provider ownership changed during startup inspection')
         if 'runtime' not in record:
             return None
+        identity=installer.provider_identity()
         installer.validate_consumer_provider({
+            'identity': identity,
             'channel': record['channel'], 'version': record.get('productVersion'),
             'manifest': record.get('manifest'),
         }, repository=repository)
         raw, unused = companion.trusted(BINDING)
         binding = strict_json(raw)
         runtime = record['runtime']
+        require(binding.get('uapiSha256')==identity['uapiSha256'], 'runtime UAPI differs from consumer requirements')
         require(installer.sha256_bytes(raw) == runtime['bindingSha256'] and
                 binding['sourceCommit'] == runtime['sourceCommit'] and
                 binding['productVersion'] == runtime['productVersion'] and

@@ -1595,7 +1595,9 @@ php2shell-test:
 	$(Q)python3 -B ../scripts/tests/php2shell_mitigate_test.py
 
 rp1-gpclk-dkms-installer-test:
-	$(Q)python3 ../scripts/tests/rp1_gpclk_dkms_install_test.py
+	$(Q)python3 -B ../scripts/tests/rp1_gpclk_dkms_install_test.py
+	$(Q)python3 -B ../scripts/tests/rp1_installer_shell_test.py
+	$(Q)python3 -B ../scripts/tests/install_ownership_test.py
 
 .PHONY: rp1-gpclk-update-contract-test
 rp1-gpclk-update-contract-test:
