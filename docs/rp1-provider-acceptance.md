@@ -1,11 +1,10 @@
 # RP1 provider fixture verification
 
-The normal installer consumes RP1-DKMS `0.0.1`. See
+The normal installer consumes the current RP1-DKMS provider. See
 [installation and ownership](rp1-gpclk-dkms-installation.md) for its source
 selection, repeat-install, update, and removal behavior.
 
-The retained [1.0.0](../scripts/tests/fixtures/rp1-release-1.0.0.json) and
-[1.0.1](../scripts/tests/fixtures/rp1-release-1.0.1.json) metadata are inputs to
+The retained [software metadata fixtures](../scripts/tests/fixtures/) are inputs to
 historical package-parser and qualification-attribution regression tests. They
 are not current provider selections, installation requirements, or authority to
 adopt an old installation. The [qualification metadata](rp1-qualification-metadata.md)

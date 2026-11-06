@@ -1599,7 +1599,7 @@ rp1-gpclk-dkms-installer-test:
 
 .PHONY: rp1-gpclk-update-contract-test
 rp1-gpclk-update-contract-test:
-	@test -n "$(RP1_PROVIDER_SOURCE)" || { echo "RP1_PROVIDER_SOURCE=/path/to/RP1-GPCLK-DKMS is required"; exit 2; }
+	@test -n "$(RP1_PROVIDER_SOURCE)" || { echo "RP1_PROVIDER_SOURCE=/path/to/RP1-DKMS is required"; exit 2; }
 	$(Q)python3 ../scripts/tests/rp1_gpclk_update_contract_test.py "$(RP1_PROVIDER_SOURCE)"
 
 ui-publication-test:
@@ -1816,7 +1816,7 @@ $(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT): tests/rp1_gpclk_route_run
 rp1-gpclk-route-runtime-wiring-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_ROUTE_RUNTIME_WIRING_TEST_OUT)
 
-$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT): tests/rp1_gpclk_route_service_test.cpp rp1_gpclk_route_service.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp rp1_provider_process.hpp rp1_gpclk_route_service.hpp
+$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT): tests/rp1_gpclk_route_service_test.cpp rp1_gpclk_route_service.cpp WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp rp1_provider_process.hpp rp1_gpclk_route_service.hpp rp1_runtime_ownership.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) -DWSPRRYPI_ROUTE_SERVICE_TEST $(filter %.cpp,$^) -o $@
 
@@ -1824,9 +1824,14 @@ $(BIN_DIR)/rp1_provider_process_test: tests/rp1_provider_process_test.cpp rp1_pr
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $< -o $@
 
-rp1-gpclk-route-service-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT) $(BIN_DIR)/rp1_provider_process_test
+$(BIN_DIR)/rp1_runtime_ownership_test: tests/rp1_runtime_ownership_test.cpp rp1_runtime_ownership.hpp WSPR-Transmitter/src/rp1_gpclk_consumer_contract.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(RP1_GPCLK_PLANNER_TEST_FLAGS) $< -o $@
+
+rp1-gpclk-route-service-test: $(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT) $(BIN_DIR)/rp1_provider_process_test $(BIN_DIR)/rp1_runtime_ownership_test
 	$(Q)./$(BIN_DIR)/$(RP1_GPCLK_ROUTE_SERVICE_TEST_OUT)
 	$(Q)./$(BIN_DIR)/rp1_provider_process_test
+	$(Q)./$(BIN_DIR)/rp1_runtime_ownership_test
 	$(Q)python3 ../scripts/tests/route_application_test.py
 	$(Q)python3 ../scripts/tests/runtime_reconcile_test.py
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve and install the independently owned RP1-GPCLK-DKMS provider.
+"""Resolve and install the independently owned RP1-DKMS provider.
 
 This helper deliberately owns only WsprryPi's orchestration and acceptance
 policy.  Package and exact-source lifecycle mechanics remain upstream.
@@ -53,7 +53,7 @@ CORRECTED_RUNTIME_COMMIT = "817f3dc6a194f4a92a7f94acf10147169e6439d6"
 RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v1"
 STATE_SCHEMA = "wsprrypi-rp1-gpclk-dkms-plan-v1"
 RUNTIME_READINESS_CONTRACT = "rp1-gpclk-runtime-readiness-v1"
-RUNTIME_BINDING_CONTRACT = "rp1-gpclk-runtime-binding-v3"
+RUNTIME_BINDING_CONTRACT = "rp1-gpclk-runtime-binding-v1"
 RUNTIME_ROUTE_CONTRACT = "rp1-gpclk-route-manager-runtime"
 RUNTIME_PROVIDER = pathlib.Path("/usr/lib/rp1-gpclk-dkms/runtime_provider.py")
 RUNTIME_ROUTE_CLIENT = pathlib.Path("/usr/lib/rp1-gpclk-dkms/runtime_route_client.py")
@@ -347,7 +347,7 @@ def release_candidate(release: Mapping[str, Any]) -> bool:
 
 def select_release(releases: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     candidates = [release for release in releases if release_candidate(release)]
-    require(bool(candidates), "no eligible RP1-GPCLK-DKMS release is available")
+    require(bool(candidates), "no eligible RP1-DKMS release is available")
     return max(candidates, key=lambda item: parse_semver(str(item["tag_name"])))
 
 
@@ -633,7 +633,7 @@ def download_release(state_dir: pathlib.Path, client: GitHubClient, runner: Runn
     tag = str(release["tag_name"])
     assets = release_assets(release)
     package_names = sorted(name for name in assets if re.fullmatch(r"rp1-gpclk-dkms_[0-9A-Za-z.+:~-]+_all\.deb", name))
-    require(len(package_names) == 1, "selected release must contain exactly one RP1-GPCLK-DKMS package")
+    require(len(package_names) == 1, "selected release must contain exactly one RP1-DKMS package")
     package_name = package_names[0]
     for name in (MANIFEST_NAME, CHECKSUMS_NAME, package_name):
         authoritative_asset_url(tag, name, assets[name])
@@ -733,7 +733,7 @@ def require_compatible_runtime_source(
     )
     require(
         compatible.returncode == 0,
-        "selected RP1-GPCLK-DKMS source predates the corrected runtime lifecycle contract",
+        "selected RP1-DKMS source predates the corrected runtime lifecycle contract",
     )
 
 
@@ -747,7 +747,7 @@ def validate_checkout(source_text: str, runner: Runner) -> dict[str, Any]:
     top = pathlib.Path(git_output(runner, resolved, "rev-parse", "--show-toplevel"))
     require(top.resolve(strict=True) == resolved, "checkout path is not the repository root")
     remote = git_output(runner, resolved, "remote", "get-url", "origin")
-    require(normalize_repository_url(remote) == REPOSITORY_URL, "checkout is not the authoritative RP1-GPCLK-DKMS repository")
+    require(normalize_repository_url(remote) == REPOSITORY_URL, "checkout is not the authoritative RP1-DKMS repository")
     commit = git_output(runner, resolved, "rev-parse", "HEAD")
     require(SHA40.fullmatch(commit) is not None, "checkout HEAD is not a full commit SHA")
     status_text = git_output(runner, resolved, "status", "--porcelain=v1", "--untracked-files=all")
@@ -769,12 +769,12 @@ def clone_exact(state_dir: pathlib.Path, selector: str, value: str | None, runne
     runner.run(["git", "clone", "--no-checkout", "--origin", "origin", REPOSITORY_URL, str(source)])
     if selector == "devel":
         result = runner.run(["git", "-C", str(source), "rev-parse", "--verify", "origin/devel^{commit}"], check=False)
-        require(result.returncode == 0, "authoritative RP1-GPCLK-DKMS origin/devel is unavailable")
+        require(result.returncode == 0, "authoritative RP1-DKMS origin/devel is unavailable")
         commit = result.stdout.strip()
     else:
         require(value is not None and SHA40.fullmatch(value) is not None, "internal exact-commit resolution error")
         result = runner.run(["git", "-C", str(source), "cat-file", "-e", f"{value}^{{commit}}"], check=False)
-        require(result.returncode == 0, "requested RP1-GPCLK-DKMS commit does not exist in the authoritative repository")
+        require(result.returncode == 0, "requested RP1-DKMS commit does not exist in the authoritative repository")
         commit = value
     require(SHA40.fullmatch(commit) is not None, "resolved development commit is not immutable")
     runner.run(["git", "-C", str(source), "checkout", "--detach", commit])
@@ -1200,7 +1200,7 @@ def recover_pending_removal(path: pathlib.Path) -> bool:
 
 
 def render_plan(plan: Mapping[str, Any]) -> None:
-    print("RP1-GPCLK-DKMS installation plan")
+    print("RP1-DKMS installation plan")
     print(f"  Provider repository: {REPOSITORY}")
     print(f"  WsprryPi source channel: {plan['wsprryChannel']}")
     print(f"  Installation decision: {'install' if plan['decision']['install'] else 'skip'} ({plan['decision']['reason']})")
@@ -1517,7 +1517,7 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
     elif inventory["packageVersion"] == expected:
         pass
     else:
-        raise ContractError(f"existing RP1-GPCLK-DKMS {inventory['packageVersion']} requires cleanup-first migration: retain its exact package and ownership evidence, prepare/remove its runtime through the owning provider, remove the predecessor through its owning lifecycle, and verify complete absence before installing the selected provider; direct upgrade/downgrade refused")
+        raise ContractError(f"existing RP1-DKMS {inventory['packageVersion']} requires cleanup-first migration: retain its exact package and ownership evidence, prepare/remove its runtime through the owning provider, remove the predecessor through its owning lifecycle, and verify complete absence before installing the selected provider; direct upgrade/downgrade refused")
     verify_installed_release(root, manifest, runner, allow_owned_runtime=owned_runtime)
     if installed_by_wsprrypi:
         artifacts = module_artifacts(root)
@@ -2175,7 +2175,7 @@ def verify_provider_absent(root: pathlib.Path, runner: Runner) -> None:
 
 def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
     if args.remove == "false":
-        print("RP1-GPCLK-DKMS preserved: explicit operator opt-out.")
+        print("RP1-DKMS preserved: explicit operator opt-out.")
         return
     recovered_removal = recover_pending_removal(args.record)
     record, identity, reason = load_ownership_record(args.record)
@@ -2184,9 +2184,9 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
             root = args.root.resolve(strict=True)
             verify_provider_absent(root, runner)
         except (OSError, ContractError):
-            print(f"RP1-GPCLK-DKMS preserved: {reason or 'WsprryPi ownership is unproven'}.")
+            print(f"RP1-DKMS preserved: {reason or 'WsprryPi ownership is unproven'}.")
         else:
-            print("RP1-GPCLK-DKMS absent: no provider removal was required.")
+            print("RP1-DKMS absent: no provider removal was required.")
         return
     try:
         root = args.root.resolve(strict=True)
@@ -2224,7 +2224,7 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
             command = [str(entrypoint), "--record", str(rollback)]
             working_directory = entrypoint.parents[1]
     except ContractError as error:
-        print(f"RP1-GPCLK-DKMS preserved: installed state does not match WsprryPi ownership ({error}).")
+        print(f"RP1-DKMS preserved: installed state does not match WsprryPi ownership ({error}).")
         if args.remove == "true":
             raise ContractError(
                 "explicitly requested owned-provider removal did not complete"
@@ -2260,7 +2260,7 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
         runner.run(command, cwd=working_directory, passthrough=True)
         verify_provider_absent(root, runner)
         remove_ownership_record(args.record, identity)
-    print("WsprryPi-owned RP1-GPCLK-DKMS provider removed and absence verified.")
+    print("WsprryPi-owned RP1-DKMS provider removed and absence verified.")
 
 
 def load_plan(state_dir: pathlib.Path) -> dict[str, Any]:
@@ -2515,7 +2515,8 @@ def validate_runtime_bundle(
         "gpio4": f"v{product}-rp1-gpio4",
         "gpio20": f"v{product}-rp1-gpio20",
     }
-    require(binding["schemaVersion"] == 3 and binding["contract"] == RUNTIME_BINDING_CONTRACT, "runtime bundle binding contract differs")
+    require(type(binding["schemaVersion"]) is int and binding["schemaVersion"] == 1
+            and binding["contract"] == RUNTIME_BINDING_CONTRACT, "runtime bundle binding contract differs")
     require(binding["sourceCommit"] == resolved.get("commit"), "runtime bundle source commit differs from selected provider")
     require(binding["productVersion"] == product, "runtime bundle product version differs from selected provider")
     require(binding["kernel"] == platform.release(), "runtime bundle targets a different running kernel")
@@ -2764,7 +2765,7 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
         plan = load_plan(secure_state_dir(args.state_dir))
         require(not plan.get("dryRun"), "dry-run plan cannot prepare a runtime update")
         if not plan["decision"]["install"]:
-            print("RP1-GPCLK-DKMS runtime update preparation skipped by resolved plan.")
+            print("RP1-DKMS runtime update preparation skipped by resolved plan.")
             return
         resolved = plan.get("resolved")
         require(isinstance(resolved, dict), "prepared runtime source identity is missing")
@@ -2787,14 +2788,14 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
         else:
             require_unchanged_ownership(args.record, record, identity, "stale ownership retirement")
             remove_ownership_record(args.record, identity)
-            print("RP1-GPCLK-DKMS absent: stale ownership record retired; no runtime removal was required.")
+            print("RP1-DKMS absent: stale ownership record retired; no runtime removal was required.")
             return
     if resolved is not None:
         retain_provider_migration(args.record, record, resolved, runner)
     # Ownership without a runtime receipt includes the interrupted window before a
     # neutral-activation receipt. The provider decides whether residue exists.
     remove_owned_runtime_for_fresh_activation(args.record, record, identity, runner, resolved)
-    print("RP1-GPCLK-DKMS runtime preparation verified through the provider update contract.")
+    print("RP1-DKMS runtime preparation verified through the provider update contract.")
 
 
 
@@ -2805,7 +2806,7 @@ def activate_runtime(args: argparse.Namespace, runner: Runner) -> None:
     plan = load_plan(state_dir)
     require(not plan.get("dryRun"), "dry-run plan cannot activate runtime administration")
     if not plan["decision"]["install"]:
-        print("RP1-GPCLK-DKMS runtime administration skipped by resolved plan.")
+        print("RP1-DKMS runtime administration skipped by resolved plan.")
         return
     resolved = plan.get("resolved")
     require(isinstance(resolved, dict), "prepared runtime source identity is missing")
@@ -2867,7 +2868,7 @@ def activate_runtime(args: argparse.Namespace, runner: Runner) -> None:
     replacement["runtime"] = runtime
     validate_runtime_ownership(runtime, replacement)
     replace_owned_record(args.record, record, record_identity, replacement)
-    print("RP1-GPCLK-DKMS neutral runtime administration verified; GPIO route and transmission remain unselected and disabled.")
+    print("RP1-DKMS neutral runtime administration verified; GPIO route and transmission remain unselected and disabled.")
 
 
 def apply(args: argparse.Namespace, runner: Runner) -> None:
@@ -2875,7 +2876,7 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
     plan = load_plan(state_dir)
     require(not plan.get("dryRun"), "dry-run plan cannot be applied")
     if not plan["decision"]["install"]:
-        print("RP1-GPCLK-DKMS installation skipped by resolved plan.")
+        print("RP1-DKMS installation skipped by resolved plan.")
         return
     resolved = plan.get("resolved")
     require(isinstance(resolved, dict), "prepared installation identity is missing")
@@ -2906,7 +2907,7 @@ def apply(args: argparse.Namespace, runner: Runner) -> None:
         apply_development(resolved, record, runner)
     else:
         raise ContractError("prepared source channel is invalid")
-    print("RP1-GPCLK-DKMS package/source and DKMS installation verified; no route or transmission was activated.")
+    print("RP1-DKMS package/source and DKMS installation verified; no route or transmission was activated.")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -2966,7 +2967,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             remove_owned_provider(args, Runner(args.debug))
     except ContractError as error:
-        print(f"RP1-GPCLK-DKMS operation refused: {error}", file=sys.stderr)
+        print(f"RP1-DKMS operation refused: {error}", file=sys.stderr)
         return 1
     finally:
         configure_provider_repository(previous_repository)

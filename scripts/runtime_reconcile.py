@@ -232,7 +232,8 @@ def restore_installation(system):
         digest = plan.get('planSha256')
         body = {key: value for key, value in plan.items() if key != 'planSha256'}
         require(digest == installer.sha256_bytes(installer.canonical(body)) and
-                plan.get('version') == 1 and plan.get('operation') == 'select' and
+                type(plan.get('version')) is int and plan['version'] == 1 and
+                plan.get('operation') == 'select' and
                 plan.get('bindingSha256') == record['runtime']['bindingSha256'] and
                 all(plan.get(name) == route for name in
                     ('route', 'requestedRoute', 'configuredRoute', 'persistedRoute')),
@@ -306,7 +307,8 @@ def prepare_environment(system):
 
 
 def selected_history(plan, route):
-    require(plan.get('version') == 3 and plan.get('activationContext') == 'post-reboot',
+    require(type(plan.get('version')) is int and plan['version'] == 1 and
+            plan.get('activationContext') == 'post-reboot',
             'provider lacks supported terminal reboot reconciliation')
     tx = plan['rebootEvidence']['transactions']['transaction.json']
     if tx is None or tx['phase'] == 'recovered-inhibited':

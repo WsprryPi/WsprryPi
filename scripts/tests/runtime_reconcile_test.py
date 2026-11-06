@@ -34,7 +34,7 @@ class System:
         self.state = 'activation_required'
         self.service_state = {'LoadState': 'loaded', 'ActiveState': 'active', 'UnitFileState': 'enabled'}
         self.current_boot = '00000000-0000-0000-0000-000000000002'
-        self.plan = {'version': 3, 'activationContext': 'post-reboot',
+        self.plan = {'version': 1, 'activationContext': 'post-reboot',
             'bindingSha256': 'a'*64, 'artifactSetSha256': 'b'*64,
             'bootId': self.current_boot, 'rebootEvidence': {'transactions': {
                 'transaction.json': {'phase': 'complete-inhibited', 'target': 1 if route == 'gpio4' else 2} if history else None}}}

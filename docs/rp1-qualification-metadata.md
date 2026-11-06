@@ -13,14 +13,15 @@ application eligibility and current output state remain separate facts.
 
 The [bundle](../release_tools/rp1-qualification/) contains `rp1-qualification.json`,
 `rp1-qualification.schema.json`, `qualification_status.py` and `SHA256SUMS`.
-These files are reproduced byte-for-byte from provider metadata source
-`bb6815446beb9b96853ad5a353b0d355d4975710` and retain their existing SHA-256
-identities. Resolve that source by its full commit. The metadata's `metadataTag`
-field is a stable evidence identifier; the application consumes the bundle locally.
-The original [software lock](../scripts/tests/fixtures/rp1-release-1.0.0.json)
-and immutable `v1.0.0` package remain unchanged.
+The bundle and maintained reference contain its recorded source identity,
+artifact digests, and evidence attribution. The helper verifies those values
+before interpreting the evidence; documentation does not duplicate its version
+numbers or relabel the recorded software.
 
-The consumer compatibility contract selects `v1.0.1`, whose source, package, module version, and route identities differ. The retained `v1.0.0` bundle does not qualify that provider. Its status is unattributed to this evidence, while structural compatibility and readiness remain independently reported. No evidence files or hashes are relabeled for the patch.
+The current consumer contract determines runtime compatibility. Evidence for a
+different provider source remains unattributed, while structural compatibility
+and readiness are reported independently. No evidence files or hashes are
+relabeled when the selected provider changes.
 
 GPIO4 and GPIO20 have independent finite conducted TONE evidence at
 14,097,100 Hz, 2 mA and nominal 200 MHz `pll_sys`: seven cases per route,
@@ -76,6 +77,5 @@ An unknown or mismatched provider is reported as unattributed; local evidence
 availability never promotes it to qualified or ready.
 
 Ordinary scheduler status does not perform this inspection while holding
-configuration or route locks. The diagnostic executable frozen in provider
-`1.0.0-1` does not interpret this metadata; use the maintained application helper
-for scoped attribution.
+configuration or route locks. Use the maintained application helper for scoped attribution; older provider
+diagnostics do not necessarily interpret this metadata.
