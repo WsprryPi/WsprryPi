@@ -72,6 +72,14 @@ class Tests(unittest.TestCase):
         self.assertEqual([x[0] for x in calls],['removal-plan','remove'])
         self.assertIn('a'*64,calls[-1][1])
 
+    def test_absent_provider_preparation_and_repeat_removal_are_noops(self):
+        for command in ['prepare-runtime-removal','remove']:
+            args=client.parser().parse_args([command])
+            with patch.object(Path,'exists',return_value=False),patch.object(client,'invoke') as invoke:
+                client.execute_client(args);invoke.assert_not_called()
+        args=client.parser().parse_args(['remove','--remove','true'])
+        with patch.object(Path,'exists',return_value=False),self.assertRaises(client.ContractError):client.execute_client(args)
+
     def test_out_of_band_plan_change_stops_before_effect(self):
         with tempfile.TemporaryDirectory() as raw:
             state=Path(raw).resolve()

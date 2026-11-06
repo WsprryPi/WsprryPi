@@ -455,7 +455,7 @@ def execute_client(args):
     else:
         if not ACTIVE_FACADE.exists():
             require(not PROVIDER_RECORD.exists() and not LEGACY_RECORD.exists(),'provider receipt has no authenticated facade')
-            require(args.remove!='true','explicit provider removal has no attributable installation')
+            require(getattr(args,'remove','auto')!='true','explicit provider removal has no attributable installation')
             print('No application-managed provider facade exists; no provider removal requested.')
             return
         entrypoint=retained_facade()
