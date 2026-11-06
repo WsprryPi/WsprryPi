@@ -14,6 +14,7 @@ These operations use the existing `exec_command` wrapper:
 | --- | --- |
 | Application executable | Stage the executable, back up the old executable, publish the replacement at its full destination path, stop for rollback, restore or remove a failed replacement. |
 | Precompiled input | Set staging permissions, copy the supplied executable, and set executable permissions. |
+| Uninstall source | Fetch one selected-branch checkout into a private temporary directory, and validate required helper files, shell entry points, Python syntax, and policy JSON before provider or application removal. Remote mode preserves existing checkouts; the exit handler removes only this invocation's temporary source. Dry runs defer acquisition and validation. |
 | Route runtime | Create its installed directory, install the application companion, and invoke runtime-reconciliation installation or removal. |
 | RP1 helper preparation | Protect staging directories, copy or download the selected helper, and set its permissions. |
 | Temporary build swap | Create its directory, protect and allocate the file, format and enable swap, then disable swap and remove the file. |

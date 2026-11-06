@@ -232,6 +232,8 @@ declare TEMP_BUILD_SWAP_ROOT_OWNED="false"
 # @global GIT_API_BASE The base URL for accessing GitHub's API.
 # @global GIT_CLONE_BASE The base URL for cloning repositories from GitHub.
 # -----------------------------------------------------------------------------
+declare UNINSTALL_SOURCE_DIR="" # Private checkout owned only by this invocation.
+declare UNINSTALL_SOURCE_VALIDATED="false"
 declare IS_REPO="${IS_REPO:-false}"
 declare REPO_ORG="${REPO_ORG:-WsprryPi}"
 declare REPO_NAME="WsprryPi"      # Case Sensitive
@@ -1028,6 +1030,7 @@ egress() {
         rollback_executable || status=1
         restore_daemon_state || status=1
     fi
+    cleanup_uninstall_source
     cleanup_precompiled_executable
     report_ui_publication_result
     cleanup_rp1_gpclk_dkms_state
@@ -2823,7 +2826,9 @@ prepare_owned_rp1_gpclk_runtime_removal() {
     local script_source="${BASH_SOURCE[0]:-}"
     local local_helper=""
     local state_dir=""
-    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+    if [[ "$UNINSTALL_SOURCE_VALIDATED" == "true" ]]; then
+        local_helper="$LOCAL_REPO_DIR/scripts/rp1_gpclk_dkms_install.py"
+    elif [[ -n "$script_source" && "$script_source" != "bash" ]]; then
         local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
     fi
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -2894,7 +2899,9 @@ remove_owned_rp1_gpclk_dkms_provider() {
 
     local script_source="${BASH_SOURCE[0]:-}"
     local local_helper=""
-    if [[ -n "$script_source" && "$script_source" != "bash" ]]; then
+    if [[ "$UNINSTALL_SOURCE_VALIDATED" == "true" ]]; then
+        local_helper="$LOCAL_REPO_DIR/scripts/rp1_gpclk_dkms_install.py"
+    elif [[ -n "$script_source" && "$script_source" != "bash" ]]; then
         local_helper="$(cd "$(dirname "$script_source")" && pwd -P)/rp1_gpclk_dkms_install.py"
     fi
 
@@ -5474,6 +5481,79 @@ get_proj_params() {
     return 0
 }
 
+# Uninstall needs source helpers even when the installer itself arrives on stdin.
+# Never reuse or alter an operator checkout in remote mode. One Git checkout
+# keeps every helper and policy on the same selected branch revision.
+cleanup_uninstall_source() {
+    [[ -n "$UNINSTALL_SOURCE_DIR" ]] || return 0
+    rm -rf -- "$UNINSTALL_SOURCE_DIR"
+    UNINSTALL_SOURCE_DIR=""
+    UNINSTALL_SOURCE_VALIDATED="false"
+}
+
+# Validate inputs without running Python helper operations or importing their
+# implementation. Python is already required by the uninstall helpers; its
+# standard command-line modules check syntax without embedded interpreter code.
+validate_uninstall_helpers() {
+    local scripts="$LOCAL_REPO_DIR/scripts" name path
+    local python_helpers=(
+        udp_log_control.py rp1_qualification.py install_runtime_reconcile.py
+        runtime_reconcile.py route_application.py rp1_gpclk_dkms_install.py
+        pico_usb_deploy.py pico_usb_bundle.py
+    )
+    local shell_helpers=(support_bundle_runtime_install.sh pico_usb_runtime_install.sh)
+    local python_paths=()
+    for name in "${python_helpers[@]}" "${shell_helpers[@]}" ../config/pico-usb-installer.json; do
+        path="$scripts/$name"
+        if [[ -L "$path" || ! -f "$path" || ! -r "$path" || ! -s "$path" ]]; then
+            printf 'Missing or unsafe uninstall helper input: %s\n' "$path" >&2
+            return 1
+        fi
+    done
+    for name in "${shell_helpers[@]}"; do
+        bash -n "$scripts/$name" || return 1
+        # shellcheck disable=SC1090 # Fixed helper inventory validated above.
+        ( source "$scripts/$name" &&
+          declare -F "${name%_install.sh}_provision" >/dev/null ) || return 1
+    done
+    for name in "${python_helpers[@]}"; do
+        python_paths+=("$scripts/$name")
+    done
+    # Keep bytecode out of an operator's checkout, including during local use.
+    PYTHONPYCACHEPREFIX="$UNINSTALL_SOURCE_DIR/bytecode" \
+        python3 -m py_compile "${python_paths[@]}" || return 1
+    python3 -m json.tool "$LOCAL_REPO_DIR/config/pico-usb-installer.json" >/dev/null
+}
+
+prepare_uninstall_source() {
+    [[ "$ACTION" == "uninstall" ]] || return 0
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logD "Uninstall helper acquisition and validation deferred (dry-run)."
+        return 0
+    fi
+    UNINSTALL_SOURCE_DIR=$(mktemp -d /tmp/wsprrypi-uninstall.XXXXXX) || return 1
+    if [[ "$IS_REPO" != "true" ]]; then
+        if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$UNINSTALL_SOURCE_DIR/fetch.log" \
+            exec_command "Fetch uninstall helper source" \
+            git clone --depth 1 --single-branch --branch "$REPO_BRANCH" -- \
+            "$GIT_CLONE" "$UNINSTALL_SOURCE_DIR/source" "$@"; then
+            cleanup_uninstall_source
+            return 1
+        fi
+        LOCAL_REPO_DIR="$UNINSTALL_SOURCE_DIR/source"
+        LOCAL_SOURCE_DIR="$LOCAL_REPO_DIR/src"
+        LOCAL_SYSTEMD_DIR="$LOCAL_REPO_DIR/systemd"
+        LOCAL_CONFIG_DIR="$LOCAL_REPO_DIR/config"
+        LOCAL_WWW_DIR="$LOCAL_REPO_DIR/$UI_REPO_DIR/data"
+    fi
+    if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$UNINSTALL_SOURCE_DIR/validation.log" \
+        exec_command "Validate uninstall helper source" validate_uninstall_helpers "$@"; then
+        cleanup_uninstall_source
+        return 1
+    fi
+    UNINSTALL_SOURCE_VALIDATED="true"
+}
+
 ############
 ### Git Functions
 ############
@@ -7386,6 +7466,10 @@ manage_exe() {
 #          or deleting any diagnostic artifacts they need.
 # -----------------------------------------------------------------------------
 manage_support_bundle_runtime() {
+    if [[ "$ACTION" == "uninstall" && "$DRY_RUN" == "true" && "$IS_REPO" != "true" ]]; then
+        logD "Remove runtime helpers (dry-run; source validation deferred)."
+        return 0
+    fi
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
@@ -7406,6 +7490,10 @@ manage_support_bundle_runtime() {
 }
 
 manage_pico_usb_runtime() {
+    if [[ "$ACTION" == "uninstall" && "$DRY_RUN" == "true" && "$IS_REPO" != "true" ]]; then
+        logD "Remove runtime helpers (dry-run; source validation deferred)."
+        return 0
+    fi
     local debug
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
@@ -10208,6 +10296,9 @@ _main() {
             return 1
         fi
     fi
+
+    # Validate all teardown helpers before provider, service, or file removal.
+    prepare_uninstall_source "$debug" || return 1
 
     # Install or uninstall Wsprry Pi services
     manage_wsprry_pi "$debug" || return $?

@@ -34,6 +34,7 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
     finish_script egress; do
     eval "$step() { :; }"
 done
+logD() { :; }
 logI() { printf '[INFO ] %s\n' "$1"; }
 logE() { printf '[ERROR] %s\n' "$1" >&2; }
 logW() { printf '[WARN] %s\n' "$1" >&2; }
@@ -120,6 +121,38 @@ if [[ "$EXISTING_CHECKOUT" == true ]]; then
     handle_execution_context() { IS_REPO=true; }
     get_proj_params() { LOCAL_REPO_DIR="$USER_HOME/WsprryPi"; }
 fi
+
+# Uninstall runs real context detection, preflight and dispatch. Only external
+# source transport and mutating lifecycle boundaries are replaced.
+if [[ "$ACTION" == uninstall ]]; then
+    git() {
+        [[ "$1" == clone && "$2" == --depth && "$3" == 1 &&
+           "$4" == --single-branch && "$5" == --branch &&
+           "$6" == "$REPO_BRANCH" && "$7" == -- && "$8" == "$GIT_CLONE" ]] || return 95
+        record uninstall-fetch
+        printf '%s\n' "${9%/source}" >"$STAGED_SOURCE"
+        [[ "$FAIL_AT" != uninstall-fetch ]] || return 18
+        mkdir -p "$9/scripts" "$9/config"
+        cp "$SOURCE_ROOT"/scripts/*.py "$9/scripts/"
+        cp "$SOURCE_ROOT"/scripts/*runtime_install.sh "$9/scripts/"
+        cp "$SOURCE_ROOT/config/pico-usb-installer.json" "$9/config/"
+        case "$FAIL_AT" in
+            missing) rm "$9/scripts/$BROKEN_INPUT";;
+            symlink) rm "$9/scripts/$BROKEN_INPUT"; ln -s "$SOURCE_ROOT/scripts/$BROKEN_INPUT" "$9/scripts/$BROKEN_INPUT";;
+            python-syntax) printf 'invalid python !\n' >"$9/scripts/udp_log_control.py";;
+            shell-entry) printf ':\n' >"$9/scripts/pico_usb_runtime_install.sh";;
+            shell-syntax) printf 'if\n' >"$9/scripts/pico_usb_runtime_install.sh";;
+            policy) printf '{invalid\n' >"$9/config/pico-usb-installer.json";;
+        esac
+    }
+    for step in prepare_owned_rp1_gpclk_runtime_removal remove_owned_rp1_gpclk_dkms_provider \
+        manage_apache manage_web manage_udp_logging manage_service manage_i2c \
+        manage_config manage_route_application manage_pico_usb_runtime \
+        manage_support_bundle_runtime manage_exe manage_sound; do
+        eval "$step() { record remove:$step; }"
+    done
+    egress() { local status=$?; cleanup_uninstall_source; exit "$status"; }
+fi
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 '''
 
@@ -135,7 +168,7 @@ class InstallerBootstrapTest(unittest.TestCase):
         # until the mocked APT transaction installs it; host Git cannot mask it.
         for name in ("bash", "python3", "dirname", "basename", "realpath", "uname",
                      "whoami", "tr", "sed", "grep", "awk", "cut", "cat", "cp",
-                     "chmod", "mkdir", "mktemp", "rm", "tail", "tee", "sleep", "stat"):
+                     "chmod", "mkdir", "mktemp", "rm", "tail", "tee", "sleep", "stat", "ln"):
             tool = shutil.which(name)
             self.assertIsNotNone(tool, name)
             (self.bin / name).symlink_to(tool)
@@ -182,6 +215,8 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
             EXISTING_CHECKOUT="false", BINARY_SOURCE="build", ACTION="install",
             DRY_RUN="false", REPO_BRANCH="main", NO_WEB="true",
             PATH=str(self.bin), FIXTURE_BIN=str(self.bin), GIT_STUB=str(self.git_stub),
+            SOURCE_ROOT=str(ROOT), STAGED_SOURCE=str(self.root / "staged-source"),
+            BROKEN_INPUT="udp_log_control.py",
             RP1_HELPER=str(self.rp1_helper), RP1_SELECTED="false",
             BINARY_HELPER=str(self.binary_helper), RESOLVED_BINARY=str(self.root / "resolved-binary"),
         )
@@ -332,6 +367,102 @@ support_bundle_validate_age_dependency() {
         self.assertNotIn("clone", self.recorded_events())
         self.assertIn("age-validation", self.recorded_events())
         self.assertIn("application", self.recorded_events())
+
+    def assert_uninstall_staging_removed(self) -> None:
+        marker = self.root / "staged-source"
+        if marker.exists():
+            self.assertFalse(Path(marker.read_text().strip()).exists())
+
+    def test_streamed_uninstall_fetches_validates_and_preserves_existing_checkout(self) -> None:
+        self.checkout.mkdir()
+        sentinel = self.checkout / "operator-work"
+        sentinel.write_text("preserve me")
+        result = self.run_installer(ACTION="uninstall", REPO_BRANCH="devel",
+                                    REMOVE_RP1_GPCLK_DKMS="false")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        events = self.recorded_events()
+        self.assertEqual(events[:5], ["confirmation", "model-info", "system-info",
+                                      "version-info", "uninstall-fetch"])
+        self.assertTrue(all(event.startswith("remove:") for event in events[5:]))
+        self.assertGreater(len(events[5:]), 10)
+        self.assertIn("Complete: Validate uninstall helper source.", result.stdout)
+        self.assertLess(result.stdout.index("Complete: Fetch uninstall helper source."),
+                        result.stdout.index("Complete: Validate uninstall helper source."))
+        self.assertEqual(sentinel.read_text(), "preserve me")
+        self.assertEqual(list(self.checkout.iterdir()), [sentinel])
+        self.assert_uninstall_staging_removed()
+
+    def test_streamed_uninstall_failures_stop_before_any_teardown(self) -> None:
+        cases = [("uninstall-fetch", ""), ("python-syntax", ""),
+                 ("shell-syntax", ""), ("policy", ""),
+                 ("shell-entry", "")]
+        for name in ("udp_log_control.py", "rp1_qualification.py", "install_runtime_reconcile.py",
+                     "runtime_reconcile.py", "route_application.py", "rp1_gpclk_dkms_install.py",
+                     "pico_usb_deploy.py", "pico_usb_bundle.py",
+                     "support_bundle_runtime_install.sh", "pico_usb_runtime_install.sh",
+                     "../config/pico-usb-installer.json"):
+            cases.extend([("missing", name), ("symlink", name)])
+        for failure, name in cases:
+            with self.subTest(failure=failure, name=name):
+                self.events.unlink(missing_ok=True)
+                result = self.run_installer(ACTION="uninstall", FAIL_AT=failure, BROKEN_INPUT=name)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.recorded_events(), ["confirmation", "model-info", "system-info",
+                                                          "version-info", "uninstall-fetch"])
+                if failure in ("missing", "symlink"):
+                    self.assertIn("Missing or unsafe uninstall helper input:", result.stderr)
+                self.assert_uninstall_staging_removed()
+                self.assertFalse(self.checkout.exists())
+
+    def test_local_uninstall_validates_without_cloning_or_writing_checkout(self) -> None:
+        checkout = self.root / "local-checkout"
+        shutil.copytree(ROOT / "scripts", checkout / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
+        (checkout / "config").mkdir()
+        shutil.copyfile(ROOT / "config/pico-usb-installer.json", checkout / "config/pico-usb-installer.json")
+        result = run_fixture_shell(r'''
+source "$INSTALLER"
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+ACTION=uninstall
+IS_REPO=true
+LOCAL_REPO_DIR="$CHECKOUT"
+git() { exit 97; }
+trap cleanup_uninstall_source EXIT
+prepare_uninstall_source
+[[ "$UNINSTALL_SOURCE_VALIDATED" == true ]]
+[[ "$LOCAL_REPO_DIR" == "$CHECKOUT" ]]
+[[ -d "$UNINSTALL_SOURCE_DIR/bytecode" ]]
+''', cwd=self.root, env={**os.environ, "INSTALLER": str(INSTALLER),
+                        "CHECKOUT": str(checkout), "DRY_RUN": "false", "TERM": "dumb"},
+            stage=self._testMethodName)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(list(checkout.rglob("*.pyc")))
+        self.assertFalse(list(checkout.rglob("__pycache__")))
+
+    def test_actual_runtime_wrappers_skip_missing_source_during_streamed_dry_run(self) -> None:
+        result = run_fixture_shell(r'''
+source "$INSTALLER"
+ACTION=uninstall
+IS_REPO=false
+LOCAL_REPO_DIR="$CHECKOUT"
+logD() { :; }
+git() { exit 97; }
+python3() { exit 98; }
+prepare_uninstall_source
+manage_support_bundle_runtime
+manage_pico_usb_runtime
+[[ -z "$UNINSTALL_SOURCE_DIR" ]]
+''', cwd=self.root, env={**os.environ, "INSTALLER": str(INSTALLER),
+                        "CHECKOUT": str(self.checkout), "DRY_RUN": "true", "TERM": "dumb"},
+            stage=self._testMethodName)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(self.checkout.exists())
+
+    def test_streamed_uninstall_dry_run_does_not_acquire_source(self) -> None:
+        result = self.run_installer(ACTION="uninstall", DRY_RUN="true")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("uninstall-fetch", self.recorded_events())
+        self.assertFalse(self.checkout.exists())
+        self.assertFalse((self.root / "staged-source").exists())
 
     @staticmethod
     def package_events() -> list[str]:
