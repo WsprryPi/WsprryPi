@@ -84,7 +84,7 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 10. ✅ **Review and Streamline CI.** Required software coverage is retained; the 50% reduction objective was not achieved.
 11. ✅ **Review and Streamline Pico CI.**
 12. ▧ **Publish new RP1 beta.**
-13. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
+13. ✅ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
 14. ▧ **Ensure WsprryPi consumes the latest RP1 beta.** Verify the latest
    published RP1-GPCLK-DKMS beta, update the pinned consumer integration
