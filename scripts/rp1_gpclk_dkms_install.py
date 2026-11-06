@@ -9,6 +9,7 @@ import os
 import pathlib
 import platform
 import re
+import shlex
 import stat
 import subprocess
 import sys

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MIT
 """Offline tests for the application client; provider mechanics live upstream."""
 import copy
+import contextlib
+import io
 import importlib.util
 import json
 import os
@@ -28,6 +30,17 @@ def identity(version='12.34.56-rc.2+developer'):
 
 
 class Tests(unittest.TestCase):
+    def test_debug_runner_preserves_literal_arguments_and_failure_details(self):
+        stdout=io.StringIO();stderr=io.StringIO()
+        with contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr):
+            runner=client.Runner(True)
+            result=runner.run([sys.executable,'-c','import sys; print(sys.argv[1])','literal $(no-command)'])
+            self.assertEqual(result.stdout,'literal $(no-command)\n')
+            with self.assertRaisesRegex(client.ContractError,'expected failure'):
+                runner.run([sys.executable,'-c','import sys; sys.exit("expected failure")'])
+        self.assertIn('[RP1 DEBUG] command',stderr.getvalue())
+        self.assertIn('expected failure',stderr.getvalue())
+
     def test_requirements_do_not_pin_the_product(self):
         for version in ['0.0.1','0.0.1+changed','2.0.0-rc.1','123.45.6']:
             client.validate_consumer_provider({'identity':identity(version)})
