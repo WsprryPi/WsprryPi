@@ -86,10 +86,11 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 12. ▧ **Publish new RP1 beta.**
 13. ▧ **Publish new Pico beta.** Prepare, validate, and publish the next Pico
    beta under separate release authorization.
-14. ▧ **Ensure WsprryPi consumes the latest RP1 release.** Verify the latest
-   published RP1-GPCLK-DKMS release, update the pinned consumer integration
-   where needed, and validate the selected release before the next WsprryPi beta.
-15. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
+14. ▧ **Ensure WsprryPi consumes the latest RP1 beta.** Verify the latest
+   published RP1-GPCLK-DKMS beta, update the pinned consumer integration
+   where needed, and validate the selected beta before the next WsprryPi beta.
+15. ▧ **Ensure WsprryPi consumes the latest Pico devel.**
+16. ▧ **Publish new beta.** Prepare, validate, and publish the next beta under
    separate release authorization.
 
 ## Final 4.0 stable release gate
