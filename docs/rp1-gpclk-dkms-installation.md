@@ -1,7 +1,7 @@
-# RP1-DKMS installation
+# RP1-GPIO-CLK-DKMS installation
 
 WsprryPi installs the independently maintained
-[`WsprryPi/RP1-DKMS`](https://github.com/WsprryPi/RP1-DKMS) provider.
+[`WsprryPi/RP1-GPIO-CLK-DKMS`](https://github.com/WsprryPi/RP1-GPIO-CLK-DKMS) provider.
 The package and DKMS name remains `rp1-gpclk-dkms`; its kernel-module and UAPI
 names are unchanged.
 WsprryPi does not vendor its module source, reproduce its DKMS
@@ -15,11 +15,11 @@ transaction, with transmission disabled.
 
 WsprryPi authenticates the selected provider source, requests a public provider
 plan, waits for its result, and validates its contract and postconditions.
-RP1-DKMS owns provider identity, version transitions, package/source operations,
+RP1-GPIO-CLK-DKMS owns provider identity, version transitions, package/source operations,
 runtime preparation, rollback, and removal. Its provider-owned receipt is
 `/var/lib/rp1-gpclk-dkms/provider-installation.json`. The receipt identifies
-WsprryPi as the invoking client. Existing attributable WsprryPi receipts are
-exported to the provider's verified adoption adapter before their retirement.
+WsprryPi as the invoking client. Application-owned provider receipts are
+unsupported and block installation; they are never adopted or relabeled.
 
 The consumer requires canonical UAPI hashes, runtime/lifecycle interfaces and
 capabilities from `config/rp1-provider-requirements.json`. Product versions are
@@ -117,7 +117,7 @@ An explicit release selector accepts `release:1.0.0-rc.1` or
 
 Automatic selection uses `v1.0.0-rc.1`. Explicit `release` selection uses the
 highest semantic version among eligible published releases, including prereleases,
-from `WsprryPi/RP1-DKMS`. The application authenticates the source and selects a
+from `WsprryPi/RP1-GPIO-CLK-DKMS`. The application authenticates the source and selects a
 release; the provider verifies its manifest, checksums, package, compatibility,
 and native installation identity. Failed selection or verification stops the
 installation without falling back to development source.
@@ -173,7 +173,7 @@ packages and `picotool` remain available to other consumers. Modified applicatio
 code produces a cleanup failure. Provider recovery evidence remains protected
 until its owning transaction is terminal and no live reference needs it.
 
-## RP1-DKMS source selection
+## RP1-GPIO-CLK-DKMS source selection
 
 Use `auto` for the normal application channel, `release` for eligible published
 artifacts, or an exact development selector for testing. The application requires

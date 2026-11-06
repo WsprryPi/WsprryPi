@@ -72,7 +72,7 @@ class Linux:
         captured = strict_json(companion.trusted(OWNERSHIP)[0])
         require(isinstance(captured, dict), 'provider ownership is not an object')
         repository = captured.get('repository')
-        require(repository == installer.MIGRATION_REPOSITORY,
+        require(repository == installer.REPOSITORY,
                 'provider ownership repository is not allowlisted')
         # Startup follows existing ownership, never installer defaults or
         # repository discovery. Keep the installer invocation's authority intact.

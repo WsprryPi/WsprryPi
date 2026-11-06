@@ -11,7 +11,7 @@ interface.
 
 Local output uses the supported Raspberry Pi GPIO backend or a Si5351 clock
 generator. Pi 5-family GPIO output uses the separately maintained
-RP1-DKMS provider. Available modes and frequencies depend on the selected
+RP1-GPIO-CLK-DKMS provider. Available modes and frequencies depend on the selected
 backend and its admission policy. Software support does not establish RF power,
 frequency accuracy, spectral performance or suitability of a physical setup.
 Use suitable filtering, attenuation and a load for the selected output path.

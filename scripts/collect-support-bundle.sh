@@ -359,8 +359,8 @@ def pairs(items):
     return value
 
 def summarize(value):
-    if (not isinstance(value, dict) or value.get('owner') != 'RP1-DKMS' or value.get('client') != 'WsprryPi/WsprryPi' or
-        value.get('repository') not in ('WsprryPi/RP1-DKMS',) or
+    if (not isinstance(value, dict) or value.get('owner') != 'RP1-GPIO-CLK-DKMS' or value.get('client') != 'WsprryPi/WsprryPi' or
+        value.get('repository') not in ('WsprryPi/RP1-GPIO-CLK-DKMS',) or
         value.get('schema') != 'rp1-gpclk-dkms-provider-installation-v1' or
         value.get('channel') not in ('development', 'release') or
         value.get('qualificationClaim') is not False):

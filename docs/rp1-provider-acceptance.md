@@ -1,7 +1,7 @@
 # RP1 provider acceptance
 
 The maintainer tool `scripts/maintainer/accept_rp1_release.py` accepts a clean,
-authenticated RP1-DKMS checkout and delegates artifact construction and independent
+authenticated RP1-GPIO-CLK-DKMS checkout and delegates artifact construction and independent
 validation to that provider's public tools. The product version comes from the
 provider's canonical header and public identity. There is no selected historical
 product version or release lock in the application acceptance policy.
@@ -10,7 +10,7 @@ Run in a Linux Debian packaging environment with the provider's build prerequisi
 
 ```sh
 python3 scripts/maintainer/accept_rp1_release.py \
-  --provider-source /absolute/path/to/RP1-DKMS \
+  --provider-source /absolute/path/to/RP1-GPIO-CLK-DKMS \
   --output /absolute/path/outside-git/acceptance
 ```
 
@@ -35,7 +35,7 @@ versioned UAPI and runtime/lifecycle interfaces must satisfy
 consumer implementation.
 
 Historical software metadata remains fixture data for qualification attribution.
-Provider package-parser rejection fixtures run in RP1-DKMS's offline suite; the
+Provider package-parser rejection fixtures run in RP1-GPIO-CLK-DKMS's offline suite; the
 application's `make rp1-release-acceptance-test SUDO=` checks public delegation,
 consumer compatibility, source/asset stability, and truthful non-installing results.
 The actual cross-repository identity/runtime integration tests use an explicitly

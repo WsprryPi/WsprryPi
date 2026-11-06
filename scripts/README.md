@@ -138,7 +138,7 @@ and lifecycle without creating or enabling swap. Insufficient storage or a
 failure to create or enable the temporary swap stops installation; the installer
 does not proceed past a failed resource preflight.
 
-## RP1-GPCLK-DKMS provider
+## RP1-GPIO-CLK-DKMS provider
 
 `install.sh` uses `rp1_gpclk_dkms_install.py` to select/authenticate provider
 inputs and call the independently owned public lifecycle. The provider owns
@@ -148,7 +148,7 @@ digest-reviewed neutral runtime deployment/activation, deferred explicit
 GPIO4/GPIO20 route selection, dry-run, exact-owned development no-op,
 foreign-state refusal, and
 ownership-aware uninstall behavior are
-documented in [RP1-GPCLK-DKMS installation](../docs/rp1-gpclk-dkms-installation.md).
+documented in [RP1-GPIO-CLK-DKMS installation](../docs/rp1-gpclk-dkms-installation.md).
 Dry-run uses the installer's standard command wrapper and never starts the
 Python helper. Passing `debug` displays the safely quoted helper command. The
 wrapper suppresses ordinary child stdout and stderr and owns all status and
@@ -234,7 +234,7 @@ and open-file-descriptor count. Unavailable, stopped, permission, and process
 race states are labeled explicitly rather than reported as zero. This snapshot
 does not provide historical resource monitoring.
 
-On systems using the external RP1-GPCLK-DKMS provider, the bundle includes
+On systems using the external RP1-GPIO-CLK-DKMS provider, the bundle includes
 passive, kernel-specific DKMS and `modinfo` reports for both modules, loaded
 module state, running-kernel header availability, WsprryPi installation-record
 presence, and the runtime provider's read-only `inspect` result. Missing tools,

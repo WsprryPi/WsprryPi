@@ -108,7 +108,7 @@ class Tests(unittest.TestCase):
             binding_path.write_bytes(installer.canonical(binding))
             record = {
                 'schema': installer.RECORD_SCHEMA, 'repository': repository,
-                'owner': 'RP1-DKMS', 'client':'WsprryPi/WsprryPi', 'channel': 'development',
+                'owner': 'RP1-GPIO-CLK-DKMS', 'client':'WsprryPi/WsprryPi', 'channel': 'development',
                 'installationMethod': 'upstream-development-rollback',
                 'sourceCommit': 'a'*40, 'productVersion': version, 'sourceTree': 'c'*40,
                 'uapiSha256': 'd'*64, 'versionSource': 'include/rp1_gpclk/version.h',
@@ -157,7 +157,7 @@ class Tests(unittest.TestCase):
     def test_owned_repository_drives_real_startup_validation_and_retries(self):
         installer = recovery.installer
         original = (installer.REPOSITORY, installer.REPOSITORY_URL, installer.REPOSITORY_URL)
-        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),(installer.MIGRATION_REPOSITORY,'12.34.56-rc.2+build')):
+        for repository, version in ((installer.REPOSITORY, '0.0.1'),(installer.REPOSITORY,'12.34.56-rc.2+build')):
             for route in ('gpio4', 'gpio20'):
                 with self.subTest(repository=repository, route=route), \
                      self.installed_ownership(repository, version) as (record, path, unused, helper):
@@ -206,12 +206,12 @@ class Tests(unittest.TestCase):
         installer = recovery.installer
         cases = [
             ('attacker/provider', '0.0.1', None),
-            ('WsprryPi/RP1-GPCLK-DKMS', '1.0.1', None),
+            ('WsprryPi/RP1-DKMS', '1.0.1', None),
             ('WsprryPi/RP1-GPCLK-DKMS', '0.0.1', None),
-            (installer.MIGRATION_REPOSITORY, '0.0.1', 'productVersion'),
-            (installer.MIGRATION_REPOSITORY, '0.0.1', 'sourceCommit'),
-            (installer.MIGRATION_REPOSITORY, '0.0.1', 'artifactSetSha256'),
-            (installer.MIGRATION_REPOSITORY, '0.0.1', 'kernel'),
+            (installer.REPOSITORY, '0.0.1', 'productVersion'),
+            (installer.REPOSITORY, '0.0.1', 'sourceCommit'),
+            (installer.REPOSITORY, '0.0.1', 'artifactSetSha256'),
+            (installer.REPOSITORY, '0.0.1', 'kernel'),
         ]
         for repository, version, changed in cases:
             with self.subTest(repository=repository, version=version, changed=changed), \
@@ -234,7 +234,7 @@ class Tests(unittest.TestCase):
 
     def test_startup_refuses_changed_or_duplicate_ownership_before_provider_calls(self):
         installer = recovery.installer
-        with self.installed_ownership(installer.MIGRATION_REPOSITORY, '0.0.1') as (record, path, unused, helper):
+        with self.installed_ownership(installer.REPOSITORY, '0.0.1') as (record, path, unused, helper):
             changed = copy.deepcopy(record)
             changed['sourceTree'] = 'f'*40
             with patch.object(installer, 'load_ownership_record', return_value=(changed, path.stat(), None)):
@@ -246,7 +246,7 @@ class Tests(unittest.TestCase):
 
     def test_release_ownership_uses_the_same_repository_version_boundary(self):
         installer = recovery.installer
-        for repository, version in ((installer.MIGRATION_REPOSITORY, '0.0.1'),):
+        for repository, version in ((installer.REPOSITORY, '0.0.1'),):
             with self.subTest(repository=repository), \
                  self.installed_ownership(repository, version) as (development, path, unused, helper):
                 record = {name: development[name] for name in (

@@ -251,7 +251,7 @@ declare UI_PUBLICATION_REPORTED="false"
 declare UI_PUBLICATION_RESULT_FILE=""
 declare INSTALL_RP1_GPCLK_DKMS="${INSTALL_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_SOURCE="${RP1_GPCLK_DKMS_SOURCE:-auto}"
-declare RP1_GPCLK_DKMS_REPOSITORY="${RP1_GPCLK_DKMS_REPOSITORY-WsprryPi/RP1-DKMS}"
+declare RP1_GPCLK_DKMS_REPOSITORY="${RP1_GPCLK_DKMS_REPOSITORY-WsprryPi/RP1-GPIO-CLK-DKMS}"
 declare REMOVE_RP1_GPCLK_DKMS="${REMOVE_RP1_GPCLK_DKMS:-auto}"
 declare RP1_GPCLK_DKMS_STATE_DIR=""
 declare RP1_GPCLK_DKMS_HELPER=""
@@ -2441,9 +2441,9 @@ rp1_gpclk_dkms_installation_selected() {
 # Source selection remains independent; no alternate repository is discovered.
 validate_rp1_gpclk_repository() {
     case "$RP1_GPCLK_DKMS_REPOSITORY" in
-        WsprryPi/RP1-DKMS) return 0 ;;
+        WsprryPi/RP1-GPIO-CLK-DKMS) return 0 ;;
         *)
-            warn "RP1_GPCLK_DKMS_REPOSITORY must be WsprryPi/RP1-DKMS."
+            warn "RP1_GPCLK_DKMS_REPOSITORY must be WsprryPi/RP1-GPIO-CLK-DKMS."
             return 1
             ;;
     esac
@@ -2601,7 +2601,7 @@ cleanup_rp1_gpclk_dkms_state() {
 }
 
 # -----------------------------------------------------------------------------
-# @brief Resolve and validate the RP1-DKMS installation before provider mutation.
+# @brief Resolve and validate the RP1-GPIO-CLK-DKMS installation before provider mutation.
 # @details Uses the checked-out helper when available. A streamed installer
 #          retrieves the helper from the exact WsprryPi source selector already
 #          chosen for this installer invocation. The helper enumerates and
@@ -2643,7 +2643,7 @@ prepare_rp1_gpclk_dkms_installation() {
             local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
             if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
                 --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
-                warn "Unable to retrieve the RP1-DKMS installer helper from $helper_url."
+                warn "Unable to retrieve the RP1-GPIO-CLK-DKMS installer helper from $helper_url."
                 cleanup_rp1_gpclk_dkms_state
                 return 1
             fi
@@ -2677,9 +2677,9 @@ prepare_rp1_gpclk_dkms_installation() {
     fi
     if ! EXEC_COMMAND_STATUS_MODE=quiet \
         EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
-        exec_command "Resolve RP1-DKMS installation plan" \
+        exec_command "Resolve RP1-GPIO-CLK-DKMS installation plan" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${prepare_args[@]}" "$debug"; then
-        warn "RP1-DKMS installation planning failed before provider or application installation."
+        warn "RP1-GPIO-CLK-DKMS installation planning failed before provider or application installation."
         cleanup_rp1_gpclk_dkms_state
         return 1
     fi
@@ -2704,7 +2704,7 @@ apply_rp1_gpclk_dkms_installation() {
     validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" && \
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
-        warn "RP1-DKMS plan state is unavailable."
+        warn "RP1-GPIO-CLK-DKMS plan state is unavailable."
         return 1
     fi
 
@@ -2717,9 +2717,9 @@ apply_rp1_gpclk_dkms_installation() {
         apply_args+=(--debug)
     fi
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
-        exec_command "Apply RP1-DKMS installation plan" \
+        exec_command "Apply RP1-GPIO-CLK-DKMS installation plan" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${apply_args[@]}" "$debug"; then
-        warn "RP1-DKMS installation failed closed; inspect the failure details above, retained installer log, and provider state."
+        warn "RP1-GPIO-CLK-DKMS installation failed closed; inspect the failure details above, retained installer log, and provider state."
         return 1
     fi
     debug_end "$debug"
@@ -2743,7 +2743,7 @@ prepare_rp1_gpclk_runtime_update() {
     validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" &&
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
-        warn "RP1-DKMS plan state is unavailable."
+        warn "RP1-GPIO-CLK-DKMS plan state is unavailable."
         return 1
     fi
 
@@ -2758,7 +2758,7 @@ prepare_rp1_gpclk_runtime_update() {
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
         exec_command "Prepare neutral RP1 runtime for application update" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${update_args[@]}" "$debug"; then
-        warn "RP1-DKMS runtime update preparation failed closed; application files and services were not changed."
+        warn "RP1-GPIO-CLK-DKMS runtime update preparation failed closed; application files and services were not changed."
         return 1
     fi
     debug_end "$debug"
@@ -2784,7 +2784,7 @@ activate_rp1_gpclk_runtime_administration() {
     validate_rp1_gpclk_repository || return 1
     if [[ "$DRY_RUN" != "true" && \
         ( -z "${RP1_GPCLK_DKMS_STATE_DIR:-}" || -z "${RP1_GPCLK_DKMS_HELPER:-}" ) ]]; then
-        warn "RP1-DKMS runtime plan state is unavailable."
+        warn "RP1-GPIO-CLK-DKMS runtime plan state is unavailable."
         return 1
     fi
 
@@ -2797,9 +2797,9 @@ activate_rp1_gpclk_runtime_administration() {
         runtime_args+=(--debug)
     fi
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
-        exec_command "Activate neutral RP1-DKMS administration" \
+        exec_command "Activate neutral RP1-GPIO-CLK-DKMS administration" \
         python3 "$RP1_GPCLK_DKMS_HELPER" "${runtime_args[@]}" "$debug"; then
-        warn "RP1-DKMS neutral runtime activation failed closed; no GPIO route or output was requested."
+        warn "RP1-GPIO-CLK-DKMS neutral runtime activation failed closed; no GPIO route or output was requested."
         return 1
     fi
     exec_command "Reload systemd after RP1 runtime activation" \
@@ -2859,7 +2859,7 @@ prepare_owned_rp1_gpclk_runtime_removal() {
         local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
         if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
             --output "$helper" "$helper_url" "$debug"; then
-            warn "Unable to retrieve the RP1-DKMS installer helper from $helper_url."
+            warn "Unable to retrieve the RP1-GPIO-CLK-DKMS installer helper from $helper_url."
             rm -rf -- "$state_dir"
             return 1
         fi
@@ -2873,7 +2873,7 @@ prepare_owned_rp1_gpclk_runtime_removal() {
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$failure_output_file" \
         exec_command "Prepare owned RP1 runtime for removal" \
         python3 "$helper" "${update_args[@]}" "$debug"; then
-        warn "RP1-DKMS runtime recovery failed before application teardown."
+        warn "RP1-GPIO-CLK-DKMS runtime recovery failed before application teardown."
         rm -rf -- "$state_dir"
         return 1
     fi
@@ -2933,7 +2933,7 @@ remove_owned_rp1_gpclk_dkms_provider() {
             local helper_url="${GIT_RAW_BASE}/${REPO_ORG}/${REPO_NAME}/${REPO_BRANCH}/scripts/rp1_gpclk_dkms_install.py"
             if ! exec_command "Download RP1 installer helper" curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
                 --output "$RP1_GPCLK_DKMS_HELPER" "$helper_url" "$debug"; then
-                warn "Unable to retrieve the RP1-DKMS installer helper from $helper_url."
+                warn "Unable to retrieve the RP1-GPIO-CLK-DKMS installer helper from $helper_url."
                 cleanup_rp1_gpclk_dkms_state
                 return 1
             fi
@@ -2953,7 +2953,7 @@ remove_owned_rp1_gpclk_dkms_provider() {
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$removal_output_file" \
         exec_command "Check owned RP1 provider" \
             python3 "$RP1_GPCLK_DKMS_HELPER" "${remove_args[@]}" "$debug"; then
-        warn "RP1-DKMS owned-provider removal failed; the ownership record was retained for recovery."
+        warn "RP1-GPIO-CLK-DKMS owned-provider removal failed; the ownership record was retained for recovery."
         cleanup_rp1_gpclk_dkms_state
         return 1
     fi
@@ -2971,7 +2971,7 @@ assert value['contract']=='wsprrypi-rp1-provider-removal-v1' and value['outcome'
 print(value['outcome'])
 PY_REMOVAL_RESULT
         ); then
-            warn "RP1-DKMS client did not supply a valid structured removal outcome."
+            warn "RP1-GPIO-CLK-DKMS client did not supply a valid structured removal outcome."
             cleanup_rp1_gpclk_dkms_state
             return 1
         fi
@@ -9988,7 +9988,7 @@ finish_script() {
     elif [[ "$ACTION" == "uninstall" && "$overall_status" -eq 0 ]]; then
         printf "\n%s has been uninstalled. Shared apt packages were retained.\n" "$REPO_TITLE"
         if [[ "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN" == "true" ]]; then
-            printf "The RP1-DKMS provider was not removed, as I was unable to prove\n"
+            printf "The RP1-GPIO-CLK-DKMS provider was not removed, as I was unable to prove\n"
             printf "WsprryPi's secure ownership of the module.\n"
         fi
         printf "\n"
@@ -10181,7 +10181,7 @@ manage_wsprry_pi() {
 display_action_notes() {
     if [[ "$ACTION" == "install" ]]; then
         if rp1_gpclk_dkms_installation_selected; then
-            logI "Resolved RP1-DKMS installation plan."
+            logI "Resolved RP1-GPIO-CLK-DKMS installation plan."
         fi
         if [[ "$BINARY_SOURCE" == "auto" ]]; then
             logI "Dry run: release availability is unresolved; application build steps depend on that selection."
@@ -10199,7 +10199,7 @@ display_action_notes() {
             logI "Web UI disabled (--no-web)."
         fi
     elif [[ "$REMOVE_RP1_GPCLK_DKMS" == "false" ]]; then
-        logI "RP1-DKMS preserved by explicit operator opt-out."
+        logI "RP1-GPIO-CLK-DKMS preserved by explicit operator opt-out."
     elif [[ "$DRY_RUN" == "true" ]]; then
         logI "Dry run: would recover exact owned RP1 runtime before application teardown."
     fi

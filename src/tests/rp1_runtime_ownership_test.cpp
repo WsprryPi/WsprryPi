@@ -43,7 +43,7 @@ struct Fixture {
 nlohmann::json owned() {
   return {{"schema", "rp1-gpclk-dkms-provider-installation-v1"},
           {"repository", wsprrypi::Rp1GpclkConsumerContract::repository},
-          {"owner", "RP1-DKMS"}, {"client", "WsprryPi/WsprryPi"},
+          {"owner", "RP1-GPIO-CLK-DKMS"}, {"client", "WsprryPi/WsprryPi"},
           {"channel", "development"}, {"productVersion", "12.34.56"},
           {"runtime", {{"readinessContract", "rp1-gpclk-runtime-readiness-v1"},
                        {"productVersion", "12.34.56"},
@@ -67,7 +67,7 @@ int main() try {
     catch (const std::exception &) { denied = true; }
     require(denied, "production default accepted non-root ownership");
   }
-  for (const auto &repository : {"WsprryPi/RP1-GPCLK-DKMS", "foreign/provider"}) {
+  for (const auto &repository : {"WsprryPi/RP1-DKMS", "WsprryPi/RP1-GPCLK-DKMS", "foreign/provider"}) {
     auto value = current;
     value["repository"] = repository;
     fixture.write(value.dump());

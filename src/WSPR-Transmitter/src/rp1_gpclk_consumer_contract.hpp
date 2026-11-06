@@ -10,7 +10,7 @@ namespace wsprrypi {
 // Interface/limit/capability checks admit the provider. Product identity is
 // bounded SemVer data, with the route identity format defined by the UAPI contract.
 struct Rp1GpclkConsumerContract {
-    static constexpr std::string_view repository = "WsprryPi/RP1-DKMS";
+    static constexpr std::string_view repository = "WsprryPi/RP1-GPIO-CLK-DKMS";
     static constexpr std::string_view module = "rp1-gpclk-dkms";
     static bool validProduct(std::string_view product) {
         if (product.empty() || product.size() > 48) return false;

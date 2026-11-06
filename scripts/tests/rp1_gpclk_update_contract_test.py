@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 APP=Path(__file__).resolve().parents[2]
-if len(sys.argv)!=2:raise SystemExit('usage: rp1_gpclk_update_contract_test.py /path/to/RP1-DKMS')
+if len(sys.argv)!=2:raise SystemExit('usage: rp1_gpclk_update_contract_test.py /path/to/RP1-GPIO-CLK-DKMS')
 PROVIDER=Path(sys.argv.pop()).resolve(strict=True)
 sys.path.insert(0,str(APP/'scripts'))
 import rp1_gpclk_dkms_install as client

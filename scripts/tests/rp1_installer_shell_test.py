@@ -25,7 +25,7 @@ from fixture_filesystem import temporary_root
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 os.environ["LOCAL_REPO_DIR"]=str(ROOT)
-PROVIDER_ROOT = pathlib.Path(os.environ.get('RP1_DKMS_SOURCE', ROOT.parent/'RP1-DKMS')).resolve()
+PROVIDER_ROOT = pathlib.Path(os.environ.get('RP1_DKMS_SOURCE', ROOT.parent/'RP1-GPIO-CLK-DKMS')).resolve()
 sys.path[:0] = [str(ROOT/"scripts"), str(PROVIDER_ROOT/"scripts")]
 import rp1_gpclk_dkms_install as CLIENT
 SCRIPT = PROVIDER_ROOT / 'scripts/provider_lifecycle.py'
@@ -99,7 +99,7 @@ class RunnerFixtures:
         super().setUp()
         # Historical fixtures explicitly select their recorded authority.
         self.addCleanup(MOD.configure_provider_repository, MOD.REPOSITORY)
-        MOD.configure_provider_repository(MOD.LEGACY_REPOSITORY)
+        MOD.configure_provider_repository(MOD.REPOSITORY)
 
     def runner(self, responses=None, *, steps=()):
         runner = StrictCommands({key: value for key, value in (responses or {}).items()
@@ -154,9 +154,9 @@ cleanup_rp1_gpclk_dkms_state
 [[ -z "$RP1_GPCLK_DKMS_STATE_DIR" && -z "$RP1_GPCLK_DKMS_HELPER" ]]
 '''
         for selector, branch, repository in (
-            ("release", "main", MOD.MIGRATION_REPOSITORY),
-            ("devel", "codex/issue-412-test", MOD.MIGRATION_REPOSITORY),
-            ("commit:" + "a"*40, "devel", MOD.MIGRATION_REPOSITORY),
+            ("release", "main", MOD.REPOSITORY),
+            ("devel", "codex/issue-412-test", MOD.REPOSITORY),
+            ("commit:" + "a"*40, "devel", MOD.REPOSITORY),
         ):
             sentinel = self.root / f"{selector}.invoked"
             environment = os.environ.copy()
@@ -175,9 +175,9 @@ cleanup_rp1_gpclk_dkms_state
             self.assertFalse(sentinel.exists())
             self.assertEqual(result.stdout.count("Complete: (dry)"), 6)
             self.assertNotIn("[INFO ]", result.stdout)
-            self.assertNotIn("Resolve RP1-DKMS installation plan", result.stdout)
+            self.assertNotIn("Resolve RP1-GPIO-CLK-DKMS installation plan", result.stdout)
             self.assertIn(
-                "Complete: (dry) Apply RP1-DKMS installation plan",
+                "Complete: (dry) Apply RP1-GPIO-CLK-DKMS installation plan",
                 result.stdout,
             )
             self.assertIn(
@@ -185,7 +185,7 @@ cleanup_rp1_gpclk_dkms_state
                 result.stdout,
             )
             self.assertIn(
-                "Complete: (dry) Activate neutral RP1-DKMS administration",
+                "Complete: (dry) Activate neutral RP1-GPIO-CLK-DKMS administration",
                 result.stdout,
             )
             self.assertIn(
@@ -196,8 +196,8 @@ cleanup_rp1_gpclk_dkms_state
                 "Complete: (dry) Start WsprryPi after RP1 runtime activation",
                 result.stdout,
             )
-            self.assertIn("Name:    Resolve RP1-DKMS installation plan", result.stderr)
-            self.assertIn("Name:    Apply RP1-DKMS installation plan", result.stderr)
+            self.assertIn("Name:    Resolve RP1-GPIO-CLK-DKMS installation plan", result.stderr)
+            self.assertIn("Name:    Apply RP1-GPIO-CLK-DKMS installation plan", result.stderr)
             helper = install_script.parent / "rp1_gpclk_dkms_install.py"
             prepare_command = (
                 f"Command: python3 {helper} --provider-repository {repository} prepare --state-dir dry-run:no-state-created "
@@ -255,7 +255,7 @@ activate_rp1_gpclk_runtime_administration debug
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, "")
-            self.assertNotIn("RP1-DKMS", result.stderr)
+            self.assertNotIn("RP1-GPIO-CLK-DKMS", result.stderr)
             self.assertFalse(sentinel.exists())
 
     def test_auto_pi5_shell_path_still_reaches_provider_planner(self):
@@ -288,7 +288,7 @@ cleanup_rp1_gpclk_dkms_state
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("Resolve RP1-DKMS installation plan", result.stdout)
+        self.assertNotIn("Resolve RP1-GPIO-CLK-DKMS installation plan", result.stdout)
         self.assertFalse((self.root / "auto-pi5-planner").exists())
 
     def test_shell_rp1_identity_requires_pi5_model_and_bcm2712(self):
@@ -433,7 +433,7 @@ cleanup_rp1_gpclk_dkms_state
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("[INFO ]", result.stdout)
-        self.assertNotIn("Resolve RP1-DKMS installation plan", result.stdout)
+        self.assertNotIn("Resolve RP1-GPIO-CLK-DKMS installation plan", result.stdout)
         arguments = capture.read_text().splitlines()
         self.assertEqual(arguments.count("CALL"), 5)
         self.assertEqual(arguments.count("ARG=--debug"), 4)
@@ -456,7 +456,7 @@ python3() {
     local arg
     for arg in "$@"; do
         if [[ "$arg" == remove ]]; then
-            printf 'RP1-DKMS absent: no provider removal was required.\n'
+            printf 'RP1-GPIO-CLK-DKMS absent: no provider removal was required.\n'
         fi
     done
     return 0
@@ -479,7 +479,7 @@ ACTION=uninstall
 prepare_owned_rp1_gpclk_runtime_removal debug
 remove_owned_rp1_gpclk_dkms_provider debug
 '''
-        for repository in (None, MOD.MIGRATION_REPOSITORY):
+        for repository in (None, MOD.REPOSITORY):
             with self.subTest(repository=repository):
                 capture = self.root / 'repository-argv.txt'
                 capture.unlink(missing_ok=True)
@@ -496,11 +496,11 @@ remove_owned_rp1_gpclk_dkms_provider debug
                 helpers = [args for args in calls if args[0].endswith('rp1_gpclk_dkms_install.py')]
                 self.assertEqual(len(helpers), 10)
                 for args in helpers:
-                    self.assertEqual(args[1:3], ['--provider-repository', MOD.MIGRATION_REPOSITORY])
+                    self.assertEqual(args[1:3], ['--provider-repository', MOD.REPOSITORY])
                     self.assertIn('--debug', args)
                     # Parse actual shell arguments with the real helper CLI.
                     parsed = CLIENT.parser().parse_args(args[1:])
-                    self.assertEqual(parsed.provider_repository, MOD.MIGRATION_REPOSITORY)
+                    self.assertEqual(parsed.provider_repository, MOD.REPOSITORY)
                 self.assertEqual([args[3] for args in helpers],
                     ['prepare', 'prepare-runtime-update', 'apply', 'activate-runtime']*2 +
                     ['prepare-runtime-removal', 'remove'])
@@ -524,7 +524,7 @@ ACTION=install DRY_RUN=false INSTALL_RP1_GPCLK_DKMS=true
             'prepare_rp1_gpclk_runtime_update', 'apply_rp1_gpclk_dkms_installation',
             'activate_rp1_gpclk_runtime_administration', 'prepare_owned_rp1_gpclk_runtime_removal',
             'remove_owned_rp1_gpclk_dkms_provider')
-        for repository in ('', MOD.LEGACY_REPOSITORY, 'attacker/provider', 'WsprryPi/RP1-DKMS;false'):
+        for repository in ('', 'WsprryPi/RP1-DKMS', 'attacker/provider', 'WsprryPi/RP1-GPIO-CLK-DKMS;false'):
             for operation in operations:
                 with self.subTest(repository=repository, operation=operation):
                     capture = self.root / 'invalid-repository-effects'
@@ -567,7 +567,7 @@ cleanup_rp1_gpclk_dkms_state
         self.assertLessEqual(max(map(len, result.stdout.splitlines())), 80)
         helper = install_script.parent / "rp1_gpclk_dkms_install.py"
         self.assertIn(
-            f"Command: python3 {helper} --provider-repository WsprryPi/RP1-DKMS remove --remove auto --debug",
+            f"Command: python3 {helper} --provider-repository WsprryPi/RP1-GPIO-CLK-DKMS remove --remove auto --debug",
             result.stderr,
         )
 
@@ -650,7 +650,7 @@ remove_owned_rp1_gpclk_dkms_provider debug
             source.index("prepare_owned_rp1_gpclk_runtime_removal()")
         ]
         activation = function.index(
-            'exec_command "Activate neutral RP1-DKMS administration"'
+            'exec_command "Activate neutral RP1-GPIO-CLK-DKMS administration"'
         )
         reload = function.index(
             'exec_command "Reload systemd after RP1 runtime activation"'
@@ -704,10 +704,10 @@ printf 'SETUP_CONTINUES\n'
     def test_helper_invocations_use_exec_command_and_propagate_debug(self):
         source = (ROOT / "scripts/install.sh").read_text()
         self.assertNotRegex(source, r'if ! python3 "\$RP1_GPCLK_DKMS_HELPER"')
-        self.assertEqual(source.count('exec_command "Resolve RP1-DKMS installation plan"'), 1)
-        self.assertEqual(source.count('exec_command "Apply RP1-DKMS installation plan"'), 1)
+        self.assertEqual(source.count('exec_command "Resolve RP1-GPIO-CLK-DKMS installation plan"'), 1)
+        self.assertEqual(source.count('exec_command "Apply RP1-GPIO-CLK-DKMS installation plan"'), 1)
         self.assertEqual(source.count('exec_command "Prepare neutral RP1 runtime for application update"'), 1)
-        self.assertEqual(source.count('exec_command "Activate neutral RP1-DKMS administration"'), 1)
+        self.assertEqual(source.count('exec_command "Activate neutral RP1-GPIO-CLK-DKMS administration"'), 1)
         self.assertGreaterEqual(source.count('args+=(--debug)'), 4)
         self.assertIn('runtime-update-output.log', source)
         self.assertIn('runtime-removal-output.log', source)
@@ -828,13 +828,13 @@ printf 'return_status=%s\n' "$status" >>"$CAPTURE"
         self.assertIn("finish_status=0", lines)
         self.assertIn("return_status=0", lines)
         self.assertIn("Uninstallation successful", stdout)
-        self.assertNotIn("RP1-DKMS provider was not removed", stdout)
+        self.assertNotIn("RP1-GPIO-CLK-DKMS provider was not removed", stdout)
 
     def test_successful_uninstall_reports_unproven_provider_preservation(self):
         lines, stdout = self.run_uninstall_orchestration(provider_unproven=True)
         self.assertIn("finish_status=0", lines)
         self.assertIn(
-            "The RP1-DKMS provider was not removed, as I was unable to prove\n"
+            "The RP1-GPIO-CLK-DKMS provider was not removed, as I was unable to prove\n"
             "WsprryPi's secure ownership of the module.",
             stdout,
         )

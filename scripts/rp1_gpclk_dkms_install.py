@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""WsprryPi selection, authentication, and client of the RP1-DKMS public facade."""
+"""WsprryPi selection, authentication, and client of the RP1-GPIO-CLK-DKMS public facade."""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 sys.dont_write_bytecode = True
 
-MIGRATION_REPOSITORY = REPOSITORY = 'WsprryPi/RP1-DKMS'
+REPOSITORY = 'WsprryPi/RP1-GPIO-CLK-DKMS'
 REPOSITORY_URL='https://github.com/'+REPOSITORY+'.git'
 PUBLIC_CONTRACT='rp1-gpclk-provider-lifecycle-v1'
 DEFAULT_RELEASE_TAG='v1.0.0-rc.1'
@@ -28,7 +28,7 @@ RUNTIME_READINESS_CONTRACT='rp1-gpclk-runtime-readiness-v1'
 RUNTIME_PROVIDER=pathlib.Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
 PROVIDER_RECORD=pathlib.Path('/var/lib/rp1-gpclk-dkms/provider-installation.json')
 ACTIVE_FACADE=pathlib.Path('/var/lib/rp1-gpclk-dkms/facade/active.json')
-LEGACY_RECORD=pathlib.Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
+UNRECOGNIZED_RECORD=pathlib.Path('/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json')
 SHA256=re.compile(r'^[0-9a-f]{64}$')
 SHA40=re.compile(r'^[0-9a-f]{40}$')
 MAX_API_BYTES=16*1024*1024
@@ -443,26 +443,15 @@ def prepare_client(args):
     state=args.state_dir
     if skipped_auto(args):
         atomic_json(state/'client.json',{'skip':True})
-        print('RP1-DKMS installation skipped by platform/operator selection.')
+        print('RP1-GPIO-CLK-DKMS installation skipped by platform/operator selection.')
         return
     policy=source_policy(args.wsprry_source) if args.source=='auto' else 'explicit-source'
     if args.dry_run:
         print('Dry run: would authenticate selected provider and invoke its public lifecycle plan; no provider effects.')
         atomic_json(state/'client.json',{'skip':True})
         return
+    require(not (UNRECOGNIZED_RECORD.exists() or UNRECOGNIZED_RECORD.is_symlink()), 'unrecognized application-owned provider receipt blocks installation')
     entrypoint,source=bootstrap(state,args.source,policy)
-    # Export an existing attributable client receipt to the provider's explicit
-    # adoption adapter; the provider never discovers/reads application state.
-    if LEGACY_RECORD.exists():
-        require(not PROVIDER_RECORD.exists(),'both legacy and provider receipts exist')
-        old_identity=record_file_identity(LEGACY_RECORD)
-        old_bytes=LEGACY_RECORD.read_bytes()
-        receipt=state/'predecessor-receipt.json'
-        atomic_json(receipt,strict_json(old_bytes))
-        invoke(entrypoint,'adopt','--receipt',receipt)
-        require(record_file_identity(LEGACY_RECORD)==old_identity and LEGACY_RECORD.read_bytes()==old_bytes,
-                'legacy receipt changed during provider adoption; retained for recovery')
-        LEGACY_RECORD.unlink()
     req=state/'consumer-requirements.json'
     atomic_json(req,strict_json(requirements_path().read_bytes()))
     response=invoke(entrypoint,'prepare','--state-dir',state,'--install',args.install,'--source',source,
@@ -470,7 +459,7 @@ def prepare_client(args):
     require(response.get('decision',{}).get('install') is True,'provider did not plan installation')
     require(isinstance(response.get('planSha256'),str) and SHA256.fullmatch(response['planSha256']), 'provider preparation omitted its plan digest')
     atomic_json(state/'client.json',{'skip':False,'entrypoint':str(entrypoint),'planSha256':response['planSha256']})
-    print('RP1-DKMS public plan: '+str(response.get('transition')))
+    print('RP1-GPIO-CLK-DKMS public plan: '+str(response.get('transition')))
 
 
 def removal_result(args,outcome):
@@ -498,7 +487,7 @@ def execute_client(args):
         arguments=['--state-dir',state]
     else:
         if not ACTIVE_FACADE.exists():
-            require(not PROVIDER_RECORD.exists() and not LEGACY_RECORD.exists(),'provider receipt has no authenticated facade')
+            require(not PROVIDER_RECORD.exists() and not (UNRECOGNIZED_RECORD.exists() or UNRECOGNIZED_RECORD.is_symlink()),'provider receipt has no authenticated facade')
             require(getattr(args,'remove','auto')!='true','explicit provider removal has no attributable installation')
             removal_result(args,'unmanaged')
             print('No application-managed provider facade exists; no provider removal requested.')
@@ -518,7 +507,7 @@ def execute_client(args):
         require(response.get('postconditions')=={'providerAbsent':True,'transmissionAuthorized':False},
                 'provider removal did not prove absence')
         removal_result(args,'absent')
-    print('RP1-DKMS '+args.command+' completed through its public lifecycle interface.')
+    print('RP1-GPIO-CLK-DKMS '+args.command+' completed through its public lifecycle interface.')
 
 
 def parser():
@@ -549,7 +538,7 @@ def main(argv=None):
         else: execute_client(args)
         return 0
     except (ContractError,OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as error:
-        print('RP1-DKMS operation refused: '+str(error),file=sys.stderr)
+        print('RP1-GPIO-CLK-DKMS operation refused: '+str(error),file=sys.stderr)
         return 1
 
 

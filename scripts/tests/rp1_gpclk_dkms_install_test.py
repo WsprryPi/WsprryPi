@@ -51,6 +51,21 @@ class Tests(unittest.TestCase):
         self.assertGreater(client.release_precedence('v1.0.0'),client.release_precedence('v1.0.0-rc.10'))
         self.assertEqual(client.release_precedence('v1.0.0+build'),client.release_precedence('v1.0.0'))
 
+    def test_obsolete_authorities_and_application_receipt_cannot_be_adopted(self):
+        for repository in ('WsprryPi/RP1-DKMS', 'WsprryPi/RP1-GPCLK-DKMS'):
+            value = identity(); value['repository'] = repository
+            with self.assertRaises(client.ContractError): client.validate_consumer_provider({'identity': value})
+            with self.assertRaises(client.ContractError): client.canonical_origin('https://github.com/'+repository+'.git')
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw); receipt = root/'unrecognized.json'
+            receipt.write_bytes(b'foreign receipt')
+            args = client.parser().parse_args(['prepare', '--state-dir', str(root), '--install', 'true',
+                                              '--source', 'devel', '--wsprry-source', 'devel'])
+            with patch.object(client, 'UNRECOGNIZED_RECORD', receipt), patch.object(client, 'bootstrap') as bootstrap:
+                with self.assertRaises(client.ContractError): client.prepare_client(args)
+                bootstrap.assert_not_called()
+            self.assertEqual(receipt.read_bytes(), b'foreign receipt')
+
     def test_invalid_release_prefix_is_refused_before_fetch(self):
         with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json') as fetch:
             with self.assertRaises(client.ContractError):
@@ -164,22 +179,36 @@ class Tests(unittest.TestCase):
         for prefix in ['https://github.com/','ssh://git@github.com/','git@github.com:']:
             for suffix in ['', '.git', '.git/']:
                 self.assertEqual(client.canonical_origin(prefix+client.REPOSITORY+suffix),client.REPOSITORY_URL)
-        for value in ['https://attacker.example/'+client.REPOSITORY,'git@github.com:foreign/RP1-DKMS.git',
+        for value in ['https://attacker.example/'+client.REPOSITORY,'git@github.com:foreign/RP1-GPIO-CLK-DKMS.git',
                       'https://github.com/'+client.REPOSITORY+'.git?redirect=evil','http://github.com/'+client.REPOSITORY]:
             with self.assertRaises(client.ContractError):client.canonical_origin(value)
 
     def test_actual_clean_ssh_origin_checkout_bootstraps_without_network(self):
-        provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-DKMS'))
+        provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-GPIO-CLK-DKMS'))
         with tempfile.TemporaryDirectory() as raw:
             root=Path(raw).resolve();root.chmod(0o700);source=root/'source';state=root/'state';state.mkdir(mode=0o700)
-            subprocess.run(['git','clone','--no-local',str(provider),str(source)],check=True,capture_output=True)
+            # Synthetic Git metadata belongs only to this disposable fixture.
+            import shutil
+            source.mkdir()
+            names = subprocess.check_output(['git', '-C', str(provider), 'ls-files', '-z',
+                                             '--cached', '--others', '--exclude-standard']).split(b'\0')
+            for raw_name in set(names) - {b''}:
+                name = raw_name.decode(); original = provider/name
+                if not original.is_file(): continue
+                target = source/name; target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(original, target)
+            for command in (['init', '-q'], ['config', 'user.name', 'Fixture'],
+                            ['config', 'user.email', 'fixture@example.invalid'], ['add', '.'],
+                            ['commit', '-qm', 'Synthetic candidate snapshot'],
+                            ['remote', 'add', 'origin', client.REPOSITORY_URL]):
+                subprocess.run(['git', '-C', str(source), *command], check=True, capture_output=True)
             subprocess.run(['git','-C',str(source),'remote','set-url','origin','git@github.com:'+client.REPOSITORY+'.git'],check=True)
             entrypoint,selected=client.bootstrap(state,'checkout:'+str(source),'explicit-source')
             self.assertTrue(entrypoint.is_file());self.assertEqual(selected,'checkout:'+str(state/'provider-source'))
             self.assertEqual(client.run_git(source,'remote','get-url','origin'),'git@github.com:'+client.REPOSITORY+'.git')
 
     def test_real_provider_public_identity_satisfies_compiled_consumer(self):
-        provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-DKMS'))
+        provider=Path(os.environ.get('RP1_DKMS_SOURCE',ROOT.parent/'RP1-GPIO-CLK-DKMS'))
         p=subprocess.run([sys.executable,str(provider/'scripts/provider_lifecycle.py'),'identity'],capture_output=True,text=True,check=True)
         value=client.strict_json(p.stdout)
         self.assertEqual(value['contract'],client.PUBLIC_CONTRACT)

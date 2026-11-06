@@ -182,12 +182,12 @@ from pathlib import Path
 try:
     subprocess.run(["git", "--version"], check=True, capture_output=True)
 except (OSError, subprocess.CalledProcessError):
-    print("RP1-DKMS operation refused: required command is unavailable: git", file=sys.stderr)
+    print("RP1-GPIO-CLK-DKMS operation refused: required command is unavailable: git", file=sys.stderr)
     sys.exit(1)
 with Path(os.environ["EVENTS"]).open("a") as events:
     events.write("rp1-plan\\n")
 if os.environ["FAIL_AT"] == "plan":
-    print("RP1-DKMS operation refused: fixture source rejected", file=sys.stderr)
+    print("RP1-GPIO-CLK-DKMS operation refused: fixture source rejected", file=sys.stderr)
     sys.exit(17)
 ''', encoding="utf-8")
         self.binary_helper = self.root / "binary-helper.py"
@@ -304,9 +304,9 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
                         self.assertLess(max(info), min(progress), result.stdout)
                         self.assertIn("[INFO ] Managing required packages (this may take a few minutes).",
                                       result.stdout)
-                        announcement = "[INFO ] Resolved RP1-DKMS installation plan."
+                        announcement = "[INFO ] Resolved RP1-GPIO-CLK-DKMS installation plan."
                         self.assertEqual(result.stdout.count(announcement), int(rp1 == "true"))
-                        self.assertNotIn("Complete: Resolve RP1-DKMS installation plan.",
+                        self.assertNotIn("Complete: Resolve RP1-GPIO-CLK-DKMS installation plan.",
                                          result.stdout)
 
     def test_clone_failure_stops_before_validation_and_provider_changes(self) -> None:
@@ -505,9 +505,9 @@ manage_pico_usb_runtime
         result = self.run_installer(FAIL_AT="plan", RP1_SELECTED="true")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.recorded_events(), [*self.package_events(), "clone", "rp1-plan"])
-        self.assertIn("RP1-DKMS operation refused: fixture source rejected", result.stderr)
-        self.assertIn("Failed: Resolve RP1-DKMS installation plan.", result.stderr)
-        self.assertNotIn("Complete: Resolve RP1-DKMS installation plan.", result.stdout)
+        self.assertIn("RP1-GPIO-CLK-DKMS operation refused: fixture source rejected", result.stderr)
+        self.assertIn("Failed: Resolve RP1-GPIO-CLK-DKMS installation plan.", result.stderr)
+        self.assertNotIn("Complete: Resolve RP1-GPIO-CLK-DKMS installation plan.", result.stdout)
         self.assertNotIn("before package mutation", result.stderr)
 
     def test_pi5_dry_run_does_not_install_git_or_execute_the_planner(self) -> None:
@@ -537,7 +537,7 @@ LOCAL_REPO_DIR="$(dirname "$(dirname "$INSTALLER")")"
 init_log() { :; }
 setup_log
 rp1_gpclk_dkms_installation_selected() { return 0; }
-python3() { printf 'RP1-DKMS operation refused: fixture source rejected\n' >&2; return 17; }
+python3() { printf 'RP1-GPIO-CLK-DKMS operation refused: fixture source rejected\n' >&2; return 17; }
 if prepare_rp1_gpclk_dkms_installation; then exit 1; fi
 [[ -z "$RP1_GPCLK_DKMS_STATE_DIR" ]]
 '''],

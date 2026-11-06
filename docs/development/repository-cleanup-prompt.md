@@ -139,7 +139,7 @@ hardware task and its current setup limits, but do not manufacture a hardware
 test to validate deletion of old evidence.
 
 The maintained WsprryPico, WsprryPi-Docs, WsprryPi-Qualification-Harness,
-RP1-GPCLK-DKMS and GPSDO repositories are independent. Do not edit their
+RP1-GPIO-CLK-DKMS and GPSDO repositories are independent. Do not edit their
 maintained files under this prompt. A disposable paired-source test snapshot
 can be removed only after its role, lack of unique work and source availability
 are verified; a name containing `pi` or `pico` establishes none of these facts.

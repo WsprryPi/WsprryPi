@@ -18,7 +18,7 @@ scope['OWNER_UID'] = os.geteuid()  # Internal fixture only, never a collector co
 class Tests(unittest.TestCase):
     def record(self, channel='development'):
         return {'schema': 'rp1-gpclk-dkms-provider-installation-v1',
-                'owner': 'RP1-DKMS', 'client':'WsprryPi/WsprryPi', 'repository': 'WsprryPi/RP1-DKMS',
+                'owner': 'RP1-GPIO-CLK-DKMS', 'client':'WsprryPi/WsprryPi', 'repository': 'WsprryPi/RP1-GPIO-CLK-DKMS',
                 'channel': channel, 'sourceCommit': 'a'*40, 'productVersion': '1.0.0',
                 'sourceTree': 'b'*40, 'uapiSha256': 'c'*64, 'qualificationClaim': False,
                 'runtime': {'bindingSha256': 'd'*64, 'artifactSetSha256': 'e'*64,
@@ -41,7 +41,7 @@ class Tests(unittest.TestCase):
                                 value['compatibilityIdentities']['gpio20'])
 
     def test_invalid_identity_never_becomes_free_text(self):
-        value = self.record(); value['repository'] = 'WsprryPi/RP1-DKMS'
+        value = self.record(); value['repository'] = 'WsprryPi/RP1-GPIO-CLK-DKMS'
         self.assertEqual(scope['summarize'](value)['status'], 'recorded-only')
         value['repository'] = 'attacker/provider'
         with self.assertRaises(ValueError): scope['summarize'](value)

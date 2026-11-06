@@ -63,7 +63,7 @@ inline std::string readRp1RuntimeOwnership(const char *path,
           "rp1-gpclk-dkms-provider-installation-v1" ||
       record.value("repository", std::string{}) !=
           Rp1GpclkConsumerContract::repository ||
-      record.value("owner", std::string{}) != "RP1-DKMS" ||
+      record.value("owner", std::string{}) != "RP1-GPIO-CLK-DKMS" ||
       record.value("client", std::string{}) != "WsprryPi/WsprryPi" ||
       !record.contains("runtime") || !record["runtime"].is_object())
     throw std::runtime_error("WsprryPi runtime ownership contract differs.");

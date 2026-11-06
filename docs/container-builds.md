@@ -137,4 +137,4 @@ appropriate target and OS. ARMv6 compiler support does not prove that the full
 application fits the Pi 1A+'s runtime memory budget.
 
 These commands do not produce `.deb` packages, publish releases, install on a
-Pi, or change the installer. RP1-GPCLK-DKMS remains a separately managed provider.
+Pi, or change the installer. RP1-GPIO-CLK-DKMS remains a separately managed provider.
