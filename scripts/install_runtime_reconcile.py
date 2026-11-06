@@ -50,12 +50,18 @@ def apply(remove=False):
     record = recovery.strict_json(raw) if raw is not None else None
     if record is not None:
         if (set(record) != {'version', 'phase', 'before', 'after'} or
-                record['version'] != 1 or record['phase'] not in ('pending', 'complete') or
-                any(not isinstance(record[key], dict) or set(record[key]) != set(FILES)
-                    for key in ('before', 'after')) or
+                type(record['version']) is not int or record['version'] != 1 or record['phase'] not in ('pending', 'complete') or
+                any(not isinstance(record[key], dict) or not record[key] or not set(record[key]) <= set(FILES)
+                    for key in ('before', 'after'))
+                or set(record['before'])!=set(record['after']) or
                 any(value is not None and (not isinstance(value, str) or not installer.SHA256.fullmatch(value))
                     for key in ('before', 'after') for value in record[key].values())):
             raise ValueError('invalid startup installation ownership record')
+        # Additive application inventories never claim an existing new path.
+        # Its absent recorded digest must match the actual destination below.
+        for name in FILES:
+            record['before'].setdefault(name,None)
+            record['after'].setdefault(name,None)
         if record['phase'] == 'pending' and record['after'] != target:
             raise ValueError('retry the exact pending startup installation first')
     current = {name: digest(read(Path(name))) for name in FILES}

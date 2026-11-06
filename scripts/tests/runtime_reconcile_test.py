@@ -559,6 +559,23 @@ class Tests(unittest.TestCase):
                     self.assertTrue(all(call.args[0] in (['/usr/bin/systemctl', 'daemon-reload'], ['/usr/bin/systemctl','is-failed','--quiet','wsprrypi-rp1-reconcile.service']) for call in command.call_args_list))
                     self.assertFalse(state.exists())
 
+    def test_startup_inventory_can_grow_without_adopting_foreign_files(self):
+        import install_runtime_reconcile as installation
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);(root/'source').write_bytes(b'owned')
+            state=root/'state.json';first=str(root/'first');added=str(root/'requirements')
+            read=lambda p:p.read_bytes() if p.exists() else None
+            with patch.object(installation,'ROOT',root),patch.object(installation,'STATE',state),patch.object(installation,'read',read),patch.object(installation.subprocess,'run'):
+                with patch.object(installation,'FILES',{first:('source',0o644)}):installation.apply()
+                original=state.read_bytes();Path(added).write_bytes(b'foreign')
+                with patch.object(installation,'FILES',{first:('source',0o644),added:('source',0o644)}):
+                    with self.assertRaisesRegex(ValueError,'differs from recorded ownership'):installation.apply()
+                    self.assertEqual(state.read_bytes(),original);self.assertEqual(Path(added).read_bytes(),b'foreign')
+                    Path(added).unlink();installation.apply()
+                    self.assertEqual(Path(added).read_bytes(),b'owned')
+                    installation.apply(remove=True)
+                    self.assertFalse(Path(first).exists());self.assertFalse(Path(added).exists());self.assertFalse(state.exists())
+
     def test_provider_replacement_or_conflict_starts_diagnostics_idle_without_administration(self):
         for error in (FileNotFoundError('binding retired'), recovery.installer.ContractError('ownership differs')):
             system = System()
