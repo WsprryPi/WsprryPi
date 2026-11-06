@@ -71,6 +71,7 @@ def apply(remove=False):
                    {record['after'][name]})
         if actual not in allowed:
             raise ValueError('startup file differs from recorded ownership: '+name)
+    if remove and record is None and all(value is None for value in current.values()):return
     STATE.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     installer.atomic_json(STATE, {'version': 1, 'phase': 'pending',
                                   'before': current, 'after': target})
@@ -111,6 +112,7 @@ def apply(remove=False):
 
 def install(remove=False):
     if os.geteuid() != 0: raise ValueError('root required')
+    if remove and read(STATE) is None and all(read(Path(name)) is None for name in FILES):return
     with recovery.Linux().lock():
         apply(remove)
 

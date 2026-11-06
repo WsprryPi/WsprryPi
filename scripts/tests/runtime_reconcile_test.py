@@ -559,6 +559,15 @@ class Tests(unittest.TestCase):
                     self.assertTrue(all(call.args[0] in (['/usr/bin/systemctl', 'daemon-reload'], ['/usr/bin/systemctl','is-failed','--quiet','wsprrypi-rp1-reconcile.service']) for call in command.call_args_list))
                     self.assertFalse(state.exists())
 
+    def test_absent_startup_removal_creates_no_coordination_or_state(self):
+        import install_runtime_reconcile as installation
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw);state=root/'absent/state.json';target=str(root/'absent/installed')
+            read=lambda p:p.read_bytes() if p.exists() else None
+            with patch.object(installation,'STATE',state),patch.object(installation,'FILES',{target:('source',0o644)}),patch.object(installation,'read',read),patch.object(installation.os,'geteuid',return_value=0),patch.object(installation.recovery.Linux,'lock') as lock,patch.object(installation.subprocess,'run') as command:
+                installation.install(remove=True);installation.apply(remove=True)
+                lock.assert_not_called();command.assert_not_called();self.assertFalse(state.parent.exists())
+
     def test_startup_inventory_can_grow_without_adopting_foreign_files(self):
         import install_runtime_reconcile as installation
         with tempfile.TemporaryDirectory() as raw:

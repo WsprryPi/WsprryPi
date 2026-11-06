@@ -48,6 +48,7 @@ def provision(action,repository,root=Path('/'),development_source=None):
     policy = bundle.decode((repository/'config/pico-usb-installer.json').read_bytes())
     bundle.Store(target,policy)
     bundle.safe(target,owner=False)
+    if action == 'uninstall' and not target.exists():return
     with bundle.lock(target,owner=root == Path('/')):
         prior = None
         if target.exists():

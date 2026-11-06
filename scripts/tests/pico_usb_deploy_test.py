@@ -90,6 +90,11 @@ class DeploymentTests(unittest.TestCase):
         path.unlink();outside=self.base/'outside';outside.write_bytes(b'private');path.symlink_to(outside)
         with self.assertRaises(ValueError):self.install()
         self.assertEqual(outside.read_bytes(),b'private')
+    def test_absent_uninstall_creates_no_lock_or_parent_directory(self):
+        with patch.object(bundle,'lock',side_effect=AssertionError('unneeded coordination state')):
+            deploy.provision('uninstall',self.repository,self.root)
+        self.assertFalse(self.root.exists())
+
     def test_uninstall_keeps_retained_installer_and_private_recovery(self):
         self.seed();store=self.store();identity=store.active()['identity'];state=self.root/'var/lib/wsprrypi/pico-usb';bucket=store.snapshot(state,identity)
         private=state/'private.bin';private.write_bytes(b'private')
