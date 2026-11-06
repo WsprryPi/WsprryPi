@@ -108,7 +108,7 @@ class ContractTests(unittest.TestCase):
                     receipt = provider.installation_status(host)["receipt"]
                     if route in (4, 20):
                         host.select_route(route)
-                    record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": channel,
+                    record = {"schema": installer.RECORD_SCHEMA, "channel": channel,
                               "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"],
                               "runtime": receipt}
                     if channel == 'release':
@@ -130,7 +130,7 @@ class ContractTests(unittest.TestCase):
             if bad == "identity": receipt["bindingSha256"] = "0" * 64
             elif bad == "owner": host.system.controller_open = True
             else: host._artifacts[next(iter(host._artifacts))]["status"] = "changed"
-            record = {"schema": installer.RUNTIME_RECORD_SCHEMA, "channel": channel,
+            record = {"schema": installer.RECORD_SCHEMA, "channel": channel,
                       "sourceCommit": host.value["sourceCommit"], "productVersion": receipt["productVersion"], "runtime": receipt}
             if channel == 'release':
                 record['manifest'] = {'productVersion': receipt['productVersion']}

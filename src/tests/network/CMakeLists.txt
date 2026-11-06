@@ -171,3 +171,8 @@ target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/inclu
 target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto OpenSSL::SSL OpenSSL::Crypto
     "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
 target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
+
+add_executable(wtp_fixture_clock_test fixture_clock_test.cpp)
+target_include_directories(wtp_fixture_clock_test PRIVATE "${PICO_SOURCE}/src")
+target_link_libraries(wtp_fixture_clock_test PRIVATE pico_consumer_fixture)
+target_compile_options(wtp_fixture_clock_test PRIVATE -Wall -Wextra -Wpedantic -Werror)

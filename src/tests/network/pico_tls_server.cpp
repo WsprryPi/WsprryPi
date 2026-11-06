@@ -6,25 +6,22 @@
 #include "standalone/progress.hpp"
 #include "network_credentials.hpp"
 #include "pico/time.h"
+#include "fixture_clock.hpp"
+#include "time/mapping.hpp"
 #include <chrono>
 #include <csignal>
 #include <poll.h>
 #include <unistd.h>
 #include <thread>
 namespace {
-struct Clock : wsprrypico::wtp::Clock {
-  wsprrypico::wtp::ClockSnapshot snapshot() const override {
-    using namespace std::chrono;
-    return {wsprrypico::wtp::ClockState::Synchronized,
-      static_cast<std::uint64_t>(duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count()),
-      time_us_64() * 1000, 1000000, 0, wsprrypico::wtp::LeapState::Normal, {}};
-  }
- };
+using Clock = network_test::FixtureClock;
 // Preserve the production dry-run engine's timing policy. Diagnose a host OS
 // scheduling miss instead of treating a later retry as evidence it never happened.
 struct ObservedEngine final : wsprrypico::wtp::RfEngine {
   wsprrypico::standalone::DryRunEngine engine;
-  std::uint64_t start{}, allowance{};
+  Clock &clock;
+  explicit ObservedEngine(Clock &value) : clock(value) {}
+  std::uint64_t start{}, allowance{}, start_utc{};
   bool reported{};
   unsigned disables{}, prepares{};
   bool can_disable=true;
@@ -34,7 +31,7 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
   bool schedules_locally() const override { return true; }
   bool schedule(const wsprrypico::wtp::Job &job, std::uint64_t when,
                 const wsprrypico::wtp::LocalStartConditions &conditions) override {
-    start = when; allowance = conditions.maximum_uncertainty_ns; reported = false;
+    start = when; allowance = conditions.maximum_uncertainty_ns; start_utc = conditions.start_utc_ns; reported = false;
     return engine.schedule(job, when, conditions);
   }
   bool begin(const wsprrypico::wtp::Job &job, std::uint64_t when) override {
@@ -44,9 +41,16 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
     const auto result = engine.poll(now);
     if (!reported && result.state == wsprrypico::wtp::EngineState::Missed) {
       reported = true;
+      const auto &sample = clock.last_snapshot();
+      std::uint64_t mapped{};
+      const bool valid = wsprrypico::time::project(sample, start, mapped);
       std::cerr << "HOST_DRY_RUN_MISSED start_ns=" << start << " poll_ns=" << now
                 << " elapsed_ns=" << (now >= start ? now - start : 0)
-                << " allowance_ns=" << allowance << std::endl;
+                << " allowance_ns=" << allowance << " start_utc_ns=" << start_utc
+                << " window_ns=" << wsprrypico::wtp::start_window_ns(start_utc)
+                << " mapping_valid=" << valid << " mapping_error_ns="
+                << (mapped > start_utc ? mapped - start_utc : start_utc - mapped)
+                << " uncertainty_ns=" << sample.uncertainty_ns << std::endl;
     }
     return result;
   }
@@ -69,10 +73,13 @@ int main(int argc, char **argv) {
     config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
     if (!store.save(config) || !store.reserve(1'700'000'000'000'000'000ULL)) return 1;
   }
-  Clock clock;
+  const auto utc_epoch = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count());
+  const auto mono_epoch = time_us_64() * 1000;
+  Clock clock{utc_epoch, mono_epoch, [] { return time_us_64() * 1000; }};
   network_test::Identity identities;
   if (argc > 1) identities.boot = static_cast<unsigned>(std::stoul(argv[1]));
-  ObservedEngine engine;
+  ObservedEngine engine{clock};
   wsprrypico::wtp::JobService service{clock, engine, identities};
   wsprrypico::standalone::Scheduler scheduler{store, service};
   network_test::Network network;

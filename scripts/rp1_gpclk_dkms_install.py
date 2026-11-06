@@ -50,9 +50,7 @@ MODULE_NAME = "rp1_gpclk_dkms"
 CONTROLLER_MODULE_NAME = "rp1_route_controller"
 LEGACY_COMPATIBILITY_IDENTITY = "v0.9.0-pi5"
 CORRECTED_RUNTIME_COMMIT = "817f3dc6a194f4a92a7f94acf10147169e6439d6"
-LEGACY_RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-installation-v1"
-RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v2"
-RUNTIME_RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v3"
+RECORD_SCHEMA = "wsprrypi-rp1-gpclk-dkms-ownership-v1"
 STATE_SCHEMA = "wsprrypi-rp1-gpclk-dkms-plan-v1"
 RUNTIME_READINESS_CONTRACT = "rp1-gpclk-runtime-readiness-v1"
 RUNTIME_BINDING_CONTRACT = "rp1-gpclk-runtime-binding-v3"
@@ -1012,7 +1010,7 @@ def record_file_identity(path: pathlib.Path) -> os.stat_result:
 
 
 def load_ownership_record(path: pathlib.Path, *, repository: str | None = None) -> tuple[dict[str, Any] | None, os.stat_result | None, str | None]:
-    """Validate v2/v3 ownership against one authority without changing invocation defaults."""
+    """Validate current v1 ownership against one authority without changing invocation defaults."""
     if not path.is_absolute():
         return None, None, "ownership record path is not absolute"
     if not path.exists() and not path.is_symlink():
@@ -1035,10 +1033,8 @@ def load_ownership_record(path: pathlib.Path, *, repository: str | None = None) 
         require(len(payload) <= MAX_RECORD_BYTES, "installation ownership record exceeds the bounded size")
         value = json.loads(payload.decode("utf-8"))
         require(isinstance(value, dict), "installation ownership record is not an object")
-        if value.get("schema") == LEGACY_RECORD_SCHEMA:
-            return None, info, "legacy v1 installation record cannot prove WsprryPi ownership"
         schema = value.get("schema")
-        require(schema in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}, "installation ownership record schema is unsupported")
+        require(schema == RECORD_SCHEMA, "installation ownership record schema is unsupported")
         common = {
             "schema", "repository", "owner", "channel", "installationMethod",
             "routeActivation", "output", "qualificationClaim",
@@ -1057,7 +1053,7 @@ def load_ownership_record(path: pathlib.Path, *, repository: str | None = None) 
             }
         else:
             raise ContractError("installation ownership record channel is unsupported")
-        if schema == RUNTIME_RECORD_SCHEMA:
+        if "runtime" in value:
             required.add("runtime")
         require_exact_keys(value, required, "installation ownership record")
         require(value["repository"] == authority, "installation ownership repository differs")
@@ -1070,7 +1066,7 @@ def load_ownership_record(path: pathlib.Path, *, repository: str | None = None) 
         else:
             string_fields = required - common - {"runtime"}
             require(all(isinstance(value[field], str) for field in string_fields), "development ownership evidence fields are invalid")
-        if schema == RUNTIME_RECORD_SCHEMA:
+        if "runtime" in value:
             validate_runtime_ownership(value["runtime"], value)
         return value, info, None
     except (ContractError, OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -1254,7 +1250,7 @@ def prepare(args: argparse.Namespace, runner: Runner) -> dict[str, Any]:
             owned, _, reason = load_ownership_record(args.record)
             require(
                 owned is not None
-                and owned.get("schema") in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA},
+                and owned.get("schema") == RECORD_SCHEMA,
                 "RP1 runtime-controller residue blocks installation planning; use the owning runtime cleanup workflow: "
                 + ", ".join(residue) + (f" ({reason})" if reason else ""),
             )
@@ -1313,14 +1309,18 @@ def runtime_residue_inventory(root: pathlib.Path) -> list[str]:
     return sorted(set(residue))
 
 
-def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
+def existing_inventory(root: pathlib.Path, runner: Runner, *, strict: bool = False) -> dict[str, Any]:
     package = runner.run(["dpkg-query", "-W", "-f=${Status}\n${Version}\n", PACKAGE_NAME], check=False)
+    if strict:
+        require(package.returncode in {0, 1}, "package inventory is unavailable")
     package_version = None
     if package.returncode == 0:
         lines = package.stdout.splitlines()
         require(len(lines) >= 2 and lines[0] == "install ok installed", "existing package state is ambiguous")
         package_version = lines[1]
     dkms = runner.run(["dkms", "status", "-m", DKMS_NAME], check=False)
+    if strict:
+        require(dkms.returncode == 0, "DKMS inventory is unavailable")
     modules_file = root_path(root, "/proc/modules")
     active = False
     active_controller = False
@@ -1336,8 +1336,10 @@ def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
     if modules_base.exists():
         module_candidates = sorted(str(path) for path in modules_base.glob("*/updates/dkms/rp1_gpclk_dkms.ko*"))
         controller_candidates = sorted(str(path) for path in modules_base.glob("*/updates/dkms/rp1_route_controller.ko*"))
-    enrollment = root_path(root, "/etc/rp1-gpclk-dkms/enrollment.json").exists()
-    manager = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d/90-source-development.conf").exists()
+    enrollment_path = root_path(root, "/etc/rp1-gpclk-dkms/enrollment.json")
+    enrollment = enrollment_path.exists() or enrollment_path.is_symlink()
+    manager_path = root_path(root, "/etc/systemd/system/rp1-gpclk-route-manager@.service.d/90-source-development.conf")
+    manager = manager_path.exists() or manager_path.is_symlink()
     overlay_paths = [
         root_path(root, "/boot/firmware/overlays/rp1-gpclk-gpio4.dtbo"),
         root_path(root, "/boot/firmware/overlays/rp1-gpclk-gpio20.dtbo"),
@@ -1347,6 +1349,8 @@ def existing_inventory(root: pathlib.Path, runner: Runner) -> dict[str, Any]:
     overlays = sorted(str(path) for path in overlay_paths if path.exists() or path.is_symlink())
     configured = False
     for config in (root_path(root, "/boot/firmware/config.txt"), root_path(root, "/boot/config.txt")):
+        if strict:
+            require(not config.is_symlink(), "boot configuration inventory is ambiguous")
         if config.is_file() and not config.is_symlink():
             configured = configured or "dtoverlay=rp1-gpclk-" in config.read_text(errors="replace")
     return {
@@ -1481,7 +1485,7 @@ def apply_release(state_dir: pathlib.Path, resolved: Mapping[str, Any], record: 
     owned, owned_identity, _ = load_ownership_record(record)
     owned_runtime = bool(
         owned is not None and owned_identity is not None
-        and owned.get("schema") == RUNTIME_RECORD_SCHEMA
+        and "runtime" in owned
         and owned.get("channel") == "release"
         and owned.get("sourceCommit") == resolved.get("commit")
     )
@@ -1636,8 +1640,8 @@ def validate_runtime_development_provider(
     require(not inventory["activeModule"], "the transmission consumer is active during neutral runtime reuse")
     # A WsprryPi-owned neutral runtime deliberately keeps the administration
     # controller loaded while the transmission consumer remains absent.  The
-    # caller admits that state only for a v3 runtime ownership record; runtime
-    # activation subsequently revalidates the bound controller and artifacts.
+    # caller admits that state only with a runtime receipt; runtime activation
+    # subsequently revalidates the bound controller and artifacts.
     require(not inventory["configuredRoute"], "a configured RP1 GPCLK route blocks neutral runtime reuse")
     require(not inventory["enrollment"] and not inventory["developmentManager"], "legacy development administration blocks neutral runtime reuse")
     lines = [line for line in inventory["dkms"].splitlines() if line.strip()]
@@ -1708,7 +1712,7 @@ def recover_and_remove_owned_runtime(
 ) -> None:
     provider = runtime_update_provider(runner, migration_provider)
     runtime = (validate_runtime_ownership(record.get("runtime"), record)
-               if record.get("schema") == RUNTIME_RECORD_SCHEMA else {})
+               if "runtime" in record else {})
     identity = {"sourceCommit": record["sourceCommit"],
                 "bindingSha256": runtime.get("bindingSha256"),
                 "artifactSetSha256": runtime.get("artifactSetSha256"),
@@ -1773,11 +1777,12 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
     existing_record, record_identity, record_reason = load_ownership_record(record)
     owned_runtime = bool(
         existing_record is not None and record_identity is not None
-        and existing_record.get("schema") == RUNTIME_RECORD_SCHEMA
+        and "runtime" in existing_record
     )
     owned_provider = bool(
         existing_record is not None and record_identity is not None
         and existing_record.get("schema") == RECORD_SCHEMA
+        and "runtime" not in existing_record
     )
     require(
         not before.get("activeController", False) or owned_runtime or owned_provider,
@@ -1823,7 +1828,7 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
             migration_required
             and before["runtimeResidue"]
             and existing_record.get("schema")
-                in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}
+                == RECORD_SCHEMA
         )
         require(
             not before["activeModule"] or recoverable_runtime,
@@ -1836,7 +1841,7 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
             "an active RP1 route controller blocks exact-source development installation",
         )
         if (migration_required
-                and existing_record.get("schema") in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}):
+                and existing_record.get("schema") == RECORD_SCHEMA):
             if before["runtimeResidue"]:
                 entrypoint, rollback = validate_development_rollback_authority(
                     existing_record, pathlib.Path("/")
@@ -1905,7 +1910,7 @@ def apply_development(resolved: Mapping[str, Any], record: pathlib.Path, runner:
                 "interrupted runtime activation changed during verification",
             )
             replacement = copy.deepcopy(current_record)
-            replacement["schema"] = RUNTIME_RECORD_SCHEMA
+            replacement["schema"] = RECORD_SCHEMA
             replacement["runtime"] = rechecked_runtime
             validate_runtime_ownership(rechecked_runtime, replacement)
             replace_owned_record(record, current_record, current_identity, replacement)
@@ -2150,7 +2155,7 @@ def validate_development_removal(
 
 
 def verify_provider_absent(root: pathlib.Path, runner: Runner) -> None:
-    inventory = existing_inventory(root, runner)
+    inventory = existing_inventory(root, runner, strict=True)
     require_no_runtime_residue(inventory, "provider absence verification")
     require(
         inventory["packageVersion"] is None
@@ -2197,7 +2202,7 @@ def remove_owned_provider(args: argparse.Namespace, runner: Runner) -> None:
             print("Interrupted owned-package removal completed; absence verified.")
             return
     try:
-        if record["schema"] == RUNTIME_RECORD_SCHEMA:
+        if "runtime" in record:
             inventory = existing_inventory(root, runner)
             if record["channel"] == "release":
                 inventory = release_runtime_inventory(inventory, root, record["manifest"])
@@ -2768,12 +2773,25 @@ def prepare_runtime_update(args: argparse.Namespace, runner: Runner) -> None:
     if record is None or identity is None:
         print(f"No owned RP1 runtime requires preparation: {reason or 'ownership is unproven'}.")
         return
-    if record.get("schema") not in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}:
+    if record.get("schema") != RECORD_SCHEMA:
         print("No owned runtime administration requires preparation.")
         return
+    if args.command == "prepare-runtime-removal":
+        # A retained record alone does not prove that the provider still exists.
+        # Do not require its runtime API or saved rollback inputs to retire a
+        # record after complete absence has been independently verified.
+        try:
+            verify_provider_absent(args.root.resolve(strict=True), runner)
+        except (OSError, ContractError):
+            pass  # Partial or uncertain state still requires owning recovery.
+        else:
+            require_unchanged_ownership(args.record, record, identity, "stale ownership retirement")
+            remove_ownership_record(args.record, identity)
+            print("RP1-GPCLK-DKMS absent: stale ownership record retired; no runtime removal was required.")
+            return
     if resolved is not None:
         retain_provider_migration(args.record, record, resolved, runner)
-    # v2 includes the interrupted window before the application recorded a
+    # Ownership without a runtime receipt includes the interrupted window before a
     # neutral-activation receipt. The provider decides whether residue exists.
     remove_owned_runtime_for_fresh_activation(args.record, record, identity, runner, resolved)
     print("RP1-GPCLK-DKMS runtime preparation verified through the provider update contract.")
@@ -2793,9 +2811,9 @@ def activate_runtime(args: argparse.Namespace, runner: Runner) -> None:
     require(isinstance(resolved, dict), "prepared runtime source identity is missing")
     record, record_identity, reason = load_ownership_record(args.record)
     require(record is not None and record_identity is not None, f"WsprryPi provider ownership is required before runtime deployment: {reason or 'unknown record'}")
-    require(record["schema"] in {RECORD_SCHEMA, RUNTIME_RECORD_SCHEMA}, "runtime deployment ownership schema is unsupported")
+    require(record["schema"] == RECORD_SCHEMA, "runtime deployment ownership schema is unsupported")
     require(record["sourceCommit"] == resolved.get("commit"), "owned provider and runtime source commits differ")
-    if record["schema"] == RUNTIME_RECORD_SCHEMA:
+    if "runtime" in record:
         print("Existing WsprryPi-owned runtime record detected; revalidating before neutral activation.")
     bundle, reviewed = build_runtime_bundle(state_dir, resolved, runner)
     provider = bundle / "runtime_provider.py"
@@ -2845,7 +2863,7 @@ def activate_runtime(args: argparse.Namespace, runner: Runner) -> None:
             and runtime["activationPlanSha256"] == activation_digest,
             "runtime installation receipt differs from the reviewed plans")
     replacement = copy.deepcopy(record)
-    replacement["schema"] = RUNTIME_RECORD_SCHEMA
+    replacement["schema"] = RECORD_SCHEMA
     replacement["runtime"] = runtime
     validate_runtime_ownership(runtime, replacement)
     replace_owned_record(args.record, record, record_identity, replacement)
@@ -2917,6 +2935,7 @@ def parser() -> argparse.ArgumentParser:
     update_parser.add_argument("--record", type=pathlib.Path, default=pathlib.Path("/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"))
     update_parser.add_argument("--debug", action="store_true")
     removal_update_parser = sub.add_parser("prepare-runtime-removal")
+    removal_update_parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path("/"))
     removal_update_parser.add_argument("--record", type=pathlib.Path, default=pathlib.Path("/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json"))
     removal_update_parser.add_argument("--debug", action="store_true")
     runtime_parser = sub.add_parser("activate-runtime")
