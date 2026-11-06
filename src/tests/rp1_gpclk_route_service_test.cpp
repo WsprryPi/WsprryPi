@@ -437,10 +437,17 @@ int main() {
           {"state", state()}};
   assert(service.query().at("result") == "contract_mismatch");
 
-  next = {{"schemaVersion", 3}, {"contract", "rp1-gpclk-route-manager-runtime"},
+  next = {{"schemaVersion", 1}, {"contract", "rp1-gpclk-route-manager-runtime"},
           {"status", "ok"}, {"state", {{"profile", "runtime"}, {"activeRoute", "gpio4"},
           {"outputEnabled", false}, {"qualification", false}, {"controller", {{"id", 9}}},
           {"applicationRestoration", true}, {"preflightToken", std::string(64, 'a')}}}};
+  const auto current_runtime = next;
+  for (const auto &schema : {nlohmann::json(true), nlohmann::json(1.0),
+                             nlohmann::json(2), nlohmann::json(3)}) {
+    next["schemaVersion"] = schema;
+    assert(service.query().at("result") == "contract_mismatch");
+  }
+  next = current_runtime;
   assert(service.query().at("profile") == "runtime");
   assert(inhibited);
   auto runtime_preflight = service.operate("preflight", "GPIO20", 0);
@@ -554,7 +561,7 @@ int main() {
   nlohmann::json lifecycle = {{"ready",true},{"executionAuthorized",false},
       {"route","gpio20"},{"controller",ctl},{"bootId","current-boot"},
       {"bindingSha256",std::string(64,'a')}};
-  auto runtime = nlohmann::json{{"schemaVersion",3},
+  auto runtime = nlohmann::json{{"schemaVersion",1},
       {"contract","rp1-gpclk-route-manager-runtime"},{"status","ok"},
       {"state",{{"profile","runtime"},{"outputEnabled",false},{"qualification",false},
           {"controller",ctl},{"bootId","current-boot"},{"bindingSha256",std::string(64,'a')},

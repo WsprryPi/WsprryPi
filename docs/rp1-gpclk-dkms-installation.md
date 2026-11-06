@@ -22,7 +22,7 @@ application-owned installer support, `wsprrypi-rp1-reconcile.service`, and the
 exact interrupted-installation retries. `remove` removes only that recorded
 inventory; neither operation starts a service or selects a route.
 
-Normal reboot recovery requires a provider supporting version-3 post-reboot
+Normal reboot recovery requires a provider supporting current post-reboot
 activation plans and an application binary with the separate reboot-idle flag.
 A provider-only update does not supply this orchestration. See the
 [runtime workflow](runtime-route-workflow.md) for route and idle policy. Provider
@@ -84,7 +84,7 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 Production `auto` and explicit `release` selection require the newest eligible
 published release from `WsprryPi/RP1-DKMS`, subject to exact application
-compatibility. Version `0.0.1` is unreleased and uses development source.
+compatibility. Unreleased development source is selected by exact commit.
 An unavailable, incompatible, or corrupt release selection fails
 closed without fallback. Publication and builds establish no live eligibility.
 Existing application-bundled evidence remains bound to its original software.
@@ -94,7 +94,7 @@ Updates of an existing RP1-DKMS installation use its owning cleanup-first workfl
 Release selection enumerates published, non-draft, non-prerelease
 semantic versions rather than following a `latest` redirect. A candidate must provide
 exactly one Debian package plus `SHA256SUMS` and
-`rp1-gpclk-dkms-installation-manifest-v1.json`. The selected manifest binds:
+the installation manifest named by the release metadata. The selected manifest binds:
 
 - repository, release tag, resolved tag commit, product and Debian versions,
   and release-channel classification;
@@ -135,7 +135,7 @@ from the exact checkout's canonical source header and binds that header by hash.
 WsprryPi does not infer a development version from release metadata
 or supply a version to the upstream installer.
 
-The maintained exact-source installer must provide the explicit `runtime-controller` DKMS profile through a route-neutral installation without loading either module. A single DKMS instance owns the consumer and controller; WsprryPi verifies the returned exact commit, canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes, null route, and quiescent unowned state before recording success. Development provenance records version-derived GPIO4 and GPIO20 compatibility identities separately. The `0.0.1` identities are `v0.0.1-rp1-gpio4` and `v0.0.1-rp1-gpio20`. Exact commit, kernel, route, hashes, enrollment, and qualification remain separate facts.
+The maintained exact-source installer must provide the explicit `runtime-controller` DKMS profile through a route-neutral installation without loading either module. A single DKMS instance owns the consumer and controller; WsprryPi verifies the returned exact commit, canonical version, kernel, UAPI, both installed-file and decompressed-ELF hashes, null route, and quiescent unowned state before recording success. Development provenance records version-derived GPIO4 and GPIO20 compatibility identities separately. The canonical runtime binding defines the identity for each supported route. Exact commit, kernel, route, hashes, enrollment, and qualification remain separate facts.
 
 The selected RP1-DKMS commit must declare the supported runtime binding,
 readiness, and update protocols in its consumer contract. WsprryPi independently
@@ -144,7 +144,7 @@ provider mutation or runtime bundle creation.
 
 
 A repeated development installation is a no-op only when WsprryPi's existing
-v1 ownership record and the complete inactive provider inventory still match
+ownership record and the complete inactive provider inventory still match
 the newly resolved commit, source tree, version source, UAPI, compatibility
 identity, running kernel, DKMS registration, source destination, module bytes,
 and retained upstream rollback tools. The installer revalidates the ownership
@@ -162,10 +162,10 @@ residue.
 Foreign or unowned residue is preserved and blocks installation. Exact state
 already recorded by WsprryPi is revalidated rather than silently adopted. If
 neutral runtime deployment is interrupted after the exact provider has a valid
-WsprryPi v1 ownership record, a repeated installation may enter the same bound
+WsprryPi ownership record, a repeated installation may enter the same bound
 deployment and recovery workflow; it does not treat that partial state as a
 foreign installation or publish runtime readiness before final neutral proof.
-The selected exact source must advertise `rp1-gpclk-runtime-update-v1`
+The selected exact source must advertise the current runtime update contract
 during read-only source resolution, after APT dependencies but before application
 or provider mutation. An unsupported source fails with an instruction to select a compatible
 provider. Release installations therefore require a provider release containing
@@ -174,8 +174,8 @@ to an exact commit.
 
 The installed provider is preferred for update preparation. If it lacks the
 interface or its executable has already been removed, the selected exact source
-may provide the compatibility adapter. The provider owns binding-v3 predecessor
-compatibility, controller and journal interpretation, recovery, retirement, and
+may provide the compatibility adapter. The provider owns current binding validation, controller and journal
+interpretation, recovery, retirement, and
 its deployment inverse. WsprryPi supplies its recorded source, binding, artifact
 and deployment identities, and verifies the public response and plan digest.
 It does not interpret the opaque plan contents or archive provider journals.
@@ -204,9 +204,9 @@ removed. The same bounded diagnostic capture applies to pre-update runtime
 recovery and final neutral activation failures.
 
 Only when WsprryPi actually mutates an empty provider state and then verifies
-the result does it atomically create the root-owned, mode-0600 v1 ownership
-record (`wsprrypi-rp1-gpclk-dkms-ownership-v1`) at
-`/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json`. The same v1 format
+the result does it atomically create the root-owned, mode-0600 ownership
+record at
+`/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json`. The same current format
 represents installation ownership with or without a validated `runtime` receipt.
 Unsupported ownership formats are rejected; existing records are not rewritten
 or adopted automatically. A release record embeds
@@ -244,7 +244,7 @@ installer's bounded error output.
 
 After the application binary, configuration, service, and exact route companion
 then exist, the installer builds the opt-in bundle from the same exact source
-commit and the exact DKMS-installed module pair. Binding version 3 records each
+commit and the exact DKMS-installed module pair. The runtime binding records each
 module's canonical path, installed-file digest, decompressed-ELF digest,
 compression, version, kernel, and build-note digest. The bundle contains no
 module payload and never writes `/lib/modules`. The installer independently
@@ -307,7 +307,7 @@ URLs are printed. `--no-web` installations require only active service state.
 The record proves only that this WsprryPi workflow installed the recorded
 provider identity. It is not a signature, route selection, hardware or kernel
 qualification, GPIO permission, transmission authority, or RF evidence. The
-older v1 installation record did not distinguish a newly installed provider
+older installation record did not distinguish a newly installed provider
 from an idempotently accepted pre-existing provider, so it is deliberately
 insufficient for automatic removal.
 
@@ -393,7 +393,7 @@ a later installation.
 
 `REMOVE_RP1_GPCLK_DKMS` accepts exactly:
 
-- `auto` (default): remove only a matching, inactive provider proven by the v1
+- `auto` (default): remove only a matching, inactive provider proven by its
   ownership record;
 - `true`: explicitly request the same ownership-aware removal; it does not
   bypass any provenance, identity, inactivity, or upstream lifecycle check; or
@@ -413,8 +413,8 @@ argv. No failure selects a fallback backend.
 ## RP1-DKMS source selection
 
 Normal development installation, repeat installation, updates, and removal use
-`WsprryPi/RP1-DKMS` without a repository override. The accepted provider version
-is `0.0.1`, with matching GPIO4 and GPIO20 compatibility identities. Unknown
+`WsprryPi/RP1-DKMS` without a repository override. The accepted provider identity
+is defined by the consumer contract, with matching GPIO4 and GPIO20 identities. Unknown
 versions, repositories, or route pairs fail closed.
 
 With the selected WsprryPi development checkout, the normal installer resolves
@@ -427,7 +427,7 @@ sudo env RP1_GPCLK_DKMS_SOURCE="commit:${RP1_DKMS_COMMIT}" ./scripts/install.sh
 ```
 
 An unchanged source and attributable installed inventory permit repeat-install
-checks. A changed RP1-DKMS source commit, even at version `0.0.1`, uses its owning
+checks. A changed RP1-DKMS source commit uses its owning
 cleanup-first update workflow and retains its own recovery inputs. For removal:
 
 ```sh
@@ -444,7 +444,7 @@ before installing RP1-DKMS. The installer does not adopt, rename, migrate, or
 retain recovery inputs for that installation. Conflicting provider state blocks
 installation.
 
-Startup reconciliation accepts only RP1-DKMS ownership and version `0.0.1`,
+Startup reconciliation accepts only current RP1-DKMS ownership and identity,
 verifies the bound runtime files, and preserves disabled output while recovering
 an explicitly saved GPIO4 or GPIO20 route. Unknown repositories, mismatched
 versions, changed ownership, or altered runtime files block provider

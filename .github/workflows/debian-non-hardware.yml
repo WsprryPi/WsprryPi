@@ -489,7 +489,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-DKMS
-          ref: 4509b48c1e17a2ce2e6296dc95cd3202b0bfe353
+          ref: 221c0253b6d43b5aeba4a446da8851d50638a04f
           path: src/build/rp1-provider-reference
           persist-credentials: false
 

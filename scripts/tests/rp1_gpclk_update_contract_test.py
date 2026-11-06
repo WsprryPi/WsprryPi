@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual provider/installer JSON boundary without hardware.
 
-Pass an explicit RP1-GPCLK-DKMS checkout. Only its offline test adapters run.
+Pass an explicit RP1-DKMS checkout. Only its offline test adapters run.
 """
 import contextlib
 import importlib.util
@@ -17,7 +17,7 @@ from unittest import mock
 
 APP = Path(__file__).resolve().parents[2]
 if len(sys.argv) != 2:
-    raise SystemExit("usage: rp1_gpclk_update_contract_test.py /path/to/RP1-GPCLK-DKMS")
+    raise SystemExit("usage: rp1_gpclk_update_contract_test.py /path/to/RP1-DKMS")
 PROVIDER = Path(sys.argv.pop()).resolve(strict=True)
 sys.path[:0] = [str(PROVIDER / "scripts"), str(PROVIDER / "tests")]
 import runtime_provider as provider

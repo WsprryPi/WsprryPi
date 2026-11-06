@@ -1,5 +1,6 @@
 #include "rp1_gpclk_route_service.hpp"
 #include "rp1_provider_process.hpp"
+#include "rp1_runtime_ownership.hpp"
 #include "WSPR-Transmitter/src/rp1_gpclk_development_policy.hpp"
 #ifndef WSPRRYPI_ROUTE_SERVICE_TEST
 #include "config_handler.hpp"
@@ -26,60 +27,8 @@ constexpr const char *kRuntimeContract = "rp1-gpclk-route-manager-runtime";
 constexpr const char *kContract = "rp1-gpclk-route-manager";
 #ifndef WSPRRYPI_ROUTE_SERVICE_TEST
 std::string ownedRuntimeBinding() {
-  const char *path = "/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json";
-  const int fd = ::open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
-  if (fd < 0)
-    throw std::runtime_error("WsprryPi runtime ownership is unavailable.");
-  struct stat info {};
-  if (::fstat(fd, &info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != 0 ||
-      (info.st_mode & 0077) != 0 || info.st_size <= 0 ||
-      info.st_size > 4 * 1024 * 1024) {
-    ::close(fd);
-    throw std::runtime_error("WsprryPi runtime ownership is unsafe.");
-  }
-  std::string payload;
-  payload.reserve(static_cast<std::size_t>(info.st_size));
-  char buffer[4096];
-  for (;;) {
-    const auto count = ::read(fd, buffer, sizeof(buffer));
-    if (count < 0 && errno == EINTR)
-      continue;
-    if (count < 0) {
-      ::close(fd);
-      throw std::runtime_error("Could not read WsprryPi runtime ownership.");
-    }
-    if (count == 0)
-      break;
-    payload.append(buffer, static_cast<std::size_t>(count));
-    if (payload.size() > 4U * 1024U * 1024U) {
-      ::close(fd);
-      throw std::runtime_error("WsprryPi runtime ownership exceeded its bound.");
-    }
-  }
-  ::close(fd);
-  const auto record = nlohmann::json::parse(payload);
-  if (!record.is_object() ||
-      record.value("schema", std::string{}) !=
-          "wsprrypi-rp1-gpclk-dkms-ownership-v1" ||
-      record.value("repository", std::string{}) !=
-          "WsprryPi/RP1-GPCLK-DKMS" ||
-      record.value("owner", std::string{}) != "WsprryPi" ||
-      !record.contains("runtime") || !record["runtime"].is_object())
-    throw std::runtime_error("WsprryPi runtime ownership contract differs.");
-  const auto &runtime = record["runtime"];
-  const auto digest = runtime.contains("bindingSha256") &&
-                              runtime["bindingSha256"].is_string()
-                          ? runtime["bindingSha256"].get<std::string>()
-                          : std::string{};
-  if (runtime.value("readinessContract", std::string{}) !=
-          "rp1-gpclk-runtime-readiness-v1" ||
-      runtime.value("state", std::string{}) != "neutral_ready" ||
-      !runtime.contains("route") || !runtime["route"].is_null() ||
-      runtime.value("output", std::string{}) != "disabled" ||
-      digest.size() != 64 ||
-      digest.find_first_not_of("0123456789abcdef") != std::string::npos)
-    throw std::runtime_error("WsprryPi neutral runtime ownership differs.");
-  return digest;
+  return readRp1RuntimeOwnership(
+      "/var/lib/wsprrypi/rp1-gpclk-dkms-installation.json");
 }
 
 nlohmann::json providerCommand(const std::string &operation,
@@ -244,7 +193,8 @@ nlohmann::json Rp1GpclkRouteService::withQualification(nlohmann::json result) co
 nlohmann::json Rp1GpclkRouteService::request(const nlohmann::json &value) {
   try {
     const auto response = operations_.request(value);
-    if (response.is_object() && response.value("schemaVersion", 0) == 3 &&
+    if (response.is_object() && response.contains("schemaVersion") &&
+        response["schemaVersion"].is_number_integer() && response["schemaVersion"] == 1 &&
         response.value("contract", std::string{}) == kRuntimeContract &&
         response.contains("status") &&
         (response.contains("state") || response.contains("error"))) {
@@ -461,7 +411,7 @@ bool Rp1GpclkRouteService::acknowledgeRestoration(const std::string &token,
   const int gpio = operations_.persisted_gpio();
   if (gpio != 4 && gpio != 20)
     return false;
-  const auto reply = request({{"schemaVersion", 3}, {"operation", "application-ready"},
+  const auto reply = request({{"schemaVersion", 1}, {"operation", "application-ready"},
       {"route", gpio == 4 ? "gpio4" : "gpio20"}, {"token", token},
       {"pid", static_cast<int>(::getpid())}, {"transmit", false}});
   return field(reply, "status") == "ok";
@@ -753,7 +703,7 @@ nlohmann::json Rp1GpclkRouteService::reconcileRuntime(
   const int gpio = gpioForRoute(route);
   if (!gpio || gpio != operations_.persisted_gpio())
     return failure("runtime_route_mismatch", "Requested and saved runtime route differ.");
-  const auto raw = request({{"schemaVersion",3},
+  const auto raw = request({{"schemaVersion",1},
       {"operation",development ? "reconcile-output" : "idle"},
       {"route",gpio == 4 ? "gpio4" : "gpio20"}});
   const auto state = raw.value("state", nlohmann::json::object());

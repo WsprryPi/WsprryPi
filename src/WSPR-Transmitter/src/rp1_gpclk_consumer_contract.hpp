@@ -7,6 +7,7 @@
 namespace wsprrypi {
 // Product compatibility is independent of publication and physical qualification.
 struct Rp1GpclkConsumerContract {
+    static constexpr std::string_view repository = "WsprryPi/RP1-DKMS";
     static constexpr std::string_view module = "rp1-gpclk-dkms";
     static constexpr std::string_view version = "0.0.1";
     static constexpr std::string_view compatibility(
