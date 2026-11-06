@@ -72,6 +72,21 @@ class Tests(unittest.TestCase):
         self.assertEqual([x[0] for x in calls],['removal-plan','remove'])
         self.assertIn('a'*64,calls[-1][1])
 
+    def test_removal_result_file_is_written_only_after_verified_absence(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw).resolve();root.chmod(0o700)
+            marker=root/'active.json';marker.write_text('{}')
+            output=root/'result.json'
+            args=client.parser().parse_args(['remove','--result-file',str(output)])
+            with patch.object(client,'ACTIVE_FACADE',marker),patch.object(client,'retained_facade',return_value=root/'provider.py'):
+                for absent in [False,True]:
+                    with patch.object(client,'invoke',side_effect=[{'planSha256':'a'*64},{'postconditions':{'providerAbsent':absent,'transmissionAuthorized':False}}]):
+                        if not absent:
+                            with self.assertRaises(client.ContractError):client.execute_client(args)
+                            self.assertFalse(output.exists())
+                        else:client.execute_client(args)
+            self.assertEqual(json.loads(output.read_text()),{'schemaVersion':1,'contract':'wsprrypi-rp1-provider-removal-v1','outcome':'absent'})
+
     def test_absent_provider_preparation_and_repeat_removal_are_noops(self):
         for command in ['prepare-runtime-removal','remove']:
             args=client.parser().parse_args([command])

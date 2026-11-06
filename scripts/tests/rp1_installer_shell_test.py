@@ -502,6 +502,14 @@ set -e
 source "$INSTALL_SCRIPT"
 python3() {
     { printf '%s\t' "$@"; printf '\n'; } >>"$CAPTURE"
+    if [[ "$1" == -I ]]; then command python3 "$@"; return; fi
+    local index
+    for ((index=1; index<$#; index++)); do
+        if [[ "${!index}" == --result-file ]]; then
+            index=$((index+1))
+            (umask 077; printf '%s\n' '{"schemaVersion":1,"contract":"wsprrypi-rp1-provider-removal-v1","outcome":"absent"}' >"${!index}")
+        fi
+    done
     local arg
     for arg in "$@"; do
         if [[ "$arg" == remove ]]; then
@@ -553,7 +561,8 @@ remove_owned_rp1_gpclk_dkms_provider debug
                 self.assertEqual([args[3] for args in helpers],
                     ['prepare', 'prepare-runtime-update', 'apply', 'activate-runtime']*2 +
                     ['prepare-runtime-removal', 'remove'])
-                self.assertEqual(len(calls)-len(helpers), 2, 'separate startup route-restoration calls')
+                self.assertEqual(len(calls)-len(helpers), 3, 'startup restoration and structured removal-result validation')
+                self.assertEqual(sum(args[:2]==['-I','-'] for args in calls),1)
 
     def test_invalid_repository_stops_before_helper_staging_or_dependency_resolution(self):
         shell = r'''
@@ -896,15 +905,18 @@ DRY_RUN=false
 REMOVE_RP1_GPCLK_DKMS=auto
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 python3() {
-    printf '%s\n' "$HELPER_OUTPUT"
+    if [[ "$1" == -I ]]; then command python3 "$@"; return; fi
+    while (( $# )); do
+        if [[ "$1" == --result-file ]]; then shift; (umask 077; printf '%s\n' "$HELPER_OUTPUT" >"$1"); break; fi
+        shift
+    done
 }
-remove_owned_rp1_gpclk_dkms_provider
+remove_owned_rp1_gpclk_dkms_provider || exit $?
 printf '%s\n' "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN"
 '''
         outcomes = {
-            "WsprryPi-owned RP1-DKMS provider removed and absence verified.": "false",
-            "RP1-DKMS absent: no provider removal was required.": "false",
-            "RP1-DKMS preserved: WsprryPi ownership is unproven.": "true",
+            json.dumps({'schemaVersion':1,'contract':'wsprrypi-rp1-provider-removal-v1','outcome':outcome}): expected
+            for outcome,expected in [('absent','false'),('unmanaged','true'),('preserved','true')]
         }
         for helper_output, expected in outcomes.items():
             with self.subTest(helper_output=helper_output):
@@ -919,6 +931,10 @@ printf '%s\n' "$RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN"
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.strip().splitlines()[-1], expected)
+        for bad in ['human success wording', '{}', '{"schemaVersion":true,"contract":"wsprrypi-rp1-provider-removal-v1","outcome":"absent"}']:
+            result=subprocess.run(['bash','-c',shell],text=True,capture_output=True,
+                env={**os.environ,'INSTALL_SCRIPT':str(install_script),'HELPER_OUTPUT':bad})
+            self.assertNotEqual(result.returncode,0)
 
     def test_owned_provider_removal_failure_fails_uninstall(self):
         lines, stdout = self.run_uninstall_orchestration("remove_owned_rp1_gpclk_dkms_provider")

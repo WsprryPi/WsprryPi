@@ -439,8 +439,18 @@ def prepare_client(args):
     print('RP1-DKMS public plan: '+str(response.get('transition')))
 
 
+def removal_result(args,outcome):
+    path=getattr(args,'result_file',None)
+    if path is not None:
+        require(path.is_absolute(),'application removal result path must be absolute')
+        secure_record_parent(path)
+        require(not path.exists() and not path.is_symlink(),'application removal result already exists')
+        atomic_json(path,{'schemaVersion':1,'contract':'wsprrypi-rp1-provider-removal-v1','outcome':outcome})
+
+
 def execute_client(args):
     if args.command=='remove' and args.remove=='false':
+        removal_result(args,'preserved')
         print('Provider preserved by explicit operator opt-out.')
         return
     state=args.state_dir
@@ -456,6 +466,7 @@ def execute_client(args):
         if not ACTIVE_FACADE.exists():
             require(not PROVIDER_RECORD.exists() and not LEGACY_RECORD.exists(),'provider receipt has no authenticated facade')
             require(getattr(args,'remove','auto')!='true','explicit provider removal has no attributable installation')
+            removal_result(args,'unmanaged')
             print('No application-managed provider facade exists; no provider removal requested.')
             return
         entrypoint=retained_facade()
@@ -472,6 +483,7 @@ def execute_client(args):
     if args.command=='remove' and args.remove!='false':
         require(response.get('postconditions')=={'providerAbsent':True,'transmissionAuthorized':False},
                 'provider removal did not prove absence')
+        removal_result(args,'absent')
     print('RP1-DKMS '+args.command+' completed through its public lifecycle interface.')
 
 
@@ -490,7 +502,9 @@ def parser():
         item=sub.add_parser(name)
         item.add_argument('--state-dir',type=pathlib.Path,required=name in {'apply','prepare-runtime-update','activate-runtime'})
         item.add_argument('--debug',action='store_true')
-        if name=='remove':item.add_argument('--remove',choices=['auto','true','false'],default='auto')
+        if name=='remove':
+            item.add_argument('--remove',choices=['auto','true','false'],default='auto')
+            item.add_argument('--result-file',type=pathlib.Path)
     return result
 
 

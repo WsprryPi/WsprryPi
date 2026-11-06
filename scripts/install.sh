@@ -2948,6 +2948,7 @@ remove_owned_rp1_gpclk_dkms_provider() {
     fi
     if [[ "$DRY_RUN" != "true" ]]; then
         removal_output_file="$RP1_GPCLK_DKMS_STATE_DIR/provider-removal-output.log"
+        remove_args+=(--result-file "$RP1_GPCLK_DKMS_STATE_DIR/provider-removal-result.json")
     fi
     if ! EXEC_COMMAND_FAILURE_OUTPUT_FILE="$removal_output_file" \
         exec_command "Check owned RP1 provider" \
@@ -2957,21 +2958,27 @@ remove_owned_rp1_gpclk_dkms_provider() {
         return 1
     fi
     if [[ "$DRY_RUN" != "true" ]]; then
-        if grep -Fq "RP1-DKMS preserved:" "$removal_output_file"; then
-            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="true"
-        elif grep -Fq \
-            "WsprryPi-owned RP1-DKMS provider removed and absence verified." \
-            "$removal_output_file"; then
-            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
-        elif grep -Fq \
-            "RP1-DKMS absent: no provider removal was required." \
-            "$removal_output_file"; then
-            RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false"
-        else
-            warn "RP1-DKMS removal helper did not report a recognized outcome."
+        local removal_outcome
+        if ! removal_outcome=$(python3 -I - "$RP1_GPCLK_DKMS_STATE_DIR/provider-removal-result.json" <<'PY_REMOVAL_RESULT'
+import json,os,stat,sys
+path=sys.argv[1]
+info=os.lstat(path)
+assert stat.S_ISREG(info.st_mode) and info.st_uid==os.geteuid() and info.st_mode&0o077==0 and info.st_size<=4096
+with open(path) as stream:value=json.load(stream)
+assert isinstance(value,dict) and set(value)=={'schemaVersion','contract','outcome'}
+assert type(value['schemaVersion']) is int and value['schemaVersion']==1
+assert value['contract']=='wsprrypi-rp1-provider-removal-v1' and value['outcome'] in {'absent','unmanaged','preserved'}
+print(value['outcome'])
+PY_REMOVAL_RESULT
+        ); then
+            warn "RP1-DKMS client did not supply a valid structured removal outcome."
             cleanup_rp1_gpclk_dkms_state
             return 1
         fi
+        case "$removal_outcome" in
+            absent) RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="false";;
+            unmanaged|preserved) RP1_GPCLK_DKMS_PROVIDER_REMOVAL_UNPROVEN="true";;
+        esac
     fi
     cleanup_rp1_gpclk_dkms_state
     debug_end "$debug"
