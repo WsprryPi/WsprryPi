@@ -209,11 +209,11 @@
                 </div>
                 <div class="col-12 col-lg-4">
                     <label class="form-label" for="wtp-firmware-source">Image selection</label>
-                    <select id="wtp-firmware-source" class="form-select"><option value="latest">Latest verified CI image</option><option value="version">Specific CI version</option><option value="stable">Stable release</option></select>
+                    <select id="wtp-firmware-source" class="form-select"><option value="latest">Latest verified CI image</option><option value="version" selected>Specific version</option><option value="stable">Stable release</option></select>
                 </div>
-                <div id="wtp-firmware-version-field" class="col-12 col-lg-4" hidden>
-                    <label class="form-label" for="wtp-firmware-version">CI version</label>
-                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" placeholder="0.1.0-ci.RUN.ATTEMPT" autocomplete="off" spellcheck="false">
+                <div id="wtp-firmware-version-field" class="col-12 col-lg-4">
+                    <label class="form-label" for="wtp-firmware-version">Firmware version</label>
+                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" value="1.0.0-rc.1" placeholder="1.0.0-rc.1" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3">

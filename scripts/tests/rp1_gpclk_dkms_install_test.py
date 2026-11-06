@@ -30,6 +30,33 @@ def identity(version='12.34.56-rc.2+developer'):
 
 
 class Tests(unittest.TestCase):
+    def test_auto_and_release_select_prereleases_for_both_application_channels(self):
+        def release(tag, **extra):
+            return {'tag_name':tag,'draft':False,'prerelease':'-' in tag,'published_at':'2026-11-06T00:00:00Z',
+                    'assets':[{'name':name} for name in ['SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json']],**extra}
+        releases=[release('v0.9.0'),release('v1.0.0-rc.1'),release('v1.0.0-rc.10'),
+                  release('v1.0.0-rc.2'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
+        for selector,policy in [('auto','development'),('auto','production'),('release','explicit-source'),('release:v1.0.0-rc.1','explicit-source'),('release:1.0.0-rc.1','explicit-source')]:
+            response=releases if selector=='release' else release('v1.0.0-rc.1')
+            with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json',return_value=response), \
+                 patch.object(client.subprocess,'run') as run,patch.object(client,'run_git',return_value='a'*40), \
+                 patch.object(client,'invoke',return_value={'providerIdentity':identity('1.0.0-rc.10')}):
+                state=Path(raw);source=state/'provider-source';(source/'scripts').mkdir(parents=True)
+                (source/'scripts/provider_lifecycle.py').touch()
+                _,selected=client.bootstrap(state,selector,policy)
+                self.assertEqual(selected,'release:v1.0.0-rc.10' if selector=='release' else 'release:v1.0.0-rc.1')
+                if selector.startswith('release:'):
+                    self.assertTrue(client.fetch_json.call_args.args[0].endswith('/releases/tags/v1.0.0-rc.1'))
+                self.assertEqual(run.call_args_list[-1].args[0][-1],'origin/devel')
+        self.assertGreater(client.release_precedence('v1.0.0'),client.release_precedence('v1.0.0-rc.10'))
+        self.assertEqual(client.release_precedence('v1.0.0+build'),client.release_precedence('v1.0.0'))
+
+    def test_invalid_release_prefix_is_refused_before_fetch(self):
+        with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json') as fetch:
+            with self.assertRaises(client.ContractError):
+                client.bootstrap(Path(raw),'release:vv1.0.0-rc.1','explicit-source')
+            fetch.assert_not_called()
+
     def test_debug_runner_preserves_literal_arguments_and_failure_details(self):
         stdout=io.StringIO();stderr=io.StringIO()
         with contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr):

@@ -157,6 +157,17 @@ async function main() {
             window.confirm=()=>true;
         })()`);
         assert.equal(await evaluate("document.getElementById('wtp-firmware-branch').value"),"main");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-source').value"),"version");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.1");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-version-field').hidden"),false);
+        await evaluate(`document.getElementById('wtp-firmware-read').click()`);
+        await waitFor(async()=>await evaluate("!document.getElementById('wtp-firmware-plan').disabled"),"firmware plan available");
+        for (const version of ["v1.0.0-rc.1", "1.0.0-rc.1"]) {
+            await evaluate(`document.getElementById('wtp-firmware-version').value=${JSON.stringify(version)};document.getElementById('wtp-firmware-version').dispatchEvent(new Event('change'));document.getElementById('wtp-firmware-plan').click()`);
+            await waitFor(async()=>await evaluate("!document.getElementById('wtp-firmware-plan').disabled"),"version normalization");
+            assert.equal(await evaluate("window.__requests.at(-1).version"),"1.0.0-rc.1");
+            assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.1");
+        }
         const states={
             checked:{operation:'plan',plan_id:'fixture-plan',result:{ok:true,branch:'main',version:'0.1.0-ci.40000000000.1',source:'a'.repeat(40),workflow:{run_id:40000000000,attempt:1}}},
             pending:{operation:'upgrade',running:true,maintenance:true,result:null},

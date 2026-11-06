@@ -127,7 +127,10 @@
             let payload;
             if (action === "plan") {
                 payload = {action,selection_id:state.selection_id,branch:el("branch").value};
-                if (el("source").value === "version") payload.version = el("version").value.trim();
+                if (el("source").value === "version") {
+                    payload.version = el("version").value.trim().replace(/^v/, "");
+                    el("version").value = payload.version;
+                }
                 if (el("source").value === "stable") payload.stable = true;
             } else if (action === "erase") {
                 root.PicoFirmwareSafety?.begin();

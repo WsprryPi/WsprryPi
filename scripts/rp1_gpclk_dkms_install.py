@@ -22,6 +22,7 @@ sys.dont_write_bytecode = True
 MIGRATION_REPOSITORY = REPOSITORY = 'WsprryPi/RP1-DKMS'
 REPOSITORY_URL='https://github.com/'+REPOSITORY+'.git'
 PUBLIC_CONTRACT='rp1-gpclk-provider-lifecycle-v1'
+DEFAULT_RELEASE_TAG='v1.0.0-rc.1'
 RECORD_SCHEMA='rp1-gpclk-dkms-provider-installation-v1'
 RUNTIME_READINESS_CONTRACT='rp1-gpclk-runtime-readiness-v1'
 RUNTIME_PROVIDER=pathlib.Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
@@ -359,23 +360,46 @@ def canonical_origin(value):
     raise ContractError('provider checkout authority differs')
 
 
+def release_precedence(tag):
+    match=re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?',tag)
+    require(match is not None,'release tag is not a semantic version')
+    prerelease=match[4].split('.') if match[4] else []
+    require(not any(item.isdigit() and len(item)>1 and item.startswith('0') for item in prerelease),
+            'numeric prerelease identifier has a leading zero')
+    return tuple(map(int,match.group(1,2,3))),not prerelease,tuple((0,int(item)) if item.isdigit() else (1,item) for item in prerelease)
+
+
 def bootstrap(state, selector, policy):
-    if selector=='auto': selector='release' if policy=='production' else 'devel'
+    if selector=='auto': selector='release:'+DEFAULT_RELEASE_TAG
     selected=selector
-    if selector=='release':
-        releases=fetch_json('https://api.github.com/repos/'+REPOSITORY+'/releases?per_page=100')
+    if selector=='release' or selector.startswith('release:'):
+        requested_tag=selector.partition(':')[2]
+        if requested_tag:
+            release_precedence(requested_tag)
+            requested_tag='v'+requested_tag.removeprefix('v')
+            releases=[fetch_json('https://api.github.com/repos/'+REPOSITORY+'/releases/tags/'+requested_tag)]
+        else:
+            releases=fetch_json('https://api.github.com/repos/'+REPOSITORY+'/releases?per_page=100')
         require(isinstance(releases,list),'release listing malformed')
         candidates=[]
         for value in releases:
             require(isinstance(value,dict),'release listing contains a malformed entry')
             tag=value.get('tag_name','')
-            if (not value.get('draft',True) and not value.get('prerelease',True) and value.get('published_at')
-                    and re.fullmatch(r'v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)',tag)):
+            if (not value.get('draft',True) and value.get('published_at')
+                    and isinstance(tag,str)):
+                try: precedence=release_precedence(tag)
+                except ContractError: continue
                 names={item.get('name') for item in value.get('assets',[]) if isinstance(item,dict)}
                 if {'SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json'}<=names:
-                    candidates.append((tuple(map(int,tag.lstrip('v').split('.'))),tag))
+                    candidates.append((precedence,tag))
         require(bool(candidates),'no eligible published provider release')
-        reference='refs/tags/'+max(candidates)[1]
+        tag=max(candidates)[1]
+        if requested_tag: require(tag==requested_tag,'published release tag differs from selected release')
+        selected='release:'+tag
+        # Installer tooling and the selected package have independent revisions.
+        # Freeze the maintained tooling once; it verifies the exact published
+        # package/tag below instead of executing an older tag's selector policy.
+        reference='origin/devel'
         origin=REPOSITORY_URL
     elif selector=='devel': reference='origin/devel'; origin=REPOSITORY_URL
     elif selector.startswith('commit:'):
@@ -402,7 +426,7 @@ def bootstrap(state, selector, policy):
     validate_consumer_provider({'identity':metadata})
     # Development resolution uses the authenticated frozen snapshot. Release
     # resolution remains release-channel verification inside the provider.
-    return entrypoint, ('release' if selected=='release' else 'checkout:'+str(checkout))
+    return entrypoint, (selected if selected.startswith('release:') else 'checkout:'+str(checkout))
 
 
 def skipped_auto(args):

@@ -4,7 +4,7 @@ const assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("nod
 const source=fs.readFileSync(path.join(__dirname,"../data/wtp-firmware.js"),"utf8");
 async function main() {
     const fields=new Map(),requests=[];
-    const element=id=>{if(!fields.has(id))fields.set(id,{value:id.endsWith("branch")?"main":id.endsWith("source")?"latest":"",listeners:{},disabled:false,hidden:false,textContent:"",setAttribute(){},addEventListener(n,f){this.listeners[n]=f;}});return fields.get(id);};
+    const element=id=>{if(!fields.has(id))fields.set(id,{value:id.endsWith("branch")?"main":id.endsWith("source")?"version":id.endsWith("version")?"1.0.0-rc.1":"",listeners:{},disabled:false,hidden:false,textContent:"",setAttribute(){},addEventListener(n,f){this.listeners[n]=f;}});return fields.get(id);};
     let state={serial:"1545B6EFBF78028C",device_id:"c".repeat(32),selection_id:"fresh-selection",installed_version:"old",running:false,maintenance:false},fail=false;
     const root={document:{readyState:"complete",getElementById:element},AbortSignal,confirm:()=>true,setTimeout:()=>0,clearTimeout(){},fetch:async(url,options)=>{
         requests.push({url,...options});if(fail)throw Error("Disconnected");
@@ -16,6 +16,16 @@ async function main() {
     const el=name=>element("wtp-firmware-"+name), click=name=>el(name).listeners.click();
     assert(el("plan").disabled);await click("read");assert.match(el("read-status").textContent,/Status read at/);await click("plan");
     assert.equal(JSON.parse(requests.at(-1).body).branch,"main");assert.equal(el("upgrade").disabled,false);
+    assert.equal(JSON.parse(requests.at(-1).body).version,"1.0.0-rc.1");
+    for (const version of ["v1.0.0-rc.1", "  v1.0.0-rc.1  ", "1.0.0-rc.1", "vv1.0.0-rc.1"]) {
+        el("version").value=version;el("version").listeners.change();await click("plan");
+        const normalized=version.trim().replace(/^v/, "");
+        assert.equal(JSON.parse(requests.at(-1).body).version,normalized);
+        assert.equal(el("version").value,normalized);
+    }
+    el("source").value="latest";el("source").listeners.change();
+    assert(el("upgrade").disabled);await click("plan");
+    assert(!('version' in JSON.parse(requests.at(-1).body)));
     el("branch").value="devel";el("branch").listeners.change();assert(el("upgrade").disabled);
     await click("plan");assert.equal(JSON.parse(requests.at(-1).body).branch,"devel");
     root.confirm=()=>false;let count=requests.length;await click("upgrade");assert.equal(requests.length,count);

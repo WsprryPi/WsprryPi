@@ -72,10 +72,9 @@ not assert current-boot ownership.
 
 `RP1_GPCLK_DKMS_SOURCE` accepts exactly:
 
-- `auto` (default): on a development WsprryPi branch, resolve RP1-DKMS
-  `devel` once to an exact commit; on a production branch, require an eligible
-  published release;
-- `release`: select the latest eligible published stable release;
+- `auto` (default): select the latest eligible published release, including
+  prereleases, independently of the WsprryPi branch;
+- `release`: select the latest eligible published release, including prereleases;
 - `devel`: resolve upstream `origin/devel` once to a full commit;
 - `commit:FULL_40_CHARACTER_SHA`: select an exact upstream commit; or
 - `checkout:/absolute/path`: select the clean HEAD of an authoritative local
@@ -112,7 +111,11 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 
 ## Published releases
 
-Production selection requires an eligible published stable release from
+An explicit release selector accepts `release:1.0.0-rc.1` or
+`release:v1.0.0-rc.1`. Both select the published tag `v1.0.0-rc.1`.
+
+Automatic and release selection use the highest semantic version among eligible
+published releases, including prereleases, from
 `WsprryPi/RP1-DKMS`. The application authenticates the source and selects a
 release; the provider verifies its manifest, checksums, package, compatibility,
 and native installation identity. Failed selection or verification stops the

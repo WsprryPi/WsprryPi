@@ -6,8 +6,12 @@ WsprryPi provides **Pico firmware over USB** beside selected Pico controls in
 Setup. The shared core remains owned by WsprryPico; WsprryPi provides protected routes,
 process/permission boundaries, selected-member maintenance and presentation.
 
-The default firmware branch is **main**, independently of WsprryPi's branch.
-The operator can explicitly choose devel, a specific CI version or stable.
+The default image is the published **1.0.0-rc.1** prerelease under **Specific
+version**. The firmware branch defaults to **main**, independently of WsprryPi's
+branch; branch selection applies to CI images. The operator can explicitly choose
+devel, another release or CI version, or stable.
+The version field accepts `1.0.0-rc.1` or `v1.0.0-rc.1`; a leading `v` is
+removed when checking the image.
 Download and check image resolves the canonical public image without touching
 the device. An unavailable main image or compatible stable release is refused
 without substitution. Installation needs a successful plan for the current USB
