@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Non-installing acceptance of the locked published RP1 1.0.1 release.
-
-This maintainer entry point validates assets without installing them.
-Publication verification is an explicit, read-only network option.
-The provider's independent validator and the production consumer parsers both
-inspect a fresh reproducible build. All generated files stay outside Git.
-"""
+"""Accept a provider candidate through public, non-installing interfaces."""
 from __future__ import annotations
-
 import argparse
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -18,215 +10,112 @@ import stat
 import subprocess
 import sys
 import tempfile
-
-sys.dont_write_bytecode = True
-ROOT = Path(__file__).resolve().parents[2]
-LOCK_PATH = ROOT / "scripts/tests/fixtures/rp1-release-1.0.1.json"
-spec = importlib.util.spec_from_file_location("rp1_installer", ROOT / "scripts/rp1_gpclk_dkms_install.py")
-installer = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = installer
-spec.loader.exec_module(installer)
-# This read-only fixture verifier remains bound to its recorded repository.
-installer.configure_provider_repository(installer.LEGACY_REPOSITORY)
-require = installer.require
+sys.dont_write_bytecode=True
+ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'scripts'))
+import rp1_gpclk_dkms_install as client
+require=client.require
 
 
-def strict_json(data):
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            require(key not in result, "duplicate JSON field: " + key)
-            result[key] = value
-        return result
-    return json.loads(data, object_pairs_hook=pairs)
+def source_identity(source):
+    require(source.is_absolute() and source.resolve(strict=True)==source and source.is_dir(),'canonical provider source required')
+    require(Path(client.run_git(source,'rev-parse','--show-toplevel')).resolve()==source,'provider source is not a repository root')
+    client.canonical_origin(client.run_git(source,'remote','get-url','origin'))
+    require(not client.run_git(source,'status','--porcelain=v1','--untracked-files=all'),'provider source is dirty')
+    require(all(line.startswith('H ') for line in client.run_git(source,'ls-files','-v').splitlines()),'provider source has hidden index state')
+    commit=client.run_git(source,'rev-parse','HEAD');tree=client.run_git(source,'rev-parse','HEAD^{tree}')
+    require(client.SHA40.fullmatch(commit) and client.SHA40.fullmatch(tree),'provider Git identity malformed')
+    return {'sourceCommit':commit,'sourceTree':tree}
 
 
-def snapshot(candidate: Path, lock: dict) -> dict[str, bytes]:
-    require(candidate.is_absolute() and candidate.resolve(strict=True) == candidate,
-            "release asset path must be absolute and nonsymlink")
-    descriptor = os.open(candidate, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        require(set(os.listdir(descriptor)) == set(lock["assets"]), "missing or unexpected release assets")
-        result = {}
-        for name, expected in lock["assets"].items():
-            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=descriptor)
-            try:
-                info = os.fstat(fd)
-                require(stat.S_ISREG(info.st_mode) and info.st_size <= 64 * 1024 * 1024,
-                        "unsafe release asset: " + name)
-                with os.fdopen(fd, "rb", closefd=False) as stream:
-                    data = stream.read(64 * 1024 * 1024 + 1)
-                require(installer.sha256_bytes(data) == expected, "release asset checksum differs: " + name)
-                result[name] = data
-            finally:
-                os.close(fd)
-        return result
-    finally:
-        os.close(descriptor)
+def snapshot(candidate):
+    require(candidate.is_absolute() and candidate.resolve(strict=True)==candidate and candidate.is_dir(),'canonical candidate directory required')
+    result={}
+    for path in candidate.iterdir():
+        info=path.lstat()
+        require(stat.S_ISREG(info.st_mode) and info.st_size<=64*1024*1024 and len(result)<64,'unsafe or oversized candidate inventory')
+        result[path.name]=client.sha256_file(path)
+    require(bool(result),'candidate has no assets')
+    return result
 
 
-def validate_assets(candidate: Path, source: Path, lock: dict) -> dict:
-    runner = installer.Runner()
-    checkout = installer.validate_checkout(str(source), runner)
-    require(checkout["commit"] == lock["sourceCommit"], "wrong release commit")
-    require(checkout["tree"] == lock["sourceTree"], "wrong release source tree")
-    require(runner.run(["git", "-C", str(source), "symbolic-ref", "-q", "HEAD"], check=False).returncode == 1,
-            "release checkout must be detached")
-    return validate_snapshot(snapshot(candidate, lock), candidate, lock, runner)
-
-
-def validate_snapshot(assets: dict[str, bytes], candidate: Path, lock: dict,
-                      runner: installer.Runner) -> dict:
-    require(set(assets) == set(lock["assets"]), "missing or unexpected release assets")
-    for name, expected in lock["assets"].items():
-        require(installer.sha256_bytes(assets[name]) == expected, "release asset checksum differs: " + name)
-    sums = installer.parse_checksums(assets[installer.CHECKSUMS_NAME])
-    require(sums == {name: digest for name, digest in lock["assets"].items()
-                     if name != installer.CHECKSUMS_NAME}, "release checksum inventory differs")
-    metadata = strict_json(assets["release-metadata.json"])
-    for name in ("sourceCommit", "sourceTree", "productVersion", "debianVersion", "classification", "published", "releaseTag", "releaseUrl"):
-        require(metadata.get(name) == lock[name], "release metadata differs: " + name)
-    require(metadata.get("published") is True and metadata.get("classification") == "release",
-            "release profile must match the published lock")
-    require(metadata.get("qualification") == {name: False for name in
-        ("hardware", "lifecycle", "product", "rf", "wsprrypiAcceptance")}, "release claims qualification")
-    for name, expected in lock["runtime"].items():
-        require(metadata["runtime"][name] == expected, "release runtime interface differs: " + name)
-    for route, identity in lock["compatibilityIdentities"].items():
-        require(metadata["routes"][route]["compatibilityId"] == identity
-                and metadata["routes"][route]["dtboSha256"] == lock["overlaySha256"][route],
-                "release route identity differs: " + route)
-    for name, file in (("consumer", "rp1_gpclk.h"), ("controller", "rp1_route_admin.h")):
-        require(metadata["uapi"][file]["sha256"] == lock["uapiSha256"][name],
-                "release UAPI differs: " + name)
-    manifest = installer.validate_manifest(strict_json(assets[installer.MANIFEST_NAME]),
-        tag="v" + lock["productVersion"], tag_commit=lock["sourceCommit"])
-    require(manifest["debianVersion"] == lock["debianVersion"]
-            and manifest["uapi"]["sha256"] == lock["uapiSha256"]["consumer"], "release manifest identity differs")
-    # Work from captured bytes, never mutable user input during package parsing.
-    with tempfile.TemporaryDirectory(prefix="rp1-consumer-package-") as raw:
-        package = Path(raw) / manifest["package"]["filename"]
-        package.write_bytes(assets[package.name])
-        installer.validate_package(package, manifest, runner)
-    return {"schema": "wsprrypi-rp1-release-acceptance-v1", "status": "PASS",
-            "providerSelection": "release", "published": False, "publicationVerified": False,
-            "releaseProfileVerified": True, "qualification": False,
-            "sourceCommit": lock["sourceCommit"], "sourceTree": lock["sourceTree"],
-            "productVersion": lock["productVersion"], "debianVersion": lock["debianVersion"],
-            "assets": lock["assets"], "compatibilityIdentities": lock["compatibilityIdentities"],
-            "uapiSha256": lock["uapiSha256"], "runtime": lock["runtime"],
-            "productionSelectable": False, "installationPerformed": False}
-
-
-def validate_publication(client, lock: dict) -> dict:
-    """Use production selection rules plus the exact reviewed release lock."""
-    tag = lock["releaseTag"]
-    release = client.json(installer.API_BASE + "/releases/tags/" + tag)
-    require(installer.select_release([release])["tag_name"] == tag,
-            "published release tag differs from lock")
-    require(release.get("html_url") == lock["releaseUrl"], "release URL differs from lock")
-    require(client.tag_commit(tag) == lock["sourceCommit"], "published tag commit differs from lock")
-    assets = installer.release_assets(release)
-    require(set(assets) == set(lock["assets"]), "published asset set differs from lock")
-    for name, url in assets.items():
-        installer.authoritative_asset_url(tag, name, url)
-    for item in release["assets"]:
-        require(item.get("digest") == "sha256:" + lock["assets"][item["name"]],
-                "published asset digest differs: " + item["name"])
-    return {"published": True, "publicationVerified": True, "productionSelectable": True,
-            "releaseTag": tag, "releaseUrl": lock["releaseUrl"]}
-
-
-def validate_production_resolution(client, lock: dict, directory: Path) -> dict:
-    """Exercise the installer's real download/source path without applying it."""
-    runner = installer.Runner()
-    resolved = installer.download_release(directory, client, runner)
-    require(resolved["channel"] == "release" and resolved["tag"] == lock["releaseTag"]
-            and resolved["commit"] == lock["sourceCommit"],
-            "production resolver selected a different release")
-    manifest = resolved["manifest"]
-    package = manifest["package"]
-    require(manifest["debianVersion"] == lock["debianVersion"]
-            and package["sha256"] == lock["assets"][package["filename"]],
-            "production resolver package differs from release lock")
-    require(installer.sha256_file(directory / installer.MANIFEST_NAME)
-            == installer.sha256_bytes(installer.canonical(manifest) + b"\n"),
-            "production resolver retained manifest differs")
-    source = Path(resolved["checkout"]["path"])
-    require(installer.git_output(runner, source, "rev-parse", "HEAD^{tree}") == lock["sourceTree"],
-            "production resolver runtime tree differs from release lock")
-    require(installer.sha256_file(Path(resolved["packagePath"])) == package["sha256"],
-            "production resolver retained package differs")
-    return {"productionResolverVerified": True,
-            "resolvedPackageSha256": package["sha256"], "resolvedSourceTree": lock["sourceTree"]}
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--provider-source", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True, help="new external directory")
-    parser.add_argument("--compare-retained", type=Path)
-    parser.add_argument("--verify-publication", action="store_true",
-                        help="read-only GitHub verification plus the production download/source resolver")
-    args = parser.parse_args()
-    lock = strict_json(LOCK_PATH.read_bytes())
-    source, output = args.provider_source, args.output
-    runner = installer.Runner()
-    identity = installer.validate_checkout(str(source), runner)
-    require(identity["commit"] == lock["sourceCommit"] and identity["tree"] == lock["sourceTree"],
-            "provider source is not the locked release")
-    require(runner.run(["git", "-C", str(source), "symbolic-ref", "-q", "HEAD"], check=False).returncode == 1,
-            "release source must be detached")
-    require(output.is_absolute() and output == output.resolve() and not output.exists(), "new canonical output path required")
-    require(runner.run(["git", "-C", str(output.parent), "rev-parse", "--show-toplevel"], check=False).returncode != 0,
-            "acceptance output must be outside Git")
+def accept(args):
+    source=args.provider_source;identity=source_identity(source)
+    entry=source/'scripts/provider_lifecycle.py'
+    metadata=client.invoke(entry,'identity')['providerIdentity']
+    client.validate_consumer_provider({'identity':metadata})
+    if args.verify_publication:require('release-audit' in metadata['capabilities'],'provider lacks non-installing release audit')
+    output=args.output
+    require(output.is_absolute() and output.resolve()==output and not output.exists() and not output.is_symlink(),'new canonical output directory required')
+    require(output.parent.is_dir(),'output parent is missing')
+    probe=subprocess.run(['git','-C',str(output.parent),'rev-parse','--show-toplevel'],capture_output=True,check=False)
+    require(probe.returncode!=0,'acceptance output must be outside Git')
     output.mkdir(mode=0o700)
-    candidate = output / "release"
-    with (output / "build.log").open("wb") as log:
-        subprocess.run([str(source / "scripts/build-release-candidate"), "--version", lock["productVersion"],
-            "--source-commit", lock["sourceCommit"], "--output", str(candidate), "--release"],
-            stdout=log, stderr=subprocess.STDOUT, check=True, timeout=600)
-    validated = subprocess.run([str(source / "scripts/validate-release-candidate"), "--candidate", str(candidate),
-        "--source-commit", lock["sourceCommit"], "--release"], text=True, capture_output=True, check=True, timeout=600)
-    validation = strict_json(validated.stdout)
-    require(validation == {"status": "PASS", "classification": "release", "independentlyRebuilt": True,
-        "published": False, "sourceCommit": lock["sourceCommit"], "sourceTree": lock["sourceTree"]},
-        "independent provider validation result differs")
-    (output / "provider-validation.json").write_text(validated.stdout)
-    result = validate_assets(candidate, source, lock)
-    installer.require_compatible_runtime_source(source, lock["sourceCommit"], runner)
-    installer.runtime_source_interface(source, runner)
-    installer.runtime_source_identity(source, lock["productVersion"])
-    # Exercise real exact-source development selection as a separate policy.
-    # Its identity/help probes are read-only; no install/apply entry point runs.
-    with tempfile.TemporaryDirectory(prefix="development-selection-", dir=output) as raw:
-        development = installer.prepare_development(Path(raw), "checkout", str(source), runner)
-        require(development["commit"] == lock["sourceCommit"] and development["sourceTree"] == lock["sourceTree"]
-                and development["version"] == lock["productVersion"]
-                and development["compatibilityIdentity"] == installer.development_compatibility(lock["productVersion"]),
-                "exact-source development selection differs from release")
-    result["sourceDevelopmentSelectionValidated"] = True
-    if args.compare_retained:
-        require(snapshot(args.compare_retained, lock) == snapshot(candidate, lock), "retained release differs from fresh build")
+    release=args.release or args.verify_publication
+    candidate=args.candidate
+    if candidate is None:
+        candidate=output/'release'
+        command=[str(source/'scripts/build-release-candidate'),'--version',metadata['productVersion'],
+                 '--source-commit',identity['sourceCommit'],'--output',str(candidate)]
+        if release:command+=['--release']
+        with (output/'build.log').open('wb') as log:
+            subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=600)
+    captured=snapshot(candidate)
+    command=[str(source/'scripts/validate-release-candidate'),'--candidate',str(candidate),
+             '--source-commit',identity['sourceCommit']]
+    if release:command+=['--release']
+    checked=subprocess.run(command,text=True,capture_output=True,check=True,timeout=600)
+    validation=client.strict_json(checked.stdout)
+    require(isinstance(validation,dict) and validation.get('status')=='PASS'
+            and validation.get('independentlyRebuilt') is True and validation.get('published') is False
+            and validation.get('classification')==('release' if release else 'candidate')
+            and all(validation.get(k)==v for k,v in identity.items()),'provider independent validation result differs')
+    require(snapshot(candidate)==captured,'candidate changed during acceptance')
+    if args.compare_retained:require(snapshot(args.compare_retained)==captured,'retained candidate differs')
+    publication=None
     if args.verify_publication:
-        client = installer.GitHubClient()
-        result.update(validate_publication(client, lock))
-        with tempfile.TemporaryDirectory(prefix="production-resolution-", dir=output) as raw:
-            result.update(validate_production_resolution(client, lock, Path(raw)))
-    result["independentlyRebuilt"] = True
-    result["wsprrypiCommit"] = installer.git_output(runner, ROOT, "rev-parse", "HEAD")
-    result["wsprrypiWorkingTreeClean"] = not bool(installer.git_output(
-        runner, ROOT, "status", "--porcelain=v1", "--untracked-files=all"))
-    result["acceptanceToolSha256"] = installer.sha256_file(Path(__file__))
-    result["releaseLockSha256"] = installer.sha256_file(LOCK_PATH)
-    result["installerSha256"] = installer.sha256_file(ROOT / "scripts/rp1_gpclk_dkms_install.py")
-    (output / "acceptance.json").write_bytes(installer.canonical(result) + b"\n")
-    print(json.dumps(result, sort_keys=True))
+        state=output/'publication';state.mkdir(mode=0o700)
+        requirements=output/'consumer-requirements.json'
+        client.atomic_json(requirements,client.strict_json(client.requirements_path().read_bytes()))
+        arguments=['--state-dir',state,'--requirements',requirements,'--compare-candidate',candidate]
+        if args.release_tag:arguments+=['--tag',args.release_tag]
+        publication=client.invoke(entry,'verify-release',*arguments)
+        require(publication.get('publicationVerified') is True and publication.get('installationPerformed') is False
+                and publication.get('candidateMatched') is True
+                and all(publication.get(k)==v for k,v in identity.items()),'published provider differs from accepted source/candidate')
+        client.validate_consumer_provider({'identity':publication.get('providerIdentity')})
+    require(source_identity(source)==identity,'provider source changed during acceptance')
+    require(snapshot(candidate)==captured,'candidate changed during acceptance')
+    result={'schema':'wsprrypi-rp1-release-acceptance-v1','status':'PASS',**identity,
+            'providerIdentity':metadata,'providerValidation':validation,'assets':captured,
+            'productVersion':metadata['productVersion'],'debianVersion':metadata['debianVersion'],
+            'acceptanceToolSha256':client.sha256_file(Path(__file__)),
+            'consumerRequirementsSha256':client.sha256_file(client.requirements_path()),
+            'publicationVerified':publication is not None,'productionSelectable':publication is not None,
+            'published':publication is not None,'installationPerformed':False,'qualification':False}
+    client.atomic_json(output/'acceptance.json',result)
+    return result
 
 
-if __name__ == "__main__":
+def parser():
+    result=argparse.ArgumentParser(description=__doc__)
+    result.add_argument('--provider-source',type=Path,required=True)
+    result.add_argument('--output',type=Path,required=True,help='new external evidence directory')
+    result.add_argument('--candidate',type=Path,help='existing assets; otherwise independently build them')
+    result.add_argument('--release',action='store_true',help='require release-profile metadata; does not verify publication')
+    result.add_argument('--compare-retained',type=Path)
+    result.add_argument('--verify-publication',action='store_true',help='request public provider verification of published assets')
+    result.add_argument('--release-tag',help='specific published tag; otherwise provider selects latest eligible release')
+    return result
+
+
+def main(argv=None):
     try:
-        main()
-    except (OSError, ValueError, KeyError, TypeError, installer.ContractError, subprocess.SubprocessError) as error:
-        print(json.dumps({"status": "FAIL", "error": str(error)}), file=sys.stderr)
-        raise SystemExit(1)
+        args=parser().parse_args(argv)
+        require(not args.release_tag or args.verify_publication,'release tag requires publication verification')
+        print(json.dumps(accept(args),sort_keys=True));return 0
+    except (OSError,ValueError,KeyError,TypeError,client.ContractError,subprocess.SubprocessError) as error:
+        print(json.dumps({'status':'FAIL','error':str(error)}),file=sys.stderr);return 1
+
+
+if __name__=='__main__':raise SystemExit(main())

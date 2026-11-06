@@ -140,8 +140,9 @@ does not proceed past a failed resource preflight.
 
 ## RP1-GPCLK-DKMS provider
 
-`install.sh` uses `rp1_gpclk_dkms_install.py` to resolve and validate the
-independently owned provider before package mutation. Automatic Pi 5/CM5,
+`install.sh` uses `rp1_gpclk_dkms_install.py` to select/authenticate provider
+inputs and call the independently owned public lifecycle. The provider owns
+version transitions, native operations, recovery, and absence verification. Automatic Pi 5/CM5,
 explicit override/opt-out, published release, immutable development source,
 digest-reviewed neutral runtime deployment/activation, deferred explicit
 GPIO4/GPIO20 route selection, dry-run, exact-owned development no-op,

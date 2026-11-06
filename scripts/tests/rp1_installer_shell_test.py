@@ -128,63 +128,6 @@ class ApplyPolicyTests(RunnerFixtures, unittest.TestCase):
         self.resolved = {"tag": "v2.1.0", "commit": "a" * 40, "manifest": self.manifest, "packagePath": str(self.package)}
         self.record = self.root / "record.json"
 
-    def runtime_update_args(self, *, dry_run=False):
-        MOD.atomic_json(self.state / "plan.json", {
-            "schema": MOD.STATE_SCHEMA, "dryRun": dry_run,
-            "decision": {"install": True},
-            "resolved": {"channel": "development", "commit": "a" * 40,
-                         "version": MOD.CONSUMER_PROVIDER_VERSION},
-        })
-        return MOD.parser().parse_args([
-            "prepare-runtime-update", "--state-dir", str(self.state),
-            "--record", str(self.record),
-        ])
-
-    def runtime_update_record(self):
-        return {
-            "schema": MOD.RECORD_SCHEMA, "channel": "development",
-            "sourceCommit": "a" * 40, "productVersion": "1.0.0",
-            "runtime": {
-                "readinessContract": MOD.RUNTIME_READINESS_CONTRACT,
-                "bindingSha256": "b" * 64, "artifactSetSha256": "c" * 64,
-                "sourceCommit": "a" * 40, "productVersion": "1.0.0",
-                "targetKernel": MOD.platform.release(),
-                "compatibilityIdentities": {
-                    "gpio4": "v1.0.0-rp1-gpio4",
-                    "gpio20": "v1.0.0-rp1-gpio20",
-                },
-                "deploymentPlanSha256": "d" * 64,
-                "activationPlanSha256": "e" * 64,
-                "activationRequestId": "request-1234",
-                "controllerSession": 42, "controllerGeneration": 0,
-                "state": "neutral_ready", "route": None,
-                "output": "disabled",
-            },
-        }
-
-    def public_update(self, record, *, prepared=False, operation="update-plan", marker=1):
-        runtime = record.get("runtime", {})
-        identity = {"sourceCommit": record["sourceCommit"],
-                    "bindingSha256": runtime.get("bindingSha256"),
-                    "artifactSetSha256": runtime.get("artifactSetSha256"),
-                    "deploymentPlanSha256": runtime.get("deploymentPlanSha256")}
-        # Deliberately opaque: applications must not interpret provider internals.
-        plan = {"providerPrivate": {"generation": marker, "futureField": ["opaque"]}}
-        return {"schemaVersion": 1, "contract": MOD.RUNTIME_UPDATE_CONTRACT,
-                "operation": operation, "identity": identity,
-                "status": "prepared" if prepared else "planned",
-                "plan": plan, "planSha256": digest(MOD.canonical(plan)),
-                "postconditions": {"runtimeAbsent": prepared, "transmissionAuthorized": False}}
-
-    def responses(self, installed_version=None, dkms=""):
-        dpkg = MOD.CommandResult("", "missing", 1)
-        if installed_version:
-            dpkg = MOD.CommandResult(f"install ok installed\n{installed_version}\n", "", 0)
-        return {
-            ("dpkg-query", "-W", "-f=${Status}\n${Version}\n", MOD.PACKAGE_NAME): dpkg,
-            ("dkms", "status", "-m", MOD.DKMS_NAME): MOD.CommandResult(dkms, "", 0),
-        }
-
     def test_selected_shell_dry_run_never_invokes_python_or_resolution_tools(self):
         install_script = ROOT / "scripts" / "install.sh"
         shell = r'''

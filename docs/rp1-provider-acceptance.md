@@ -1,34 +1,42 @@
-# RP1 provider fixture verification
+# RP1 provider acceptance
 
-The normal installer consumes the current RP1-DKMS provider. See
-[installation and ownership](rp1-gpclk-dkms-installation.md) for its source
-selection, repeat-install, update, and removal behavior.
+The maintainer tool `scripts/maintainer/accept_rp1_release.py` accepts a clean,
+authenticated RP1-DKMS checkout and delegates artifact construction and independent
+validation to that provider's public tools. The product version comes from the
+provider's canonical header and public identity. There is no selected historical
+product version or release lock in the application acceptance policy.
 
-The retained [software metadata fixtures](../scripts/tests/fixtures/) are inputs to
-historical package-parser and qualification-attribution regression tests. They
-are not current provider selections, installation requirements, or authority to
-adopt an old installation. The [qualification metadata](rp1-qualification-metadata.md)
-remains bound to its recorded source and artifacts.
-
-Run the deterministic fixture checks from `src`:
+Run in a Linux Debian packaging environment with the provider's build prerequisites:
 
 ```sh
-make rp1-release-acceptance-test SUDO=
+python3 scripts/maintainer/accept_rp1_release.py \
+  --provider-source /absolute/path/to/RP1-DKMS \
+  --output /absolute/path/outside-git/acceptance
 ```
 
-These checks exercise malformed inventories, source and UAPI mismatches,
-substituted assets, checksums, and remote-identity refusals. The separate
-`scripts/maintainer/accept_rp1_release.py` verifier remains explicitly bound to
-its recorded fixture repository. It can rebuild and inspect those inputs without
-installing a package, changing ownership records, contacting a Pi, or creating
-a release. Its results do not select that provider for normal installation.
+The new output directory contains the build log, immutable asset fingerprints,
+provider validation result, and application consumer acceptance. Use `--candidate`
+to validate existing assets, `--release` to require release-profile metadata, and
+`--compare-retained` to require an identical retained candidate. These operations
+install nothing and grant no hardware, timing, GPIO, or RF qualification.
 
-Hosted CI exercises the actual update/bootstrap boundary against an exact
-RP1-DKMS source commit. Consumer regressions cover route identity, bounded work,
-cancellation, ownership, service intent, and cleanup failures. Those fixtures
-exercise software contracts; they do not establish installation, reboot,
-hardware, timing, GPIO, or RF qualification.
+`--verify-publication` requests the provider's public `release-audit` capability
+and `verify-release` operation. `--release-tag` selects a specific published tag;
+otherwise the provider selects the latest eligible stable release. Every accepted
+asset must match the independently validated local candidate. Missing publication,
+unsupported interfaces, different sources/assets, malformed results, and failed
+provider commands stop acceptance. A release-profile build alone is not proof of
+publication or production eligibility.
 
-An old provider is manually uninstalled before the first RP1-DKMS installation.
-There is no automatic cross-repository migration or retention of that old
-installation's recovery inputs.
+The normal installer source policy and cleanup behavior are described in
+[installation and ownership](rp1-gpclk-dkms-installation.md). The independently
+versioned UAPI and runtime/lifecycle interfaces must satisfy
+`config/rp1-provider-requirements.json`; product version numbers do not select a
+consumer implementation.
+
+Historical software metadata remains fixture data for qualification attribution.
+Provider package-parser rejection fixtures run in RP1-DKMS's offline suite; the
+application's `make rp1-release-acceptance-test SUDO=` checks public delegation,
+consumer compatibility, source/asset stability, and truthful non-installing results.
+The actual cross-repository identity/runtime integration tests use an explicitly
+selected provider checkout. None of these tests authorizes installation or RF.
