@@ -458,11 +458,11 @@ jobs:
         working-directory: WsprryPi-UI
         run: npm run test:browser
 
-      - name: Read-only RP1-DKMS development reference
+      - name: Read-only RP1-DKMS prerelease reference
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-DKMS
-          ref: 018b12ecf43c964bdb08b0c24974cb985f9abc3f
+          ref: 58424e0593a7ff5670a0ac3a46720ca3995c065e # v1.0.0-rc.1
           path: src/build/rp1-provider-reference
           persist-credentials: false
 

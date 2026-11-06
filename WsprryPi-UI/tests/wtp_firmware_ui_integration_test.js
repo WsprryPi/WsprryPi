@@ -156,6 +156,7 @@ async function main() {
             WtpFirmware.setAvailability(true);document.getElementById('wtp-firmware').open=true;
             window.confirm=()=>true;
         })()`);
+        await waitFor(async()=>await evaluate("getComputedStyle(document.getElementById('fleet-pane')).opacity==='1'"),"Fleet tab transition");
         assert.equal(await evaluate("document.getElementById('wtp-firmware-branch').value"),"main");
         assert.equal(await evaluate("document.getElementById('wtp-firmware-source').value"),"version");
         assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.1");

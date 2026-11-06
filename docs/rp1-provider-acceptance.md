@@ -22,8 +22,8 @@ install nothing and grant no hardware, timing, GPIO, or RF qualification.
 
 `--verify-publication` requests the provider's public `release-audit` capability
 and `verify-release` operation. `--release-tag` selects a specific published tag;
-otherwise the provider selects the latest eligible stable release. Every accepted
-asset must match the independently validated local candidate. Missing publication,
+otherwise the provider selects the latest eligible release, including prereleases.
+Every accepted asset must match the independently validated local candidate. Missing publication,
 unsupported interfaces, different sources/assets, malformed results, and failed
 provider commands stop acceptance. A release-profile build alone is not proof of
 publication or production eligibility.
