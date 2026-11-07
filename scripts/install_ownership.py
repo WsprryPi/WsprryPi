@@ -161,6 +161,11 @@ def remove(root):
         if preserve:print('Retained operator/shared data: '+name)
         else:deletions.append(path)
     for path in deletions:path.unlink()
+    # a2dissite creates this empty application-specific bookkeeping marker.
+    marker=physical(root,'/var/lib/apache2/site/disabled_by_admin/wsprrypi')
+    raw=read(marker)
+    if raw==b'':marker.unlink()
+    elif raw is not None:print('Retained modified Apache site marker: '+str(marker))
     pico=physical(root,'/usr/local/lib/wsprrypi/pico-usb')
     if not value['directories']['/usr/local/lib/wsprrypi/pico-usb'] and pico.is_dir():
         marker=pico/'deployment.json'

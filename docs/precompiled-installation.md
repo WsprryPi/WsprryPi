@@ -13,8 +13,7 @@ sudo ./scripts/install.sh --binary-source build
 To use an existing executable, select `--binary-source local`. Only the executable is required; no sidecar, source fingerprint, or matching Git commit is needed.
 
 Run from the intended application checkout to select its supporting files.
-Outside a checkout, an existing destination directory is refused; it is not
-silently reused as the selected source.
+Outside a checkout, including `curl | sudo bash`, supporting files come from a private temporary checkout of the selected branch. The same entry point supports fresh installation, identical reinstall and upgrade. Temporary sources are removed when the installer exits. An existing `~/WsprryPi` checkout is preserved and does not select the streamed installer's supporting files.
 
 ```sh
 rm -f ~/finished
@@ -103,3 +102,5 @@ or service changes. A local executable receives a basic ELF check; dependency
 and version checks wait for a real installation.
 
 Automatic selection resolves the release before build-resource estimates and package selection. A selected executable skips application compilation, its time/parallelism estimates, and application build dependencies. Optional RP1 provider preparation remains separate. Dry runs do not query release metadata or download executables; they report that release availability and any source-build fallback remain unresolved.
+
+Successful full uninstall removes the default installer log and attributable application/provider state after native removal succeeds. Operator checkouts, custom log paths, modified or unknown files, and shared dependencies remain outside that removal. Shared picotool is installed under `/usr/local/lib/picotool`; a verified legacy copy is relocated there before application cleanup.

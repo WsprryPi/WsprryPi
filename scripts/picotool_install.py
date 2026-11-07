@@ -17,7 +17,8 @@ import uuid
 from precompiled_binary import elf_header, host_target
 
 VERSION = '2.3.1'
-PREFIX = Path('/usr/local/lib/wsprrypi/picotool')
+PREFIX = Path('/usr/local/lib/picotool')
+LEGACY_PREFIX = Path('/usr/local/lib/wsprrypi/picotool')
 TARGETS = ('armv6-bookworm', 'armv6-trixie', 'aarch64-bookworm', 'aarch64-trixie')
 OPTIONS = {
     'info': ('-a', '--ser'), 'save': ('-r', '-v', '-t', '--ser'),
@@ -143,7 +144,51 @@ def protected_directory(path, root):
         protected_directory(path.parent, root)
 
 
+def relocate_legacy(policy, root=Path('/')):
+    """Move only a verified installer-owned tool, keeping shared tools independent."""
+    root=root.resolve();old=root/LEGACY_PREFIX.relative_to('/')
+    command=root/'usr/local/bin/picotool';destination=root/PREFIX.relative_to('/')
+    if not command.is_symlink() or command.resolve()!=old/'picotool':return 'unchanged'
+    # Recover interruption between moving the verified tree and switching its
+    # launcher. Revalidate the destination before completing that switch.
+    moved=not old.exists() and destination.exists()
+    if moved:old=destination
+    protected_directory(old,root)
+    receipt=old/'installation.json'
+    require(receipt.is_file() and not receipt.is_symlink(),'Unattributed legacy picotool retained')
+    target='-'.join(host_target());record=policy_record(policy,target)
+    expected={'schema':'wsprrypi-picotool-installation/1','target':target,
+              'version':VERSION,'archive_sha256':record['sha256']}
+    require(json.loads(receipt.read_text())==expected,'Legacy picotool receipt differs')
+    entries=list(old.rglob('*'))
+    allowed_dirs={str(parent) for name in record['files'] for parent in Path(name).parents if str(parent)!='.'}
+    require(all(not p.is_symlink() and (not p.is_dir() or str(p.relative_to(old)) in allowed_dirs)
+                and p.lstat().st_uid==os.geteuid() and not p.lstat().st_mode&0o022 for p in entries),
+            'Unattributable legacy picotool entry retained')
+    files={str(p.relative_to(old)):p for p in entries if not p.is_dir()}
+    require(set(files)==set(record['files'])|{'installation.json'},'Unknown legacy picotool files retained')
+    for name,item in record['files'].items():
+        path=files[name];info=path.lstat()
+        require(path.is_file() and not path.is_symlink() and info.st_uid==os.geteuid()
+                and not info.st_mode&0o022 and info.st_size==item['bytes']
+                and sha(path.read_bytes())==item['sha256'],'Modified legacy picotool retained')
+    require(moved or (not destination.exists() and not destination.is_symlink()),'Shared picotool destination exists; legacy tool retained')
+    protected_directory(destination.parent,root)
+    validate(old/'picotool')
+    if not moved:os.replace(old,destination)
+    link=command.with_name('.picotool-'+uuid.uuid4().hex)
+    try:
+        link.symlink_to(os.path.relpath(destination/'picotool',command.parent))
+        os.replace(link,command)
+    except BaseException:
+        if not moved:os.replace(destination,old)
+        raise
+    finally:link.unlink(missing_ok=True)
+    return 'relocated'
+
+
 def install(policy, root=Path('/'), fetch=download):
+    relocate_legacy(policy,root)
     if existing_tool():
         return 'reused'
     target = '-'.join(host_target())
@@ -208,8 +253,10 @@ def install(policy, root=Path('/'), fetch=download):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--policy', type=Path, required=True)
+    parser.add_argument('--relocate-only', action='store_true')
     args = parser.parse_args()
-    print('picotool: ' + install(json.loads(args.policy.read_text())))
+    policy=json.loads(args.policy.read_text())
+    print('picotool: ' + (relocate_legacy(policy) if args.relocate_only else install(policy)))
 
 
 if __name__ == '__main__':

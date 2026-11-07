@@ -117,15 +117,28 @@ class Tests(unittest.TestCase):
         calls=[]
         def invoke(path,operation,*args):
             calls.append((operation,args))
+            if operation=='status':return {'retirementPending':False}
             if operation=='removal-plan':return {'planSha256':'a'*64}
             return {'postconditions':{'providerAbsent':True,'transmissionAuthorized':False}}
         args=client.parser().parse_args(['remove'])
         with patch.object(client.ACTIVE_FACADE.__class__,'exists',return_value=True), \
              patch.object(client,'retained_facade',return_value=Path('/verified/provider.py')), \
+             patch.object(client,'bootstrap',return_value=(Path('/verified/maintained.py'),'devel')), \
              patch.object(client,'invoke',side_effect=invoke):
             client.execute_client(args)
-        self.assertEqual([x[0] for x in calls],['removal-plan','remove'])
+        self.assertEqual([x[0] for x in calls],['status','removal-plan','remove'])
         self.assertIn('a'*64,calls[-1][1])
+
+    def test_old_authenticated_facade_upgrades_removal_tooling(self):
+        args=client.parser().parse_args(['remove'])
+        with patch.object(Path,'exists',return_value=True), \
+             patch.object(client,'retained_facade',return_value=Path('/old/provider.py')), \
+             patch.object(client,'bootstrap',return_value=(Path('/maintained/provider.py'),'devel')) as bootstrap, \
+             patch.object(client,'invoke',side_effect=[{}, {'retirementPending':False},
+                {'planSha256':'a'*64},{'postconditions':{'providerAbsent':True,'transmissionAuthorized':False}}]) as invoke:
+            client.execute_client(args)
+            bootstrap.assert_called_once()
+            self.assertEqual(invoke.call_args.args[0],Path('/maintained/provider.py'))
 
     def test_removal_result_file_is_written_only_after_verified_absence(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -133,9 +146,9 @@ class Tests(unittest.TestCase):
             marker=root/'active.json';marker.write_text('{}')
             output=root/'result.json'
             args=client.parser().parse_args(['remove','--result-file',str(output)])
-            with patch.object(client,'ACTIVE_FACADE',marker),patch.object(client,'retained_facade',return_value=root/'provider.py'):
+            with patch.object(client,'ACTIVE_FACADE',marker),patch.object(client,'retained_facade',return_value=root/'provider.py'),patch.object(client,'bootstrap',return_value=(root/'maintained.py','devel')):
                 for absent in [False,True]:
-                    with patch.object(client,'invoke',side_effect=[{'planSha256':'a'*64},{'postconditions':{'providerAbsent':absent,'transmissionAuthorized':False}}]):
+                    with patch.object(client,'invoke',side_effect=[{'retirementPending':False}, {'planSha256':'a'*64},{'postconditions':{'providerAbsent':absent,'transmissionAuthorized':False}}]):
                         if not absent:
                             with self.assertRaises(client.ContractError):client.execute_client(args)
                             self.assertFalse(output.exists())
@@ -145,10 +158,10 @@ class Tests(unittest.TestCase):
     def test_absent_provider_preparation_and_repeat_removal_are_noops(self):
         for command in ['prepare-runtime-removal','remove']:
             args=client.parser().parse_args([command])
-            with patch.object(Path,'exists',return_value=False),patch.object(client,'invoke') as invoke:
-                client.execute_client(args);invoke.assert_not_called()
+            with patch.object(Path,'exists',return_value=False),patch.object(client,'bootstrap',return_value=(Path('/verified/provider.py'),'devel')),patch.object(client,'invoke',return_value={'retirementPending':False}) as invoke:
+                client.execute_client(args);self.assertEqual(invoke.call_args.args[1],'status')
         args=client.parser().parse_args(['remove','--remove','true'])
-        with patch.object(Path,'exists',return_value=False),self.assertRaises(client.ContractError):client.execute_client(args)
+        with patch.object(Path,'exists',return_value=False),patch.object(client,'bootstrap',return_value=(Path('/verified/provider.py'),'devel')),patch.object(client,'invoke',return_value={'retirementPending':False}),self.assertRaises(client.ContractError):client.execute_client(args)
 
     def test_out_of_band_plan_change_stops_before_effect(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -163,7 +176,8 @@ class Tests(unittest.TestCase):
         args=client.parser().parse_args(['remove'])
         with patch.object(client.ACTIVE_FACADE.__class__,'exists',return_value=True), \
              patch.object(client,'retained_facade',return_value=Path('/verified/provider.py')), \
-             patch.object(client,'invoke',side_effect=[{'planSha256':'a'*64},{'postconditions':{'providerAbsent':False,'transmissionAuthorized':False}}]), \
+             patch.object(client,'bootstrap',return_value=(Path('/verified/maintained.py'),'devel')), \
+             patch.object(client,'invoke',side_effect=[{'retirementPending':False}, {'planSha256':'a'*64},{'postconditions':{'providerAbsent':False,'transmissionAuthorized':False}}]), \
              self.assertRaises(client.ContractError):client.execute_client(args)
 
     def test_app_policy_selects_channel_without_hardware_or_provider_internals(self):

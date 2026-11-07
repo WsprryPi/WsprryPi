@@ -92,11 +92,16 @@ prepare_install_executable() { printf "%s\n" "$BINARY_SOURCE" >"$RESOLVED_BINARY
 rollback_executable() { record rollback; }
 
 runuser() {
+    if [[ "$4" == mktemp ]]; then
+        command mktemp -d "$USER_HOME/wsprrypi-install.XXXXXXXX"
+        return
+    fi
     [[ "$1" == -u && "$2" == "$SUDO_USER" && "$3" == -- &&
        "$4" == git && "$5" == clone && "$6" == -b &&
        "$7" == "$REPO_BRANCH" && "$8" == "$GIT_CLONE" &&
        "$9" == "$LOCAL_REPO_DIR" ]] || return 90
     record clone
+    [[ "$FAIL_AT" != signal ]] || kill -TERM "$$"
     [[ "$FAIL_AT" != clone ]] || return 18
     command -v git >/dev/null || return 94
     [[ ! -e "$LOCAL_REPO_DIR" ]] || return 91
@@ -110,8 +115,11 @@ support_bundle_validate_age_dependency() {
     record age-validation
     support_bundle_validate_age_dependency_at_root "$AGE_ROOT" "$FIXTURE_UID"
 }
+
 HELPER
 }
+
+egress() { local status=$?; cleanup_install_source; exit "$status"; }
 
 prepare_precompiled_executable() {
     [[ "$BINARY_SOURCE" != build ]] || return 0
@@ -137,7 +145,7 @@ if [[ "$ACTION" == uninstall ]]; then
         mkdir -p "$9/scripts" "$9/config"
         cp "$SOURCE_ROOT"/scripts/*.py "$9/scripts/"
         cp "$SOURCE_ROOT"/scripts/*runtime_install.sh "$9/scripts/"
-        cp "$SOURCE_ROOT/config/pico-usb-installer.json" "$SOURCE_ROOT/config/rp1-provider-requirements.json" "$9/config/"
+        cp "$SOURCE_ROOT/config/pico-usb-installer.json" "$SOURCE_ROOT/config/rp1-provider-requirements.json" "$SOURCE_ROOT/config/picotool-release.json" "$9/config/"
         case "$FAIL_AT" in
             missing) rm "$9/scripts/$BROKEN_INPUT";;
             symlink) rm "$9/scripts/$BROKEN_INPUT"; ln -s "$SOURCE_ROOT/scripts/$BROKEN_INPUT" "$9/scripts/$BROKEN_INPUT";;
@@ -145,9 +153,11 @@ if [[ "$ACTION" == uninstall ]]; then
             shell-entry) printf ':\n' >"$9/scripts/pico_usb_runtime_install.sh";;
             shell-syntax) printf 'if\n' >"$9/scripts/pico_usb_runtime_install.sh";;
             policy) printf '{invalid\n' >"$9/config/pico-usb-installer.json";;
+            picotool-policy) printf '{invalid\n' >"$9/config/picotool-release.json";;
         esac
     }
     for step in prepare_owned_rp1_gpclk_runtime_removal remove_owned_rp1_gpclk_dkms_provider \
+        preserve_shared_picotool \
         manage_apache manage_web manage_udp_logging manage_service manage_i2c \
         manage_config manage_route_application manage_pico_usb_runtime \
         manage_support_bundle_runtime manage_exe manage_sound; do
@@ -160,6 +170,39 @@ FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 
 
 class InstallerBootstrapTest(unittest.TestCase):
+    def test_streamed_reinstall_never_adopts_or_changes_existing_checkout(self):
+        self.checkout.mkdir()
+        marker=self.checkout/'operator-work';marker.write_text('unique work\n')
+        for _ in range(2):
+            result=self.run_installer(BINARY_SOURCE='local')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual(marker.read_text(),'unique work\n')
+            self.assertEqual(list(self.root.glob('wsprrypi-install.*')),[])
+        self.assertEqual(self.recorded_events().count('clone'),2)
+
+    def test_streamed_failed_clone_and_helper_retire_their_private_source(self):
+        self.checkout.mkdir();marker=self.checkout/'foreign';marker.write_text('keep')
+        for failure in ['clone','picotool','signal']:
+            result=self.run_installer(FAIL_AT=failure)
+            self.assertNotEqual(result.returncode,0)
+            self.assertEqual(list(self.root.glob('wsprrypi-install.*')),[])
+            self.assertEqual(marker.read_text(),'keep')
+
+    def test_streamed_source_never_adopts_a_foreign_file_or_symlink(self):
+        target=self.root/'operator-source';target.mkdir()
+        marker=target/'work';marker.write_text('keep')
+        for kind in ['file','symlink']:
+            with self.subTest(kind=kind):
+                if kind=='file':self.checkout.write_text('operator file')
+                else:self.checkout.symlink_to(target,target_is_directory=True)
+                result=self.run_installer(BINARY_SOURCE='local')
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(marker.read_text(),'keep')
+                if kind=='file':self.assertEqual(self.checkout.read_text(),'operator file')
+                else:self.assertTrue(self.checkout.is_symlink())
+                self.checkout.unlink()
+                self.assertEqual(list(self.root.glob('wsprrypi-install.*')),[])
+
     def setUp(self) -> None:
         self.root = temporary_root(self, "wsprrypi-bootstrap-")
         self.checkout = self.root / "WsprryPi"
@@ -396,13 +439,13 @@ support_bundle_validate_age_dependency() {
 
     def test_streamed_uninstall_failures_stop_before_any_teardown(self) -> None:
         cases = [("uninstall-fetch", ""), ("python-syntax", ""),
-                 ("shell-syntax", ""), ("policy", ""),
+                 ("shell-syntax", ""), ("policy", ""), ("picotool-policy", ""),
                  ("shell-entry", "")]
         for name in ("udp_log_control.py", "rp1_qualification.py", "install_runtime_reconcile.py",
                      "runtime_reconcile.py", "route_application.py", "rp1_gpclk_dkms_install.py",
-                     "pico_usb_deploy.py", "pico_usb_bundle.py",
+                     "pico_usb_deploy.py", "pico_usb_bundle.py", "picotool_install.py", "precompiled_binary.py",
                      "support_bundle_runtime_install.sh", "pico_usb_runtime_install.sh",
-                     "../config/pico-usb-installer.json"):
+                     "../config/pico-usb-installer.json", "../config/picotool-release.json"):
             cases.extend([("missing", name), ("symlink", name)])
         for failure, name in cases:
             with self.subTest(failure=failure, name=name):
@@ -422,6 +465,7 @@ support_bundle_validate_age_dependency() {
         (checkout / "config").mkdir()
         shutil.copyfile(ROOT / "config/pico-usb-installer.json", checkout / "config/pico-usb-installer.json")
         shutil.copyfile(ROOT / "config/rp1-provider-requirements.json", checkout / "config/rp1-provider-requirements.json")
+        shutil.copyfile(ROOT / "config/picotool-release.json", checkout / "config/picotool-release.json")
         result = run_fixture_shell(r'''
 source "$INSTALLER"
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=

@@ -472,6 +472,16 @@ def removal_result(args,outcome):
 
 
 def execute_client(args):
+    # Freeze maintained removal tooling independently of the outgoing package,
+    # just as installation already does. Old retained facades are authenticated
+    # before substitution; private recovery layouts remain provider-owned.
+    if args.state_dir is None and args.command in {'remove','prepare-runtime-removal'} and getattr(args,'remove','auto')!='false':
+        with tempfile.TemporaryDirectory(prefix='wsprrypi-provider-removal-') as temporary:
+            return _execute_client(args,pathlib.Path(temporary))
+    return _execute_client(args)
+
+
+def _execute_client(args, removal_source=None):
     if args.command=='remove' and args.remove=='false':
         removal_result(args,'preserved')
         print('Provider preserved by explicit operator opt-out.')
@@ -486,13 +496,31 @@ def execute_client(args):
         require(plan.get('planSha256')==record.get('planSha256'),'provider plan changed outside the acknowledged transaction')
         arguments=['--state-dir',state]
     else:
-        if not ACTIVE_FACADE.exists():
+        if not ACTIVE_FACADE.exists() and removal_source is None:
             require(not PROVIDER_RECORD.exists() and not (UNRECOGNIZED_RECORD.exists() or UNRECOGNIZED_RECORD.is_symlink()),'provider receipt has no authenticated facade')
             require(getattr(args,'remove','auto')!='true','explicit provider removal has no attributable installation')
             removal_result(args,'unmanaged')
             print('No application-managed provider facade exists; no provider removal requested.')
             return
-        entrypoint=retained_facade()
+        if ACTIVE_FACADE.exists():entrypoint=retained_facade()
+        else:entrypoint=None
+        if removal_source is not None:
+            status=invoke(entrypoint,'status') if entrypoint is not None else {}
+            current=type(status.get('retirementPending')) is bool
+            if not ACTIVE_FACADE.exists():
+                require(not PROVIDER_RECORD.exists() and not UNRECOGNIZED_RECORD.exists(),
+                        'provider receipt has no authenticated facade')
+            if not current:
+                entrypoint,_=bootstrap(removal_source,'devel','explicit-source')
+                status=invoke(entrypoint,'status')
+            require(type(status.get('retirementPending')) is bool,
+                    'maintained provider omitted terminal retirement status')
+            if not ACTIVE_FACADE.exists() and not status.get('retirementPending',False):
+                require(getattr(args,'remove','auto')!='true','explicit provider removal has no attributable installation')
+                removal_result(args,'unmanaged')
+                print('No application-managed provider requires removal.')
+                return
+        require(entrypoint is not None,'provider recovery has no authenticated tooling')
         plan=invoke(entrypoint,'removal-plan')
         arguments=[]
     require(isinstance(plan.get('planSha256'),str) and SHA256.fullmatch(plan['planSha256']), 'provider plan digest missing')

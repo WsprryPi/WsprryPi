@@ -12,6 +12,16 @@ import install_ownership as owner
 
 
 class Tests(unittest.TestCase):
+    def test_empty_generated_apache_marker_is_retired(self):
+        self.install()
+        marker=self.write('/var/lib/apache2/site/disabled_by_admin/wsprrypi',b'')
+        owner.remove(self.root);self.assertFalse(marker.exists())
+
+    def test_modified_apache_marker_is_preserved(self):
+        self.install()
+        marker=self.write('/var/lib/apache2/site/disabled_by_admin/wsprrypi',b'operator')
+        owner.remove(self.root);self.assertEqual(marker.read_bytes(),b'operator')
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name).resolve()

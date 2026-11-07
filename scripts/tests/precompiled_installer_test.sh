@@ -104,29 +104,31 @@ PYTHON
     LOCAL_REPO_DIR="$fixture/existing-source"
     mkdir "$LOCAL_REPO_DIR"
     printf preserved >"$LOCAL_REPO_DIR/sentinel"
-    exec_command() { printf invoked >"$fixture/clone-invoked"; }
-    IS_REPO=false
-    expect_failure git_clone
-    [[ $(cat "$LOCAL_REPO_DIR/sentinel") == preserved ]]
-    [[ ! -e "$fixture/clone-invoked" ]]
     IS_REPO=true
     git_clone
-    [[ ! -e "$fixture/clone-invoked" ]]
+    [[ $(cat "$LOCAL_REPO_DIR/sentinel") == preserved ]]
     IS_REPO=false
-    LOCAL_REPO_DIR="$fixture/new-source"
     SUDO_USER='fixture-user'
     REPO_BRANCH=selected-branch
     GIT_CLONE=https://example.invalid/selected-source.git
+    runuser() { command mktemp -d "$fixture/source.XXXXXXXX"; }
     exec_command() {
         shift
         [[ "$1" == runuser && "$2" == -u && "$3" == fixture-user &&
            "$4" == -- && "$5" == git && "$6" == clone && "$7" == -b &&
            "$8" == selected-branch && "$9" == "$GIT_CLONE" &&
            "${10}" == "$LOCAL_REPO_DIR" ]] || return 1
+        mkdir -p "$LOCAL_REPO_DIR"
         printf invoked >"$fixture/clone-invoked"
     }
     git_clone
-    [[ -f "$fixture/clone-invoked" && ! -e "$LOCAL_REPO_DIR" ]]
+    [[ -f "$fixture/clone-invoked" && "$INSTALL_SOURCE_READY" == true ]]
+    [[ $(cat "$fixture/existing-source/sentinel") == preserved ]]
+    staging="$INSTALL_SOURCE_DIR"
+    git_clone
+    cleanup_install_source
+    [[ ! -e "$staging" && -f "$fixture/existing-source/sentinel" ]]
+
 )
 INSTALL_RP1_GPCLK_DKMS=false
 NO_WEB=true

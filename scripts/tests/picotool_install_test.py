@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Hardware-free release-download, package-integrity and rollback coverage."""
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -33,6 +34,52 @@ def fixture(directory, target='armv6-bookworm'):
 
 
 class PicotoolTest(unittest.TestCase):
+    def test_legacy_owned_tool_moves_with_licenses_and_does_not_download(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary).resolve();policy,data=fixture(root)
+            old=root/tool.LEGACY_PREFIX.relative_to('/');old.mkdir(parents=True)
+            record=policy['targets']['armv6-bookworm'];tool.unpack(data,record,old)
+            (old/'installation.json').write_text(json.dumps({'schema':'wsprrypi-picotool-installation/1',
+                'target':'armv6-bookworm','version':tool.VERSION,'archive_sha256':record['sha256']}))
+            command=root/'usr/local/bin/picotool';command.parent.mkdir(parents=True)
+            command.symlink_to('../lib/wsprrypi/picotool/picotool')
+            with patch.object(tool,'host_target',return_value=('armv6','bookworm')),patch.object(tool,'validate'):
+                self.assertEqual(tool.relocate_legacy(policy,root),'relocated')
+            self.assertFalse(old.exists())
+            self.assertEqual(command.resolve(),root/tool.PREFIX.relative_to('/')/'picotool')
+            self.assertEqual((command.resolve().parent/'licenses/NOTICE').read_text(),'upstream notice')
+
+    def test_interrupted_legacy_move_recovers_before_reusing_tool(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary).resolve();policy,data=fixture(root)
+            dest=root/tool.PREFIX.relative_to('/');dest.mkdir(parents=True)
+            record=policy['targets']['armv6-bookworm'];tool.unpack(data,record,dest)
+            (dest/'installation.json').write_text(json.dumps({'schema':'wsprrypi-picotool-installation/1',
+                'target':'armv6-bookworm','version':tool.VERSION,'archive_sha256':record['sha256']}))
+            command=root/'usr/local/bin/picotool';command.parent.mkdir(parents=True)
+            command.symlink_to('../lib/wsprrypi/picotool/picotool')
+            with patch.object(tool,'host_target',return_value=('armv6','bookworm')),patch.object(tool,'validate'):
+                self.assertEqual(tool.relocate_legacy(policy,root),'relocated')
+                self.assertEqual(tool.relocate_legacy(policy,root),'unchanged')
+            self.assertEqual(command.resolve(),dest/'picotool')
+
+    def test_modified_legacy_tool_and_foreign_entries_are_not_moved(self):
+        for bad in ['modified','symlink','foreign-directory']:
+            with self.subTest(bad=bad),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary).resolve();policy,data=fixture(root)
+                old=root/tool.LEGACY_PREFIX.relative_to('/');old.mkdir(parents=True)
+                record=policy['targets']['armv6-bookworm'];tool.unpack(data,record,old)
+                (old/'installation.json').write_text(json.dumps({'schema':'wsprrypi-picotool-installation/1',
+                    'target':'armv6-bookworm','version':tool.VERSION,'archive_sha256':record['sha256']}))
+                command=root/'usr/local/bin/picotool';command.parent.mkdir(parents=True)
+                command.symlink_to('../lib/wsprrypi/picotool/picotool')
+                if bad=='modified':(old/'picotool').write_bytes(b'operator binary')
+                elif bad=='symlink':(old/'foreign').symlink_to(root,target_is_directory=True)
+                else:(old/'foreign').mkdir()
+                with patch.object(tool,'host_target',return_value=('armv6','bookworm')),patch.object(tool,'validate'):
+                    with self.assertRaises(ValueError):tool.relocate_legacy(policy,root)
+                self.assertTrue(old.exists());self.assertTrue(command.is_symlink())
+
     @staticmethod
     def output(*arguments, **_kwargs):
         if arguments[1:] == ('version',):

@@ -38,8 +38,7 @@ owned companions, generated default sidecars and backups, and completed startup
 file receipts. Pre-existing or modified operator data, configured fleet records,
 shared APT packages, and the shared `picotool` dependency are retained. Unknown
 or modified application code is preserved and causes a reported cleanup failure.
-Completed provider recovery evidence remains attributable recovery material and
-is distinct from installed modules or an active runtime.
+Completed provider recovery evidence is retired by the provider after terminal removal verifies native absence. Unknown files, active locks or unresolved recovery stop cleanup and retain evidence.
 
 ## Startup integration
 
@@ -170,8 +169,7 @@ Application-owned installed files have a separate receipt. Unchanged generated
 sidecars, companions, caches, and fresh empty directories are retired. Existing
 or modified operator data and configured fleet records are retained. Shared APT
 packages and `picotool` remain available to other consumers. Modified application
-code produces a cleanup failure. Provider recovery evidence remains protected
-until its owning transaction is terminal and no live reference needs it.
+code produces a cleanup failure. The provider retires its terminal journals, verified facade closures, predecessor recovery inputs, empty runtime directory and unused provider-created route group. Predecessor removal during upgrade retains recovery inputs. An authenticated current facade can remove the provider without another tooling fetch; older facades are verified before maintained removal tooling is fetched.
 
 ## RP1-GPIO-CLK-DKMS source selection
 

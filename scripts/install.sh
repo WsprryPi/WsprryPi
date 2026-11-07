@@ -235,6 +235,10 @@ declare TEMP_BUILD_SWAP_ROOT_OWNED="false"
 declare UNINSTALL_SOURCE_DIR="" # Private checkout owned only by this invocation.
 declare UNINSTALL_SOURCE_VALIDATED="false"
 declare IS_REPO="${IS_REPO:-false}"
+# Remote source is disposable; operator checkouts are never staging areas.
+declare INSTALL_SOURCE_DIR=""
+declare INSTALL_SOURCE_READY="false"
+declare MERGED_CONFIG_TEMP=""
 declare REPO_ORG="${REPO_ORG:-WsprryPi}"
 declare REPO_NAME="WsprryPi"      # Case Sensitive
 declare UI_REPO_DIR="WsprryPi-UI" # Case Sensitive
@@ -1044,6 +1048,15 @@ egress() {
         if [[ "$status" -eq 0 ]]; then
             status=1
         fi
+    fi
+    cleanup_install_source || status=1
+    if [[ -n "$MERGED_CONFIG_TEMP" ]]; then
+        rm -f -- "$MERGED_CONFIG_TEMP" || status=1
+    fi
+    if [[ "$status" -eq 0 && "$ACTION" == uninstall &&
+          "$LOG_FILE" == "$USER_HOME/$WSPR_SERVICE.log" &&
+          -f "$LOG_FILE" && ! -L "$LOG_FILE" ]]; then
+        rm -f -- "$LOG_FILE" || status=1
     fi
     trap - EXIT
     exit "$status"
@@ -5520,11 +5533,11 @@ validate_uninstall_helpers() {
     local python_helpers=(
         udp_log_control.py rp1_qualification.py install_runtime_reconcile.py
         runtime_reconcile.py route_application.py rp1_gpclk_dkms_install.py install_ownership.py
-        pico_usb_deploy.py pico_usb_bundle.py
+        pico_usb_deploy.py pico_usb_bundle.py picotool_install.py precompiled_binary.py
     )
     local shell_helpers=(support_bundle_runtime_install.sh pico_usb_runtime_install.sh)
     local python_paths=()
-    for name in "${python_helpers[@]}" "${shell_helpers[@]}" ../config/pico-usb-installer.json ../config/rp1-provider-requirements.json; do
+    for name in "${python_helpers[@]}" "${shell_helpers[@]}" ../config/pico-usb-installer.json ../config/rp1-provider-requirements.json ../config/picotool-release.json; do
         path="$scripts/$name"
         if [[ -L "$path" || ! -f "$path" || ! -r "$path" || ! -s "$path" ]]; then
             printf 'Missing or unsafe uninstall helper input: %s\n' "$path" >&2
@@ -5543,7 +5556,8 @@ validate_uninstall_helpers() {
     # Keep bytecode out of an operator's checkout, including during local use.
     PYTHONPYCACHEPREFIX="$UNINSTALL_SOURCE_DIR/bytecode" \
         python3 -m py_compile "${python_paths[@]}" || return 1
-    python3 -m json.tool "$LOCAL_REPO_DIR/config/pico-usb-installer.json" >/dev/null
+    python3 -m json.tool "$LOCAL_REPO_DIR/config/pico-usb-installer.json" >/dev/null || return 1
+    python3 -m json.tool "$LOCAL_REPO_DIR/config/picotool-release.json" >/dev/null
 }
 
 prepare_uninstall_source() {
@@ -5612,13 +5626,18 @@ git_clone() {
         debug_end "$debug"
         return 0
     fi
-
-    debug_print "Ensuring destination directory does not exist: '$dest_root'" "$debug"
-    if [[ -d "$dest_root" ]]; then
-        logE "Destination directory already exists: '$dest_root'" "$debug"
-        debug_end "$debug"
-        return 1
+    [[ "$INSTALL_SOURCE_READY" != true ]] || return 0
+    if [[ "$DRY_RUN" == true ]]; then
+        logD "Would stage installation source in a private temporary directory."
+        return 0
     fi
+    INSTALL_SOURCE_DIR=$(runuser -u "$SUDO_USER" -- mktemp -d /tmp/wsprrypi-install.XXXXXXXX) || return 1
+    LOCAL_REPO_DIR="$INSTALL_SOURCE_DIR/source"
+    LOCAL_SOURCE_DIR="$LOCAL_REPO_DIR/src"
+    LOCAL_SYSTEMD_DIR="$LOCAL_REPO_DIR/systemd"
+    LOCAL_CONFIG_DIR="$LOCAL_REPO_DIR/config"
+    LOCAL_WWW_DIR="$LOCAL_REPO_DIR/$UI_REPO_DIR/data"
+    dest_root="$LOCAL_REPO_DIR"
 
     exec_command "Clone repository '$GIT_CLONE'" \
         runuser -u "$SUDO_USER" -- git clone -b "$REPO_BRANCH" \
@@ -5629,9 +5648,16 @@ git_clone() {
         return 1
     }
 
-    [[ "$DRY_RUN" == "true" ]] || IS_REPO="true"
+    INSTALL_SOURCE_READY="true"
     debug_end "$debug"
     return "$retval"
+}
+
+cleanup_install_source() {
+    [[ -n "$INSTALL_SOURCE_DIR" ]] || return 0
+    rm -rf -- "$INSTALL_SOURCE_DIR" || return 1
+    INSTALL_SOURCE_DIR=""
+    INSTALL_SOURCE_READY="false"
 }
 
 # -----------------------------------------------------------------------------
@@ -7538,6 +7564,11 @@ complete_application_ownership() {
         "$LOCAL_REPO_DIR/scripts/install_ownership.py" complete "$@"
 }
 
+preserve_shared_picotool() {
+    exec_command "Preserve shared picotool outside application files" python3 \
+        "$LOCAL_REPO_DIR/scripts/picotool_install.py" --policy "$LOCAL_REPO_DIR/config/picotool-release.json" --relocate-only "$@"
+}
+
 remove_application_ownership() {
     [[ "$DRY_RUN" == "true" ]] && return 0
     if systemctl is-active --quiet "${WSPR_SERVICE}.service"; then
@@ -7663,7 +7694,11 @@ manage_config() {
             fi
 
             if [[ -n "$old_path" ]]; then
-                merged_ini="${LOCAL_CONFIG_DIR}/wsprrypi_merged.ini"
+                merged_ini="/tmp/wsprrypi-merged-dry-run.ini"
+                if [[ "$DRY_RUN" != "true" ]]; then
+                    MERGED_CONFIG_TEMP=$(mktemp /tmp/wsprrypi-merged.XXXXXXXX.ini) || return 1
+                    merged_ini="$MERGED_CONFIG_TEMP"
+                fi
                 if upgrade_ini "$old_path" "$source_path" "$merged_ini" "$debug"; then
                     source_path="$merged_ini"
                 else
@@ -9751,10 +9786,10 @@ cleanup_files_in_directories() {
     local dest_root
     dest_root="$LOCAL_REPO_DIR"
 
-    # Always cleanup merged INI if it exists
-    if [[ -f "$dest_root/config/wsprrypi_merged.ini" ]]; then
+    # Retire only the merge output allocated by this invocation.
+    if [[ -n "$MERGED_CONFIG_TEMP" && -f "$MERGED_CONFIG_TEMP" ]]; then
         exec_command "Delete merged INI source" \
-            rm -f "${dest_root}/config/wsprrypi_merged.ini" \
+            rm -f "$MERGED_CONFIG_TEMP" \
             "$debug" || {
             logE "Failed to delete local install files."
             debug_end "$debug"
@@ -9763,7 +9798,7 @@ cleanup_files_in_directories() {
     fi
 
     # Prevent deletion if running inside the repository
-    if [[ "$IS_REPO" == "true" ]]; then
+    if [[ "$IS_REPO" == "true" || -n "$INSTALL_SOURCE_DIR" ]]; then
         debug_end "$debug"
         return 0
     else
@@ -10342,6 +10377,9 @@ _main() {
 
     # Validate all teardown helpers before provider, service, or file removal.
     prepare_uninstall_source "$debug" || return 1
+    if [[ "$ACTION" == uninstall ]]; then
+        preserve_shared_picotool "$debug" || return 1
+    fi
 
     # Install or uninstall Wsprry Pi services
     manage_wsprry_pi "$debug" || return $?
