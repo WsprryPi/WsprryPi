@@ -241,3 +241,7 @@ The published [Pico operator manual](https://wsprrypico.readthedocs.io/en/devel/
 covers standalone installation, tool download/cleanup, preservation and recovery.
 The published [Pi operator manual](https://wsprry-pi.readthedocs.io/en/devel/User_Interface/Setup/Transmitter/index.html#install-or-update-pico-firmware-over-usb)
 covers Fleet's selected-Pico workflow. The operator manuals and this engineering contract serve different audiences.
+
+## Shared lock interoperability
+
+Runtime and standalone installer callers open an existing serial lock without `O_CREAT`. First creation is exclusive; a competing creator is followed by one ordinary reopen. This preserves the same inode and existing ownership while supporting Linux `fs.protected_regular` in the shared sticky lock directory. Regular-file validation, no-follow opens, nonblocking runtime shared leases and installer exclusive leases still apply. A refused lock is retained; neither caller removes a foreign lock or changes Linux protection settings to gain access.

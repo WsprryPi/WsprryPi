@@ -26,6 +26,22 @@ int main() {
     CHECK(refused); chmod(marker.c_str(),0600);
     pico_usb_remove_hold(marker); CHECK(!std::filesystem::exists(marker));
     CHECK(pico_usb_serial("1545B6EFBF78028C") && !pico_usb_serial("../other"));
+    const auto locks=root/"locks";std::filesystem::create_directory(locks);
+    const auto lock_path=locks/"1545B6EFBF78028C.lock";
+    {std::ofstream file(lock_path);file<<"existing-owner";}
+    struct stat original_lock{};CHECK(stat(lock_path.c_str(),&original_lock)==0);
+    auto lease=pico_usb_runtime_lease("1545B6EFBF78028C",locks);CHECK(lease);
+    struct stat opened_lock{};CHECK(stat(lock_path.c_str(),&opened_lock)==0);
+    CHECK(original_lock.st_ino==opened_lock.st_ino && opened_lock.st_size==14);
+    const int writer=open(lock_path.c_str(),O_RDWR|O_NOFOLLOW);CHECK(writer>=0);
+    CHECK(flock(writer,LOCK_EX|LOCK_NB)!=0);lease.reset();
+    CHECK(flock(writer,LOCK_EX|LOCK_NB)==0);
+    bool busy=false;try{(void)pico_usb_runtime_lease("1545B6EFBF78028C",locks);}catch(...){busy=true;}
+    CHECK(busy);close(writer);
+    std::filesystem::remove(lock_path);std::filesystem::create_symlink(marker,lock_path);
+    bool unsafe=false;try{(void)pico_usb_runtime_lease("1545B6EFBF78028C",locks);}catch(...){unsafe=true;}
+    CHECK(unsafe);std::filesystem::remove(lock_path);
+    CHECK(pico_usb_runtime_lease("1545B6EFBF78028C",locks));
     const auto controls=root/"control"; std::filesystem::create_directory(controls);
     CHECK(!pico_usb_any_update_blocked(controls));
     pico_usb_save_hold(controls/"pending.json",record,true);CHECK(pico_usb_any_update_blocked(controls));
