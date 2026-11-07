@@ -64,7 +64,7 @@ class PicotoolTest(unittest.TestCase):
             self.assertEqual(command.resolve(),dest/'picotool')
 
     def test_modified_legacy_tool_and_foreign_entries_are_not_moved(self):
-        for bad in ['modified','symlink','foreign-directory']:
+        for bad in ['modified','symlink','foreign-directory','launcher-parent-symlink','launcher-parent-writable']:
             with self.subTest(bad=bad),tempfile.TemporaryDirectory() as temporary:
                 root=Path(temporary).resolve();policy,data=fixture(root)
                 old=root/tool.LEGACY_PREFIX.relative_to('/');old.mkdir(parents=True)
@@ -75,6 +75,12 @@ class PicotoolTest(unittest.TestCase):
                 command.symlink_to('../lib/wsprrypi/picotool/picotool')
                 if bad=='modified':(old/'picotool').write_bytes(b'operator binary')
                 elif bad=='symlink':(old/'foreign').symlink_to(root,target_is_directory=True)
+                elif bad=='launcher-parent-symlink':
+                    command.unlink();command.parent.rmdir()
+                    actual=root/'operator-bin';actual.mkdir()
+                    (actual/'picotool').symlink_to(old/'picotool')
+                    command.parent.symlink_to(actual,target_is_directory=True)
+                elif bad=='launcher-parent-writable':command.parent.chmod(0o777)
                 else:(old/'foreign').mkdir()
                 with patch.object(tool,'host_target',return_value=('armv6','bookworm')),patch.object(tool,'validate'):
                     with self.assertRaises(ValueError):tool.relocate_legacy(policy,root)

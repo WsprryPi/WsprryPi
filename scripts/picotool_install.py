@@ -149,6 +149,7 @@ def relocate_legacy(policy, root=Path('/')):
     root=root.resolve();old=root/LEGACY_PREFIX.relative_to('/')
     command=root/'usr/local/bin/picotool';destination=root/PREFIX.relative_to('/')
     if not command.is_symlink() or command.resolve()!=old/'picotool':return 'unchanged'
+    protected_directory(command.parent,root)
     # Recover interruption between moving the verified tree and switching its
     # launcher. Revalidate the destination before completing that switch.
     moved=not old.exists() and destination.exists()
