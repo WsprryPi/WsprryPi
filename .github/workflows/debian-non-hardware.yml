@@ -462,7 +462,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-GPIO-CLK-DKMS
-          ref: 3cfcf234cb068753a98a04ae6a4b991d20620814 # v1.0.0-rc.1
+          ref: e417e00f1a8d45b7ffe0aa47971fb7e4dcdb7fb1 # v1.0.0-rc.1
           path: src/build/rp1-provider-reference
           persist-credentials: false
 
