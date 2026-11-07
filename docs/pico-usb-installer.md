@@ -245,3 +245,5 @@ covers Fleet's selected-Pico workflow. The operator manuals and this engineering
 ## Shared lock interoperability
 
 Runtime and standalone installer callers open an existing serial lock without `O_CREAT`. First creation is exclusive; a competing creator is followed by one ordinary reopen. This preserves the same inode and existing ownership while supporting Linux `fs.protected_regular` in the shared sticky lock directory. Regular-file validation, no-follow opens, nonblocking runtime shared leases and installer exclusive leases still apply. A refused lock is retained; neither caller removes a foreign lock or changes Linux protection settings to gain access.
+
+Application removal validates and retires a completed RP1 reboot-reconciliation checkpoint with its owned startup integration. A pending, malformed or unsafe checkpoint refuses before startup files are removed, preserving the supported recovery implementation. Protected configuration/Apache backups and persistent WTP endpoint data retain their separate ownership policies; they are not terminal provider residue.

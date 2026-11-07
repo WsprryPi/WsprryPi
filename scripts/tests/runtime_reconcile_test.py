@@ -93,6 +93,11 @@ class System:
 
 
 class Tests(unittest.TestCase):
+    def setUp(self):
+        scratch=tempfile.TemporaryDirectory();self.addCleanup(scratch.cleanup)
+        checkpoint=patch.object(recovery,'CHECKPOINT',Path(scratch.name)/'checkpoint.json')
+        checkpoint.start();self.addCleanup(checkpoint.stop)
+
     @contextlib.contextmanager
     def installed_ownership(self, repository, version):
         """Real ownership parsing and binding hashes with mapped trusted files."""
@@ -567,6 +572,33 @@ class Tests(unittest.TestCase):
             with patch.object(installation,'STATE',state),patch.object(installation,'FILES',{target:('source',0o644)}),patch.object(installation,'read',read),patch.object(installation.os,'geteuid',return_value=0),patch.object(installation.recovery.Linux,'lock') as lock,patch.object(installation.subprocess,'run') as command:
                 installation.install(remove=True);installation.apply(remove=True)
                 lock.assert_not_called();command.assert_not_called();self.assertFalse(state.parent.exists())
+
+    def test_terminal_checkpoint_retirement_and_incomplete_refusal(self):
+        import install_runtime_reconcile as installation
+        for phase in ('complete','pending','malformed','unsafe-mode','unreadable'):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);(root/'source').write_bytes(b'owned')
+                state=root/'state.json';target=root/'installed';checkpoint=root/'checkpoint.json'
+                value={'schema':recovery.SCHEMA,'bootId':'00000000-0000-0000-0000-000000000001',
+                       'bindingSha256':'a'*64,'activationPlanSha256':'b'*64,'route':'gpio4','phase':'complete' if phase=='unsafe-mode' else phase}
+                def read(p):
+                    if phase=='unreadable' and p==checkpoint:raise ValueError('foreign checkpoint')
+                    return p.read_bytes() if p.exists() else None
+                with patch.object(installation,'ROOT',root),patch.object(installation,'STATE',state), \
+                     patch.object(installation,'FILES',{str(target):('source',0o644)}), \
+                     patch.object(installation,'read',read),patch.object(recovery,'CHECKPOINT',checkpoint), \
+                     patch.object(installation.subprocess,'run'):
+                    installation.apply();checkpoint.write_text(json.dumps(value));checkpoint.chmod(0o644 if phase=='unsafe-mode' else 0o600)
+                    if phase=='complete':
+                        installation.apply(remove=True)
+                        self.assertFalse(checkpoint.exists());self.assertFalse(state.exists())
+                        self.assertFalse(target.exists())
+                    else:
+                        before=state.read_bytes()
+                        with self.assertRaises((ValueError,recovery.installer.ContractError)):
+                            installation.apply(remove=True)
+                        self.assertEqual(state.read_bytes(),before);self.assertTrue(target.exists())
+                        self.assertEqual(json.loads(checkpoint.read_text()),value)
 
     def test_startup_inventory_can_grow_without_adopting_foreign_files(self):
         import install_runtime_reconcile as installation
