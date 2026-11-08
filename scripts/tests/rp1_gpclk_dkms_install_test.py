@@ -37,16 +37,17 @@ class Tests(unittest.TestCase):
         releases=[release('v0.9.0'),release('v1.0.0-rc.1'),release('v1.0.0-rc.10'),
                   release('v1.0.0-rc.2'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
         for selector,policy in [('auto','development'),('auto','production'),('release','explicit-source'),('release:v1.0.0-rc.1','explicit-source'),('release:1.0.0-rc.1','explicit-source')]:
-            response=releases if selector=='release' else release('v1.0.0-rc.1')
+            expected='v1.0.0-rc.10' if selector=='release' else 'v1.0.0-rc.2' if selector=='auto' else 'v1.0.0-rc.1'
+            response=releases if selector=='release' else release(expected)
             with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json',return_value=response), \
                  patch.object(client.subprocess,'run') as run,patch.object(client,'run_git',return_value='a'*40), \
                  patch.object(client,'invoke',return_value={'providerIdentity':identity('1.0.0-rc.10')}):
                 state=Path(raw);source=state/'provider-source';(source/'scripts').mkdir(parents=True)
                 (source/'scripts/provider_lifecycle.py').touch()
                 _,selected=client.bootstrap(state,selector,policy)
-                self.assertEqual(selected,'release:v1.0.0-rc.10' if selector=='release' else 'release:v1.0.0-rc.1')
-                if selector.startswith('release:'):
-                    self.assertTrue(client.fetch_json.call_args.args[0].endswith('/releases/tags/v1.0.0-rc.1'))
+                self.assertEqual(selected,'release:'+expected)
+                if selector!='release':
+                    self.assertTrue(client.fetch_json.call_args.args[0].endswith('/releases/tags/'+expected))
                 self.assertEqual(run.call_args_list[-1].args[0][-1],'origin/devel')
         self.assertGreater(client.release_precedence('v1.0.0'),client.release_precedence('v1.0.0-rc.10'))
         self.assertEqual(client.release_precedence('v1.0.0+build'),client.release_precedence('v1.0.0'))
