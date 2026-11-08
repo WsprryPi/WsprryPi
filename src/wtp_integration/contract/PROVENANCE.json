@@ -1,9 +1,9 @@
 {
   "repository": "https://github.com/WsprryPi/WsprryPico",
-  "source_base_revision": "ae5156566990aece3bc6b4318078b5d16cf27388",
+  "source_base_revision": "f2153dfde20174c41da1782e5c14a019b51b192f",
   "source_uncommitted": false,
   "upstream": "engineering/protocol/control-1.schema.json",
-  "sha256": "0d36af732480f74abd83f14753634e3c8da8e994dcebffcc0bf00bd39a03b319",
+  "sha256": "5128fab958b88183e94569267c55e924eb6fc8b4cca6bac3ee2c04b5ab1a833b",
   "javascript_sha256": "1c6bcab60fd1e77511ffc1cede644db4085bc7abe71a753b13d03e7a63c65302",
   "si5351_javascript_sha256": "c0325caa6eebb5281bfa92843011312dd9fb87d5adaed86a5bebb7c6a001e889",
   "gps_javascript_sha256": "9b57dcdb62df630cba72854479fb8a4458e761e64fd93108e97cf5da43c6fdcf",

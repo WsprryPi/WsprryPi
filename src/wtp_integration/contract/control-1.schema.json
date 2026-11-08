@@ -3901,7 +3901,7 @@
           ]
         }
       },
-      "oneOf": [
+      "anyOf": [
         {
           "$ref": "#/$defs/config-update/$defs/merge"
         },
