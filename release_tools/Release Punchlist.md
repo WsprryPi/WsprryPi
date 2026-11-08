@@ -12,7 +12,7 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
 ## Ordered backlog
 
-1. ⏳ **Increase Fleet capacity to 32 remote devices.** Consolidate the limit
+1. ✅ **Increase Fleet capacity to 32 remote devices.** Consolidate the limit
    into one authoritative constant and coordinate runtime, UI, persistence,
    tests, and documentation changes. Follow the
    [implementation prompt](Fleet%2032%20Device%20Implementation%20Prompt.md),
