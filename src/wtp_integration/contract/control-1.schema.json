@@ -6749,8 +6749,8 @@
             },
             "configured_hostname": {
               "type": "string",
-              "maxLength": 63,
-              "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$"
+              "maxLength": 69,
+              "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.local)?$(?![\\s\\S])"
             },
             "mdns_state": {
               "enum": [
