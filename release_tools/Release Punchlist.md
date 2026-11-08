@@ -83,15 +83,30 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
    documentation reference was superseded by P15.20 numbering.
 10. ✅ **Review and Streamline CI.** Required software coverage is retained; the 50% reduction objective was not achieved.
 11. ✅ **Review and Streamline Pico CI.**
-12. ✅ **Publish new RP1 RC.**
-13. ✅ **Publish new Pico RC.** Prepare, validate, and publish the next Pico
-   RC under separate release authorization.
-14. ✅ **Ensure WsprryPi consumes the latest RP1 RC.** Verify the latest
-   published RP1-GPIO-CLK-DKMS RC, update the pinned consumer integration
-   where needed, and validate the selected RC before the next WsprryPi beta.
-15. ✅ **Ensure WsprryPi consumes the latest Pico devel.**
-16. ⏳ **Publish new beta.** Prepare, validate, and publish the next beta under
-   separate release authorization.
+12. ✅ **Prepare, integrate, validate, and publish the selected RP1 RC.**
+   Record the selected version and immutable source revision; accept the exact
+   provider candidate in WsprryPi before provider publication, and verify the
+   published artifacts and their identities.
+13. ✅ **Prepare, integrate, validate, and publish the selected Pico RC.**
+   Record the selected version and immutable source revision, validate the
+   intended Pi/Pico source pair, and verify the published firmware artifacts.
+14. ✅ **Pin and validate WsprryPi against the published RP1 RC.** Pin the
+   explicitly selected version and immutable source revision, verify artifact
+   identities, and complete affected consumer integration checks.
+15. ✅ **Pin and validate WsprryPi against the published Pico RC.** Use the
+   selected RC's immutable source revision and complete both required actual
+   Pi/Pico network and USB integration suites against the intended sources.
+16. ✅ **Validate the final WsprryPi candidate, publish its beta and documentation,
+   and verify public downloads.** Record exact application, companion, and
+   documentation revisions and artifact checksums. Both companion-consumption
+   gates must pass before publication; changed inputs require affected checks
+   to be repeated. Verify public artifact identities and served documentation.
+
+Steps 12–16 form a reusable release cycle. RP1 and Pico preparation may proceed
+independently; each publication requires its own accepted candidate. Keep the
+completed cycle's evidence and identities when starting a new cycle, and reset
+statuses only for the newly selected cycle. Publication requires explicit
+release authorization.
 
 ## Final 4.0 stable release gate
 
