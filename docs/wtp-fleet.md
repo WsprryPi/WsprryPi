@@ -305,7 +305,8 @@ The rendered Fleet test is
 from `WsprryPi-UI`. Chromium 156 captures at 1280×900 and 390×844 cover
 32 rows in both themes, first/last rows, long names, recovery messages, final
 assignment admission, capacity refusal, missing/malformed advertisements,
-retained-context accounting, and actions on a reassigned identity. Impeccable
+retained-context accounting, actions on a reassigned identity, and visibly
+disabled actions while Fleet state is unreadable. Impeccable
 review retains the existing visual language; its detector returned no findings.
 Operator documentation passes its strict Sphinx HTML build, extension test,
 and desktop/mobile rendered review. Existing Setup screenshots depict unchanged

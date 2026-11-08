@@ -94,7 +94,11 @@
         byId("fleet-schedule-capacity").textContent = data && validCapacity(data)
             ? `${data.assignments.length} of ${data.maximum_outputs} remote outputs assigned. ${occupied(data) - data.assignments.length} unresolved contexts retained.${canAssign() ? "" : " Capacity reached; remove an assignment or reconcile unresolved outputs first."}`
             : "Capacity unavailable. Refresh schedules before assigning an output.";
-        if (!data) return;
+        if (!data) {
+            for (const elements of rows.values())
+                for (const button of Object.values(elements.buttons)) button.disabled = true;
+            return;
+        }
         const retired = Object.entries(data.outputs || {}).filter(([id, output]) =>
             output.revoked && !data.assignments.some(row => row.device_id === id));
         const current = new Set([...data.assignments.map(row => row.device_id), ...retired.map(([id]) => id)]);

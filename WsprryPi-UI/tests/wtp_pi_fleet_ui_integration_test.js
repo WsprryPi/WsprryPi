@@ -376,11 +376,20 @@ async function main() {
         for(const invalid of [null,0,-1,1.5,'32',true,Number.MAX_SAFE_INTEGER+1]){
             await evaluate(`__fleet.maximum_outputs=${JSON.stringify(invalid)};document.getElementById('fleet-schedule-refresh').click();`);
             await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-feedback").textContent.includes("capacity")'),'invalid capacity disables admission');
+            assert.equal(await evaluate('Array.from(document.querySelectorAll("#fleet-output-list button")).every(button=>button.disabled)'),true,'unreadable state visibly disables retained row actions');
         }
         await evaluate(`delete __fleet.maximum_outputs;document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-new").disabled'),'missing capacity disables admission');
+        for(const viewport of viewports){
+            await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            await evaluate(`applyThemePreference('light');document.getElementById('fleet-schedule-feedback').scrollIntoView({block:'start'});window.scrollBy(0,-180);document.getAnimations().forEach(a=>a.finish());`);
+            await client.settleRendering();
+            const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            fs.writeFileSync(path.join(output,viewport.name+'-fleet-unreadable.png'),Buffer.from(shot.data,'base64'));
+        }
         await evaluate(`__fleet.maximum_outputs=40;document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 40")'),'UI derives capacity from server');
+        assert.equal(await evaluate('Array.from(document.querySelectorAll("#fleet-output-list button")).some(button=>!button.disabled)'),true,'valid refresh restores row actions');
         // The keyboard interaction grants native user activation. This fixture
         // has no host config readback, so establish its synthetic baseline before
         // leaving Setup; otherwise the real unsaved-edit guard correctly blocks.
