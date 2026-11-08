@@ -92,11 +92,20 @@ inline bool pico_usb_update_blocked(const std::string& serial) {
   if (lstat(pico_usb_hold_path(serial).c_str(),&observed)==0) return true;
   return errno!=ENOENT;
 }
-inline std::shared_ptr<void> pico_usb_runtime_lease(const std::string& serial) {
+inline std::shared_ptr<void> pico_usb_runtime_lease(const std::string& serial,
+    const std::filesystem::path& root="/run/lock/wsprrypico") {
   if (!pico_usb_serial(serial)) return {};
-  const std::filesystem::path root("/run/lock/wsprrypico");
   if (!std::filesystem::exists(root)) return {}; // Optional updater is not installed.
-  const int fd=open((root/(serial+".lock")).c_str(),O_CREAT|O_RDWR|O_CLOEXEC|O_NOFOLLOW,0660);
+  const auto path=root/(serial+".lock");
+  constexpr int flags=O_RDWR|O_CLOEXEC|O_NOFOLLOW;
+  // O_CREAT on another user's existing file is denied by protected_regular in
+  // a shared sticky directory, even for root. Open it without creation first;
+  // exclusive creation and one reopen handle a concurrent first owner safely.
+  int fd=open(path.c_str(),flags);
+  if(fd<0 && errno==ENOENT) {
+    fd=open(path.c_str(),flags|O_CREAT|O_EXCL,0660);
+    if(fd<0 && errno==EEXIST) fd=open(path.c_str(),flags);
+  }
   if (fd<0) throw std::runtime_error("pico_updater_lock_permissions");
   struct stat info{};
   if(fstat(fd,&info) || !S_ISREG(info.st_mode)) {close(fd);throw std::runtime_error("unsafe_pico_updater_lock");}

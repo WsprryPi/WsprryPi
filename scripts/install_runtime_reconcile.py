@@ -71,6 +71,18 @@ def apply(remove=False):
                    {record['after'][name]})
         if actual not in allowed:
             raise ValueError('startup file differs from recorded ownership: '+name)
+    checkpoint = None
+    if remove and record is not None:
+        # A completed worker receipt is terminal application state. Validate it
+        # before retiring any code; a pending, foreign or malformed receipt must
+        # retain the recovery implementation and ownership transaction.
+        checkpoint = read(recovery.CHECKPOINT)
+        if checkpoint is not None:
+            if stat.S_IMODE(recovery.CHECKPOINT.stat().st_mode) != 0o600:
+                raise ValueError('unsafe reboot reconciliation checkpoint retained')
+            value = recovery.validate_checkpoint(recovery.strict_json(checkpoint))
+            if value['phase'] != 'complete':
+                raise ValueError('incomplete reboot reconciliation checkpoint retained')
     if remove and record is None and all(value is None for value in current.values()):return
     STATE.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     installer.atomic_json(STATE, {'version': 1, 'phase': 'pending',
@@ -106,6 +118,13 @@ def apply(remove=False):
         failed = subprocess.run(['/usr/bin/systemctl','is-failed','--quiet','wsprrypi-rp1-reconcile.service'],check=False)
         if failed.returncode == 0:
             subprocess.run(['/usr/bin/systemctl','reset-failed','wsprrypi-rp1-reconcile.service'],check=True)
+        if checkpoint is not None:
+            if read(recovery.CHECKPOINT) != checkpoint:
+                raise ValueError('reboot reconciliation checkpoint changed during removal')
+            recovery.CHECKPOINT.unlink()
+            fd=os.open(recovery.CHECKPOINT.parent,os.O_RDONLY|os.O_DIRECTORY)
+            try:os.fsync(fd)
+            finally:os.close(fd)
         STATE.unlink()
 
 
