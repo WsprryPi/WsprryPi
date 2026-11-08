@@ -238,7 +238,8 @@ Pico identities through a loopback byte-carrier fixture. All use inhibited RF
 engines. The test qualifies host software, not firmware execution on 32 boards.
 A coherent projected fixture clock and a test-only Linux `adjtimex` linker
 wrapper provide clock qualification without changing the host clock. The
-executable refuses to run while any non-loopback interface is up.
+executable queries interfaces in its current network namespace and refuses to
+run while any non-loopback interface is up.
 
 The workload admits 32 assignments, rejects another before connecting, reloads
 all 32, completes a shared UTC slot, and checks a second slot with a 150 ms Pi
@@ -262,8 +263,8 @@ sudo unshare --net sh -c 'ip link set lo up; exec ./src/build/bin/wtp_fleet_capa
 ```
 
 The November 2026 software run used Debian GCC 12.2 on LinuxKit aarch64 with
-18 reported CPUs. Two passing mixed workloads observed 36,988–37,224 KiB peak RSS, 162 threads,
-132 open descriptors, and 19–120 ms shutdown. These process measurements include
+18 reported CPUs. Three passing mixed workloads observed 36,988–37,224 KiB peak RSS, 162 threads,
+132 open descriptors, and 19–147 ms shutdown. These process measurements include
 all endpoint fixture threads, sockets, and HTTP services as well as the
 controller. They are observations, not resource guarantees for a deployed Pi.
 The architecture retains one runtime and worker per output, serialized durable
@@ -302,8 +303,8 @@ from `WsprryPi-UI`. Chromium 156 captures at 1280×900 and 390×844 covered
 assignment admission, capacity refusal, missing/malformed advertisements,
 retained-context accounting, and actions on a reassigned identity. Impeccable
 review retained the existing visual language; its detector returned no findings.
-Operator documentation passed its Sphinx HTML build and desktop/mobile rendered
-review. Existing Setup screenshots depict unchanged general controls.
+Operator documentation passed its strict Sphinx HTML build, extension test,
+and desktop/mobile rendered review. Existing Setup screenshots depict unchanged general controls.
 
 Adversarial review resolved save/reload size asymmetry, union accounting for
 saved and retained contexts, bounded recovery-worker creation, a completion/pause

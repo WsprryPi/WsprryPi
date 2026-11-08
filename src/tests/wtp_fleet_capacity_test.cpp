@@ -12,7 +12,8 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
-#include <fstream>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <iostream>
 #include <memory>
 #include <thread>
@@ -163,10 +164,14 @@ int main(){
  // loopback, every server uses the production inhibited RF engine, no devices.
  ArgParserConfig policy=::config;policy.allow_unqualified_frequency=true;
  copy_runtime_config(policy,::config); // publish explicit test planning policy
- for(const auto& interface:std::filesystem::directory_iterator("/sys/class/net")) {
-  std::ifstream flags(interface.path()/"flags");unsigned value=0;flags>>std::hex>>value;
-  check(interface.path().filename()=="lo" || !(value & 1U),"capacity fixture requires all non-loopback interfaces down");
- }
+ // sysfs may remain mounted for the parent namespace after unshare --net.
+ // Query the current namespace through its network interface API instead.
+ ifaddrs* interfaces=nullptr;
+ check(getifaddrs(&interfaces)==0,"read fixture network interfaces");
+ struct FreeInterfaces {ifaddrs* value;~FreeInterfaces(){freeifaddrs(value);}} free_interfaces{interfaces};
+ for(const auto* interface=interfaces;interface;interface=interface->ifa_next)
+  check(!(interface->ifa_flags & IFF_UP) || (interface->ifa_flags & IFF_LOOPBACK),
+        "capacity fixture requires all non-loopback interfaces down");
  check(wtp_host_utc_valid(),"fixture clock qualification must be selected explicitly");
  unsetenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
  char path[]="/tmp/wsprrypi-fleet-capacity.XXXXXX";check(mkdtemp(path),"temporary directory");
