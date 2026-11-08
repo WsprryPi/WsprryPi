@@ -6,16 +6,21 @@ validation workflows. Completed execution handoffs are retired under the
 
 - [Wsprry Pi 4.0 Release Punchlist](Release%20Punchlist.md): saved follow-ups,
   release gates, and RP1 dependency order.
-- [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md): direct PPS
-  deferral, current RP1 parent, correction authority and reopening criteria.
+- [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md): RP1 direct
+  PPS scope, Pi 1–4 host estimation, correction authority, and clock-parent decisions.
 - [Release artifact preparation](Build%20Orchestration.md): source/version
   identity, four-target exports and the separate publication boundary.
-- Beta 1 preparation: [execution prompt](Item%2016%20Beta%201%20Preparation%20Prompt.md),
-  [public notes draft](4.0-Beta-1-Release-Notes.md),
-  [evidence and remaining gates](4.0-Beta-1-Release-Evidence.md),
+- [4.0.0 release notes](4.0.0-Release-Notes.md): cumulative operator-facing
+  draft since 3.2.1, including a separate section for actual bug fixes.
+- [4.0.0 release evidence](4.0.0-Release-Evidence.md): source and issue
+  dispositions, post-Beta changes, validation limits, remaining stable gates,
+  and the full preserved local and published Beta 1 material.
+- Historical Beta 1 preparation: [execution prompt](Item%2016%20Beta%201%20Preparation%20Prompt.md),
   [source inventory](4.0-Beta-1-Source-Inventory.json),
-  [candidate manifest](4.0-Beta-1-Candidate-Manifest.json), and
-  [artifact checksums](4.0-Beta-1-SHA256SUMS). Publication remains separate.
+  [candidate manifest](4.0-Beta-1-Candidate-Manifest.json),
+  [artifact checksums](4.0-Beta-1-SHA256SUMS), and the
+  [published prerelease](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.1).
+  These records retain their original identities; final 4.0.0 publication is separate.
 
 
 ## Shared control first-release gate

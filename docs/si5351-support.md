@@ -31,7 +31,7 @@ Current physical support claims remain bounded by board, reference clock,
 output, drive, mode, frequency and measurement setup. Neither a software check
 nor these inhibited I2C observations qualify another setup, a complete encoded
 WSPR transmission, calibrated power/frequency/spectrum or temperature extremes.
-The [active release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md)
+The [active release evidence](../release_tools/4.0.0-Release-Evidence.md)
 records the selected candidate and its remaining acceptance gates.
 
 ## Native macOS transport

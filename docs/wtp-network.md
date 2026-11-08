@@ -283,5 +283,5 @@ run.
 Software loopback results do not qualify physical USB, GPIO, timing, RF,
 installation or service lifecycle. Physical claims require exact source,
 firmware, board, clock, mode, frequency and setup identities. The active
-[release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md) records its
+[release evidence](../release_tools/4.0.0-Release-Evidence.md) records its
 selected candidate and remaining gates; no broader qualification is inferred.

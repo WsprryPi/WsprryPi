@@ -2,7 +2,7 @@
 
 This is the selected work and release-gate authority. Completed items retain
 their status and disposition in this list. Beta 1 acceptance, source identities, publication, and
-qualification limits remain in the [release evidence](4.0-Beta-1-Release-Evidence.md),
+qualification limits remain in the [release evidence](4.0.0-Release-Evidence.md),
 [source inventory](4.0-Beta-1-Source-Inventory.json), and
 [candidate manifest](4.0-Beta-1-Candidate-Manifest.json).
 
@@ -53,7 +53,7 @@ repositories, freeze and publish the provider, adopt the published artifacts,
 and validate affected production integration before application release.
 Changed candidates require updated identities and affected requalification.
 See the [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases)
-and [release evidence](4.0-Beta-1-Release-Evidence.md) for existing acceptance
+and [release evidence](4.0.0-Release-Evidence.md) for existing acceptance
 and its limits. Software tests do not establish physical or RF qualification.
 
 This backlog does not authorize implementation, issue edits, cross-repository

@@ -24,7 +24,7 @@ SPEC.loader.exec_module(scope)
 class PolicyTests(unittest.TestCase):
     def test_only_known_documentation_locations_skip(self):
         for path in ["README.md", "docs/reference.md", "docs/nested/guide.rst",
-                     "release_tools/4.0-Beta-1-Release-Notes.md",
+                     "release_tools/4.0.0-Release-Notes.md",
                      "docs/image.png", "docs/nested/figure.pdf"]:
             with self.subTest(path=path):
                 self.assertTrue(scope.documentation_path(path))

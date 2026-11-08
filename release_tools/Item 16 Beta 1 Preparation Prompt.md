@@ -81,8 +81,8 @@ announcement/edit, or final stable-release claim.
    merges, source, component READMEs, acceptance records and operator guidance.
    Classify included, partial, superseded/duplicate, excluded, deferred and
    unresolved. Neither closure nor a readiness label proves implementation.
-4. Write `release_tools/4.0-Beta-1-Release-Notes.md` as the eventual public body,
-   and `release_tools/4.0-Beta-1-Release-Evidence.md` as its claim/issue/commit/
+4. Write `release_tools/4.0.0-Release-Notes.md` as the eventual public body,
+   and `release_tools/4.0.0-Release-Evidence.md` as its claim/issue/commit/
    validation map. Retain machine-readable issue/source/artifact inventory where
    useful. Do not expose private bench paths, credentials or target captures in
    the public notes.

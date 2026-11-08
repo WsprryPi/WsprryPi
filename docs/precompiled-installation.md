@@ -94,7 +94,7 @@ selected GitHub release, where `<cpu>` is `armv6` or `aarch64` and `<release>` i
 branch selection controls supporting files. A missing or incompatible asset
 fails the installation without falling back to compilation. Release download
 support performs a checksum comparison when automatic selection supplies the published manifest or GitHub asset checksum. An explicit tagged-release invocation without an expected checksum retains its existing validation behavior. To install independently checked bytes, use the guide's local-binary procedure. Beta public-download
-verification is tracked in the [release evidence](../release_tools/4.0-Beta-1-Release-Evidence.md);
+verification is tracked in the [release evidence](../release_tools/4.0.0-Release-Evidence.md);
 draft or dry-run checks alone do not establish public availability.
 
 `--dry-run` performs no downloads, package installation, executable replacement,

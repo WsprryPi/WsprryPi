@@ -28,7 +28,7 @@ and cleanup receipts describe observed software authority; they do not replace
 independent output observation. Installed services, USB timing, RF accuracy,
 spectrum and general availability each require corresponding evidence.
 
-The active [Beta 1 evidence](../release_tools/4.0-Beta-1-Release-Evidence.md)
-binds the selected candidate, reused acceptance scope and remaining gates.
+The cumulative [release evidence](../release_tools/4.0.0-Release-Evidence.md)
+records source-specific acceptance, reused evidence, and remaining gates.
 Cleanup or a later documentation commit does not change that candidate identity
 or establish installation/runtime acceptance.

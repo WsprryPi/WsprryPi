@@ -57,7 +57,7 @@ separately authorized operation.
 
 Beta 1's [candidate manifest](4.0-Beta-1-Candidate-Manifest.json),
 [checksums](4.0-Beta-1-SHA256SUMS) and
-[release evidence](4.0-Beta-1-Release-Evidence.md) bind its accepted artifacts,
+[release evidence](4.0.0-Release-Evidence.md) bind its accepted artifacts,
 reused evidence and remaining gates. Later documentation or supporting-source
 changes do not silently replace those identities or complete their acceptance.
 
