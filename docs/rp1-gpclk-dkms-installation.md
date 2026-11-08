@@ -71,7 +71,7 @@ not assert current-boot ownership.
 
 `RP1_GPCLK_DKMS_SOURCE` accepts exactly:
 
-- `auto` (default): select published `v1.0.0-rc.1`, independently of the
+- `auto` (default): select published `v1.0.0-rc.2`, independently of the
   WsprryPi branch;
 - `release`: select the latest eligible published release, including prereleases;
 - `release:TAG`: select an exact published release, including prereleases;
@@ -114,7 +114,7 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 An explicit release selector accepts `release:1.0.0-rc.1` or
 `release:v1.0.0-rc.1`. Both select the published tag `v1.0.0-rc.1`.
 
-Automatic selection uses `v1.0.0-rc.1`. Explicit `release` selection uses the
+Automatic selection uses `v1.0.0-rc.2`. Explicit `release` selection uses the
 highest semantic version among eligible published releases, including prereleases,
 from `WsprryPi/RP1-GPIO-CLK-DKMS`. The application authenticates the source and selects a
 release; the provider verifies its manifest, checksums, package, compatibility,
