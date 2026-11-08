@@ -12,26 +12,32 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
 ## Ordered backlog
 
-1. ✅ **Prepare, integrate, validate, and publish the selected RP1 RC.**
+1. ▧ **Increase Fleet capacity to 32 remote devices.** Consolidate the limit
+   into one authoritative constant and coordinate runtime, UI, persistence,
+   tests, and documentation changes. Follow the
+   [implementation prompt](Fleet%2032%20Device%20Implementation%20Prompt.md),
+   including repeated adversarial review and both required Pi/Pico integration
+   suites.
+2. ✅ **Prepare, integrate, validate, and publish the selected RP1 RC.**
    Record the selected version and immutable source revision; accept the exact
    provider candidate in WsprryPi before provider publication, and verify the
    published artifacts and their identities.
-2. ✅ **Prepare, integrate, validate, and publish the selected Pico RC.**
+3. ✅ **Prepare, integrate, validate, and publish the selected Pico RC.**
    Record the selected version and immutable source revision, validate the
    intended Pi/Pico source pair, and verify the published firmware artifacts.
-3. ✅ **Pin and validate WsprryPi against the published RP1 RC.** Pin the
+4. ✅ **Pin and validate WsprryPi against the published RP1 RC.** Pin the
    explicitly selected version and immutable source revision, verify artifact
    identities, and complete affected consumer integration checks.
-4. ✅ **Pin and validate WsprryPi against the published Pico RC.** Use the
+5. ✅ **Pin and validate WsprryPi against the published Pico RC.** Use the
    selected RC's immutable source revision and complete both required actual
    Pi/Pico network and USB integration suites against the intended sources.
-5. ✅ **Validate the final WsprryPi candidate, publish its beta and documentation,
+6. ✅ **Validate the final WsprryPi candidate, publish its beta and documentation,
    and verify public downloads.** Record exact application, companion, and
    documentation revisions and artifact checksums. Both companion-consumption
    gates must pass before publication; changed inputs require affected checks
    to be repeated. Verify public artifact identities and served documentation.
 
-Steps 1–5 form a reusable release cycle. RP1 and Pico preparation may proceed
+Steps 2–6 form a reusable release cycle. RP1 and Pico preparation may proceed
 independently; each publication requires its own accepted candidate. Keep the
 completed cycle's evidence and identities when starting a new cycle, and reset
 statuses only for the newly selected cycle. Publication requires explicit
