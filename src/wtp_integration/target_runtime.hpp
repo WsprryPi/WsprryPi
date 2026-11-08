@@ -28,7 +28,8 @@ struct WtpTargetRuntime {
   std::shared_ptr<void> output_lease_snapshot() const {
     std::lock_guard lock(output_lease_mutex); return output_lease;
   }
-  wsprrypi::WtpSystemScheduleClock clock{wsprrypi::wtp_host_utc_valid};
+  wsprrypi::WtpSystemScheduleClock system_clock{wsprrypi::wtp_host_utc_valid};
+  wsprrypi::WtpScheduleClock& clock = system_clock;
   wsprrypi::PosixCdcSystem system;
   wsprrypi::UsbCdcStream stream{system};
   std::shared_ptr<void> updater_lease;
@@ -281,10 +282,11 @@ struct WtpTargetRuntime {
   WtpTargetRuntime(WtpSettings s, wsprrypi::WtpScheduleClock &c,
                 wsprrypi::wtp::ByteStream &b,
                 wsprrypi::wtp::SessionOptions options,
-                std::function<bool()> reopen)
-      : settings(std::move(s)),
+                std::function<bool()> reopen, std::function<bool()> admission = {})
+      : settings(std::move(s)), clock(c),
         app(std::make_unique<wsprrypi::WtpApplication>(
-            c, b, settings, std::move(options), std::move(reopen), [this]{refresh_usb_time(true);return usb_identity_admitted();})) {
+            c, b, settings, std::move(options), std::move(reopen),
+            [this, admission=std::move(admission)]{refresh_usb_time(true);return usb_identity_admitted() && (!admission || admission());})) {
     if (settings.transport == "network")
       credentials = std::make_shared<wsprrypi::TlsCredentials>(network_selection());
   }

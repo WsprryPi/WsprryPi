@@ -16,6 +16,9 @@ public:
   virtual ~WtpHostClock() = default;
   virtual std::uint64_t now_ms() const = 0;
   virtual void wait_ms(std::uint64_t duration) = 0;
+  // Interrupt a developer clock blocked on an explicit logical-time barrier.
+  // System clocks already bound waits to 10 ms and need no notification.
+  virtual void wake() noexcept {}
 };
 class WtpSteadyClock final : public WtpHostClock {
 public:

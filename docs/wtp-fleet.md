@@ -224,61 +224,65 @@ refused before replacing the existing file. This also bounds previously accepted
 extension data in settings, whose size is otherwise unconstrained.
 
 Older software limited to eight assignments refuses files containing more than
-eight. Before downgrading, pause, reconcile, and explicitly remove enough
+eight and files larger than its 128 KiB read limit. Before downgrading, pause,
+reconcile, and explicitly remove enough
 assignments using the current software. Preserve a private backup for recovery;
 never truncate the file or erase an in-flight barrier to force an older version
 to load it. Software fixtures do not establish capacity on 32 physical radios.
 
 ### Capacity validation
 
-The hardware-free capacity target exercises the production Fleet coordinator,
-store, scheduler, session, framing, server `Endpoint`, and `JobService`. Sixteen
-endpoints advertise Pi identities through `WtpPlainListener`; sixteen advertise
-Pico identities through a loopback byte-carrier fixture. All use inhibited RF
-engines. The test qualifies host software, not firmware execution on 32 boards.
-A coherent projected fixture clock and a test-only Linux `adjtimex` linker
-wrapper provide clock qualification without changing the host clock. The
-executable queries interfaces in its current network namespace and refuses to
-run while any non-loopback interface is up.
+`wtp-fleet-capacity-test` exercises the production Fleet coordinator, store,
+scheduler, session, framing, server `Endpoint`, and `JobService`. Sixteen peers
+advertise Pi identities and sixteen advertise Pico identities. Typed C++ fixture
+providers select memory byte carriers, inhibited RF engines, and explicit logical
+clocks. The production entry point retains its system clock, native transports,
+and hardware guards. No CLI, INI, environment, browser, or automatic fallback
+selects the fixture providers.
 
-The workload admits 32 assignments, rejects another before connecting, reloads
-all 32, completes a shared UTC slot, and checks a second slot with a 150 ms Pi
-management delay, a disconnected target, and a restarted target. It checks pause
-completion, explicit restart reconciliation, takeover with an unreachable
-controller transport, retained-context refusal, successful capacity reclamation,
-removal, and shutdown. The separate store test covers every count through 32,
-maximum connection fields and finite schedule parameters, full removal history,
-32 crash barriers, exact file-size boundaries, duplicate/self identities, and
-revision preservation. Its populated known-field state is 206,350 bytes; the
-528 KiB save/read limit also bounds otherwise unconstrained inactive/extension
-settings. Refused saves leave the prior document and revision unchanged.
+Logical time advances through readiness barriers. All 32 peers acknowledge ARM
+before the first launch gate opens; every engine starts at logical second 60.
+Completion evidence passes through the production session and cleanup paths
+before the pause/barrier checks. In the second scenario, one peer's exchange is
+held until the other 29 healthy peers acknowledge ARM. After release, all 30
+start at logical second 180. Disconnected and changed-boot peers cannot rearm.
+The fixture also verifies takeover, retained-context refusal, capacity reclamation,
+explicit restart reconciliation, removal, shutdown, and no replay after recovery.
+CPU scheduling and operator setup do not choose a launch time. A wall-clock
+watchdog detects a hung test only; it is not an admission or timing allowance.
+Stopping or invalidating waiting work wakes a blocked developer clock; system
+clocks retain their ordinary bounded waits.
 
-Run the coordinator fixture inside a private network namespace or a dedicated
-container with no external network. The CI recipe builds the executable before
-entering the namespace:
+The store test covers every count through 32, maximum connection fields and
+finite schedule parameters, full removal history, 32 crash barriers, exact file
+size boundaries, duplicate/self identities, and revision preservation. Its
+populated known-field state is 206,350 bytes. The shared 528 KiB save/read limit
+also bounds otherwise unconstrained inactive/extension settings. Refused saves
+leave the prior document and revision unchanged.
+
+Run the focused checks without privileges or external network access:
 
 ```sh
-make -C src wtp-fleet-test build/bin/wtp_fleet_capacity_test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-sudo unshare --net sh -c 'ip link set lo up; exec ./src/build/bin/wtp_fleet_capacity_test'
+make -C src wtp-fleet-test wtp-fleet-capacity-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+make -C src wtp-backend-test wtp-scheduler-test wtp-application-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 ```
 
-The November 2026 software run used Debian GCC 12.2 on LinuxKit aarch64 with
-18 reported CPUs. Three passing mixed workloads observed 36,988–37,224 KiB peak RSS, 162 threads,
-132 open descriptors, and 19–147 ms shutdown. These process measurements include
-all endpoint fixture threads, sockets, and HTTP services as well as the
-controller. They are observations, not resource guarantees for a deployed Pi.
-The architecture retains one runtime and worker per output, serialized durable
-store updates, and one process-wide outstanding resolver lookup. The test uses
-loopback addresses and local hostname resolution; arbitrary external DNS stalls,
-physical USB capacity, Wi-Fi congestion, services, and RF remain unqualified.
+The logical outcomes were identical over three runs limited to two CPUs and a
+single-CPU run on LinuxKit aarch64, Debian GCC 12.2. The final single-CPU repeats
+observed 33,448–33,964 KiB peak RSS, 66 threads, four descriptors, and six user
+CPU seconds. These observations include the memory-carrier endpoints and do not
+measure TCP sockets, Wi-Fi contention, physical USB, or physical launch timing.
+The production architecture retains one runtime and worker per output,
+serialized durable store updates, and one process-wide outstanding resolver
+lookup. Hardware, installation, services, and RF remain separately qualified.
 
-The paired validation selected Pico `devel` commit
+The paired validation selects Pico `devel` commit
 `f6c90a4925d02d60b7404487e24316f239c48e7c` from a clean isolated checkout,
 with Mbed TLS `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20` and its pinned
-submodule. It excluded changes in the independently active Pico checkout.
-The Pi source was the candidate based on
-`f59bba741ff367d0652f6db03b0bf67d4d10444a`, including the Fleet diff.
-The required recipes passed:
+submodule. It excludes changes in the independently active Pico checkout.
+The Pi candidate is based on `f59bba741ff367d0652f6db03b0bf67d4d10444a`,
+including the Fleet changes and deterministic fixture construction. The actual
+network and USB recipes remain separate from the memory-carrier capacity test:
 
 ```sh
 make -C src wtp-network-runtime-test wtp-network-interop-test wtp-config-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= WTP_NETWORK_BUILD_DIR=/tmp/fleet-network PICO_SOURCE=/validation/pico MBEDTLS_SOURCE=/validation/mbedtls
@@ -291,26 +295,26 @@ python3 -B scripts/tests/ci_execution_graph_test.py
 ```
 
 The portable semantics profile excludes physical-backend semantics and is not
-full Linux hardware coverage. TLS permission fixtures used container-native
-storage because the macOS bind mount did not provide normal Linux overwrite
-permissions. Initial fixture failures were corrected and affected checks rerun;
-the final production network-runtime rerun reported 916 passing checks.
+full Linux hardware coverage. TLS permission fixtures use container-native
+storage because the macOS bind mount does not provide normal Linux overwrite
+permissions. Both paired suites must pass for the intended source pair; a memory
+carrier result alone does not satisfy either integration gate.
 
-The rendered Fleet test passed via
+The rendered Fleet test is
 `CHROME_BIN=/usr/bin/chromium node tests/wtp_pi_fleet_ui_integration_test.js`
-from `WsprryPi-UI`. Chromium 156 captures at 1280×900 and 390×844 covered
+from `WsprryPi-UI`. Chromium 156 captures at 1280×900 and 390×844 cover
 32 rows in both themes, first/last rows, long names, recovery messages, final
 assignment admission, capacity refusal, missing/malformed advertisements,
 retained-context accounting, and actions on a reassigned identity. Impeccable
-review retained the existing visual language; its detector returned no findings.
-Operator documentation passed its strict Sphinx HTML build, extension test,
-and desktop/mobile rendered review. Existing Setup screenshots depict unchanged general controls.
+review retains the existing visual language; its detector returned no findings.
+Operator documentation passes its strict Sphinx HTML build, extension test,
+and desktop/mobile rendered review. Existing Setup screenshots depict unchanged
+general controls.
 
-Adversarial review resolved save/reload size asymmetry, union accounting for
-saved and retained contexts, bounded recovery-worker creation, a completion/pause
-race that could retain a confirmed-complete in-flight barrier, and hidden row
-actions surviving a skipped intermediate reconciliation poll. The completion
-handler now consumes confirmed cleanup before handling a paused assignment;
-uncertain outcomes retain their barriers. Final reassessment passed the repeated mixed
-workload and complete-diff review without relaxing protocol validation or
-substituting older companion sources.
+Adversarial review addresses save/reload size asymmetry, union accounting for
+saved and retained contexts, bounded recovery-worker creation, completion/pause
+races, hidden actions on reassigned identity rows, and deterministic fixture
+readiness. The completion handler consumes confirmed cleanup before handling a
+paused assignment; uncertain outcomes retain their barriers. Reassessment uses
+fixed logical launch instants and explicit ARM/completion evidence without
+relaxing protocol validation or substituting older companion sources.

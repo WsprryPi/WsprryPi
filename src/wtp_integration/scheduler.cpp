@@ -403,7 +403,8 @@ void WtpScheduler::request_stop() noexcept {
 void WtpScheduler::invalidate_pending() noexcept {
   invalidated_ = true;
   auto expected = WtpSchedulePhase::Waiting;
-  phase_.compare_exchange_strong(expected, WtpSchedulePhase::Invalidated);
+  if (phase_.compare_exchange_strong(expected, WtpSchedulePhase::Invalidated))
+    clock_.wake();
 }
 StartupQuiesceResult WtpScheduler::inspect_idle() {
   if (phase() != WtpSchedulePhase::Idle)

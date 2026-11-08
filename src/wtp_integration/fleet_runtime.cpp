@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "fleet_runtime.hpp"
 #include "fleet_limits.hpp"
+#include "fleet_test.hpp"
 #include "runtime_config_bridge.hpp"
 #include "fleet_store.hpp"
 #include "fleet_schedule.hpp"
@@ -45,15 +46,23 @@ void check_caps(const Json& row,const WtpRuntimeStatus& status) {
         {std::string(32,'1'),121000000000ULL,status.capabilities->maximum_arm_uncertainty_ns});
     if(!prepared) throw std::runtime_error(prepared.explanation);
 }
+std::unique_ptr<WtpTargetRuntime> make_target(const WtpFleetTestHooks& hooks,
+    WtpSettings settings, std::function<bool()> admission = {}, std::shared_ptr<void> lease = {}) {
+    if(hooks.create_target)return hooks.create_target(std::move(settings),std::move(admission),std::move(lease));
+    return std::make_unique<WtpTargetRuntime>(std::move(settings),std::move(admission),std::move(lease));
+}
+Json revocation_status(const WtpFleetTestHooks& hooks,const WtpSettings& settings,unsigned port) {
+    return hooks.revocation_status?hooks.revocation_status(settings,port):wtp_pi_revocation_status(settings,port);
+}
 class OutputWorker {
 public:
-    OutputWorker(WtpFleetStore& store,Json row,std::unique_ptr<WtpTargetRuntime> verified={})
-        :store_(store),id_(row.at("device_id").get<std::string>()),settings_(parse_wtp_settings(row.at("settings"),true)) {
+    OutputWorker(WtpFleetStore& store,const WtpFleetTestHooks& hooks,Json row,std::unique_ptr<WtpTargetRuntime> verified={})
+        :store_(store),hooks_(hooks),id_(row.at("device_id").get<std::string>()),settings_(parse_wtp_settings(row.at("settings"),true)) {
         // Use one native context per target; a temporary read-only inspection
         // can transfer its identity exclusion lease without transferring jobs.
         auto lease=verified?verified->output_lease_snapshot():std::shared_ptr<void>{};
         verified.reset();
-        target_=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},std::move(lease));
+        target_=make_target(hooks_,settings_,[this]{return admit();},std::move(lease));
     }
     ~OutputWorker(){halt();}
     void start(){quit_=false;finished_=false;thread_=std::thread([this]{run();});}
@@ -82,7 +91,7 @@ private:
     }
     bool reconcile(const Json& row) {
         if(row.at("product")!="WsprryPi") return true;
-        const auto state=wtp_pi_revocation_status(settings_,row.at("management_port").get<unsigned>());
+        const auto state=revocation_status(hooks_,settings_,row.at("management_port").get<unsigned>());
         if(state.at("revocation_generation")!=row.at("revocation_generation")) {
             store_.revoke(id_,state.at("revocation_generation").get<std::string>());
             revoked_=true;
@@ -112,7 +121,7 @@ private:
         // Close the retired connection before inspecting a single-client Pico.
         // Reuse its exclusion lease, but never its owner, job or transaction.
         target_->plain.close();target_->tls.close();target_->stream.close();
-        auto fresh=std::make_unique<WtpTargetRuntime>(settings_,[this]{return admit();},target_->output_lease_snapshot());
+        auto fresh=make_target(hooks_,settings_,[this]{return admit();},target_->output_lease_snapshot());
         const auto inspection=fresh->app->inspect();
         if(!inspection.ok)return {false,inspection.error};
         const auto status=fresh->app->status();
@@ -224,6 +233,7 @@ private:
         finished_=true;
     }
     WtpFleetStore& store_;
+    const WtpFleetTestHooks& hooks_;
     std::string id_;
     WtpSettings settings_;
     std::unique_ptr<WtpTargetRuntime> target_;
@@ -237,11 +247,11 @@ private:
 };
 class Fleet {
 public:
-    Fleet(const std::string& path,const std::string& self):store_(path,self),self_id_(self) {
+    Fleet(const std::string& path,const std::string& self,WtpFleetTestHooks hooks={}):store_(path,self),self_id_(self),hooks_(std::move(hooks)) {
         const auto saved = store_.snapshot().first;
         for(const auto& row:saved.at("assignments")) {
             const auto id=row.at("device_id").get<std::string>();
-            try{auto worker=std::make_unique<OutputWorker>(store_,row);worker->start();workers_.emplace(id,std::move(worker));}
+            try{auto worker=std::make_unique<OutputWorker>(store_,hooks_,row);worker->start();workers_.emplace(id,std::move(worker));}
             catch(const std::exception& e){errors_[id]=e.what();}
         }
     }
@@ -274,7 +284,7 @@ public:
                 workers_.erase(old);
             }
             validate_wtp_fleet_schedule(command.at("schedule"));
-            auto verified=std::make_unique<WtpTargetRuntime>(settings);
+            auto verified=make_target(hooks_,settings);
             const auto inspected=verified->app->inspect();
             if(!inspected.ok)throw std::runtime_error(inspected.error);
             const auto status=verified->app->status();
@@ -284,7 +294,7 @@ public:
                 {"product",status.identity->product},{"management_port",command.at("management_port")},
                 {"revocation_generation",nullptr},{"last_start_ns","0"},{"in_flight",false}};
             if(status.identity->product=="WsprryPi") {
-                const auto state=wtp_pi_revocation_status(settings,row.at("management_port").get<unsigned>());
+                const auto state=revocation_status(hooks_,settings,row.at("management_port").get<unsigned>());
                 if(state.value("local_requested",true)||state.value("output_unknown",true))
                     throw std::runtime_error("Release local control on the target before assigning it");
                 row["revocation_generation"]=state.at("revocation_generation");
@@ -292,7 +302,7 @@ public:
             check_caps(row,status);
             // Validate self/duplicate/field policy before creating a worker.
             auto candidate=before;candidate["assignments"].push_back(row);WtpFleetStore::validate(candidate,self_id_);
-            auto worker=std::make_unique<OutputWorker>(store_,row,std::move(verified));
+            auto worker=std::make_unique<OutputWorker>(store_,hooks_,row,std::move(verified));
             store_.update(revision,[&](Json& data){data["assignments"].push_back(row);});
             auto [it,inserted]=workers_.emplace(settings.device_id,std::move(worker));
             if(!inserted)throw std::runtime_error("Resolve the previous output context before reassigning it");
@@ -319,7 +329,7 @@ public:
                 if(worker==workers_.end()) {
                     if(workers_.size()>=kMaximumFleetOutputs)
                         throw std::runtime_error("Fleet context capacity reached; reconcile unresolved outputs first");
-                    auto fresh=std::make_unique<OutputWorker>(store_,*row);fresh->start();
+                    auto fresh=std::make_unique<OutputWorker>(store_,hooks_,*row);fresh->start();
                     worker=workers_.emplace(id,std::move(fresh)).first;errors_.erase(id);
                 }
                 worker->second->recover();
@@ -361,6 +371,7 @@ private:
     }
     WtpFleetStore store_;
     std::string self_id_;
+    WtpFleetTestHooks hooks_;
     std::mutex mutex_;
     std::map<std::string,std::unique_ptr<OutputWorker>> workers_;
     std::map<std::string,std::string> errors_;
@@ -375,6 +386,12 @@ void start_wtp_fleet(const std::string& ini_path, const std::string& self_id) {
                                               self_id.empty()?wtp_pi_device_id():self_id);
         std::lock_guard lock(manager_mutex);manager=std::move(candidate);startup_error.clear();
     }catch(const std::exception& e){std::lock_guard lock(manager_mutex);startup_error=e.what();}
+}
+void start_wtp_fleet_for_test(const std::string& ini_path,const std::string& self_id,WtpFleetTestHooks hooks) {
+    if(!hooks.create_target || !hooks.revocation_status)
+        throw std::runtime_error("Fleet fixtures require explicit target and revocation providers");
+    auto candidate=std::make_shared<Fleet>(ini_path+".wtp-assignments.json",self_id,std::move(hooks));
+    std::lock_guard lock(manager_mutex);manager=std::move(candidate);startup_error.clear();
 }
 void stop_wtp_fleet() noexcept {
     std::shared_ptr<Fleet> old;{std::lock_guard lock(manager_mutex);old.swap(manager);}old.reset();

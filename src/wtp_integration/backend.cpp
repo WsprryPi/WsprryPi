@@ -430,7 +430,7 @@ StartupQuiesceResult WtpTransmitBackend::quiesceForStartup() {
           safe ? ""
                : "WTP endpoint occupied or unsafe; startup made no mutation"};
 }
-void WtpTransmitBackend::stop() noexcept { stopped_ = true; }
+void WtpTransmitBackend::stop() noexcept { stopped_ = true; clock_.wake(); }
 CleanupResult WtpTransmitBackend::clean() {
   const auto end =
       deadline(); // One budget across observation, ABORT and RELEASE.
