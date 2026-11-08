@@ -106,15 +106,15 @@
   }
   function create(container,{changed=()=>{},bootstrap=false,compact=false,scheduleContainer=null}={}) {
     const options = values => values.map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
-    const select=(name,label,values)=>`<label>${label}<select data-gps="${name}">${options(values)}</select></label>`;
-    const number=(name,label,min,max)=>`<label>${label}<input data-gps="${name}" type="number" step="1" min="${min}" max="${max}" required></label>`;
+    const select=(name,label,values)=>`<label><span class="field-caption">${label}</span><select data-gps="${name}">${options(values)}</select></label>`;
+    const number=(name,label,min,max)=>`<label><span class="field-caption">${label}</span><input data-gps="${name}" type="number" step="1" min="${min}" max="${max}" required></label>`;
     const bool=(name,label)=>select(name,label,[['false','Disabled'],['true','Enabled']]);
     container.innerHTML=`<h3>GPS and PPS</h3><p>Use an optional GPS receiver for offline time and location. GPS serial and PPS use separate inputs. Save RF output settings, then restart to activate changes.</p>
-      <div class="fields">${bool('enabled','GPS input')}${select('receiver','Receiver',[['qlg3','QRP Labs QLG3 (receive only)'],['e108','E108 / GK9501 with optional configuration output']])}
+      <div class="fields control-grid">${bool('enabled','GPS input')}${select('receiver','Receiver',[['qlg3','QRP Labs QLG3 (receive only)'],['e108','E108 / GK9501 with optional configuration output']])}
       ${select('location','Station locator',[['manual','Use saved manual locator'],['gps','Use current GPS location']])}
       ${select('daylight','Automatic beacon schedule',[['always','All day'],['day','Daylight only'],['night','Night only']])}</div>
       <details><summary>GPS wiring and timing</summary>${compact ? '' : '<p>GP numbers identify GPIOs, not physical header pins. QLG3 uses receiver TX to Pico RX; it has no receiver RX header. The Pico keeps its PPS pin as an input.</p>'}
-      <div class="fields">${select('rx_gp','GPS serial input GPIO',[1,5,9,13,17,21].map(v=>[v,`GP${v}`]))}
+      <div class="fields control-grid">${select('rx_gp','GPS serial input GPIO',[1,5,9,13,17,21].map(v=>[v,`GP${v}`]))}
       ${select('pps_gp','PPS input GPIO',[1,3,5,7,9,11,13,15,17,19,21,27].map(v=>[v,`GP${v}`]))}
       ${select('baud','Serial baud rate',[9600,19200,38400,115200].map(v=>[v,String(v)]))}
       ${select('tx_gp','Optional receiver configuration output',[['','None'],...[0,4,8,12,16,20,28].map(v=>[v,`GP${v}`])])}
