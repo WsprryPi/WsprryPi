@@ -12,97 +12,26 @@ Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
 ## Ordered backlog
 
-1. ✅ **UI Review.** Review the current application interface using Impeccable,
-   including desktop and mobile workflows. Record findings and the validation
-   required for any resulting changes. This is a new review; prior Beta review
-   acceptance remains bound to its recorded implementation.
-2. ✅ **Direct PPS frequency calibration.** RP1 direct capture is complete.
-   Pi 1–4 use the existing Chrony host-frequency estimate; optional GPS/PPS
-   improves that estimate at the OS level, without application PPS capture.
-   Optional Pi 5/RP1 input-only
-   GPIO17 capture replaces the host-rate proxy, with bounded qualification,
-   per-job correction, residual adjustment, and manual fallback. Thirty
-   conducted cases on wspr5's GPIO4/GPIO20 routes passed the declared scoped
-   accuracy/trim checks; full Linux, UI, and actual Pi/Pico network/USB suites
-   passed, and adversarial findings are closed. Pi 1–4 direct capture remains
-   outside this adapter. Merged into `devel`; the release build is installed on
-   wspr5 with direct PPS enabled and qualified. No published release implied. See the
-   [capture contract](../docs/direct-pps-calibration.md),
-   [validation and RF evidence](../docs/direct-pps-validation.md), and
-   [scope](Calibration%20Scope%20Decisions.md#direct-pps-disposition-and-acceptance-criteria).
-3. ✅ **Alternative RP1 clock parents.** Bounded feasibility review complete;
-   retain nominal 200 MHz `pll_sys`. No alternative-parent hardware testing
-   selected or physical qualification claimed; see the [parent disposition](Calibration%20Scope%20Decisions.md#rp1-parent-disposition).
-4. ✅ **[#411 — Complete selectable hardware profiles and Linux MCP2221A/Si5351 support](https://github.com/WsprryPi/WsprryPi/issues/411).**
-   Implementation and scoped Ubuntu/Raspberry Pi OS bench qualification accepted;
-   **Ready for Release**. Keep the issue open for its next release boundary,
-   including exact release-candidate validation and publication.
-5. ✅ **[#419 — Add a native macOS MCP2221A transport beneath the Si5351 backend](https://github.com/WsprryPi/WsprryPi/issues/419).**
-   Native transport, web adapter selection/status, unsupported macOS
-   Reboot/Shutdown capability and command admission, and operator documentation
-   are implemented. Hardware acceptance stands. Final integration requires the
-   complete hardware-free matrix, including both current-source Pi/Pico pairs.
-   Keep the issue open; Ready for Release remains removed at the maintainer's
-   direction. Release labeling and publication are separate decisions.
-6. ✅ **Installer Git clone requirement.** Research complete; retain the
-   current clone requirement to deliver supporting tooling, configuration,
-   service templates, and web assets. Closed for now with no installer changes.
-7. ✅ **All-host tooling updates.** Closed November 3, 2026, for the
-   maintainer-selected hosts: this Mac (`/Users/lbussy`) and `wspr5`
-   (`/home/pi`). Both hosts' user-level `.agents/skills/impeccable` and
-   `.codex/skills/impeccable` installations were updated from 4.1.1 to 4.8.0,
-   matching the official version endpoint and npm package at execution time.
-   `npx --yes impeccable@4.8.0 update --global --yes --no-hooks` succeeded
-   on both hosts and installed the platform engine (release 0.1.18).
-   The current installer targets `.agents`, including when Codex is selected;
-   the legacy `.codex` copies were refreshed from the installed payloads after
-   retaining temporary 4.1.1 backups. All four skill metadata checks reported
-   4.8.0, all four engine `--version` checks passed with 4.8.0, and all four
-   `SKILL.md` SHA-256 values matched
-   `fab04b31f946573b00a8559db1fc070f8ea5825254d491c2b13156e5661a86d7`.
-   The CLI `check` command inspected project scope and reported no project
-   installation; user-level verification used the explicit installed paths.
-   Fresh agent sessions are required to load the updated skill instructions.
-   Hook manifests, application code, services, and hardware were unchanged.
-   Operator documentation was reviewed for impact; this maintainer-tool update
-   changes no operator behavior and requires no operator-manual update.
-8. ✅ **Pico Type 1 rationale wording.** Closed November 3, 2026, in
-   WsprryPico `devel` commit `cb560ae8` (pushed with `[no ci]`). The explanation
-   now makes six-character locator retention conditional and states that only
-   the first four characters are transmitted. Four- and six-character locator
-   previews passed production-handler and authenticated browser regression
-   checks; WSPR planner, resource, and schema tests passed. Impeccable review
-   included desktop/mobile browser captures and a detector check with no
-   findings. The operator manual already describes both locator lengths
-   correctly and required no change. Encoding, persistence, and protocol
-   schemas are unchanged; validation was hardware-free.
-9. ✅ **Pico operator documentation for independent valid-field saves.**
-   Closed November 3, 2026. The Pico operator manual's `docs/configure.md`
-   covers independent valid-field saves, incomplete progress, explicit
-   application, and uncertain-save recovery. The historical P15.14
-   documentation reference was superseded by P15.20 numbering.
-10. ✅ **Review and Streamline CI.** Required software coverage is retained; the 50% reduction objective was not achieved.
-11. ✅ **Review and Streamline Pico CI.**
-12. ✅ **Prepare, integrate, validate, and publish the selected RP1 RC.**
+1. ✅ **Prepare, integrate, validate, and publish the selected RP1 RC.**
    Record the selected version and immutable source revision; accept the exact
    provider candidate in WsprryPi before provider publication, and verify the
    published artifacts and their identities.
-13. ✅ **Prepare, integrate, validate, and publish the selected Pico RC.**
+2. ✅ **Prepare, integrate, validate, and publish the selected Pico RC.**
    Record the selected version and immutable source revision, validate the
    intended Pi/Pico source pair, and verify the published firmware artifacts.
-14. ✅ **Pin and validate WsprryPi against the published RP1 RC.** Pin the
+3. ✅ **Pin and validate WsprryPi against the published RP1 RC.** Pin the
    explicitly selected version and immutable source revision, verify artifact
    identities, and complete affected consumer integration checks.
-15. ✅ **Pin and validate WsprryPi against the published Pico RC.** Use the
+4. ✅ **Pin and validate WsprryPi against the published Pico RC.** Use the
    selected RC's immutable source revision and complete both required actual
    Pi/Pico network and USB integration suites against the intended sources.
-16. ✅ **Validate the final WsprryPi candidate, publish its beta and documentation,
+5. ✅ **Validate the final WsprryPi candidate, publish its beta and documentation,
    and verify public downloads.** Record exact application, companion, and
    documentation revisions and artifact checksums. Both companion-consumption
    gates must pass before publication; changed inputs require affected checks
    to be repeated. Verify public artifact identities and served documentation.
 
-Steps 12–16 form a reusable release cycle. RP1 and Pico preparation may proceed
+Steps 1–5 form a reusable release cycle. RP1 and Pico preparation may proceed
 independently; each publication requires its own accepted candidate. Keep the
 completed cycle's evidence and identities when starting a new cycle, and reset
 statuses only for the newly selected cycle. Publication requires explicit
