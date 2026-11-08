@@ -60,7 +60,7 @@ readback requirements; opening a disclosure never applies settings.
 
 ## Independent output schedules
 
-**Output schedules** supports zero through eight remote outputs alongside this
+**Output schedules** supports zero through 32 remote outputs alongside this
 Pi's own schedule. Select a verified saved Pi/Pico profile, assign a finite job,
 and save it explicitly. The assignment starts paused unless **Start this output's
 schedule after saving** is selected. **Resume**, **Pause and stop**, **Edit schedule**,
@@ -86,7 +86,7 @@ authorization. CAPS acceptance and a saved assignment do not silently grant
 either override. A policy rejection is returned before saving the assignment.
 
 `<active-INI-path>.wtp-assignments.json` is a private atomic file, independent of
-the profile catalog and `[WTP]`. It records up to eight assignments, the last
+the profile catalog and `[WTP]`. It records up to 32 assignments, the last
 consumed UTC slot, in-flight state, and up to 32 local-takeover removal notices.
 A slot is consumed before dispatch and is never automatically retried. Failed
 or uncertain work pauses that assignment. After an interrupted process with
@@ -200,3 +200,116 @@ There is no browser-local credential store or independent job authority.
 `make wtp-catalog-test` exercises the injected discovery store, TXT parser, nondefault SRV port, interface collision, loss/restart/failure, legacy import, revision guard, and Plain LAN consent without an Avahi daemon. The portable Mac profile compiles the unavailable adapter. Linux CI declares Avahi development headers and compiles the native adapter. These are source/software checks. Live Avahi/multicast discovery, listener advertisement, physical TCP/TLS acceptance, GPIO, services, and RF remain separate qualification. Interoperability tests compile the selected current Pico sources, including edits; source identity is informational. Software tests do not qualify DNS-SD advertisements, physical transport or RF.
 
 Fleet WSPR `frequency_hz` is an absolute RF center, not a USB dial or tone 0. At `14097100 Hz`, tones are 14,097,097.802734375; 14,097,099.267578125; 14,097,100.732421875; and 14,097,102.197265625 Hz. No dial or random placement is applied. Finite tone and QRSS use a carrier, FSKCW uses space, and DFCW uses dot; mark and dash add the positive shift. Mode changes update labels without changing the frequency draft or saved numeric meaning. WTP carries absolute event targets; the receiving endpoint does not add 1,500 Hz or reapply standalone settings or Pi calibration.
+
+## Fleet capacity and rollback
+
+The controller supports up to 32 independently scheduled remote Pi/Pico outputs,
+in addition to its local schedule. The 64 saved catalog profiles are connection
+records; saving one does not consume an assignment slot. Removed outputs with
+unresolved cleanup retain a bounded runtime context and identity exclusion until
+reconciliation succeeds; these contexts also count against Fleet capacity.
+
+The server advertises `maximum_outputs` from `kMaximumFleetOutputs` in
+`src/wtp_integration/fleet_limits.hpp`. The browser validates this advertisement
+and disables new assignments when capacity is unavailable or reached. The server
+independently refuses an additional assignment before target inspection or writes.
+Assignment files retain their version, consumed slots, enabled states, and
+in-flight barriers across restart. Uncertain work requires explicit reconciliation
+before it can resume; restarting does not replay it.
+
+The assignment read/write ceiling is derived from capacity with 16 KiB per output
+plus 16 KiB for removal history and document overhead. Connection fields contain
+path references, not embedded certificates. A save exceeding this ceiling is
+refused before replacing the existing file. This also bounds previously accepted
+extension data in settings, whose size is otherwise unconstrained.
+
+Older software limited to eight assignments refuses files containing more than
+eight. Before downgrading, pause, reconcile, and explicitly remove enough
+assignments using the current software. Preserve a private backup for recovery;
+never truncate the file or erase an in-flight barrier to force an older version
+to load it. Software fixtures do not establish capacity on 32 physical radios.
+
+### Capacity validation
+
+The hardware-free capacity target exercises the production Fleet coordinator,
+store, scheduler, session, framing, server `Endpoint`, and `JobService`. Sixteen
+endpoints advertise Pi identities through `WtpPlainListener`; sixteen advertise
+Pico identities through a loopback byte-carrier fixture. All use inhibited RF
+engines. The test qualifies host software, not firmware execution on 32 boards.
+A coherent projected fixture clock and a test-only Linux `adjtimex` linker
+wrapper provide clock qualification without changing the host clock. The
+executable refuses to run while any non-loopback interface is up.
+
+The workload admits 32 assignments, rejects another before connecting, reloads
+all 32, completes a shared UTC slot, and checks a second slot with a 150 ms Pi
+management delay, a disconnected target, and a restarted target. It checks pause
+completion, explicit restart reconciliation, takeover with an unreachable
+controller transport, retained-context refusal, successful capacity reclamation,
+removal, and shutdown. The separate store test covers every count through 32,
+maximum connection fields and finite schedule parameters, full removal history,
+32 crash barriers, exact file-size boundaries, duplicate/self identities, and
+revision preservation. Its populated known-field state is 206,350 bytes; the
+528 KiB save/read limit also bounds otherwise unconstrained inactive/extension
+settings. Refused saves leave the prior document and revision unchanged.
+
+Run the coordinator fixture inside a private network namespace or a dedicated
+container with no external network. The CI recipe builds the executable before
+entering the namespace:
+
+```sh
+make -C src wtp-fleet-test build/bin/wtp_fleet_capacity_test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+sudo unshare --net sh -c 'ip link set lo up; exec ./src/build/bin/wtp_fleet_capacity_test'
+```
+
+The November 2026 software run used Debian GCC 12.2 on LinuxKit aarch64 with
+18 reported CPUs. Two passing mixed workloads observed 36,988–37,224 KiB peak RSS, 162 threads,
+132 open descriptors, and 19–120 ms shutdown. These process measurements include
+all endpoint fixture threads, sockets, and HTTP services as well as the
+controller. They are observations, not resource guarantees for a deployed Pi.
+The architecture retains one runtime and worker per output, serialized durable
+store updates, and one process-wide outstanding resolver lookup. The test uses
+loopback addresses and local hostname resolution; arbitrary external DNS stalls,
+physical USB capacity, Wi-Fi congestion, services, and RF remain unqualified.
+
+The paired validation selected Pico `devel` commit
+`f6c90a4925d02d60b7404487e24316f239c48e7c` from a clean isolated checkout,
+with Mbed TLS `0bebf8b8c7f07abe3571ded48a11aa907a1ffb20` and its pinned
+submodule. It excluded changes in the independently active Pico checkout.
+The Pi source was the candidate based on
+`f59bba741ff367d0652f6db03b0bf67d4d10444a`, including the Fleet diff.
+The required recipes passed:
+
+```sh
+make -C src wtp-network-runtime-test wtp-network-interop-test wtp-config-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= WTP_NETWORK_BUILD_DIR=/tmp/fleet-network PICO_SOURCE=/validation/pico MBEDTLS_SOURCE=/validation/mbedtls
+cmake -S /validation/pico -B /validation/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build /validation/pico-host --target usb_management_driver -j2
+make -C src wtp-usb-pair-client-build wtp-usb-management-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client /validation/pico-host/usb_management_driver
+make -C src semantics-test-portable SUDO=
+python3 -B scripts/tests/ci_execution_graph_test.py
+```
+
+The portable semantics profile excludes physical-backend semantics and is not
+full Linux hardware coverage. TLS permission fixtures used container-native
+storage because the macOS bind mount did not provide normal Linux overwrite
+permissions. Initial fixture failures were corrected and affected checks rerun;
+the final production network-runtime rerun reported 916 passing checks.
+
+The rendered Fleet test passed via
+`CHROME_BIN=/usr/bin/chromium node tests/wtp_pi_fleet_ui_integration_test.js`
+from `WsprryPi-UI`. Chromium 156 captures at 1280×900 and 390×844 covered
+32 rows in both themes, first/last rows, long names, recovery messages, final
+assignment admission, capacity refusal, missing/malformed advertisements,
+retained-context accounting, and actions on a reassigned identity. Impeccable
+review retained the existing visual language; its detector returned no findings.
+Operator documentation passed its Sphinx HTML build and desktop/mobile rendered
+review. Existing Setup screenshots depict unchanged general controls.
+
+Adversarial review resolved save/reload size asymmetry, union accounting for
+saved and retained contexts, bounded recovery-worker creation, a completion/pause
+race that could retain a confirmed-complete in-flight barrier, and hidden row
+actions surviving a skipped intermediate reconciliation poll. The completion
+handler now consumes confirmed cleanup before handling a paused assignment;
+uncertain outcomes retain their barriers. Final reassessment passed the repeated mixed
+workload and complete-diff review without relaxing protocol validation or
+substituting older companion sources.

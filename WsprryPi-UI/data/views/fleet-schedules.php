@@ -1,7 +1,8 @@
 <?php // SPDX-License-Identifier: MIT ?>
 <section id="fleet-schedules" class="mb-4" aria-labelledby="fleet-schedules-heading" data-independent-wtp>
     <h4 id="fleet-schedules-heading" class="cw-control-section__title">Output schedules</h4>
-    <p class="form-text">Assign a schedule to each remote output. This Pi keeps its own schedule and Enable setting. Up to eight remote outputs can run independently.</p>
+    <p class="form-text">Assign a schedule to each remote output. This Pi keeps its own schedule and Enable setting.</p>
+    <p id="fleet-schedule-capacity" class="form-text" role="status" aria-live="polite">Load schedules to check available capacity.</p>
     <div class="d-flex flex-wrap gap-2 mb-2">
         <button type="button" id="fleet-schedule-new" class="btn btn-primary">Assign a schedule</button>
         <button type="button" id="fleet-schedule-refresh" class="btn btn-outline-secondary">Refresh schedules</button>

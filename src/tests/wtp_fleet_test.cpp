@@ -1,4 +1,5 @@
 #include "wtp_integration/fleet_store.hpp"
+#include "wtp_integration/fleet_limits.hpp"
 #include "wtp_integration/fleet_schedule.hpp"
 #include "wtp_integration/output_lease.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
@@ -68,6 +69,64 @@ int main(){
     const std::string self(32,'f');
     WtpFleetStore store(file,self);
     auto [empty,first]=store.snapshot();check(empty.at("assignments").empty(),"zero targets valid");
+    check(kMaximumFleetOutputs==32,"supported capacity is independently specified as 32");
+    {
+        WtpFleetStore large(std::string(path)+"/large.json",self);
+        Json expected;
+        for(unsigned count=1;count<=32;++count) {
+            auto row=assignment('a');
+            const auto id=std::string(30,'0')+"0123456789abcdef"[count/16]+"0123456789abcdef"[count%16];
+            row["device_id"]=id;row["settings"]["Device ID"]=id;
+            row["name"]=std::string(80,'"');
+            row["settings"]["Hostname"]=std::string(63,'a')+"."+std::string(63,'b')+"."+std::string(63,'c')+"."+std::string(61,'d');
+            row["revocation_generation"]="18446744073709551615";
+            for(const char* key:{"Endpoint","TLS CA File","TLS Client Certificate","TLS Client Key"})
+                row["settings"][key]=std::string(512,'"');
+            row["settings"]["USB Serial"]=std::string(128,'"');
+            row["settings"]["TLS Server Identity"]=std::string(254,'"'); // inactive Plain LAN field
+            row["schedule"]={{"mode","dfcw"},{"frequency_hz",14097100},{"message",std::string(32,'E')},{"dot_ms",60000},{"shift_hz",1000},{"period_seconds",86400},{"phase_seconds",86399}};
+            row["last_start_ns"]="18446744073709551615";
+            row["in_flight"]=true;row["enabled"]=(count%2==0);
+            expected=large.update({},[&](Json& d){d["assignments"].push_back(row);}).first;
+            WtpFleetStore reload(std::string(path)+"/large.json",self);
+            check(reload.snapshot().first==expected,"all 1 through 32 assignments reload without normalization");
+        }
+        auto full=large.update({},[](Json& d){for(unsigned i=0;i<32;++i)
+            d["removals"].push_back({{"device_id",std::string(32,'b')},{"revocation_generation","18446744073709551615"}});});
+        check(std::filesystem::file_size(std::string(path)+"/large.json")>131072,"escaped maximum fields exceed former read ceiling");
+        WtpFleetStore reload(std::string(path)+"/large.json",self);
+        check(reload.snapshot().first==full.first,"full removal history and barriers reload");
+        rejects([&]{large.update({},[&](Json& d){d["assignments"].push_back(assignment('c'));});},"33rd unique stored assignment refused");
+        rejects([&]{large.update({},[](Json& d){d["assignments"][31]["device_id"]=d["assignments"][0]["device_id"];d["assignments"][31]["settings"]["Device ID"]=d["assignments"][0]["device_id"];});},"duplicate at capacity refused");
+        rejects([&]{large.update({},[&](Json& d){d["assignments"][31]["device_id"]=self;d["assignments"][31]["settings"]["Device ID"]=self;});},"self at capacity refused");
+        rejects([&]{large.update({},[](Json& d){d["assignments"][0]["settings"]["extension"]=std::string(kMaximumFleetFileBytes,'x');});},"oversize save refused before replacement");
+        check(large.snapshot()==full,"all refused mutations preserve revision and memory");
+        WtpFleetStore still_saved(std::string(path)+"/large.json",self);
+        check(still_saved.snapshot()==full,"all refused mutations preserve disk");
+        const auto full_ini=std::string(path)+"/full-runtime.ini";
+        WtpFleetStore full_runtime(full_ini+".wtp-assignments.json",self);
+        const auto preserved=full_runtime.update({},[&](Json& d){d=full.first;});
+        start_wtp_fleet(full_ini,self);
+        const auto running_full=wtp_fleet_api("GET","","");
+        check(running_full.status==200 && Json::parse(running_full.body).at("outputs").size()==32,"32 crash-retained contexts start");
+        stop_wtp_fleet();
+        WtpFleetStore after_stop(full_ini+".wtp-assignments.json",self);
+        check(after_stop.snapshot()==preserved,"32 crash-retained slots and barriers survive shutdown unchanged");
+        const auto exact_file=std::string(path)+"/exact.json";
+        WtpFleetStore exact(exact_file,self);
+        auto boundary=full.first;
+        boundary["assignments"][0]["settings"]["extension"]="";
+        const auto overhead=boundary.dump(2).size()+1;
+        boundary["assignments"][0]["settings"]["extension"]=std::string(kMaximumFleetFileBytes-overhead,'x');
+        const auto exact_saved=exact.update({},[&](Json& d){d=boundary;});
+        check(std::filesystem::file_size(exact_file)==kMaximumFleetFileBytes,"exact save limit accepted");
+        WtpFleetStore exact_reload(exact_file,self);
+        check(exact_reload.snapshot()==exact_saved,"exact byte limit reloads");
+        rejects([&]{exact.update({},[](Json& d){d["assignments"][0]["settings"]["extension"].get_ref<std::string&>()+='x';});},"one byte over save limit refused");
+        {std::ofstream append(exact_file,std::ios::app);append<<' ';}
+        rejects([&]{WtpFleetStore oversized(exact_file,self);oversized.snapshot();},"one byte over read limit refused");
+        std::cout<<"Maximum populated fixture bytes: "<<std::filesystem::file_size(std::string(path)+"/large.json")<<"\n";
+    }
     auto a=assignment('a'),b=assignment('b');b["schedule"]["phase_seconds"]=30;
     auto [two,revision]=store.update(first,[&](Json& d){d["assignments"]=Json::array({a,b});});
     check(two.at("assignments").size()==2,"independent outputs saved");

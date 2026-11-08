@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "fleet_runtime.hpp"
+#include "fleet_limits.hpp"
 #include "runtime_config_bridge.hpp"
 #include "fleet_store.hpp"
 #include "fleet_schedule.hpp"
@@ -145,14 +146,9 @@ private:
             else publish("recovery_required",result.error);
             return;
         }
-        if(!row->at("enabled").get<bool>()) {
-            if(target_->app->active()) {
-                cleanup_ok_=target_->app->stop().ok;
-                if(cleanup_ok_)clear_in_flight();
-            }
-            publish(row->at("in_flight").get<bool>()?"recovery_required":"paused");
-            return;
-        }
+        // A completion can arrive concurrently with Pause. Consume its confirmed
+        // cleanup before the paused branch, or an idle finished job can retain
+        // a false crash barrier forever. Unconfirmed outcomes stay blocked.
         if(auto completion=target_->app->take_completion()) {
             const auto state=target_->app->status();
             const bool safe=state.phase==WtpSchedulePhase::Idle && !state.uncertain && !state.safety_fault &&
@@ -167,6 +163,14 @@ private:
             publish("complete");
             row=row_for(store_.snapshot().first,id_);
             if(!row)return;
+        }
+        if(!row->at("enabled").get<bool>()) {
+            if(target_->app->active()) {
+                cleanup_ok_=target_->app->stop().ok;
+                if(cleanup_ok_)clear_in_flight();
+            }
+            publish(row->at("in_flight").get<bool>()?"recovery_required":"paused");
+            return;
         }
         if(target_->app->active()) {publish("scheduled");return;}
         if(row->at("in_flight").get<bool>()) {publish("recovery_required","A previous process may have dispatched this job. Reconcile before resuming.");return;}
@@ -257,8 +261,13 @@ public:
             if(settings.device_id.size()!=32)throw std::runtime_error("Confirm the full WTP device identity first");
             if(settings.transport=="network_plain" && command.at("consent_plain")!=true)
                 throw std::runtime_error("Plain LAN requires explicit consent");
-            if(before.at("assignments").size()>=8 || workers_.size()>=8)
-                throw std::runtime_error("Fleet supports at most eight remote contexts; reconcile unresolved outputs first");
+            std::size_t occupied=before.at("assignments").size();
+            for(const auto& [id,worker]:workers_) {
+                (void)worker;
+                if(!row_for(before,id))++occupied;
+            }
+            if(occupied>=kMaximumFleetOutputs)
+                throw std::runtime_error("Fleet supports at most " + std::to_string(kMaximumFleetOutputs) + " remote contexts; reconcile unresolved outputs first");
             if(row_for(before,settings.device_id))throw std::runtime_error("This output already has an assignment");
             if(auto old=workers_.find(settings.device_id);old!=workers_.end()) {
                 if(!old->second->halt()) {old->second->start();throw std::runtime_error("Previous output cleanup is unresolved");}
@@ -308,6 +317,8 @@ public:
             if(operation_name=="recover" && command.size()==2) {
                 store_.update(revision,[&](Json& data){modify_row(data,id,[](Json& r){r["enabled"]=false;});});
                 if(worker==workers_.end()) {
+                    if(workers_.size()>=kMaximumFleetOutputs)
+                        throw std::runtime_error("Fleet context capacity reached; reconcile unresolved outputs first");
                     auto fresh=std::make_unique<OutputWorker>(store_,*row);fresh->start();
                     worker=workers_.emplace(id,std::move(fresh)).first;errors_.erase(id);
                 }
@@ -341,7 +352,7 @@ private:
     }
     PicoHttpResponse snapshot(){
         auto [data,revision]=store_.snapshot();
-        data["scope"]="wsprrypi-wtp-fleet/1";data["maximum_outputs"]=8;
+        data["scope"]="wsprrypi-wtp-fleet/1";data["maximum_outputs"]=kMaximumFleetOutputs;
         data["now_ms"]=std::to_string(WtpSteadyClock{}.now_ms());
         data["outputs"]=Json::object();
         for(const auto& [id,worker]:workers_)data["outputs"][id]=worker->status();

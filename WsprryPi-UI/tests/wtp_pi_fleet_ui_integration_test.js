@@ -31,12 +31,13 @@ async function main() {
         await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.FleetSchedules && !!window.LocalWtp'), 'new UI scripts');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-new").disabled'), true);
         const mock = `(() => {
+            Object.defineProperty(navigator,"onLine",{configurable:true,get:()=>true}); // loopback-only container has no default route
             window.__requests = [];
             window.__host = {Operation:{Transmit:false}, 'WTP Server':{Enabled:true,Port:31417,Interface:'wlan0'}};
             window.__endpoint = {schema:'wsprrypi-wtp-endpoint/1',device_id:'f'.repeat(32),enabled:true,listener_running:true,dns_sd_published:true,address:'192.168.1.68',port:31417,local_requested:false,local_effective:false,remote_owner:'b'.repeat(32),remote_job_id:'c'.repeat(32),remote_state:'running',remote_output_active:true,output_unknown:false,revocation_unavailable:false};
             window.__settings = {Transport:'network_plain',Hostname:'wspr4.local','TCP Port':31417,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':true,Endpoint:'','USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'TLS Server Identity':'','TLS CA File':'','TLS Client Certificate':'','TLS Client Key':''};
             const schedule={mode:'tone',frequency_hz:14097100,duration_ms:3000,period_seconds:120,phase_seconds:0};
-            window.__fleet = {scope:'wsprrypi-wtp-fleet/1',version:1,maximum_outputs:8,now_ms:'12000',assignments:[
+            window.__fleet = {scope:'wsprrypi-wtp-fleet/1',version:1,maximum_outputs:32,now_ms:'12000',assignments:[
                 {device_id:'d'.repeat(32),name:'Bench Pi',schedule,enabled:true,in_flight:true,settings:window.__settings},
                 {device_id:'e'.repeat(32),name:'Garden Pico',schedule:{...schedule,mode:'qrss',message:'TEST',dot_ms:3000},enabled:false,in_flight:false,settings:window.__settings}],
                 removals:[],outputs:{['d'.repeat(32)]:{state:'scheduled',message:'',wtp:{status_observed_ms:'11000'}},['e'.repeat(32)]:{state:'paused',message:'',wtp:{status_observed_ms:'10000'}}}};
@@ -345,6 +346,41 @@ async function main() {
             }
         }
 
+        // Capacity is advertised, never inferred from the historical UI bound.
+        await evaluate(`window.__originalFleet=structuredClone(__fleet);__fleet.assignments=Array.from({length:31},(_,i)=>({...__originalFleet.assignments[0],device_id:i.toString(16).padStart(32,'0'),name:'Remote '+(i+1)+' '+('Long device name ').repeat(3),enabled:false,in_flight:false}));__fleet.outputs={};document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===31 && !document.getElementById("fleet-schedule-new").disabled'),'31 allows final assignment');
+        await evaluate(`document.getElementById('fleet-schedule-new').click();`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'32nd assignment editor');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='3';document.getElementById('fleet-schedule-plain').checked=true;document.getElementById('fleet-schedule-save').click();`);
+        await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===32 && document.getElementById("fleet-schedule-new").disabled'),'32 prevents 33rd assignment');
+        assert.match(await evaluate('document.getElementById("fleet-schedule-capacity").textContent'),/32 of 32/);
+        for(const theme of ['light','dark'])for(const viewport of viewports){
+            await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+            await evaluate(`document.documentElement.setAttribute('data-bs-theme','${theme}');__fleet.outputs[__fleet.assignments[30].device_id]={state:'recovery_required',message:'Disconnected target: reconcile the previous job before resuming. '+('Long recovery detail ').repeat(6)};document.getElementById('fleet-schedule-refresh').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("fleet-output-list").textContent.includes("Long recovery detail")'),'failure row');
+            await evaluate(`document.getElementById('fleet-schedules').scrollIntoView({block:'start'});window.scrollBy(0,-160);document.getAnimations().forEach(a=>a.finish());`);
+            await client.settleRendering();
+            assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),true,'32-row layout stays within viewport');
+            const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            fs.writeFileSync(path.join(output,viewport.name+'-fleet32-'+theme+'.png'),Buffer.from(shot.data,'base64'));
+            await evaluate(`document.querySelector('#fleet-output-list section:last-child').scrollIntoView({block:'center'});`);
+            const last=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+            fs.writeFileSync(path.join(output,viewport.name+'-fleet32-last-'+theme+'.png'),Buffer.from(last.data,'base64'));
+        }
+        await evaluate(`__fleet.assignments.pop();__fleet.outputs['f'.repeat(32)]={revoked:true,state:'recovery_required',message:'Cleanup unresolved'};document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-capacity").textContent.includes("1 unresolved") && document.getElementById("fleet-schedule-new").disabled'),'retained context consumes capacity');
+        await evaluate(`delete __fleet.outputs['f'.repeat(32)];__fleet.assignments.push({...__fleet.assignments[0],device_id:'f'.repeat(32),name:'Reassigned output'});document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('Array.from(document.querySelectorAll("#fleet-output-list section")).some(row=>row.textContent.includes("Reassigned output") && Array.from(row.querySelectorAll("button")).every(button=>!button.hidden))'),'reassignment restores all actions on reused identity row');
+        await evaluate(`__fleet.assignments.pop();document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled'),'reconciliation reclaims capacity');
+        for(const invalid of [null,0,-1,1.5,'32',true,Number.MAX_SAFE_INTEGER+1]){
+            await evaluate(`__fleet.maximum_outputs=${JSON.stringify(invalid)};document.getElementById('fleet-schedule-refresh').click();`);
+            await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-feedback").textContent.includes("capacity")'),'invalid capacity disables admission');
+        }
+        await evaluate(`delete __fleet.maximum_outputs;document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-new").disabled'),'missing capacity disables admission');
+        await evaluate(`__fleet.maximum_outputs=40;document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 40")'),'UI derives capacity from server');
         // The keyboard interaction grants native user activation. This fixture
         // has no host config readback, so establish its synthetic baseline before
         // leaving Setup; otherwise the real unsaved-edit guard correctly blocks.

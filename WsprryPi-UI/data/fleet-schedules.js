@@ -52,10 +52,26 @@
             : value.error?.message || value.error?.code || `Request failed (${response.status}).`), {status: response.status});
         return {value, etag: response.headers.get("ETag")};
     }
+    function validCapacity(value) {
+        return Number.isSafeInteger(value?.maximum_outputs) && value.maximum_outputs > 0;
+    }
+    function occupied(value) {
+        return new Set([...value.assignments.map(row => row.device_id), ...Object.keys(value.outputs || {})]).size;
+    }
+    function validateFleet(value) {
+        if (value.scope !== "wsprrypi-wtp-fleet/1" || !Array.isArray(value.assignments) ||
+            !validCapacity(value) || value.assignments.length > value.maximum_outputs ||
+            !value.outputs || typeof value.outputs !== "object" || Array.isArray(value.outputs)) {
+            data = null;
+            throw new Error("Invalid fleet status or capacity. Refresh schedules before assigning an output.");
+        }
+        return value;
+    }
+    function canAssign() {return data && validCapacity(data) && occupied(data) < data.maximum_outputs;}
     function createRow(id) {
         const row = root.document.createElement("section");
         row.className = "py-3 border-bottom";
-        const name = root.document.createElement("h5");name.className = "h6 mb-1";
+        const name = root.document.createElement("h5");name.className = "h6 mb-1 text-break";
         const description = root.document.createElement("p");description.className = "mb-1";
         const status = root.document.createElement("p");status.className = "form-text text-break mb-2";
         const actions = root.document.createElement("div");actions.className = "d-flex flex-wrap gap-2";
@@ -73,8 +89,11 @@
     function render() {
         const list = byId("fleet-output-list");
         list.setAttribute("aria-busy", String(busy));
-        byId("fleet-schedule-new").disabled = !visible || busy || !data || data.assignments.length >= 8;
+        byId("fleet-schedule-new").disabled = !visible || busy || !canAssign();
         byId("fleet-schedule-refresh").disabled = !visible || busy;
+        byId("fleet-schedule-capacity").textContent = data && validCapacity(data)
+            ? `${data.assignments.length} of ${data.maximum_outputs} remote outputs assigned. ${occupied(data) - data.assignments.length} unresolved contexts retained.${canAssign() ? "" : " Capacity reached; remove an assignment or reconcile unresolved outputs first."}`
+            : "Capacity unavailable. Refresh schedules before assigning an output.";
         if (!data) return;
         const retired = Object.entries(data.outputs || {}).filter(([id, output]) =>
             output.revoked && !data.assignments.some(row => row.device_id === id));
@@ -92,7 +111,7 @@
             const observed = output?.wtp?.status_observed_ms;
             const age = observed && data.now_ms ? `${Math.max(0, Math.round((Number(data.now_ms) - Number(observed) + Date.now() - observedAt) / 1000))} s ago` : "age unknown";
             elements.status.textContent = `${assignment.enabled ? "Schedule enabled" : "Schedule paused"} · ${output?.state || "unavailable"}. ${output?.message || ""} WTP observation: ${age}.`;
-            for (const button of Object.values(elements.buttons)) button.disabled = !visible || busy;
+            for (const button of Object.values(elements.buttons)) {button.hidden = false;button.disabled = !visible || busy;}
             elements.buttons.enable.disabled ||= assignment.enabled || assignment.in_flight;
             elements.buttons.pause.disabled ||= !assignment.enabled && !assignment.in_flight;
             elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight;
@@ -121,13 +140,12 @@
         clearTimeout(timer);
         try {
             const result = await fetchJson("fleet");
-            if (result.value.scope !== "wsprrypi-wtp-fleet/1" || !Array.isArray(result.value.assignments)) throw new Error("Invalid fleet status response.");
             if (closed || busy || !visible) return;
-            data = result.value;revision = result.etag;observedAt = Date.now();
+            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();
             if (byId("fleet-schedule-feedback").textContent.startsWith("Fleet status unavailable:")) message("");
             if (!rows.size) byId("fleet-output-list").replaceChildren();
             render();
-        } catch (error) {if (!closed && !busy && visible) message(`Fleet status unavailable: ${error.message}`);}
+        } catch (error) {if (!closed && !busy && visible) {data = null;render();message(`Fleet status unavailable: ${error.message}`);}}
         finally {if (!closed) timer = setTimeout(load, 3000);}
     }
     async function mutate(operation, id, trigger) {
@@ -144,7 +162,7 @@
             if (closed || !visible) return;
             message(`${operation === "recover" ? "Requesting reconciliation" : "Updating assignment"}…`);
             const result = await fetchJson("fleet", "POST", {operation, device_id: id}, reviewedRevision);
-            data = result.value;revision = result.etag;observedAt = Date.now();
+            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();
             message(operation === "recover" ? "Reconciliation requested. Review the output status before resuming." : "Assignment updated.");
         } catch (error) {message(`${error.message} Read status before repeating an unconfirmed action.`);}
         finally {
@@ -188,6 +206,7 @@
     }
     async function openEditor(id = "") {
         if (closed || busy || !visible || !data) return;
+        if (!id && !canAssign()) return;
         const assignment = id ? data.assignments.find(row => row.device_id === id) : null;
         if (id && (!assignment || assignment.enabled || assignment.in_flight)) return;
         // Bind the draft to the schedule displayed when it was opened. Status
@@ -233,6 +252,7 @@
     }
     async function save() {
         if (busy || !visible) return;
+        if (!editId && !canAssign()) {message("Capacity unavailable or reached. Refresh schedules and review before saving. Your draft is preserved.", true);return;}
         const fields = [...byId("fleet-schedule-editor").querySelectorAll("input,select")].filter(field => !field.disabled && !field.closest("[hidden]"));
         for (const field of fields) if (!field.reportValidity()) return;
         const profile = profiles.find(p => p.id === text("device"));
@@ -245,7 +265,7 @@
         busy = true;setVisible(visible);message("Checking the output and saving…", true);
         try {
             const result = await fetchJson("fleet", "POST", command, editorRevision);
-            data = result.value;revision = result.etag;observedAt = Date.now();byId("fleet-schedule-editor").hidden = true;
+            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();byId("fleet-schedule-editor").hidden = true;
             message("Output schedule saved.");byId("fleet-schedule-new").focus();
         } catch (error) {
             const detail = error.status === 412 ? "Schedules changed. Cancel this draft, reopen the editor, and review the current settings." : error.message;

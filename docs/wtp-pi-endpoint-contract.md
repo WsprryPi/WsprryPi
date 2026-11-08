@@ -413,7 +413,7 @@ without its separate authorization.
 - Durable private per-device generation journal on the target. Central Pi
   status reconciliation compares generations before CLAIM/ARM and removes
   changed assignments without local takeover waiting for controller contact.
-- Up to eight independent target contexts and one saved finite periodic
+- Up to 32 independent target contexts and one saved finite periodic
   schedule per output, alongside the existing local scheduler. The legacy
   `[WTP]` route remains available; full-identity exclusion prevents duplicate
   authority. Assignments have a separate atomic private file and revision.

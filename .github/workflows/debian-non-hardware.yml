@@ -205,6 +205,10 @@ jobs:
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+      - name: Validate 32 independent Fleet outputs without external networking
+        run: |
+          make -C src wtp-fleet-test build/bin/wtp_fleet_capacity_test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          sudo unshare --net sh -c 'ip link set lo up; exec ./src/build/bin/wtp_fleet_capacity_test'
       - name: Shipped Pico controls through actual public and encrypted HTTP handlers
         env:
           CHROME_BIN: /usr/bin/google-chrome

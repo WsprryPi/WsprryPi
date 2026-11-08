@@ -2293,3 +2293,14 @@ ci-installer-offline-test: support-bundle-runtime-installer-test pico-usb-instal
 	$(Q)python3 -B ../scripts/tests/apache_privileged_network_policy_renderer_test.py
 
 .PHONY: gpio-line-resolver-test non-wspr-repeat-policy-test
+
+ifeq ($(shell uname -s),Linux)
+FLEET_TEST_CLOCK_FLAGS := -Wl,--wrap=adjtimex
+endif
+.PHONY: wtp-fleet-capacity-test
+$(BIN_DIR)/wtp_fleet_capacity_test: tests/wtp_fleet_capacity_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS) $(FLEET_TEST_CLOCK_FLAGS)
+# Requires network isolation: numeric loopback endpoints, production inhibited RF.
+wtp-fleet-capacity-test: $(BIN_DIR)/wtp_fleet_capacity_test
+	$(Q)./$(BIN_DIR)/wtp_fleet_capacity_test

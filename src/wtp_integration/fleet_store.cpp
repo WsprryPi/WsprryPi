@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "fleet_store.hpp"
+#include "fleet_limits.hpp"
 #include "fleet_schedule.hpp"
 #include "catalog.hpp"
 #include "wtp_settings_json.hpp"
@@ -25,7 +26,7 @@ WtpFleetStore::WtpFleetStore(std::string path, std::string self_id)
     : path_(std::move(path)), self_id_(std::move(self_id)) {}
 void WtpFleetStore::validate(const nlohmann::json& data, const std::string& self_id) {
     if (!data.is_object() || data.size() != 3 || data.at("version") != 1 ||
-        !data.at("assignments").is_array() || data.at("assignments").size() > 8 ||
+        !data.at("assignments").is_array() || data.at("assignments").size() > kMaximumFleetOutputs ||
         !data.at("removals").is_array() || data.at("removals").size() > 32)
         throw std::runtime_error("Invalid fleet assignment document");
     std::set<std::string> identities;
@@ -72,8 +73,8 @@ void WtpFleetStore::load() {
         struct Guard { int fd; ~Guard() { close(fd); } } guard{fd};
         struct stat info{};
         if (fstat(fd,&info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != geteuid() ||
-            (info.st_mode & 0077) != 0 || info.st_size > 131072)
-            throw std::runtime_error("Fleet assignments must be a private host-owned regular file under 128 KiB");
+            (info.st_mode & 0077) != 0 || info.st_size > static_cast<off_t>(kMaximumFleetFileBytes))
+            throw std::runtime_error("Fleet assignments must be a private host-owned regular file within the Fleet size limit");
         std::string bytes;
         std::array<char,4096> buffer{};
         for (;;) {
@@ -81,7 +82,7 @@ void WtpFleetStore::load() {
             if (n == 0) break;
             if (n < 0) { if (errno == EINTR) continue; throw std::runtime_error("Fleet assignment read failed"); }
             bytes.append(buffer.data(),static_cast<std::size_t>(n));
-            if (bytes.size() > 131072) throw std::runtime_error("Fleet assignments exceed size limit");
+            if (bytes.size() > kMaximumFleetFileBytes) throw std::runtime_error("Fleet assignments exceed size limit");
         }
         std::vector<std::set<std::string>> keys;
         data_ = nlohmann::json::parse(bytes,[&](int, nlohmann::json::parse_event_t e,nlohmann::json& v) {
@@ -96,12 +97,14 @@ void WtpFleetStore::load() {
     loaded_ = true;
 }
 void WtpFleetStore::save(const nlohmann::json& data) {
+    const auto bytes = data.dump(2) + "\n";
+    if (bytes.size() > kMaximumFleetFileBytes)
+        throw std::runtime_error("Fleet assignments exceed size limit");
     std::string pattern = path_ + ".tmp.XXXXXX";
     std::vector<char> filename(pattern.begin(),pattern.end()); filename.push_back(0);
     int fd = mkstemp(filename.data());
     if (fd < 0) throw std::runtime_error("Cannot create fleet assignment file");
     try {
-        const auto bytes = data.dump(2) + "\n";
         std::size_t offset = 0;
         while (offset < bytes.size()) {
             const auto n = write(fd,bytes.data()+offset,bytes.size()-offset);

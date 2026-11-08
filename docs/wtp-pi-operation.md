@@ -14,7 +14,7 @@ pinned for this implementation to `c13fc16819749e9b53a42609f31702c3aca9931c`.
 | WTP Server Enabled | Opens inbound Plain LAN inspection/control connections. |
 | Each output assignment Enabled | Runs that remote output's independent schedule. |
 
-A central Pi can keep its own schedule while managing zero through eight remote
+A central Pi can keep its own schedule while managing zero through 32 remote
 outputs. Inbound admission never makes an outbound assignment, and an outbound
 assignment never enables local transmission. The existing process singleton
 prevents a second normal WsprryPi process from bypassing the managed authority.
