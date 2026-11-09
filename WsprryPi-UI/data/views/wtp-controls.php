@@ -213,7 +213,7 @@
                 </div>
                 <div id="wtp-firmware-version-field" class="col-12 col-lg-4">
                     <label class="form-label" for="wtp-firmware-version">Firmware version</label>
-                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" value="1.0.0-rc.1" placeholder="1.0.0-rc.1" autocomplete="off" spellcheck="false">
+                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" value="1.0.0-rc.2" placeholder="1.0.0-rc.2" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3">
