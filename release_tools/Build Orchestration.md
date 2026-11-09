@@ -6,6 +6,24 @@ tags, upload assets or publish a release. The
 [release punchlist](Release%20Punchlist.md) governs selected release work and
 acceptance gates. Publication requires its own authorization.
 
+## Required release opening
+
+Begin every WsprryPi release body with an **Install or update** section before highlights, source identities or validation details. Include a copyable idempotent installer command and explain that rerunning it installs or updates from the selected channel, which may select a newer release. Use matching URL and environment branch selections.
+
+For current prereleases:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WsprryPi/WsprryPi/refs/heads/devel/scripts/install.sh | sudo env REPO_BRANCH=devel bash
+```
+
+For stable releases:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WsprryPi/WsprryPi/refs/heads/main/scripts/install.sh | sudo env REPO_BRANCH=main bash
+```
+
+Check the command against the current installer contract and release channel before publication. Verify that the published body retains these instructions at the top. Editing release prose does not change the release tag or retained artifact identities.
+
 ## Source and version identity
 
 Build a release candidate from a clean checkout at an accepted full commit.

@@ -384,6 +384,8 @@ When reporting validation:
 
 ## Documentation Requirements
 
+Every WsprryPi release body must begin with install/update instructions and a copyable idempotent installer command in the form `curl -fsSL <installer-url> | sudo env REPO_BRANCH=<branch> bash`. Use the matching installer URL and branch for the release channel (`devel` for current prereleases, `main` for stable releases). Explain that rerunning the command installs or updates from that channel and may select a newer release. Include this section before release highlights and verify it in the published release body.
+
 Review documentation impact for every user-visible or operator-facing change.
 
 Changes involving configuration, modes, timing, frequencies, scheduling, GPIO, transmitter backends, installation, services, logging, maintenance, or UI workflow should be presumed to require documentation review.
