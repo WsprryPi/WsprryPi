@@ -8,6 +8,8 @@ qualification limits remain in the [release evidence](4.0.0-Release-Evidence.md)
 
 Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
+Latest completed cycle: [WsprryPi 4.0 Beta 7](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.7), application source `3db74d7b5311d904a56f8b7ad0543bed4020e6df`, with published Pico RC.2 source `971f7bf9f8075d64ff086f777356bdd06c3d8b53` and unchanged published RP1 RC.2. All nine exact-source tag CI jobs, four executable exports, draft/public byte verification and four production installer-consumer checks passed. The [versioned manual](https://wsprry-pi.readthedocs.io/v4.0.0-beta.7-docs.1/Install/beta7.html) and [release evidence](4.0.0-Release-Evidence.md#beta-7-publication) record the selected cycle and retained qualification limits. Companion releases were reused, not republished. Final stable acceptance remains separate.
+
 <a id="saved-items"></a>
 
 ## Ordered backlog
