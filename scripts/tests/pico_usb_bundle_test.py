@@ -70,6 +70,14 @@ class DistributionTests(unittest.TestCase):
         code,result=entry.invoke(self.manifest,payload,['erase'])
         self.assertEqual(code,2);self.assertFalse(result['recovery_required'])
         self.assertIn('lacks full erase',result['error'])
+    def test_old_core_refuses_required_settings_compatibility_before_plan(self):
+        output=self.cache/('1'*32)
+        code,result=entry.invoke(self.manifest,self.payload,
+                                 ['plan','--output',str(output),'--require-control-sha256','a'*64])
+        self.assertEqual(code,2)
+        self.assertFalse(result['recovery_required'])
+        self.assertIn('cannot check settings compatibility',result['error'])
+        self.assertFalse(output.exists())
     def test_erase_retains_expired_host_backups_before_and_after_execution(self):
         identity=self.select();bucket=self.store.snapshot(self.state,identity);backups=[]
         for index in range(4):

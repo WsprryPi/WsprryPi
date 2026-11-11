@@ -59,6 +59,8 @@ inline bool settings(const Json &v) {
       (v["receiver"] == "qlg3" || uart(v["tx_gp"], true) < 0 ||
        uart(v["tx_gp"], true) != uart(v["rx_gp"]) || v["tx_gp"] == v["pps_gp"]))
     return false;
+  const auto &daylight = v["daylight"];
+  const bool gps_daylight = daylight == "day" || daylight == "night";
   if (!integer(v["utc_second_offset"], -1, 1) ||
       !integer(v["pps_offset_ns"], -500000000, 500000000) ||
       !integer(v["minimum_message_delay_ms"], 0, 1999) ||
@@ -71,11 +73,11 @@ inline bool settings(const Json &v) {
       !integer(v["position_maximum_age_s"], 1, 3600) ||
       !integer(v["calibration_maximum_age_s"], 10, 86400) ||
       (v["location"] != "manual" && v["location"] != "gps") ||
-      (v["daylight"] != "always" && v["daylight"] != "day" &&
-       v["daylight"] != "night"))
+      (!gps_daylight && daylight != "always" && daylight != "day_manual" &&
+       daylight != "night_manual"))
     return false;
   if (v["enabled"] == false &&
-      (v["location"] != "manual" || v["daylight"] != "always" ||
+      (v["location"] != "manual" || gps_daylight ||
        v["automatic_rf_calibration"] == true))
     return false;
   return v["automatic_rf_calibration"] == false ||

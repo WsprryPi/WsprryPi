@@ -3,6 +3,7 @@
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_integration/configuration.hpp"
+#include "wtp_integration/control_contract.hpp"
 #include "wtp_integration/target_runtime.hpp"
 #include "json.hpp"
 #include "wtp_integration/browser_api.hpp"
@@ -366,14 +367,20 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
       const std::string branch=input.value("branch",std::string("main"));
       if (branch!="main" && branch!="devel") return failure(400,"Select main or devel explicitly.");
       auto args=base;
-      args.insert(args.end(),{"plan","--branch",branch});
+      args.insert(args.end(),{"plan","--branch",branch,"--require-control-sha256",std::string(wsprrypi::control_schema_sha256)});
       if(input.contains("version")) args.insert(args.end(),{"--version",input.at("version").get<std::string>()});
       if(input.contains("stable")) { if(input.at("stable")!=true || input.contains("version")) return failure(400,"Select one image source."); args.push_back("--stable"); }
       const auto plan=wsprrypi::wtp_random_identity();
       const auto destination=std::filesystem::path("/var/cache/wsprrypi/pico-usb")/plan;
       args.insert(args.end(),{"--output",destination.string()});
       const bool started=task.start([args,plan] {
-        try { auto result=wsprrypi::pico_usb_installer_process(args); result["plan_id"]=plan; return result; }
+        try {
+          auto result=wsprrypi::pico_usb_installer_process(args);
+          if (result.value("ok",false) && result.value("control_schema_sha256","")!=wsprrypi::control_schema_sha256)
+            throw std::runtime_error("Pico settings compatibility could not be confirmed. Check an image with the current installer.");
+          result["plan_id"]=plan;
+          return result;
+        }
         catch(const std::exception& error) { return json{{"ok",false},{"error",error.what()},{"recovery_required",false}}; }
       },{{"operation","plan"},{"plan_id",plan},{"branch",branch},{"bound_serial",serial},
          {"bound_device",identity->device_id},{"bound_selection",selection}});
@@ -396,7 +403,9 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
       if (!identity || planned.value("running",false) || planned.value("operation","")!="plan" ||
           planned.value("plan_id","")!=plan || planned.value("bound_serial","")!=serial ||
           planned.value("bound_device","")!=identity->device_id || planned.value("bound_selection","")!=selection ||
-          !planned.at("result").value("ok",false) || wsprrypi::pico_usb_update_blocked(serial))
+          !planned.at("result").value("ok",false) ||
+          planned.at("result").value("control_schema_sha256","")!=wsprrypi::control_schema_sha256 ||
+          wsprrypi::pico_usb_update_blocked(serial))
         return failure(409,"Download and review a fresh plan for this selected USB Pico.");
       branch=planned.at("branch").get<std::string>(); expected=planned.at("result");
       expected["device_id"]=identity->device_id; expected["plan_id"]=plan; expected["serial"]=serial;
@@ -429,7 +438,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
           auto args=base;
           if(action=="recover") args.insert(args.end(),{"recover","--transaction",expected.at("transaction").get<std::string>()});
           else if(erasing) args.push_back("erase");
-          else args.insert(args.end(),{"upgrade","--branch",branch,"--bundle",bundle.string()});
+          else args.insert(args.end(),{"upgrade","--branch",branch,"--bundle",bundle.string(),
+                                       "--require-control-sha256",std::string(wsprrypi::control_schema_sha256)});
           args.insert(args.end(),{"--device",serial,"--board","pico2_w","--yes","--state-dir","/var/lib/wsprrypi/pico-usb"});
           result=wsprrypi::pico_usb_installer_process(args);
         }

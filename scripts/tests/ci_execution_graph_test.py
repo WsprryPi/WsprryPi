@@ -4,6 +4,7 @@ import collections
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import re
@@ -129,6 +130,19 @@ class OwnedGitTests(unittest.TestCase):
 
 
 class SourceIdentityTests(unittest.TestCase):
+    def test_default_requires_committed_contract_provenance(self):
+        provenance = self.root / 'provenance.json'
+        output = self.root / 'output'
+        sha = self.git('rev-parse', 'HEAD')
+        for revision, dirty in ((sha, True), ('devel', False), (None, False), (sha, None)):
+            with self.subTest(revision=revision, dirty=dirty):
+                provenance.write_text(json.dumps(dict(source_base_revision=revision, source_uncommitted=dirty)))
+                self.assertNotEqual(self.select('paired', provenance, GITHUB_OUTPUT=str(output)).returncode, 0)
+                self.assertFalse(output.exists())
+        provenance.write_text(json.dumps(dict(source_base_revision=sha, source_uncommitted=False)))
+        self.assertEqual(self.select('paired', provenance, GITHUB_OUTPUT=str(output)).returncode, 0)
+        self.assertEqual(output.read_text(), f'pico_ref={sha}\n')
+
     def test_source_dispatch_rejects_echo_and_preserves_argument_meaning(self):
         self.assertEqual(source_arguments({'run': 'python3 -B ./scripts/ci/selected_source.py require "${PICO_SHA}"'}), ['require', '$PICO_SHA'])
         for command in ('echo verify "$PICO_SHA" repo', 'true record repo', 'python3 -c "verify"'):
@@ -222,6 +236,7 @@ class SourceIdentityTests(unittest.TestCase):
         self.assertEqual(reference(resolver['outputs']['pico_sha']), ('steps', 'pico-output', 'outputs', 'pico_sha'))
         selected = [s for s in resolver['steps'] if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico']
         self.assertEqual(len(selected), 1)
+        self.assertEqual(reference(selected[0]['with']['ref']), ('steps', 'requested-pico', 'outputs', 'pico_ref'))
         self.assertFalse(selected[0].get('continue-on-error', False))
         recorder = next(s for s in resolver['steps'] if s.get('id') == 'pico-output')
         self.assertEqual(source_arguments(recorder), ['record', selected[0]['with']['path']])

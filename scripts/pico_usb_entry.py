@@ -48,6 +48,11 @@ def invoke(manifest,payload,arguments):
     exec(compile(payload['usb_installer.py'],module.__file__,'exec'),module.__dict__)
     if module.INSTALLER_VERSION != manifest['installer_version']:
         raise ValueError('Shared installer version differs from its receipt')
+    if '--require-control-sha256' in arguments and not callable(getattr(module,'admit_control_schema',None)):
+        return 2,{'schema':'wsprrypico-usb-result/1','installer_version':manifest['installer_version'],
+                  'installer_contract':1,'installer_source':manifest['source'],'ok':False,
+                  'recovery_required':False,
+                  'error':'The retained Pico installer cannot check settings compatibility. Update the shared installer and check the image again.'}
     if arguments[0] == 'erase' and not callable(getattr(module,'erase_transaction',None)):
         return 2,{'schema':'wsprrypico-usb-result/1','installer_version':manifest['installer_version'],
                   'installer_contract':1,'installer_source':manifest['source'],'ok':False,'operation':'erase',

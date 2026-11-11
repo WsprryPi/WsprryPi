@@ -13,6 +13,10 @@
     const retryAt = () => state?.result?.error_code === "github_rate_limited" && Number.isSafeInteger(state.result.retry_at)
         && state.result.retry_at > 0 && state.result.retry_at <= 4102444800 ? state.result.retry_at * 1000 : 0;
     const cancelPoll = () => { root.clearTimeout(timer); timer = null; };
+    const imageSelected = () => ['latest','stable'].includes(el("source").value) ||
+        el("source").value === "version" && el("version").value.trim().replace(/^v/, "").length > 0;
+    const planInstallable = () => imageSelected() && !imageEdited && state?.operation === "plan" &&
+        state.result?.ok === true && state.maintenance !== true;
     function schedulePoll(delay = state?.running ? 1500 : 3000) {
         if (!available || closed || busy || timer !== null) return;
         timer = root.setTimeout(() => { timer = null; return perform("read", true); }, delay);
@@ -62,8 +66,8 @@
         el("version-field").hidden = el("source").value !== "version";
         el("read").disabled = busy || !available;
         el("read").textContent = reading ? "Reading status…" : "Read firmware status";
-        el("plan").disabled = busy || locked || retryAt() > Date.now() || !available || !state?.selection_id || state?.maintenance === true;
-        el("upgrade").disabled = busy || locked || imageEdited || !available || state?.operation !== "plan" || state?.result?.ok !== true || state?.maintenance === true;
+        el("plan").disabled = busy || locked || retryAt() > Date.now() || !available || !state?.selection_id || state?.maintenance === true || !imageSelected();
+        el("upgrade").disabled = busy || locked || !available || !planInstallable();
         el("erase").disabled = busy || locked || !available || !state?.selection_id || !state?.device_id || state?.maintenance === true;
         el("recover").hidden = state?.maintenance !== true;
         el("recover").disabled = busy || locked || !available || !state?.recovery_plan_id;
@@ -108,7 +112,8 @@
         return value;
     }
     async function perform(action, automatic = false) {
-        if (!available || closed || busy || action === "plan" && retryAt() > Date.now() || (action !== "read" && (uncertain || state?.running))) return;
+        if (!available || closed || busy || action === "plan" && (retryAt() > Date.now() || !imageSelected()) || (action !== "read" && (uncertain || state?.running))) return;
+        if (action === "upgrade" && !planInstallable()) return;
         if (action === "erase" || action === "recover" && erasing()) {
             if (!state?.selection_id || !state?.serial || action === "erase" && (!state.device_id || state.maintenance)) return;
             if (!root.confirm(`${action === "erase" ? "Prepare full erase of" : "Erase ALL firmware and saved data on"} USB Pico ${state.serial}? This deletes Wi-Fi passwords, certificates, Bluetooth bonds and all persistent data from the entire flash. No backup is created. Existing host backups are retained. ${action === "erase" ? "Disable its saved standalone schedule first. You will be asked to reconnect while holding BOOTSEL, then explicitly continue the erase." : "This cannot be undone. Keep USB connected until all flash is verified blank."}`)) return;
@@ -170,6 +175,7 @@
         if (!el("")) return;
         for (const action of ["read","plan","upgrade","recover","erase"]) el(action).addEventListener("click", () => perform(action));
         for (const name of ["branch","source","version"]) el(name).addEventListener("change", invalidate);
+        el("version").addEventListener("input", invalidate);
         root.WtpFirmware = {setAvailability(value, member = "", selection = "", serial = "") {
             const changed = (boundMember && member && boundMember !== member) || (boundSelection && selection && boundSelection !== selection);
             if ((available && !value) || changed) {

@@ -44,6 +44,7 @@ async function main() {
         ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'chromium'), args: ['--headless', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', "about:blank"], profile: profileDir, timeoutMs: 60000, expectedDialogs: [
             "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
             "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?",
+            "Review the current saved beacon schedule beside your draft. Save the draft using the fresh revision?",
             "Review saved progress beside your preserved draft. Send one new explicit change using this fresh read?",
             "Replace these station drafts with this Pico's saved progress?"
         ]}));
@@ -164,6 +165,13 @@ async function main() {
                 if (String(url).endsWith('/network')) return {ok:true,headers:{get:()=> '\"network-r1\"'},json:async()=>({enabled:true,ipv4:'192.0.2.27',configured_hostname:window.__snapshot.network.hostname,advertised_hostname:window.__discoveryState==='active'?window.__snapshot.network.hostname:'',mdns_state:window.__discoveryState,mdns_reason:window.__discoveryState==='conflict'?'name_conflict':''})};
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
                 if (String(url).endsWith('/member/configuration')) {
+                    if (window.__beacon) {
+                        const target=window.__resourceFixtures.loaded.target;
+                        if (options.method==='POST') window.__beacon.gps=JSON.parse(options.body).config.gps;
+                        const config=window.__beacon.gps?{gps:window.__beacon.gps}:{};
+                        return {ok:true,headers:{get:()=>window.__beacon.stale?'"other-revision"':'"resource-r1"'},
+                            json:async()=>({contract:'Wsprry-Control/1',schema:'pico-settings',target,reboot_required:false,config})};
+                    }
                     if (options.method === 'POST' && window.__mutationFailure) return {ok:false,status:window.__mutationFailure==='unsupported'?409:503,json:async()=>({error:{code:window.__mutationFailure==='unsupported'?'unsupported_configuration_updates':'management_outcome_unknown'}})};
                     return {ok:true,headers:{get:()=> '\"remote-r1\"'},json:async()=>({schema:'pico-settings',target:{scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)},update_strategy:'merge',reboot_required:false,config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
                 }
@@ -335,6 +343,38 @@ async function main() {
                 await waitFor(async()=>await evaluate('document.getElementById("wtp-member-pin-feedback").textContent.includes("Preview only")'),'pin preview');
                 assert.equal(await evaluate('window.__requests.filter(r=>r.options.method==="PUT").length'),before);
                 assert.equal(await evaluate('document.getElementById("wtp-member-hardware-save").disabled'),false);
+                const mutations = 'window.__requests.filter(r=>r.url.endsWith("/member/configuration") && r.options.method==="POST")';
+                const saves = await evaluate(`${mutations}.length`);
+                await evaluate(`(()=>{
+                    window.__beacon={stale:true};
+                    const set=(field,value)=>{field.value=value;field.dispatchEvent(new Event('change',{bubbles:true}));};
+                    set(document.querySelector('#wtp-gps-controls [data-gps="receiver"]'),'e108');
+                    set(document.getElementById('wtp-member-button'),'');
+                    document.getElementById('wtp-remote-password').value='pending-network-password';
+                    set(document.querySelector('#wtp-member-beacon-controls [data-gps="daylight"]'),'day_manual');
+                    document.getElementById('wtp-member-beacon-save').click();
+                })()`);
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-member-beacon-feedback").textContent.includes("changed")'),'stale beacon revision');
+                assert.equal(await evaluate(`${mutations}.length`),saves);
+                await evaluate(`window.__beacon.stale=false;document.getElementById('wtp-member-load').click()`);
+                await waitFor(async()=>await evaluate('!document.getElementById("wtp-member-beacon-save").disabled'),'beacon loaded for review');
+                assert.match(await evaluate('document.getElementById("wtp-member-beacon-saved").textContent'),/Saved: 24 hours. Your draft is preserved./);
+                for(const [name,width,height] of [['desktop',1280,900],['mobile',390,844]]) {
+                    await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
+                    await evaluate(`document.getElementById('wtp-member-beacon-controls').scrollIntoView({block:'center',behavior:'instant'})`);
+                    await client.settleRendering();
+                    await capture(`beacon-${name}.png`);
+                    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+                }
+                await evaluate("document.getElementById('wtp-member-beacon-save').click()");
+                await waitFor(async()=>await evaluate('document.getElementById("wtp-member-beacon-feedback").textContent.includes("Beacon schedule saved")'),'isolated beacon save');
+                assert.equal(await evaluate(`${mutations}.length`),saves+1);
+                assert.deepEqual(await evaluate(`JSON.parse(${mutations}.at(-1).options.body).config`),
+                    await evaluate("({gps:{...WsprryGps.defaults,daylight:'day_manual'}})"));
+                assert.equal(await evaluate("document.querySelector('#wtp-gps-controls [data-gps=receiver]').value"),'e108');
+                assert.equal(await evaluate("document.getElementById('wtp-member-button').value"),'');
+                assert.equal(await evaluate("document.getElementById('wtp-remote-password').value"),'pending-network-password');
+                await evaluate("delete window.__beacon;document.getElementById('wtp-remote-password').value=''");
             }
             if(state==='consumer') {
                 assert.equal(resourceFixtures.consumer.profile_owned_station,false,'current consumer connection permits live station edits');

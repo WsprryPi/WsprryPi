@@ -219,7 +219,7 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
       }
     }
     const std::pair<const char*,std::uint64_t> ceilings[] = {
-      {"http_body",32768},{"consumer_plaintext",32724},{"config",1800},{"update",2048},
+      {"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},
       {"login_ms",60000},{"idle_ms",86400000},{"absolute_ms",86400000},
       {"consumer_sessions",16},{"consumer_pending_logins",16}};
     if (!j["limits"].is_object() || j["limits"].size()!=std::size(ceilings)) return false;

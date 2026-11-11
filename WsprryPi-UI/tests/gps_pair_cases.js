@@ -30,7 +30,8 @@ module.exports=async request=>{
  let before=await read();
  for(const bad of [{...settings,tx_gp:0},{...settings,baud:4800},{...settings,automatic_rf_calibration:true},
      {...settings,pps_gp:rx},{...settings,pps_gp:[...used][0]},{...settings,pps_offset_ns:500000001},
-     {...settings,receiver_uncertainty_us:'100'},{...settings,extra:true}]) {
+     {...settings,receiver_uncertainty_us:'100'},{...settings,extra:true},
+     {...gps.defaults,daylight:'night'},{...gps.defaults,daylight:'twilight'}]) {
   const refused=await save({gps:bad},before.etag);assert.equal(refused.status,400,JSON.stringify(refused));
   const after=await read();assert.equal(after.etag,before.etag);assert.deepEqual(after.body.config,before.body.config);
  }
@@ -38,6 +39,13 @@ module.exports=async request=>{
  assert.equal((await save({gps:settings},before.etag,{...target,boot_id:'f'.repeat(32)})).status,409);
  assert.equal((await save({gps:settings},before.etag,target,'Wsprry-Control/2')).status,409);
  assert.equal((await read()).etag,before.etag);
+ for(const daylight of ['day_manual','night_manual']) {
+  const manual={...gps.defaults,daylight};
+  const selected=await save({gps:manual},before.etag);assert.equal(selected.status,200,JSON.stringify(selected));
+  const readback=await get();assert.equal(readback.status,200,JSON.stringify(readback));
+  assert(gps.readback(readback.body,target));assert.deepEqual(readback.body.saved,manual);
+  before=await read();
+ }
  const saved=await save({gps:settings},before.etag);assert.equal(saved.status,200,JSON.stringify(saved));
  assert.deepEqual(saved.body.config.gps,settings);
  let active=await get();assert.equal(active.status,200,JSON.stringify(active));

@@ -209,11 +209,12 @@
                 </div>
                 <div class="col-12 col-lg-4">
                     <label class="form-label" for="wtp-firmware-source">Image selection</label>
-                    <select id="wtp-firmware-source" class="form-select"><option value="latest">Latest verified CI image</option><option value="version" selected>Specific version</option><option value="stable">Stable release</option></select>
+                    <select id="wtp-firmware-source" class="form-select" aria-describedby="wtp-firmware-selection-help"><option value="" selected disabled>Choose an image source</option><option value="latest">Latest verified CI image</option><option value="version">Specific version</option><option value="stable">Stable release</option></select>
+                    <small class="form-text" id="wtp-firmware-selection-help">The image check requires firmware that matches this WsprryPi build’s settings contract.</small>
                 </div>
                 <div id="wtp-firmware-version-field" class="col-12 col-lg-4">
                     <label class="form-label" for="wtp-firmware-version">Firmware version</label>
-                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" value="1.0.0-rc.2" placeholder="1.0.0-rc.2" autocomplete="off" spellcheck="false">
+                    <input id="wtp-firmware-version" class="form-control" type="text" maxlength="80" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3">
@@ -385,6 +386,12 @@
                     <button type="button" class="btn btn-outline-primary" id="wtp-member-station-save" disabled>Save member station</button>
                 </details>
                 <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
+                <div class="mt-3">
+                    <div class="row g-3" id="wtp-member-beacon-controls"></div>
+                    <p class="form-text mt-0" id="wtp-member-beacon-saved">Load member resources to read the saved schedule.</p>
+                    <button type="button" class="btn btn-outline-primary" id="wtp-member-beacon-save" disabled>Save beacon schedule</button>
+                    <p class="form-text mt-2" id="wtp-member-beacon-feedback" role="status"></p>
+                </div>
                 <details id="wtp-hardware-settings" class="mt-4">
                 <summary class="cw-control-section__title">RF output, GPS, and pins</summary>
                 <p class="form-text" id="wtp-member-pin-hint">Pico GP numbering. Direct PIO output, active-low button and indicator are supported. Button actions require the member's button adapter to be enabled. Changes are saved for restart; saving does not change physical routing or enable RF. Pin selection does not establish RF qualification.</p>

@@ -28,7 +28,7 @@ Json management() {
   Json carriers=Json::array();for(const auto name:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"}) carriers.push_back({{"carrier",name},{"built_in",true},{"available",true}});
   return {{"contract","Wsprry-Control/1"},{"schema","management"},{"target",target},{"profile","engineering"},{"preclock",true},{"profile_generation",nullptr},{"selected","engineering_mtls"},{"carriers",carriers},{"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
     {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},{"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
-    {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",1800},{"update",2048},{"login_ms",30000},{"idle_ms",1800000},{"absolute_ms",28800000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
+    {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},{"login_ms",30000},{"idle_ms",1800000},{"absolute_ms",28800000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
 }
 std::string document(Json value) { if(!value.contains("contract"))value["contract"]="Wsprry-Control/1";return value.dump(); }
 struct Member {
@@ -37,9 +37,11 @@ struct Member {
   Json job{{"boot_id", boot}, {"output_active", false}, {"owner_id", nullptr}, {"state", "empty"}};
   std::string revision = "\"r1\"", malformed;
   unsigned mutations = 0, reads = 0;
+  unsigned management_config_limit = 4096;
   bool race = false, drop = false, bad_reply = false;
   std::function<void(Json &)> corrupt_application;
   Json emitted;
+  Json confirmed_config;
   std::string resource, method;
   Member() {
     config["pins"] = {{"engine","direct"},{"rf_gp",28},{"i2c_pair",nullptr},{"button_gp",14},
@@ -50,7 +52,7 @@ struct Member {
   }
   void modern() {
     caps["configuration_updates"] = {{"schema", "config-update"}, {"path", "/api/control/v1/config/update"},
-        {"method", "POST"}, {"modes", {"merge"}}, {"max_update_bytes", 2048}, {"max_config_bytes", 1800}};
+        {"method", "POST"}, {"modes", {"merge"}}, {"max_update_bytes", 2048}, {"max_config_bytes", 4096}};
     caps["application_resources"] = {{"schema","application"},{"read","/api/control/v1/application"},
         {"station","/api/control/v1/station"},{"hardware","/api/control/v1/hardware"},
         {"config","/api/control/v1/config"},{"update","/api/control/v1/config/update"}};
@@ -64,10 +66,13 @@ struct Member {
       CHECK(etag == revision);
       if(config.is_null()) return {400,R"({"error":{"code":"invalid_configuration"}})",{}};
       if (drop) return {503, R"({"error":{"code":"management_outcome_unknown"}})", {}};
-      return {200, bad_reply ? "{}" : document(Json{{"config", config}, {"reboot_required", false}}), "\"r2\""};
+      return {200, bad_reply ? "{}" : document(Json{{"config", confirmed_config.is_null()?config:confirmed_config}, {"reboot_required", false}}), "\"r2\""};
     }
     ++reads;
-    if (path == "management") return {200,management().dump(),{}};
+    if (path == "management") {
+      auto value=management();value["limits"]["config"]=management_config_limit;
+      return {200,value.dump(),{}};
+    }
     if (path == "capabilities") return {200, document(caps), {}};
     if (path == "status") return {200, document(Json{{"job", job}}), {}};
     if (path == "application") {
@@ -83,7 +88,7 @@ struct Member {
           {"recurrence", {{"authority", "member"}, {"enabled", false}, {"suspended", false}, {"expires_utc_s", "0"},
               {"schedules", schedules}, {"schedule_dial_frequency_nhz", "3568600000000000"}}},
           {"capabilities", {{"application_read", true},
-              {"station_write", true}, {"hardware_write", true}, {"max_update_bytes", 1024}, {"max_config_bytes", 1800},
+              {"station_write", true}, {"hardware_write", true}, {"max_update_bytes", 1024}, {"max_config_bytes", 4096},
               {"hardware_activation", "restart"}, {"station_encoding", "wspr_type1"}, {"station_power_meaning", "reported_wspr_dbm"},
               {"recurrence_authorities", {"member"}}, {"autonomous_modes", {"wspr"}}, {"unavailable", Json::array()}}}};
       if (path == "application") {
@@ -108,6 +113,72 @@ struct Member {
     return pico_configuration_request([&](auto p, auto m, auto b, auto e) { return exchange(p,m,b,e); }, device, boot, "POST", body, etag);
   }
 };
+void configuration_limit_checks() {
+  Member bounded;
+  bounded.caps["configuration_updates"]["max_config_bytes"]=128;
+  auto refused=bounded.call();
+  CHECK(refused.status==413 && bounded.mutations==0);
+  CHECK(Json::parse(refused.body)["error"]["code"]=="configuration_too_large");
+  CHECK(Json::parse(refused.body)["mutation_attempted"]==false);
+  Member management_bound;
+  management_bound.management_config_limit=128;
+  CHECK(management_bound.call().status==413 && management_bound.mutations==0);
+  Member application_bound;
+  application_bound.corrupt_application=[](Json &value){value["capabilities"]["max_config_bytes"]=128;};
+  CHECK(application_bound.call().status==413 && application_bound.mutations==0);
+
+  // Exercise growth, shrinking nested leaves, sentinels, escaping and arrays.
+  for(unsigned variant=0;variant<7;++variant) {
+    Member baseline;
+    baseline.config["wifi"]["ssid"]=std::string(32,'s');
+    Json patch,proposed=baseline.config;
+    if(variant==0) {
+      patch={{"station",{{"callsign","WB0ABC/VE7"}}}};
+      proposed["station"]["callsign"]="WB0ABC/VE7";
+    } else if(variant==1) {
+      patch={{"wifi",{{"ssid","x"}}}};
+      proposed["wifi"]["ssid"]="x";
+    } else if(variant==2) {
+      patch={{"station",{{"power_dbm",0}}}};
+      proposed["station"]["power_dbm"]=0;
+    } else if(variant==3) {
+      patch={{"wifi",{{"password",nullptr}}}};
+    } else if(variant==4) {
+      patch={{"wifi",{{"password",std::string(12,'\\')}}}};
+      proposed["wifi"]["password"]=std::string(12,'\\');
+    } else if(variant==5) {
+      baseline.config["schedules"]=Json::array({
+        {{"period_s",240},{"phase_s",0}},{{"period_s",240},{"phase_s",120}}});
+      proposed=baseline.config;
+      proposed["schedules"]=Json::array({{{"period_s",600},{"phase_s",0}}});
+      patch={{"schedules",proposed["schedules"]}};
+    } else {
+      patch={{"pins",baseline.config["pins"]}};
+      patch["pins"].erase("amplifier_active_high");
+    }
+    const auto bytes=proposed.dump().size();
+    for(const auto limit:{bytes-1,bytes,bytes+1}) {
+      Member peer;
+      peer.config=baseline.config;
+      peer.confirmed_config=proposed;
+      if(variant==4)peer.confirmed_config["wifi"]["password"]=nullptr;
+      peer.caps["configuration_updates"]["max_config_bytes"]=limit;
+      const auto result=peer.call(patch);
+      CHECK(result.status==(limit<bytes?413:200));
+      CHECK(peer.mutations==(limit<bytes?0U:1U));
+      if(limit>=bytes)CHECK(peer.emitted["config"]==patch);
+    }
+  }
+  Member bad_ack;
+  bad_ack.caps["configuration_updates"]["max_config_bytes"]=bad_ack.config.dump().size();
+  bad_ack.confirmed_config=bad_ack.config;
+  bad_ack.confirmed_config["wifi"]["ssid"]="a longer saved network name";
+  const auto result=bad_ack.call();
+  CHECK(result.status==502 && bad_ack.mutations==1);
+  CHECK(Json::parse(result.body)["error"]["code"]=="management_outcome_unknown");
+  CHECK(Json::parse(result.body)["mutation_attempted"]==true);
+  std::cout<<"Complete configuration limits: pre-dispatch refusal, exact boundaries, nested merges, password sentinel, arrays and oversized acknowledgment passed\n";
+}
 void checks() {
   Member old;old.caps.erase("configuration_updates");
   CHECK(old.call().status!=200 && old.mutations==0);
@@ -339,6 +410,36 @@ void advertised_policy_checks() {
 }
 void gps_resource_binding_checks() {
   const auto active=Json::parse(R"({"enabled":true,"receiver":"qlg3","rx_gp":1,"pps_gp":3,"tx_gp":null,"baud":9600,"pps_active_high":true,"pairing_qualified":true,"utc_second_offset":0,"pps_offset_ns":0,"minimum_message_delay_ms":0,"maximum_message_delay_ms":800,"receiver_uncertainty_us":100,"capture_uncertainty_us":100,"location":"manual","position_maximum_age_s":30,"automatic_rf_calibration":false,"calibration_maximum_age_s":3600,"daylight":"always"})");
+  Member large;
+  large.config["gps"]=active;
+  large.config["gps"]["enabled"]=false;
+  large.config["gps"]["pairing_qualified"]=false;
+  large.config["gps"]["daylight"]="night_manual";
+  large.config["si5351"]=Json::parse(R"({"reference_hz":25000000,"reference_source":"external_xa","crystal_load_pf":null,"address":96,"drive_ma":8,"transmit_output":0,"loopback_output":2,"loopback_input_gp":7,"rf_gate_gp":null,"rf_gate_active_high":false,"reference_use":"measurement_only","trusted_uncertainty_ppb":null,"manual_correction_ppb":-100000,"automatic_calibration":false})");
+  large.config["wifi"]["ssid"]=std::string(32,'"');
+  large.config["wifi"]["ntp_ipv4"]=std::string(63,'a')+"."+std::string(63,'b')+"."+
+      std::string(63,'c')+"."+std::string(61,'d');
+  large.config["schedules"]=Json::array();
+  for(unsigned i=0;i<8;++i)large.config["schedules"].push_back({{"period_s",86400},{"phase_s",(712+i)*120}});
+  CHECK(large.config.dump().size()>1800 && large.config.dump().size()<=4096);
+  const auto large_result=pico_configuration_request(
+    [&](auto p,auto m,auto b,auto e){return large.exchange(p,m,b,e);},
+    device,boot,"GET","","");
+  CHECK(large_result.status==200 && large.mutations==0);
+  CHECK(Json::parse(large_result.body)["config"]==large.config);
+  Member cleared;
+  cleared.config=large.config;
+  cleared.confirmed_config=cleared.config;
+  cleared.confirmed_config.erase("gps");
+  cleared.confirmed_config.erase("si5351");
+  const auto cleared_bytes=cleared.confirmed_config.dump().size();
+  cleared.caps["configuration_updates"]["max_config_bytes"]=cleared_bytes;
+  const auto clearing=cleared.call({{"gps",nullptr},{"si5351",nullptr}});
+  CHECK(clearing.status==200 && cleared.mutations==1);
+  CHECK(cleared.emitted["config"]["gps"].is_null() && cleared.emitted["config"]["si5351"].is_null());
+  Member beyond; beyond.config=large.config;
+  beyond.caps["configuration_updates"]["max_config_bytes"]=4097;
+  CHECK(beyond.call().status==409 && beyond.mutations==0);
   const auto runtime=Json::parse(R"({"serial_present":true,"pps_present":true,"time_valid":true,"position_valid":true,"satellites":8,"observation_raw_ns":"2000000000","age_ns":"0","position":{"latitude_e7":390000000,"longitude_e7":-940000000,"locator":"EM39AA","observed_raw_ns":"2000000000","age_ns":"0"},"candidate_utc_ns":"1793620802000000000","candidate_raw_ns":"2100000000","candidate_pps_raw_ns":"2000000000","observations":1,"rejected_sentences":0,"dropped":0,"uart_errors":0,"irq_latency_ns":"4000","maximum_irq_latency_ns":"6000","capture_error_bound_ns":"8000","capture_rejections":0,"error":"","timer_calibration":null,"synthesizer_calibration":null})");
   const Json valid{{"schema","gps"},{"target",target},{"saved",active},{"boot_active",active},
     {"pending_restart",false},{"storage_healthy",true},{"runtime",runtime}};
@@ -524,7 +625,7 @@ void usb_management_contract() {
     {"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
     {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},
       {"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
-    {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",1800},{"update",2048},
+    {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},
       {"login_ms",30000},{"idle_ms",300000},{"absolute_ms",900000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
   for(const auto carrier:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"})
     contract["carriers"].push_back({{"carrier",carrier},{"built_in",true},{"available",std::string(carrier)=="usb_physical"}});
@@ -657,4 +758,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); advertised_policy_checks(); gps_resource_binding_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); configuration_limit_checks(); advertised_policy_checks(); gps_resource_binding_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }

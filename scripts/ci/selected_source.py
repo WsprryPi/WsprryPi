@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Record and verify the single Pico commit selected for a validation run."""
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -53,9 +54,16 @@ def git(*arguments, watchdog=30):
 
 
 def require_sha(value):
-    if not re.fullmatch(r"[0-9a-f]{40}", value) or value == "0" * 40:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value) or value == "0" * 40:
         raise ValueError("stage=source-selection; expected=one immutable nonzero commit SHA")
     return value
+
+
+def paired_revision(provenance):
+    document = json.loads(Path(provenance).read_text(encoding="utf-8"))
+    if not isinstance(document, dict) or document.get("source_uncommitted") is not False:
+        raise ValueError("stage=source-selection; generate the Pi contract from a committed Pico candidate")
+    return require_sha(document.get("source_base_revision"))
 
 
 def head(repository):
@@ -69,7 +77,7 @@ def head(repository):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
-    parser.add_argument("operation", choices=("selection", "record", "require", "verify"))
+    parser.add_argument("operation", choices=("selection", "paired", "record", "require", "verify"))
     parser.add_argument("value")
     parser.add_argument("repository", nargs="?")
     args = parser.parse_args()
@@ -82,6 +90,10 @@ def main():
             git("check-ref-format", "--allow-onelevel", args.value)
         elif args.operation == "require":
             require_sha(args.value)
+        elif args.operation == "paired":
+            sha = paired_revision(args.value)
+            with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+                output.write(f"pico_ref={sha}\n")
         elif args.operation == "record":
             sha = head(args.value)
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:

@@ -15,6 +15,31 @@ module.exports=async call=>{
  };
  const initial=await get('gpio-drive');assert.equal(initial.status,200,JSON.stringify(initial));
  const target=initial.body.target;
+ const priorConfig=await get('configuration');
+ assert.equal(priorConfig.status,200,JSON.stringify(priorConfig));
+ for(const [resource,pointer] of [
+   ['capabilities','/configuration_updates/max_config_bytes'],
+   ['management','/limits/config'],
+   ['application','/capabilities/max_config_bytes']]) {
+  try {
+   await call({control:'corrupt',corruption:{resource,pointer,value:128}});
+   const context=await get('configuration');
+   assert.equal(context.status,200,JSON.stringify(context));
+   const result=await call({method:'POST',path:prefix+'configuration',revision:context.etag,
+    body:JSON.stringify({contract:'Wsprry-Control/1',schema:'pico-settings',target,
+     operation:'save',config:{enabled:context.body.config.enabled}})});
+   assert.equal(result.status,413,JSON.stringify(result));
+   assert.equal(result.body.error.code,'configuration_too_large');
+   assert.equal(result.body.mutation_attempted,false);
+   assert(Array.isArray(result.exchanges));
+   assert.equal(result.exchanges.filter(entry=>entry.method!=='GET').length,0,
+    resource+' configuration bound must refuse before dispatch');
+  } finally {await clear();}
+  const after=await get('configuration');
+  assert.equal(after.etag,priorConfig.etag);
+  assert.deepEqual(after.body.config,priorConfig.body.config);
+ }
+ console.log('Configuration limits: all three advertised bounds refuse before any production carrier write; saved config and revision preserved');
  const setDrive=async value=>{
   const r=await get('gpio-drive');assert.equal(r.status,200,JSON.stringify(r));
   const saved=await call({method:'PUT',path:prefix+'gpio-drive',revision:r.etag,body:JSON.stringify({contract:'Wsprry-Control/1',schema:'gpio-drive',target,gpio_drive_ma:value})});

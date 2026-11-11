@@ -158,22 +158,26 @@ async function main() {
         })()`);
         await waitFor(async()=>await evaluate("getComputedStyle(document.getElementById('fleet-pane')).opacity==='1'"),"Fleet tab transition");
         assert.equal(await evaluate("document.getElementById('wtp-firmware-branch').value"),"main");
-        assert.equal(await evaluate("document.getElementById('wtp-firmware-source').value"),"version");
-        assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.2");
-        assert.equal(await evaluate("document.getElementById('wtp-firmware-version-field').hidden"),false);
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-source').value"),"");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-version-field').hidden"),true);
         await evaluate(`document.getElementById('wtp-firmware-read').click()`);
-        await waitFor(async()=>await evaluate("!document.getElementById('wtp-firmware-plan').disabled"),"firmware plan available");
+        await waitFor(async()=>await evaluate("document.getElementById('wtp-firmware-read-status').textContent.includes('Status read at')"),"firmware status read");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-plan').disabled"),true);
         for (const [name,width,height] of [["desktop",1440,1100],["mobile",390,844]]) {
             await client.send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:name==="mobile"});
             for (const theme of ["light","dark"]) {
                 await evaluate(`(async()=>{applyThemePreference('${theme}');await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));document.getElementById('wtp-firmware').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy(0,-110);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`);
-                await waitFor(async()=>await evaluate("(()=>{const r=document.getElementById('wtp-firmware-version').getBoundingClientRect();return r.top>110 && r.bottom<innerHeight-40;})()"),"firmware default visible in capture");
-                assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.2");
+                await waitFor(async()=>await evaluate("(()=>{const r=document.getElementById('wtp-firmware-source').getBoundingClientRect();return r.top>110 && r.bottom<innerHeight-40;})()"),"firmware source visible in capture");
+                assert.equal(await evaluate("document.getElementById('wtp-firmware-source').value"),"");
                 assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${name}/${theme} firmware default fits`);
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});
                 fs.writeFileSync(path.join(output,`default-${name}-${theme}.png`),Buffer.from(shot.data,"base64"));
             }
         }
+        await evaluate("document.getElementById('wtp-firmware-source').value='version';document.getElementById('wtp-firmware-source').dispatchEvent(new Event('change'))");
+        assert.equal(await evaluate("document.getElementById('wtp-firmware-plan').disabled"),true);
+        assert.equal(await evaluate("window.__requests.length"),0);
         for (const version of ["v1.0.0-rc.1", "1.0.0-rc.1"]) {
             await evaluate(`document.getElementById('wtp-firmware-version').value=${JSON.stringify(version)};document.getElementById('wtp-firmware-version').dispatchEvent(new Event('change'));document.getElementById('wtp-firmware-plan').click()`);
             await waitFor(async()=>await evaluate("!document.getElementById('wtp-firmware-plan').disabled"),"version normalization");

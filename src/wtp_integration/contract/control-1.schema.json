@@ -407,6 +407,32 @@
     }
   ],
   "$defs": {
+    "message-schedule-state": {
+      "description": "Keyed-message recurrence status. A blocked next occurrence has no next start timestamp.",
+      "enum": [
+        "not_configured",
+        "unavailable",
+        "pausing",
+        "recovery_required",
+        "paused",
+        "suspended",
+        "restart_required",
+        "waiting_for_time",
+        "expired",
+        "waiting",
+        "waiting_for_transmitter",
+        "waiting_for_gps_fix",
+        "waiting_for_beacon_window",
+        "empty",
+        "loaded",
+        "armed",
+        "running",
+        "complete",
+        "failed",
+        "aborted",
+        "missed"
+      ]
+    },
     "progress": {
       "title": "Control/1 progress",
       "description": "Closed progress resource governed by Wsprry-Control/1. Runtime authority and cross-field validation remain mandatory.",
@@ -2876,7 +2902,7 @@
             "max_config_bytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1800
+              "maximum": 4096
             },
             "hardware_activation": {
               "type": "string",
@@ -3250,7 +3276,7 @@
     "config-update": {
       "title": "Control/1 config-update",
       "x-maxWireBytes": 2048,
-      "x-maxResultBytes": 1800,
+      "x-maxResultBytes": 4096,
       "x-maxResponseBytes": 4096,
       "$defs": {
         "gpio": {
@@ -5815,7 +5841,7 @@
             "max_config_bytes": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1800
+              "maximum": 4096
             }
           }
         },
@@ -6349,7 +6375,9 @@
               "const": [
                 "always",
                 "day",
-                "night"
+                "night",
+                "day_manual",
+                "night_manual"
               ]
             },
             "source_loss": {
@@ -7152,7 +7180,7 @@
             "config": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 1800
+              "maximum": 4096
             },
             "update": {
               "type": "integer",
@@ -9781,7 +9809,9 @@
           "enum": [
             "always",
             "day",
-            "night"
+            "night",
+            "day_manual",
+            "night_manual"
           ]
         },
         "pps_offset_ns": {
@@ -9843,7 +9873,11 @@
                 "const": false
               },
               "daylight": {
-                "const": "always"
+                "enum": [
+                  "always",
+                  "day_manual",
+                  "night_manual"
+                ]
               }
             }
           }
@@ -10390,7 +10424,7 @@
         "merge"
       ],
       "max_update_bytes": 2048,
-      "max_config_bytes": 1800
+      "max_config_bytes": 4096
     },
     "standalone_frequency": {
       "schema": "standalone-frequency",
@@ -10655,7 +10689,9 @@
       "daylight_policies": [
         "always",
         "day",
-        "night"
+        "night",
+        "day_manual",
+        "night_manual"
       ],
       "source_loss": "retain_rate_grow_uncertainty",
       "gps_holdover_ns": "3600000000000",
@@ -10751,7 +10787,7 @@
       "max_config_bytes": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 1800
+        "maximum": 4096
       }
     },
     "saved_progress": {

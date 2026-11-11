@@ -6,6 +6,10 @@
     minimum_message_delay_ms:0,maximum_message_delay_ms:800,receiver_uncertainty_us:100,
     capture_uncertainty_us:100,location:'manual',position_maximum_age_s:30,
     automatic_rf_calibration:false,calibration_maximum_age_s:3600,daylight:'always'});
+  const beaconOptions = [['always','24 hours'],
+    ['day_manual','Daylight only (saved grid)'],['night_manual','Night only (saved grid)'],
+    ['day','Daylight only (GPS)'],['night','Night only (GPS)']];
+  const beaconUsesGps = policy => policy === 'day' || policy === 'night';
   const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
   const keys = (v,names) => object(v) && Object.keys(v).sort().join(',') === names.split(',').sort().join(',');
   const integer = (v,min,max) => Number.isInteger(v) && v >= min && v <= max;
@@ -33,8 +37,8 @@
       v.maximum_message_delay_ms-v.minimum_message_delay_ms<1000 &&
       integer(v.receiver_uncertainty_us,1,100000) && integer(v.capture_uncertainty_us,1,100000) &&
       ['manual','gps'].includes(v.location) && integer(v.position_maximum_age_s,1,3600) &&
-      integer(v.calibration_maximum_age_s,10,86400) && ['always','day','night'].includes(v.daylight) &&
-      (v.enabled || v.location==='manual' && !v.automatic_rf_calibration && v.daylight==='always') &&
+      integer(v.calibration_maximum_age_s,10,86400) && beaconOptions.some(([policy])=>policy===v.daylight) &&
+      (v.enabled || v.location==='manual' && !v.automatic_rf_calibration && !beaconUsesGps(v.daylight)) &&
       (!v.automatic_rf_calibration || v.pairing_qualified);
   }
   function allocation(v,p,si,selectors=[]) {
@@ -112,7 +116,7 @@
     container.innerHTML=`<h3>GPS and PPS</h3><p>Use an optional GPS receiver for offline time and location. GPS serial and PPS use separate inputs. Save RF output settings, then restart to activate changes.</p>
       <div class="fields control-grid">${bool('enabled','GPS input')}${select('receiver','Receiver',[['qlg3','QRP Labs QLG3 (receive only)'],['e108','E108 / GK9501 with optional configuration output']])}
       ${select('location','Station locator',[['manual','Use saved manual locator'],['gps','Use current GPS location']])}
-      ${select('daylight','Automatic beacon schedule',[['always','All day'],['day','Daylight only'],['night','Night only']])}</div>
+      ${select('daylight','Automatic beacon schedule',beaconOptions)}</div>
       <details><summary>GPS wiring and timing</summary>${compact ? '' : '<p>GP numbers identify GPIOs, not physical header pins. QLG3 uses receiver TX to Pico RX; it has no receiver RX header. The Pico keeps its PPS pin as an input.</p>'}
       <div class="fields control-grid">${select('rx_gp','GPS serial input GPIO',[1,5,9,13,17,21].map(v=>[v,`GP${v}`]))}
       ${select('pps_gp','PPS input GPIO',[1,3,5,7,9,11,13,15,17,19,21,27].map(v=>[v,`GP${v}`]))}
@@ -153,8 +157,9 @@
     for(const key of Object.keys(defaults)) {
       const field=input(key);field.id=`${container.id}-${key}`;
       field.closest('label').setAttribute('for',field.id);
-      field.addEventListener('change',()=>{edited=true;clearValidity();sync();changed();});
-      field.addEventListener('input',()=>{edited=true;clearValidity();changed();});
+      const markEdited=()=>{if(!scheduleContainer || key!=='daylight')edited=true;clearValidity();};
+      field.addEventListener('change',event=>{markEdited();sync();changed(event);});
+      field.addEventListener('input',event=>{markEdited();changed(event);});
     }
     function sync() {
       for(const field of fields.values())field.disabled=!enabled;
@@ -168,17 +173,30 @@
       }
       sync();
     }
-    function read(pins,si,selectors=[]) {
+    function fail(message,key) {
+      const field=input(key),details=field.closest('details');
+      if(details)details.open=true;
+      field.setCustomValidity(message);
+      const error=Error(message);error.control=field;throw error;
+    }
+    function readBeacon(saved) {
+      const daylight=input('daylight');
+      daylight.setCustomValidity('');
+      const value={...(saved??defaults),daylight:daylight.value};
+      if(!value.enabled && beaconUsesGps(value.daylight))
+        fail('Choose a saved grid schedule or 24 hours, or save enabled GPS input in Radio pins first.','daylight');
+      if(!valid(value))fail('The beacon schedule or saved GPS settings are invalid. Read saved settings and try again.','daylight');
+      return Object.keys(defaults).every(key=>defaults[key]===value[key]) ? null : value;
+    }
+    function read(pins,si,selectors=[],savedDaylight) {
       if(!configured&&!edited)return null;
       clearValidity();
-      const fail=(message,key)=>{
-        const field=input(key),details=field.closest('details');
-        if(details)details.open=true;
-        field.setCustomValidity(message);
-        const error=Error(message);error.control=field;throw error;
-      };
       const value={};
       for(const [key,fallback] of Object.entries(defaults)) {
+        if(key==='daylight' && savedDaylight!==undefined) {
+          value[key]=savedDaylight;
+          continue;
+        }
         const field=input(key),text=field.value;
         if(!field.checkValidity())fail(`Review ${field.closest('label').firstChild.textContent.trim()}.`,key);
         if(typeof fallback==='boolean' && !['true','false'].includes(text))
@@ -193,8 +211,12 @@
       if(!gp(value.pps_gp) || value.pps_gp%2!==1 || value.pps_gp===value.rx_gp)fail('Choose a separate odd GPIO for the input-only PPS counter.','pps_gp');
       if(value.tx_gp!==null && (txUart(value.tx_gp)===null || txUart(value.tx_gp)!==uart(value.rx_gp) || value.tx_gp===value.pps_gp))
         fail('Choose an output on the same UART as the serial input, separate from PPS, or choose None.','tx_gp');
-      if(!value.enabled && (value.location==='gps' || value.daylight!=='always' || value.automatic_rf_calibration))
-        fail('Enable GPS input, or use the manual locator, All day schedule and disabled automatic correction.','enabled');
+      if(!value.enabled && beaconUsesGps(value.daylight)) {
+        if(savedDaylight!==undefined)fail('The saved beacon schedule uses GPS. Save a different beacon schedule before disabling GPS input.','enabled');
+        fail('Choose a saved grid schedule or 24 hours, or enable GPS input.','daylight');
+      }
+      if(!value.enabled && (value.location==='gps' || value.automatic_rf_calibration))
+        fail('Enable GPS input to use the GPS locator or automatic RF correction.','enabled');
       if(value.minimum_message_delay_ms>value.maximum_message_delay_ms)fail('Maximum serial delay must be at least the minimum delay.','maximum_message_delay_ms');
       if(value.maximum_message_delay_ms-value.minimum_message_delay_ms>=1000)fail('Keep the serial-delay window narrower than one second so its PPS association is unique.','maximum_message_delay_ms');
       if(value.automatic_rf_calibration && !value.pairing_qualified)fail('Validate the receiver UTC/PPS association before enabling automatic correction.','pairing_qualified');
@@ -222,7 +244,7 @@
       text.textContent=`Serial ${r.serial_present?'present':'unavailable'}; PPS ${r.pps_present?'present':'unavailable'}; UTC pairing ${r.time_valid?'valid':'not available'}; ${r.satellites} satellites. ${r.position_valid?'GPS locator '+r.position.locator+'. ':'No current position fix. '}Capture IRQ latency ${(Number(r.irq_latency_ns)/1000).toFixed(1)} µs (maximum ${(Number(r.maximum_irq_latency_ns)/1000).toFixed(1)} µs); timestamp bound ${(Number(r.capture_error_bound_ns)/1000).toFixed(1)} µs; ${r.capture_rejections} rejected captures. ${describe('Pico clock',r.timer_calibration)}${describe('Si5351 reference',r.synthesizer_calibration)}${r.error?'Receiver state: '+r.error.replaceAll('_',' ')+'. ':''}${value.pending_restart?'Saved changes need an explicit Pico restart.':''}`;
     }
     load(null);
-    return {load,read,observation,enable(value){enabled=Boolean(value);sync();},element:container};
+    return {load,read,readBeacon,observation,enable(value){enabled=Boolean(value);sync();},element:container};
   }
   const api={defaults,valid,allocation,validCalibration,validRuntime,readback,create};
   root.WsprryGps=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;

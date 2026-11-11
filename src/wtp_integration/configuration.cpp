@@ -92,7 +92,7 @@ bool si_allocation(const Json &config, const Json &selectors = Json::array()) {
   return true;
 }
 bool shape(const Json &j, bool partial, bool redacted) {
-  if (!partial && j.dump().size() > 1800) return false;
+  if (!partial && j.dump().size() > 4096) return false;
   if (!(partial ? fields(j, {}, {"enabled", "station", "wifi", "schedules", "pins",
         "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps"}) && !j.empty()
       : fields(j, {"enabled", "station", "wifi", "schedules"}, {"pins",
@@ -410,6 +410,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     const auto read = [&](const std::string &resource) {
       const auto r = exchange(resource, "GET", {}, {}); success(r); return r;
     };
+    std::size_t config_limit = 4096;
     const auto caps = parsed(read("capabilities"),true);
     require(caps.is_object(),"unsupported_remote_contract",409);
     require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
@@ -423,6 +424,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       require(valid_management_contract(management, carrier, device, boot, generation) &&
           management["schema"] == caps["management_carriers"]["schema"],
           "unsupported_management_contract", 409);
+      config_limit=std::min(config_limit,management["limits"]["config"].get<std::size_t>());
     } else throw Rejected{409,"unsupported_management_contract"};
     if (method == "POST") require(drive_policy_fields(input["config"],caps),"invalid_gpio_drive",400);
     auto original = read("config");
@@ -441,12 +443,12 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     Json application = nullptr, update = nullptr;
     require(caps.contains("configuration_updates"), "unsupported_configuration_updates", 409);
     const bool has_update = true;
-    std::size_t update_limit = 2048, config_limit = 1800;
+    std::size_t update_limit = 2048;
     if (has_update) {
       update = caps["configuration_updates"];
       require(supported_descriptor(update,"configuration_updates"), "unsupported_configuration_updates", 409);
       update_limit = std::min<std::size_t>(2048, update["max_update_bytes"].get<std::size_t>());
-      config_limit = std::min<std::size_t>(1800, update["max_config_bytes"].get<std::size_t>());
+      config_limit = std::min(config_limit, update["max_config_bytes"].get<std::size_t>());
     }
     if (caps.contains("application_resources")) {
       const auto &resources = caps["application_resources"];
@@ -454,6 +456,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       const auto r = read("application"); application = parsed(r);
       require(application_shape(application, target, carrier == "usb_physical") && application["schema"] == "application" &&
           drive_policy_observation(application["hardware"]["gpio_drive"],caps), "invalid_remote_response");
+      config_limit=std::min(config_limit,application["capabilities"]["max_config_bytes"].get<std::size_t>());
       require(r.etag == original.etag, "configuration_context_changed", 409);
       require(application["station"]["storage_healthy"] == true && application["hardware"]["storage_healthy"] == true &&
           application["hardware"]["application_error"].is_null(), "remote_busy_or_output_unresolved", 409);
@@ -472,7 +475,18 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     if (method == "POST") {
       const auto &patch = input["config"];
       Json proposed=config.is_null()?Json::object():config;
-      for (const auto &[name,value]:patch.items()) proposed[name]=value;
+      for (const auto &[name,value]:patch.items()) {
+        if ((name=="gps" || name=="si5351") && value.is_null())
+          proposed.erase(name);
+        else if (name=="station" || name=="wifi") {
+          for (const auto &[field,leaf]:value.items()) {
+            if (name=="wifi" && field=="password" && leaf.is_null()) continue;
+            proposed[name][field]=leaf;
+          }
+        } else proposed[name]=value;
+      }
+      if (!expected_config_pins.is_null()) proposed["pins"]=expected_config_pins;
+      require(proposed.dump().size() <= config_limit, "configuration_too_large", 413);
       if (proposed.contains("gps") || proposed.contains("si5351") || (proposed.contains("pins") && proposed["pins"].value("engine","")=="i2c")) {
         const auto filters=filter_selector_request(exchange,device,boot,"GET",{}, {},carrier,generation);
         success(filters);
@@ -503,11 +517,12 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       Json candidate{{"contract","Wsprry-Control/1"},{"schema","config-update"},
           {"target",target},{"mode","merge"},{"config",patch}};
       const auto payload = candidate.dump();
-      require(payload.size() <= (verb == "POST" ? update_limit : config_limit), "configuration_too_large", 413);
+      require(payload.size() <= update_limit, "configuration_too_large", 413);
       attempted = true;
       auto r = exchange(resource, verb, payload, revision); success(r);
       auto result = parsed(r);
-      require(result.contains("config") && shape(result["config"], false, true) && etag(r.etag), "management_outcome_unknown");
+      require(result.contains("config") && shape(result["config"], false, true) &&
+          result["config"].dump().size() <= config_limit && etag(r.etag), "management_outcome_unknown");
       require(drive_policy_fields(result["config"],caps),"management_outcome_unknown");
       if (!expected_config_pins.is_null()) require(result["config"].at("pins").dump()==expected_config_pins.dump(),"management_outcome_unknown");
       if (patch.contains("gps")) require(patch["gps"].is_null()
@@ -616,7 +631,7 @@ void shared_application(const Json &j, const Json &target, bool usb = false) {
   }
   require(!unavailable.contains("amplifier") && !unavailable.contains("drive"),"unsupported_resource_capabilities",409);
   require(c["station_write"] == true && c["hardware_write"] == true && c["max_update_bytes"] > 0 && c["max_update_bytes"] <= 1024 &&
-      c["max_config_bytes"] > 0 && c["max_config_bytes"] <= 1800 && c["recurrence_authorities"] == Json::array({"member"}) &&
+      c["max_config_bytes"] > 0 && c["max_config_bytes"] <= 4096 && c["recurrence_authorities"] == Json::array({"member"}) &&
       c["autonomous_modes"] == Json::array({"wspr"}),
       "unsupported_resource_capabilities",409);
   for (const auto &schedule : r["schedules"]) {

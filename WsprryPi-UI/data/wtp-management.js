@@ -100,12 +100,19 @@
     let progress = null, progressRevision = "", progressEpoch = 0, progressLoaded = false, progressReview = false, stationDirty = false;
     const member = name => byId(`wtp-member-${name}`);
     let siObservation = null, gpsObservation = null;
+    let beaconDirty = false;
     const siEditor = root.WsprrySi5351 && byId('wtp-si5351-controls') ? root.WsprrySi5351.create(byId('wtp-si5351-controls'), {
         bootstrap:true,changed:()=>{validatedPlan='';resourceReconcile=resourceLoaded;resourceRender();}
     }) : null;
     const gpsEditor = root.WsprryGps && byId('wtp-gps-controls') ? root.WsprryGps.create(byId('wtp-gps-controls'), {
-        bootstrap:true,changed:()=>{validatedPlan='';resourceReconcile=resourceLoaded;resourceRender();}
+        bootstrap:true,scheduleContainer:member('beacon-controls'),
+        changed:event=>{
+            if (event.target.dataset.gps === 'daylight') beaconDirty=true;
+            else validatedPlan='';
+            resourceReconcile=resourceLoaded;resourceRender();
+        }
     }) : null;
+    const savedDaylight = () => gpsObservation?.saved?.daylight ?? root.WsprryGps.defaults.daylight;
     const resourceIdentity = data => `${data.target.device_id} / ${data.target.boot_id} / ${{engineering_mtls:"Engineering HTTPS",consumer_station:"Consumer Wi-Fi",consumer_ap:"Consumer setup Wi-Fi",usb_physical:"USB"}[data.carrier]}${data.profile_generation === null ? "" : ` / profile ${data.profile_generation}`}`;
     function frequencyText(value) {
         const nhz = BigInt(value), fraction = String(nhz % 1000000000n).padStart(9,"0").replace(/0+$/,"");
@@ -250,6 +257,7 @@
     function invalidateResources() {
         resourceRevision = resourceContext = validatedPlan = "";
         resourceReconcile = resourceLoaded;
+        if (member("beacon-saved")) member("beacon-saved").textContent = "Load member resources to read the saved schedule.";
         if (resourceLoaded) {
             member("feedback").textContent = "These observations are from the previous load. Your drafts are preserved; load member resources before another save.";
             member("identity").textContent = `Readback required. Previous observation ${resourceObserved}: ${resourceIdentity(resources)}`;
@@ -294,7 +302,9 @@
         if(member('engine')?.options) for(const option of member('engine').options)
             if(option.value==='i2c') option.disabled=!siEditor || !root.WsprryControl?.supported('si5351',resources?.control_capabilities?.si5351);
         siEditor?.show(si);siEditor?.enable(!busy && Boolean(writable));
-        gpsEditor?.enable(!busy && Boolean(writable) && root.WsprryControl?.supported('gps',resources?.control_capabilities?.gps));
+        const gpsWritable = !busy && Boolean(writable) && root.WsprryControl?.supported('gps',resources?.control_capabilities?.gps);
+        gpsEditor?.enable(gpsWritable);
+        if (member('beacon-save')) member('beacon-save').disabled = !gpsWritable || !gpsObservation;
         if(member('direct-rf')) member('direct-rf').hidden=si;
         if(si) member('rf').disabled=true;
         if(byId('gpio-drive-form')) byId('gpio-drive-form').hidden=si;
@@ -347,6 +357,15 @@
         }
         if(siObservation) siEditor?.observation(siObservation);
         if(gpsObservation) gpsEditor?.observation(gpsObservation);
+        const beacon = gpsEditor && member('beacon-controls')?.querySelector('[data-gps="daylight"]');
+        if (beacon && gpsObservation) {
+            if (!resources || resources.target.device_id !== data.target.device_id) beaconDirty = false;
+            const saved = savedDaylight();
+            if (!beaconDirty) { beacon.value = saved; beacon.setCustomValidity(''); }
+            const label = [...beacon.options].find(option => option.value === saved)?.textContent;
+            const observation = member('beacon-saved');
+            if (observation) observation.textContent = `Saved: ${label}.${beaconDirty ? ' Your draft is preserved.' : ''}`;
+        }
         resources = data; resourceLoaded = true; resourceReconcile = false; validatedPlan = "";
         member("pin-feedback").textContent = "Candidate has not been validated. Validation never saves or activates pins.";
         member("hardware-feedback").textContent = keep ? "Your hardware draft is preserved beside fresh saved and active observations. Validate it before saving." : "";
@@ -367,7 +386,7 @@
                     config.si5351=siEditor.validate(payload).settings;
                     if(!root.WsprrySi5351.allocation(config.si5351,payload)) throw Error('The Si5351 pair, loopback, gate and other GPIO roles conflict. Choose separate pins.');
                 }
-                const gps=gpsEditor?.read(payload,config.si5351 || siObservation?.saved);
+                const gps=gpsEditor?.read(payload,config.si5351 || siObservation?.saved,[],savedDaylight());
                 if(gps)config.gps=gps;
                 if(config.si5351?.automatic_calibration && (!gps?.enabled || !gps?.pairing_qualified))throw Error('Enable GPS and validate the UTC/PPS association before selecting automatic Si5351 correction.');
                 const result=await request('member/configuration' ,'POST',{contract:'Wsprry-Control/1',schema:'pico-settings',target:resources.target,operation:'save',config},resourceRevision);
@@ -380,32 +399,51 @@
         }
         return request(`member/${kind}`, "PUT", {contract:'Wsprry-Control/1',schema:station ? resources.application.station.schema : "hardware", target:resources.target, [station ? "station" : "pins"]:payload}, resourceRevision);
     }
-    async function request(resource, method = "GET", body = null, revision = "") {
+    function saveBeacon() {
+        if (!resourceRevision || !resourceContext || !resources || !gpsObservation || member('beacon-save').disabled) return;
+        if (resourceReview && !root.confirm("Review the current saved beacon schedule beside your draft. Save the draft using the fresh revision?")) return;
+        try {
+            const gps = gpsEditor.readBeacon(gpsObservation.saved);
+            return request('member/configuration','POST',{contract:'Wsprry-Control/1',schema:'pico-settings',
+                target:resources.target,operation:'save',config:{gps}},resourceRevision,'beacon');
+        } catch (error) {
+            member('beacon-feedback').textContent=error.message;
+            error.control?.focus();error.control?.reportValidity();
+        }
+    }
+    async function request(resource, method = "GET", body = null, revision = "", scope = "") {
         if (busy || (resource === "member/management" ? !canSelect : !available)) return;
         busy = true; render();
         const shared = ["member/application", "member/station", "member/hardware", "member/pins/validate"].includes(resource);
-        const feedback = shared ? member(resource.endsWith("validate") ? "pin-feedback" : method === "PUT" ? `${resource.split("/")[1]}-feedback` : "feedback")
+        const beacon = scope === "beacon";
+        const feedback = beacon ? member("beacon-feedback") : shared ? member(resource.endsWith("validate") ? "pin-feedback" : method === "PUT" ? `${resource.split("/")[1]}-feedback` : "feedback")
             : byId(resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
         const context = resourceContext;
-        if (method !== "GET" && ["member/configuration","member/station","member/hardware"].includes(resource)) {
-            const intended = JSON.parse(JSON.stringify({...body,contract:"Wsprry-Control/1"}));
-            if (intended.config?.wifi) intended.config.wifi.password = null;
-            lastAttempt = {resource,method,revision,target:body.target,selectionId,intended,sent:true};
-        }
         const recoveryAction = resource === "member/management" && ["inspect_logins","retire_login"].includes(body?.action);
         if (method !== "GET" && !resource.endsWith("validate")) invalidateEditors();
         feedback.textContent = "Contacting the idle Pico…";
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 180000);
         try {
-            if (resource === 'member/configuration' && method === 'POST' && body?.config?.pins) {
+            if (resource === 'member/configuration' && method === 'POST' && (body?.config?.pins || beacon)) {
                 // The complete configuration coordinator has its own read binding.
                 // Establish it under this serialized owner without overwriting any draft.
                 const contextResponse=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/configuration',{method:'GET',cache:'no-store',signal:controller.signal});
                 const contextData=await contextResponse.json();
                 if (!contextResponse.ok || contextData.contract!=='Wsprry-Control/1' || contextData.schema!=='pico-settings' ||
                     contextResponse.headers.get('ETag')!==revision || JSON.stringify(contextData.target)!==JSON.stringify(body.target))
-                    throw failure('Pico configuration changed or could not be confirmed. No RF output save was sent. Load member resources and review the preserved draft.');
+                    throw failure(`Pico configuration changed or could not be confirmed. No ${beacon ? 'beacon schedule' : 'RF output'} save was sent. Load member resources and review the preserved draft.`);
+                if (beacon && contextData.config && !Object.hasOwn(contextData.config,'gps') &&
+                    body.config.gps === null) {
+                    beaconDirty = false;
+                    feedback.textContent = "24 hours is already saved. Load member resources before another change.";
+                    return contextData;
+                }
+            }
+            if (method !== "GET" && ["member/configuration","member/station","member/hardware"].includes(resource)) {
+                const intended = JSON.parse(JSON.stringify({...body,contract:"Wsprry-Control/1"}));
+                if (intended.config?.wifi) intended.config.wifi.password = null;
+                lastAttempt = {resource,method,revision,target:body.target,selectionId,intended,sent:true};
             }
             const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/" + resource, {
                 method, cache: "no-store", signal: controller.signal,
@@ -465,7 +503,17 @@
                             : "The Pico request was not confirmed. Your draft is preserved. Load saved Pico settings and review them before saving again.");
             }
             const etag = response.headers.get("ETag") || "";
-            if (shared) {
+            if (beacon) {
+                const expected = body.config.gps;
+                const observed = data.config?.gps;
+                if (data.contract !== 'Wsprry-Control/1' || data.schema !== 'pico-settings' || !etag ||
+                    JSON.stringify(data.target) !== JSON.stringify(body.target) || !data.config ||
+                    (expected === null ? observed != null : !root.WsprryGps.valid(observed) ||
+                        Object.keys(expected).some(key=>observed[key]!==expected[key])))
+                    throw failure("The beacon schedule save could not be confirmed. Load member resources and review the preserved draft.");
+                beaconDirty = false;
+                feedback.textContent = "Beacon schedule saved. Load member resources before another change." + restartFeedback(data.reboot_required);
+            } else if (shared) {
                 if (method === "GET") {
                     if (data.schema !== "member-resources" || !data.application || !data.target || typeof data.member_context !== "string" || !etag)
                         throw failure("Member resources are incomplete. Your draft is preserved; load resources again.");
@@ -485,7 +533,7 @@
                         gpsObservation=value;
                     }
                     resourcePopulate(data); resourceRevision = etag; resourceContext = data.member_context;
-                    feedback.textContent = "Member resources loaded. Saved configuration was reconciled under one revision. Station and hardware are separate explicit saves.";
+                    feedback.textContent = "Member resources loaded. Saved configuration was reconciled under one revision. Station, beacon schedule, and hardware have separate save actions.";
                 } else if (resource.endsWith("validate")) {
                     if (typeof data.valid !== "boolean" || typeof data.operational_supported !== "boolean" || data.applied !== false) throw failure("Pin validation was not confirmed.");
                     validatedPlan = data.valid && data.operational_supported ? JSON.stringify(body) : "";
@@ -683,13 +731,14 @@
         member("engine")?.addEventListener("change",()=>{validatedPlan="";resourceReconcile=resourceLoaded;resourceRender();});
         member("load")?.addEventListener("click", () => request("member/application"));
         member("station-save")?.addEventListener("click", () => resourceSave("station"));
+        member("beacon-save")?.addEventListener("click", saveBeacon);
         member("hardware-save")?.addEventListener("click", () => resourceSave("hardware"));
         member("validate")?.addEventListener("click", () => {
             try {
                 const candidate=hardwareCandidate();
                 const si=candidate.engine==='i2c' ? siEditor.read().settings : siObservation?.saved;
                 if(candidate.engine==='i2c' && !root.WsprrySi5351.allocation(si,candidate)) throw Error('Resolve the Si5351 GPIO conflicts before validating.');
-                const gps=gpsEditor?.read(candidate,si);
+                const gps=gpsEditor?.read(candidate,si,[],savedDaylight());
                 if(si?.automatic_calibration && (!gps?.enabled || !gps?.pairing_qualified)) throw Error('Si5351 automatic correction requires enabled GPS with a validated UTC/PPS association.');
                 return request("member/pins/validate", "POST", candidate, resourceRevision);
             } catch(error) {member('pin-feedback').textContent=error.message;error.control?.focus();error.control?.reportValidity();}

@@ -32,6 +32,20 @@ amplifier polarity preserves the prior draft, otherwise the applied setting,
 otherwise active-high. Pi derives the expected readback from authenticated
 state bound to the same saved revision before sending a mutation.
 
+Pi accepts complete configuration readbacks up to 4,096 JSON bytes and checks
+the Pico's advertised bounds. Merge requests remain limited to 2,048 bytes.
+Pico separately checks the compact aggregate journal against its 1,984-byte
+flash budget before a durable save.
+
+Before dispatch, Pi merges the patch into the current redacted control document
+and checks its complete size against the smallest configuration limit reported
+by management, the update descriptor, and application metadata. Nested station
+and Wi-Fi leaves preserve omitted values, password null preserves the saved
+password sentinel, and optional GPS/Si5351 nulls remove those objects from the
+size calculation. Pi sends the original patch and validates the returned
+configuration against the same limit. Pico independently validates the
+unredacted configuration and durable storage.
+
 Mutations require the current target and exact If-Match revision. Missing,
 stale, busy, faulted, unhealthy or ambiguous context refuses. Secrets remain
 redacted. A lost or malformed reply invalidates the write context: retain the

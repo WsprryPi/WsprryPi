@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       pico_ref:
-        description: Pico source ref (defaults to the validated companion commit)
-        default: 971f7bf9f8075d64ff086f777356bdd06c3d8b53
+        description: Pico source ref (defaults to the commit in the vendored contract provenance)
         type: string
   pull_request:
     branches: [devel, main]
@@ -49,17 +48,24 @@ jobs:
         run: python3 -B scripts/tests/ci_execution_graph_test.py
       - name: Verify incremental compilation and build failure recovery
         run: python3 -B scripts/tests/network_build_test.py
-      - name: Validate requested Pico ref
-        if: steps.classify.outputs.run_full_ci != 'false' && github.event_name == 'workflow_dispatch'
+      - name: Select requested or paired Pico ref
+        if: steps.classify.outputs.run_full_ci != 'false'
+        id: requested-pico
         env:
           PICO_REF: ${{ inputs.pico_ref }}
-        run: python3 -B scripts/ci/selected_source.py selection "$PICO_REF"
+        run: |
+          if [[ -n "$PICO_REF" ]]; then
+            python3 -B scripts/ci/selected_source.py selection "$PICO_REF"
+            printf 'pico_ref=%s\n' "$PICO_REF" >> "$GITHUB_OUTPUT"
+          else
+            python3 -B scripts/ci/selected_source.py paired src/wtp_integration/contract/PROVENANCE.json
+          fi
       - name: Resolve Pico source once
         if: steps.classify.outputs.run_full_ci != 'false'
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/WsprryPico
-          ref: ${{ inputs.pico_ref || '971f7bf9f8075d64ff086f777356bdd06c3d8b53' }}
+          ref: ${{ steps.requested-pico.outputs.pico_ref }}
           path: src/build/selected-pico
           persist-credentials: false
       - name: Record immutable Pico source
