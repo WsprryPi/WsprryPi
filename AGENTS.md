@@ -384,7 +384,7 @@ When reporting validation:
 
 ## Documentation Requirements
 
-Every WsprryPi release body must begin with install/update instructions and a copyable idempotent installer command in the form `curl -fsSL <installer-url> | sudo env REPO_BRANCH=<branch> bash`. Use the matching installer URL and branch for the release channel (`devel` for current prereleases, `main` for stable releases). Explain that rerunning the command installs or updates from that channel and may select a newer release. Include this section before release highlights and verify it in the published release body.
+Every WsprryPi release body must begin with install/update instructions and a copyable idempotent installer command using `curl -fsSL <installer-url> | sudo env REPO_BRANCH=<branch> bash`. Every dev, beta and RC release must pin its own exact published executable with `bash -s -- --binary-source release --release-tag <exact-release-tag>`; a command that follows the newest channel release does not satisfy this requirement. Use the matching installer URL and branch for the release channel (`devel` for current prereleases, `main` for stable releases). Explain that rerunning the pinned command reinstalls the same executable version while the installer and supporting files follow the selected branch. Include this section before release highlights and verify the exact tag and command in the published release body.
 
 Review documentation impact for every user-visible or operator-facing change.
 

@@ -8,12 +8,12 @@ acceptance gates. Publication requires its own authorization.
 
 ## Required release opening
 
-Begin every WsprryPi release body with an **Install or update** section before highlights, source identities or validation details. Include a copyable idempotent installer command and explain that rerunning it installs or updates from the selected channel, which may select a newer release. Use matching URL and environment branch selections.
+Begin every WsprryPi release body with an **Install or update** section before highlights, source identities or validation details. Include a copyable idempotent installer command. Every dev, beta and RC release must select its exact published executable with `--binary-source release --release-tag <exact-release-tag>`. Use matching URL and environment branch selections. Explain that rerunning the pinned command reinstalls that executable version while installer and supporting files follow the selected branch.
 
-For current prereleases:
+For dev, beta and RC releases, substitute the actual published tag. Beta 7 uses:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/WsprryPi/WsprryPi/refs/heads/devel/scripts/install.sh | sudo env REPO_BRANCH=devel bash
+curl -fsSL https://raw.githubusercontent.com/WsprryPi/WsprryPi/refs/heads/devel/scripts/install.sh | sudo env REPO_BRANCH=devel bash -s -- --binary-source release --release-tag v4.0.0-beta.7
 ```
 
 For stable releases:
@@ -22,7 +22,7 @@ For stable releases:
 curl -fsSL https://raw.githubusercontent.com/WsprryPi/WsprryPi/refs/heads/main/scripts/install.sh | sudo env REPO_BRANCH=main bash
 ```
 
-Check the command against the current installer contract and release channel before publication. Verify that the published body retains these instructions at the top. Editing release prose does not change the release tag or retained artifact identities.
+Check the command against the current installer contract and release channel before publication. Verify that the published body retains these instructions at the top and that the pinned tag matches the release being published. A newest-channel command alone is insufficient for dev, beta or RC releases. Editing release prose does not change the release tag or retained artifact identities.
 
 ## Source and version identity
 
