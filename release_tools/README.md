@@ -4,8 +4,8 @@ These documents define selected release work, acceptance gates and maintainer
 validation workflows. Completed execution handoffs are retired under the
 [cleanup instructions](../docs/development/repository-cleanup-prompt.md).
 
-- [Wsprry Pi 4.0 Release Punchlist](Release%20Punchlist.md): saved follow-ups,
-  release gates, and RP1 dependency order.
+- [Wsprry Pi 4.0 Release Punchlist — Complete](Release%20Punchlist.md): completed
+  release-cycle record, future release requirements, and RP1 dependency order.
 - [Calibration Scope Decisions](Calibration%20Scope%20Decisions.md): RP1 direct
   PPS scope, Pi 1–4 host estimation, correction authority, and clock-parent decisions.
 - [Release artifact preparation](Build%20Orchestration.md): source/version

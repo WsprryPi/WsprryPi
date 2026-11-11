@@ -1,7 +1,9 @@
-# Wsprry Pi Backlog
+# Wsprry Pi Release Punchlist — Complete
 
-This is the selected work and release-gate authority. Completed items retain
-their status and disposition in this list. Beta 1 acceptance, source identities, publication, and
+✅ **Complete.** All six selected items are complete; this punchlist has no
+remaining TODOs. It is retained as a completed release-cycle record, with
+future release requirements below kept separate from the completed work.
+Beta 1 acceptance, source identities, publication, and
 qualification limits remain in the [release evidence](4.0.0-Release-Evidence.md),
 [source inventory](4.0-Beta-1-Source-Inventory.json), and
 [candidate manifest](4.0-Beta-1-Candidate-Manifest.json).
@@ -12,7 +14,7 @@ Latest completed cycle: [WsprryPi 4.0 Beta 7](https://github.com/WsprryPi/Wsprry
 
 <a id="saved-items"></a>
 
-## Ordered backlog
+## Completed items
 
 1. ✅ **Increase Fleet capacity to 32 remote devices.** Consolidate the limit
    into one authoritative constant and coordinate runtime, UI, persistence,
@@ -45,9 +47,10 @@ completed cycle's evidence and identities when starting a new cycle, and reset
 statuses only for the newly selected cycle. Publication requires explicit
 release authorization.
 
-## Final 4.0 stable release gate
+## Future final 4.0 stable release gate
 
-Final stable publication remains a separate gate: address Beta feedback,
+These requirements apply to a future stable release, not to completion of this
+punchlist. Final stable publication remains a separate gate: address Beta feedback,
 accept the exact final candidate, repeat affected implementation,
 operator-documentation, UI, packaging, and applicable runtime checks, and
 complete [#412](https://github.com/WsprryPi/WsprryPi/issues/412) at its proper
@@ -64,5 +67,5 @@ See the [published-release contract](../docs/rp1-gpclk-dkms-installation.md#publ
 and [release evidence](4.0.0-Release-Evidence.md) for existing acceptance
 and its limits. Software tests do not establish physical or RF qualification.
 
-This backlog does not authorize implementation, issue edits, cross-repository
+This completed punchlist does not authorize implementation, issue edits, cross-repository
 writes, hardware or service operations, commits, pushes, or publication.
