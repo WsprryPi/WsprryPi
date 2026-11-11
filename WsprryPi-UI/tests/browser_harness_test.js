@@ -159,40 +159,80 @@ const sockets=new WebSocketServer({server});sockets.on('connection',socket=>sock
  socket.send(JSON.stringify({id:m.id,result}));
 }));
 server.listen(0,'127.0.0.1',()=>{
- fs.writeFileSync(path.join(profile,'DevToolsActivePort'),'');fs.writeFileSync(path.join(profile,'spawned'),'');
- fs.watch(profile,()=>{if(exists('partial')&&fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8')!==String(server.address().port)+'\\n')fs.writeFileSync(path.join(profile,'DevToolsActivePort'),String(server.address().port)+'\\n');if(exists('endpoint')){const content=String(server.address().port)+'\\n/devtools/browser/'+id;if(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8')!==content)fs.writeFileSync(path.join(profile,'DevToolsActivePort'),content);}});
+ fs.writeFileSync(path.join(profile,'DevToolsActivePort'),'');
+ const advance=()=>{if(exists('partial')&&fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8')!==String(server.address().port)+'\\n')fs.writeFileSync(path.join(profile,'DevToolsActivePort'),String(server.address().port)+'\\n');if(exists('endpoint')){const content=String(server.address().port)+'\\n/devtools/browser/'+id;if(fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8')!==content)fs.writeFileSync(path.join(profile,'DevToolsActivePort'),content);}};
+ const ready=()=>{
+  fs.watch(profile,advance);
+  // Reconcile controls written before registration; notifications are hints.
+  advance();
+  fs.writeFileSync(path.join(profile,'spawned'),'');
+ };
+ if(process.argv.includes('--fixture-command-before-watch')){
+  fs.writeFileSync(path.join(profile,'before-watch'),'');
+  const awaitCommand=()=>exists('endpoint')?ready():setImmediate(awaitCommand);
+  awaitCommand();
+ }else ready();
 });
 `;
     fs.writeFileSync(fake, source, { mode: 0o700 });
     let browser, client, failure, outcome;
     const release = name => fs.writeFileSync(path.join(profile, name), "");
     try {
-        let settled = false;
-        const launched = launchBrowser({ executable: fake, profile, timeoutMs: 5000 }).then(result => { settled = true; return result; });
-        outcome = launched.then(value => ({ value }), error => ({ error }));
-        await waitFor(() => fs.existsSync(path.join(profile, "spawned")), "fixture child spawned");
-        assert.equal(settled, false, "empty discovery is not ready");
-        release("partial");
-        await waitFor(() => fs.readFileSync(path.join(profile, "DevToolsActivePort"), "utf8").includes("\n"), "partial discovery observed");
-        assert.equal(settled, false, "port alone is not a verified endpoint");
-        fs.unlinkSync(path.join(profile, "partial")); release("endpoint");
-        await waitFor(() => fs.existsSync(path.join(profile, "no-page-observed")), "endpoint ready without page");
-        assert.equal(settled, false, "HTTP-ready endpoint is not usable-page readiness");
-        release("page"); const result = await outcome; if (result.error) throw result.error; ({ browser, client } = result.value);
-        const initialized = waitFor(() => client.evaluate("fixture scripts ready"), "scripts initialized", 2000);
-        await waitFor(() => fs.existsSync(path.join(profile, "scripts-probed")), "script initialization probed");
-        release("scripts"); assert.equal(await initialized, true);
+        await bounded("controlled discovery handshake", 5000, async () => {
+            let settled = false;
+            const launched = launchBrowser({ executable: fake, profile, timeoutMs: 5000 }).then(result => { settled = true; return result; });
+            outcome = launched.then(value => ({ value }), error => ({ error }));
+            await waitFor(() => fs.existsSync(path.join(profile, "spawned")), "fixture child spawned");
+            assert.equal(settled, false, "empty discovery is not ready");
+            release("partial");
+            await waitFor(() => fs.readFileSync(path.join(profile, "DevToolsActivePort"), "utf8").includes("\n"), "partial discovery observed");
+            assert.equal(settled, false, "port alone is not a verified endpoint");
+            fs.unlinkSync(path.join(profile, "partial")); release("endpoint");
+            await waitFor(() => fs.existsSync(path.join(profile, "no-page-observed")), "endpoint ready without page");
+            assert.equal(settled, false, "HTTP-ready endpoint is not usable-page readiness");
+            release("page"); const result = await outcome; if (result.error) throw result.error; ({ browser, client } = result.value);
+            const initialized = waitFor(() => client.evaluate("fixture scripts ready"), "scripts initialized", 2000);
+            await waitFor(() => fs.existsSync(path.join(profile, "scripts-probed")), "script initialization probed");
+            release("scripts"); assert.equal(await initialized, true);
+        });
         const noPageProfile = path.join(root, "no-page-profile");
-        const noPage = launchBrowser({ executable: fake, profile: noPageProfile, timeoutMs: 3000 }).then(value => ({value}), error => ({error}));
-        await waitFor(() => fs.existsSync(path.join(noPageProfile, "spawned")), "no-page child spawned");
-        fs.writeFileSync(path.join(noPageProfile, "endpoint"), "");
-        await waitFor(() => fs.existsSync(path.join(noPageProfile, "no-page-observed")), "known absent usable target");
+        const noPage = launchBrowser({ executable: fake, args: ["--fixture-command-before-watch"], profile: noPageProfile, timeoutMs: 3000 }).then(value => ({value}), error => ({error}));
+        await bounded("absent-page fixture handshake", 3000, async () => {
+            await waitFor(() => fs.existsSync(path.join(noPageProfile, "before-watch")), "watch installation deliberately held");
+            assert.equal(fs.existsSync(path.join(noPageProfile, "spawned")), false, "readiness is not acknowledged before the watcher is installed");
+            // Supply the command before registration deterministically, without a sleep.
+            fs.writeFileSync(path.join(noPageProfile, "endpoint"), "");
+            await waitFor(() => fs.existsSync(path.join(noPageProfile, "spawned")), "watcher ready and existing command reconciled");
+            await waitFor(() => fs.existsSync(path.join(noPageProfile, "no-page-observed")), "known absent usable target");
+        });
         const refused = await noPage;
         assert.equal(refused.error?.cause?.code, "HARNESS_TIMEOUT");
         assert.match(refused.error.cause.message, /usable page/);
         assert.equal(fs.existsSync(noPageProfile), false, "no-target launch reaps child before removing profile");
     } catch (error) { failure = error; }
     finally { const result = await outcome; if (result?.value) ({browser,client}=result.value); await finishFixture({ failure: failure || result?.error, browser, client, profile, cleanups: [] }); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("workflow and nested cleanup failures expose bounded causes and original stacks", async () => {
+    const primary = Object.assign(new Error("expected completion; elapsed=5000ms budget=5000ms; last observed=watcher not ready"), { code: "HARNESS_TIMEOUT" });
+    const cleanup = new Error("owned cleanup failure");
+    const nested = new AggregateError([primary], "nested workflow", { cause: primary });
+    await assert.rejects(finishFixture({ failure: nested, cleanups: [() => { throw cleanup; }] }), error => {
+        assert.equal(error.cause, nested);
+        assert.deepEqual(error.errors, [nested, cleanup]);
+        assert.match(error.message, /nested workflow; owned cleanup failure/);
+        assert.match(error.stack, /HARNESS_TIMEOUT.*expected completion/);
+        assert.match(error.stack, /elapsed=5000ms.*watcher not ready/);
+        assert.ok(error.stack.includes(primary.stack));
+        assert.ok(error.stack.includes(cleanup.stack));
+        return true;
+    });
+    const oversized = new Error("x".repeat(20000)); oversized.cause = oversized;
+    await assert.rejects(finishFixture({ failure: oversized }), error => {
+        assert.ok(error.message.length < 1100);
+        assert.ok(error.stack.length < 12000);
+        return true;
+    });
 });
 
 test("detailed browser exceptions retain the failed assertion and stack", async () => {

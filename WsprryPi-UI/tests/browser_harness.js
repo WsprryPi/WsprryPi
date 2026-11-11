@@ -292,6 +292,19 @@ async function closeServer(server) {
     await bounded("HTTP fixture cleanup", 5000, () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 }
 
+function failureDetails(errors) {
+    const seen = new Set(), details = [];
+    const visit = (error, depth = 0) => {
+        if (seen.has(error) || depth > 4 || details.length >= 16) return;
+        seen.add(error);
+        details.push(`${error?.code ? error.code + ": " : ""}${error?.stack || error?.message || String(error)}`.slice(0, 2048));
+        if (Array.isArray(error?.errors)) for (const nested of error.errors) visit(nested, depth + 1);
+        if (error?.cause) visit(error.cause, depth + 1);
+    };
+    for (const error of errors) visit(error);
+    return details.join("\nCaused by:\n").slice(0, 8192);
+}
+
 async function finishFixture({ failure, client, browser, php, profile, cleanups = [] } = {}) {
     const owned = profile && profiles.get(profile);
     browser ||= owned?.child;
@@ -306,7 +319,9 @@ async function finishFixture({ failure, client, browser, php, profile, cleanups 
         if (await attempt(() => fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }))) profiles.delete(profile);
     }
     if (errors.length) {
-        const error = new AggregateError(errors, "Browser workflow or cleanup failed", { cause: failure || errors[0] });
+        const summary = errors.map(error => `${error?.code ? error.code + ": " : ""}${error?.message || String(error)}`).join("; ").slice(0, 1024);
+        const error = new AggregateError(errors, "Browser workflow or cleanup failed: " + summary, { cause: failure || errors[0] });
+        error.stack += "\nFixture failure details:\n" + failureDetails(errors);
         // Preserve ownership on failure without dumping sockets or request payloads to logs.
         Object.defineProperty(error, "resources", { value: { browser, client, profile } });
         throw error;
