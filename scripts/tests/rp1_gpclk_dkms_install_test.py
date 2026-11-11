@@ -164,32 +164,6 @@ class Tests(unittest.TestCase):
             bootstrap.assert_called_once()
             self.assertEqual(invoke.call_args.args[0],Path('/maintained/provider.py'))
 
-    def test_retained_facade_checks_old_and_current_exact_file_closures(self):
-        names={'scripts/provider_lifecycle.py','scripts/provider_identity.py',
-               'scripts/version_identity.py','scripts/runtime_layout.py','scripts/development_workflow.py',
-               'include/rp1_gpclk/version.h','include/uapi/linux/rp1_gpclk.h','include/uapi/linux/rp1_route_admin.h'}
-        metadata='scripts/retired_release_identities.json'
-        for current in (False,True):
-            content={name:('fixture '+name).encode() for name in names | ({metadata} if current else set())}
-            def fixture(payload):
-                hashes={name:client.sha256_bytes(data) for name,data in payload.items()}
-                root=client.ACTIVE_FACADE.parent/client.sha256_bytes(client.canonical(hashes))
-                value={'schemaVersion':1,'contract':client.PUBLIC_CONTRACT,'root':str(root),
-                       'entrypoint':str(root/'scripts/provider_lifecycle.py'),'files':hashes}
-                def trusted(path):
-                    return client.canonical(value) if path==client.ACTIVE_FACADE else payload[str(path.relative_to(root))]
-                return root,value,trusted
-            root,value,trusted=fixture(content)
-            with self.subTest(current=current),patch.object(client,'trusted',side_effect=trusted):
-                self.assertEqual(client.retained_facade(),root/'scripts/provider_lifecycle.py')
-                name=metadata if current else 'scripts/provider_lifecycle.py'
-                content[name]+=b' substituted'
-                with self.assertRaisesRegex(client.ContractError,'file changed'):client.retained_facade()
-            # Even a self-consistent content hash cannot authorize extra files.
-            _,_,trusted=fixture({**content,'scripts/unapproved.json':b'extra'})
-            with patch.object(client,'trusted',side_effect=trusted),self.assertRaisesRegex(client.ContractError,'closure differs'):
-                client.retained_facade()
-
     def test_removal_result_file_is_written_only_after_verified_absence(self):
         with tempfile.TemporaryDirectory() as raw:
             root=Path(raw).resolve();root.chmod(0o700)

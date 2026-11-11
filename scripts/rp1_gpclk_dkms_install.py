@@ -289,11 +289,7 @@ def retained_facade():
     require(value['entrypoint']==str(root/'scripts/provider_lifecycle.py'),'retained provider entrypoint differs')
     expected={'scripts/provider_lifecycle.py','scripts/provider_identity.py','scripts/version_identity.py','scripts/runtime_layout.py','scripts/development_workflow.py',
               'include/rp1_gpclk/version.h','include/uapi/linux/rp1_gpclk.h','include/uapi/linux/rp1_route_admin.h'}
-    # Current tooling also retains its reviewed release integrity records.
-    # Older closures remain valid; arbitrary additional files do not.
-    require(isinstance(value.get('files'),dict)
-            and set(value['files']) in (expected, expected | {'scripts/retired_release_identities.json'}),
-            'retained provider closure differs')
+    require(isinstance(value.get('files'),dict) and set(value['files'])==expected,'retained provider closure differs')
     require(sha256_bytes(canonical(value['files']))==root.name,'retained provider closure identity differs')
     for name,digest in value['files'].items():
         require(isinstance(digest,str) and SHA256.fullmatch(digest) and sha256_bytes(trusted(root/name))==digest,
