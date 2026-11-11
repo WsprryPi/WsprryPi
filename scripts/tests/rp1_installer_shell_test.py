@@ -602,7 +602,14 @@ remove_owned_rp1_gpclk_dkms_provider debug
         self.assertIn('[[ "$ACTION" == "install" ]] || return 0', install_source)
         self.assertIn('*route_args, "--output-inhibit", "1", "--install"', helper_source)
         self.assertNotIn('"--live-output"', helper_source)
-        self.assertNotRegex(helper_source, r'\["(?:dtoverlay|modprobe|insmod|rmmod|systemctl|service|reboot|shutdown)"')
+        self.assertNotRegex(helper_source, r'\["(?:dtoverlay|modprobe|insmod|rmmod|service|reboot|shutdown)"')
+        # Passive predecessor recovery observes unit state without administering
+        # services. Every direct systemctl operation except show remains banned.
+        systemctl_effect = r'\["systemctl"(?!,\s*"show"(?:,|\]))'
+        self.assertNotRegex(helper_source, systemctl_effect)
+        for operation in ("start", "stop", "restart", "enable", "disable", "daemon-reload"):
+            with self.subTest(operation=operation):
+                self.assertRegex(f'["systemctl", "{operation}", unit]', systemctl_effect)
         self.assertNotRegex(helper_source, r"config\.txt[^\n]*(?:write|replace|unlink)")
 
     def test_packages_precede_planning_and_runtime_recovery_precedes_apply(self):
