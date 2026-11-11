@@ -30,14 +30,14 @@ def identity(version='12.34.56-rc.2+developer'):
 
 
 class Tests(unittest.TestCase):
-    def test_auto_and_release_select_prereleases_for_both_application_channels(self):
+    def test_pinned_default_and_explicit_release_selection_for_both_application_channels(self):
         def release(tag, **extra):
             return {'tag_name':tag,'draft':False,'prerelease':'-' in tag,'published_at':'2026-11-06T00:00:00Z',
                     'assets':[{'name':name} for name in ['SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json']],**extra}
         releases=[release('v0.9.0'),release('v1.0.0-rc.1'),release('v1.0.0-rc.10'),
-                  release('v1.0.0-rc.2'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
+                  release('v1.0.0-rc.2'),release('v1.0.0'),release('v2.0.0-rc.10'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
         for selector,policy in [('auto','development'),('auto','production'),('release','explicit-source'),('release:v1.0.0-rc.1','explicit-source'),('release:1.0.0-rc.1','explicit-source')]:
-            expected='v1.0.0-rc.10' if selector=='release' else 'v1.0.0-rc.2' if selector=='auto' else 'v1.0.0-rc.1'
+            expected='v2.0.0-rc.10' if selector=='release' else 'v1.0.0' if selector=='auto' else 'v1.0.0-rc.1'
             response=releases if selector=='release' else release(expected)
             with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json',return_value=response), \
                  patch.object(client.subprocess,'run') as run,patch.object(client,'run_git',return_value='a'*40), \
@@ -51,6 +51,29 @@ class Tests(unittest.TestCase):
                 self.assertEqual(run.call_args_list[-1].args[0][-1],'origin/devel')
         self.assertGreater(client.release_precedence('v1.0.0'),client.release_precedence('v1.0.0-rc.10'))
         self.assertEqual(client.release_precedence('v1.0.0+build'),client.release_precedence('v1.0.0'))
+
+    def test_default_release_failures_do_not_clone_or_fall_back(self):
+        good={'tag_name':'v1.0.0','draft':False,'prerelease':False,
+              'published_at':'2026-11-11T17:47:05Z',
+              'assets':[{'name':name} for name in
+                        ['SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json']]}
+        cases=[{**good,'draft':True},{**good,'published_at':None},
+               {**good,'assets':[]},{**good,'tag_name':'v1.0.0-rc.2'},
+               {**good,'tag_name':'v2.0.0'},{}]
+        for policy in ['development','production']:
+            for response in cases:
+                with self.subTest(policy=policy,response=response),tempfile.TemporaryDirectory() as raw, \
+                     patch.object(client,'fetch_json',return_value=response) as fetch, \
+                     patch.object(client.subprocess,'run') as run:
+                    with self.assertRaises(client.ContractError):client.bootstrap(Path(raw),'auto',policy)
+                    fetch.assert_called_once_with('https://api.github.com/repos/'+client.REPOSITORY+'/releases/tags/v1.0.0')
+                    run.assert_not_called()
+            with tempfile.TemporaryDirectory() as raw, \
+                 patch.object(client,'fetch_json',side_effect=OSError('release unavailable')) as fetch, \
+                 patch.object(client.subprocess,'run') as run:
+                with self.assertRaises(OSError):client.bootstrap(Path(raw),'auto',policy)
+                self.assertEqual(fetch.call_count,1)
+                run.assert_not_called()
 
     def test_obsolete_authorities_and_application_receipt_cannot_be_adopted(self):
         for repository in ('WsprryPi/RP1-DKMS', 'WsprryPi/RP1-GPCLK-DKMS'):

@@ -26,7 +26,7 @@ capabilities from `config/rp1-provider-requirements.json`. Product versions are
 derived by the provider from its canonical header. Identical inputs are repeat
 installations; changed inputs at the same version are replacements. Compatible
 newer versions are upgrades. Downgrades require owning removal and reinstall.
-The application does not parse provider Python files or pin one product version.
+The application does not parse provider Python files. Interface acceptance is independent of the selected product version.
 
 Provider effects use opaque, digest-bound plans. Unexpected receipt or plan
 changes stop the operation. Errors preserve recovery inputs and stop application
@@ -71,7 +71,7 @@ not assert current-boot ownership.
 
 `RP1_GPCLK_DKMS_SOURCE` accepts exactly:
 
-- `auto` (default): select published `v1.0.0-rc.2`, independently of the
+- `auto` (default): select published `v1.0.0`, independently of the
   WsprryPi branch;
 - `release`: select the latest eligible published release, including prereleases;
 - `release:TAG`: select an exact published release, including prereleases;
@@ -114,7 +114,7 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 An explicit release selector accepts `release:1.0.0-rc.1` or
 `release:v1.0.0-rc.1`. Both select the published tag `v1.0.0-rc.1`.
 
-Automatic selection uses `v1.0.0-rc.2`. Explicit `release` selection uses the
+Automatic selection uses `v1.0.0`. Explicit `release` selection uses the
 highest semantic version among eligible published releases, including prereleases,
 from `WsprryPi/RP1-GPIO-CLK-DKMS`. The application authenticates the source and selects a
 release; the provider verifies its manifest, checksums, package, compatibility,

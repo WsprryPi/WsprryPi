@@ -467,11 +467,11 @@ jobs:
         working-directory: WsprryPi-UI
         run: npm run test:browser
 
-      - name: Read-only RP1-GPIO-CLK-DKMS prerelease reference
+      - name: Read-only RP1-GPIO-CLK-DKMS stable reference
         uses: actions/checkout@v7
         with:
           repository: WsprryPi/RP1-GPIO-CLK-DKMS
-          ref: 05592b54a8b28ef94a328bbbfbd72e8d30e5854a # maintained lifecycle tooling; RC1 package remains release-selected
+          ref: e17d710499e8c7c630d2eda6adececd7f6b797f5 # v1.0.0 provider source; package remains release-selected
           path: src/build/rp1-provider-reference
           persist-credentials: false
 
