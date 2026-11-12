@@ -387,6 +387,7 @@
                 </details>
                 <p class="form-text mt-2" id="wtp-member-station-feedback" role="status" aria-live="polite"></p>
                 <div class="mt-3">
+                    <div id="wtp-gray-line-controls"></div>
                     <div class="row g-3" id="wtp-member-beacon-controls"></div>
                     <p class="form-text mt-0" id="wtp-member-beacon-saved">Load member resources to read the saved schedule.</p>
                     <button type="button" class="btn btn-outline-primary" id="wtp-member-beacon-save" disabled>Save beacon schedule</button>

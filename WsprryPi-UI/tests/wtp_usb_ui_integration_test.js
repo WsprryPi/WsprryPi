@@ -147,6 +147,44 @@ async function main() {
         await evaluate("document.getElementById('fleet-edit').click()");
         assert.equal(await evaluate("document.getElementById('fleet-uncertainty').value"),"1000000");
         assert.equal(await evaluate("document.getElementById('fleet-name').value"),"Bench Pico renamed");
+        // Actual shared editor and Pi wrapper produce the current protected
+        // resource request; the paired suite separately exercises its real carrier.
+        await evaluate(`(() => {
+            const previous=window.fetch;window.__graySettings=WsprryGrayLine.defaults();window.__grayRevision=1;window.__grayWrites=[];
+            window.fetch=async(url,options={})=>{
+                if(!String(url).endsWith('/member/gray-line'))return previous(url,options);
+                if(options.method==='PUT') {
+                    const body=JSON.parse(options.body);window.__grayWrites.push({body,revision:options.headers['If-Match']});
+                    // Production C++ serializes object keys in sorted order.
+                    const sorted=value=>Array.isArray(value)?value.map(sorted):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,sorted(value[key])])):value;
+                    window.__graySettings=sorted(body.settings);window.__grayRevision++;
+                }
+                return {ok:true,status:200,headers:{get:()=> '"gray-'+window.__grayRevision+'"'},json:async()=>({contract:'Wsprry-Control/1',schema:'gray-line',
+                    target:{scope:'member',device_id:'a'.repeat(32),boot_id:'b'.repeat(32)},saved:window.__graySettings,storage_healthy:true,runtime:{selection:'ordinary',prolonged_window:false}})};
+            };
+            WtpManagement.setAvailability(true,true);document.getElementById('wtp-management').open=true;
+            document.querySelector('#wtp-gray-line-controls [data-action="read"]').click();
+        })()`);
+        await waitFor(async()=>await evaluate(`!document.querySelector('#wtp-gray-line-controls [data-gray="morning.enabled"]').matches(':disabled')`),'gray-line readback');
+        await evaluate(`(()=>{const input=document.querySelector('#wtp-gray-line-controls [data-gray="morning.enabled"]');input.checked=true;input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#wtp-gray-line-controls [data-action="save"]').click();})()`);
+        await waitFor(async()=>await evaluate(`window.__grayWrites.length===1 && document.querySelector('#wtp-gray-line-controls [role="status"]').textContent.includes('saved for future')`),'gray-line save');
+        const grayWrite=await evaluate('window.__grayWrites[0]');
+        assert.equal(grayWrite.body.contract,'Wsprry-Control/1');assert.equal(grayWrite.body.schema,'gray-line');
+        assert.deepEqual(grayWrite.body.target,{scope:'member',device_id:'a'.repeat(32),boot_id:'b'.repeat(32)});
+        assert.equal(grayWrite.body.settings.morning.enabled,true);assert.equal(grayWrite.revision,'"gray-1"');
+        for(const [name,width,height] of [['desktop',1440,1100],['mobile',390,844]]) {
+            await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
+            for(const theme of ['light','dark']) {
+                await evaluate(`applyThemePreference('${theme}');document.getElementById('wtp-management').open=true;document.getElementById('wtp-gray-line-controls').scrollIntoView({block:'start',behavior:'instant'})`);
+                await client.settleRendering();
+                assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+                const clip=await evaluate(`(()=>{const r=document.getElementById('wtp-gray-line-controls').getBoundingClientRect();return {x:0,y:r.top+scrollY,width:innerWidth,height:Math.ceil(r.height),scale:1}})()`);
+                assert(clip.height>200);
+                const shot=await client.send('Page.captureScreenshot',{format:'png',clip,captureBeyondViewport:true});
+                fs.writeFileSync(path.join(output,`gray-line-${name}-${theme}.png`),Buffer.from(shot.data,'base64'));
+            }
+        }
+        console.log('Shipped gray-line editor: target/revision/contract producer, confirmed save, desktop/mobile and both themes passed');
         fs.writeFileSync(path.join(output,"checks.json"),JSON.stringify(findings,null,2)+"\n");
         console.log("Rendered Fleet navigation, configured common name and USB no-network/logging editors at desktop/mobile in light/dark; uncertainty veto controls stay hidden, stored values survive explicit profile rename/save/reload, visible focus and layout passed");
         console.log(output);

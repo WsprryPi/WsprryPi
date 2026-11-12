@@ -4,6 +4,7 @@ const controlRequest=require('./control_pair_request.js');
 const assert=require("node:assert/strict"), readline=require("node:readline");
 const {spawnFixtureChild:spawn,finishChildren}=require("./browser_fixture_process.js");
 const {browser,reply,target}=require("./wtp_usb_settings_test.js");
+const {grayLineCases}=require('./gray_line_pair_cases.js');
 const {driveCases}=require("./gpio_drive_pair_cases.js");
 (async()=>{
     const args=process.argv.slice(2);if(!args.length)throw new Error("Usage: node wtp_usb_pair_test.js CLIENT_COMMAND [arguments]");
@@ -69,6 +70,7 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         const selectedDial=await request({raw_resource:'standalone-frequency',method:'PUT',revision:dial.etag,
             body:JSON.stringify({contract:'Wsprry-Control/1',schema:'standalone-frequency',target,frequency_hz:3568737})});
         assert.equal(selectedDial.status,200,JSON.stringify(selectedDial));assert.equal(selectedDial.body.frequency_hz,3568737);
+        await grayLineCases(request);
         // An incomplete saved draft and Pico-owned hostname are independent of applied station settings.
         const independentDraft=await request({raw_resource:'progress'});
         const savedDraft=await request({raw_resource:'progress/update',method:'POST',revision:independentDraft.etag,

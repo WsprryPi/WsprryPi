@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Lee Bussy
 #include "configuration.hpp"
 #include "gps_contract.hpp"
+#include "gray_line_contract.hpp"
 #include "consumer_radio.hpp"
 #include "browser_api.hpp"
 #include "control_contract.hpp"
@@ -94,9 +95,10 @@ bool si_allocation(const Json &config, const Json &selectors = Json::array()) {
 bool shape(const Json &j, bool partial, bool redacted) {
   if (!partial && j.dump().size() > 4096) return false;
   if (!(partial ? fields(j, {}, {"enabled", "station", "wifi", "schedules", "pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps"}) && !j.empty()
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps", "gray_line"}) && !j.empty()
       : fields(j, {"enabled", "station", "wifi", "schedules"}, {"pins",
-        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps"}))) return false;
+        "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps", "gray_line"}))) return false;
+  if (j.contains("gray_line") && !gray_line_contract::settings(j["gray_line"])) return false;
   if (j.contains("gps") && !(j["gps"].is_null() ? !redacted : gps_contract::settings(j["gps"]))) return false;
   if (!partial && !gps_contract::allocation(j)) return false;
   if (j.contains("si5351") && !(j["si5351"].is_null() ? !redacted : si_settings(j["si5351"]))) return false;
@@ -415,6 +417,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     require(caps.is_object(),"unsupported_remote_contract",409);
     require(caps.contains("si5351") && supported_descriptor(caps["si5351"],"si5351"),"unsupported_si5351_capabilities",409);
     require(caps.contains("gps") && supported_descriptor(caps["gps"],"gps"),"unsupported_gps_capabilities",409);
+    if (method == "POST" && input["config"].contains("gray_line"))
+      require(caps.contains("gray_line") && supported_descriptor(caps["gray_line"],"gray_line"),"unsupported_gray_line_capabilities",409);
     require(caps.contains("application_resources"),
         "unsupported_configuration_context",409);
     if (caps.contains("management_carriers")) {
@@ -1138,6 +1142,56 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if (resource == "gray-line") {
+    bool attempted=false;
+    try {
+      require((method=="GET" && body.empty()) || method=="PUT", "not_found",404);
+      require(identity(device) && identity(boot),"member_identity_unavailable",409);
+      require(body.size()<=2048,"body_too_large",413);
+      const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+      Json input;
+      if(method=="PUT") {
+        require(etag(revision),"revision_required",428);
+        try { input=control_document(body); }
+        catch(const Rejected&) {throw;}
+        catch(...) {throw Rejected{400,"invalid_json"};}
+        require(fields(input,{"schema","target","settings"}) && input["schema"]=="gray-line" &&
+          input["target"]==target && gray_line_contract::settings(input["settings"]),"invalid_gray_line",400);
+      }
+      const auto cr=exchange("capabilities","GET",{},{});success(cr);const auto caps=parsed(cr,true);
+      require(caps.contains("gray_line") && supported_descriptor(caps["gray_line"],"gray_line"),"unsupported_gray_line_capabilities",409);
+      require(caps.contains("management_carriers") && valid_management_descriptor(caps["management_carriers"],carrier),"unsupported_management_contract",409);
+      const auto mr=exchange("management","GET",{},{});success(mr);
+      require(valid_management_contract(strict_browser_json(mr.body),carrier,device,boot,generation),"unsupported_management_contract",409);
+      const auto checked=[&](const PicoHttpResponse& result) {
+        success(result);const auto value=parsed(result);
+        require(fields(value,{"schema","target","saved","storage_healthy","runtime"}) &&
+          value["schema"]=="gray-line" && value["target"]==target && etag(result.etag) &&
+          value["storage_healthy"].is_boolean() && (value["saved"].is_null() || gray_line_contract::settings(value["saved"])) &&
+          (value["storage_healthy"]==true || value["saved"].is_null()) && fields(value["runtime"],{"selection","prolonged_window"}) && value["runtime"]["prolonged_window"].is_boolean() &&
+          value["runtime"]["selection"].is_string(),"invalid_remote_resource");
+        const auto state=value["runtime"]["selection"].get<std::string>();
+        require(state=="disabled" || state=="ordinary" || state=="morning" || state=="evening" ||
+          state=="waiting_for_location" || state=="waiting_for_time","invalid_remote_resource");
+        return result;
+      };
+      const auto read=[&]() {return checked(exchange(resource,"GET",{},{}));};
+      const auto before=read();
+      if(method=="GET") return before;
+      require(before.etag==revision,"revision_conflict",412);
+      require(parsed(before)["storage_healthy"]==true && !parsed(before)["saved"].is_null(),"not_configured",409);
+      const auto sr=exchange("status","GET",{},{});success(sr);const auto job=parsed(sr).at("job");
+      require(job.at("boot_id")==boot && job.at("output_active")==false && job.at("owner_id").is_null() &&
+        (job.at("state")=="empty" || job.at("state")=="complete" || job.at("state")=="aborted" || job.at("state")=="missed"),"remote_busy_or_output_unresolved",409);
+      attempted=true;
+      const auto result=checked(exchange(resource,"PUT",body,revision));
+      const auto confirmed=read();
+      require(result.etag==confirmed.etag && result.etag!=revision && parsed(result)["target"]==target &&
+        parsed(result)["saved"]==input["settings"] && parsed(confirmed)["saved"]==input["settings"],"management_outcome_unknown");
+      return result;
+    } catch(const Rejected& e) {return {e.status,Json{{"error",{{"code",e.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
+      catch(...) {return {502,Json{{"error",{{"code",attempted ? "management_outcome_unknown" : "invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
+  }
   if (resource == "si5351" || resource == "gps") {
     try {
       require(method=="GET" && body.empty(),"not_found",404);
