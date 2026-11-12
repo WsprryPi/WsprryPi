@@ -76,12 +76,12 @@
       return value;
     }
     function render() {
-      fieldset.disabled=!readable||busy||!observed||!revision;
+      fieldset.disabled=!readable||busy||!observed?.saved||!revision;
       button('read').disabled=!readable||busy;
       let validation='';try{draft();}catch(e){validation=e.message;}
       button('save').disabled=fieldset.disabled||!writable||!dirty||review||Boolean(validation);
-      button('discard').disabled=busy||!observed;
-      button('adopt').hidden=!review;button('adopt').disabled=busy||!observed||!revision;
+      button('discard').disabled=busy||!observed?.saved;
+      button('adopt').hidden=!review;button('adopt').disabled=busy||!observed?.saved||!revision;
       for(const input of inputs)input.setAttribute('aria-invalid',String(dirty&&Boolean(validation)));
       if(dirty&&validation)status.textContent=validation;
     }
@@ -91,10 +91,14 @@
       try {
         const r=await exchange('GET');
         if(ticket!==epoch)return;
-        if(!r.revision||!readback(r.data,expectedTarget())||r.data.storage_healthy!==true||r.data.saved===null)throw Error('Gray-line settings are unavailable or belong to another Pico. Check station setup and read again.');
+        if(!r.revision||!readback(r.data,expectedTarget())||r.data.storage_healthy!==true)throw Error('Gray-line settings are unavailable or belong to another Pico. Check station setup and read again.');
         observed=r.data;revision=r.revision;
-        if(!dirty){fill(observed.saved);draftTarget=identity(observed);}
+        if(!dirty){fill(observed.saved || defaults());draftTarget=identity(observed);}
         review=dirty && draftTarget!==identity(observed);
+        if(observed.saved===null){
+          status.textContent='No standalone station configuration is applied. Apply the standalone station settings before editing gray-line settings.'+(dirty?' Your entries are preserved.':'');
+          return;
+        }
         status.textContent=`Current solar selection: ${observed.runtime.selection.replaceAll('_',' ')}.${observed.runtime.prolonged_window?' The daily solar range stays inside this window.':''} ${dirty?'Your entries are preserved. ':''}${review?'Review this Pico, then choose Use entries for this Pico.':''}`;
       }catch(e){if(ticket===epoch){status.textContent=e.message;onError(e);}}
       finally{busy=false;render();}
@@ -115,8 +119,8 @@
     }
     container.addEventListener('input',e=>{if(e.target.matches('[data-gray]')){dirty=true;if(observed&&!review)draftTarget=identity(observed);status.textContent=review?'Review this Pico before saving your entries.':'Your gray-line entries are not saved.';render();}});
     button('read').onclick=()=>run(read);button('save').onclick=()=>run(save);
-    button('discard').onclick=()=>{if(observed){fill(observed.saved);dirty=review=false;draftTarget=identity(observed);status.textContent='Entries restored from saved settings.';render();}};
-    button('adopt').onclick=()=>{if(observed){review=false;draftTarget=identity(observed);render();}};
+    button('discard').onclick=()=>{if(!button('discard').disabled){fill(observed.saved);dirty=review=false;draftTarget=identity(observed);status.textContent='Entries restored from saved settings.';render();}};
+    button('adopt').onclick=()=>{if(!button('adopt').disabled){review=false;draftTarget=identity(observed);render();}};
     if(bootstrap) {
       for(const field of inputs)field.classList.add(field.type==='checkbox'?'form-check-input':field.tagName==='SELECT'?'form-select':'form-control');
       for(const check of container.querySelectorAll('input[type=checkbox]'))check.classList.add('m-0','flex-shrink-0');
