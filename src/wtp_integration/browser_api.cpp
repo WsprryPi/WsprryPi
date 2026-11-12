@@ -87,10 +87,10 @@ PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
     if (r.method == "POST") { usb_resource_reads_.clear(); member_context_.clear(); member_revision_.clear(); legacy_read_required_ = true; alias_reads_required_ = {"network"}; }
     return management_("member/management", r.method, r.body, {}, {});
   }
-  for (const std::string resource : {"wifi","hostname","logging","udp-logging","udp-logging/capabilities","udp-logging/test","udp-logging/test/capabilities","restart","ap","progress","progress/update","progress/apply","gpio-drive","gpio-drive-progress","amplifier-timing","filter-selector","si5351","gps"}) {
+  for (const std::string resource : {"wifi","hostname","logging","udp-logging","udp-logging/capabilities","udp-logging/test","udp-logging/test/capabilities","restart","ap","progress","progress/update","progress/apply","gpio-drive","gpio-drive-progress","amplifier-timing","filter-selector","si5351","gps","gray-line"}) {
     if (r.path != "/api/control/v1/member/" + resource) continue;
-    const bool read = r.method == "GET" && (resource == "gps" || resource == "si5351" || resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "progress" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "gpio-drive-progress");
-    const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector") || resource == "gpio-drive-progress")) ||
+    const bool read = r.method == "GET" && (resource == "gps" || resource == "si5351" || resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || resource == "udp-logging/capabilities" || resource == "udp-logging/test/capabilities" || resource == "progress" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector" || resource == "gray-line") || resource == "gpio-drive-progress");
+    const bool write = (r.method == "PUT" && (resource == "wifi" || resource == "hostname" || resource == "logging" || resource == "udp-logging" || (resource == "gpio-drive" || resource == "amplifier-timing" || resource == "filter-selector" || resource == "gray-line") || resource == "gpio-drive-progress")) ||
         (r.method == "DELETE" && resource == "wifi") ||
         (r.method == "POST" && (resource == "udp-logging/test" || resource == "gpio-drive-progress" || resource == "restart" || resource == "ap" || resource == "progress/update" || resource == "progress/apply"));
     if (!read && !write) return error(404,"not_found");
@@ -101,7 +101,7 @@ PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
       const auto state=management_("member/management","GET",{},{},{});
       if (state.status!=200) return error(409,"member_read_required");
       const auto value=strict_browser_json(state.body);
-      if (!resource.starts_with("udp-logging") && resource != "gpio-drive" && resource != "amplifier-timing" && resource != "filter-selector" && resource != "si5351" && resource != "gps" && resource != "gpio-drive-progress" && !resource.starts_with("progress") && value.value("carrier","")!="usb_physical") return error(409,"usb_management_required");
+      if (!resource.starts_with("udp-logging") && resource != "gpio-drive" && resource != "amplifier-timing" && resource != "filter-selector" && resource != "si5351" && resource != "gps" && resource != "gray-line" && resource != "gpio-drive-progress" && !resource.starts_with("progress") && value.value("carrier","")!="usb_physical") return error(409,"usb_management_required");
       selection=value.at("selection_id").get<std::string>();
     } catch (...) { return error(409,"member_read_required"); }
     const auto key=resource=="udp-logging/test"?"udp-logging":resource.starts_with("progress/")?"progress":(resource=="restart" || resource=="ap")?"hostname":resource;

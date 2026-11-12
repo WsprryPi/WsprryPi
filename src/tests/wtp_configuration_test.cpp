@@ -21,7 +21,7 @@ Json canonical_caps() {
     {"features",Json::object()},{"active_job_connections",false},{"max_network_connections",2},{"max_wtp_connections",1},
     {"max_pending_connections",1},{"max_handshakes",1},{"max_body_bytes",32768}};
   for(const auto name:{"config","schedules","jobs","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
-  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps"})result[name]=Json::parse(control_descriptor(name));
+  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line"})result[name]=Json::parse(control_descriptor(name));
   return result;
 }
 Json management() {

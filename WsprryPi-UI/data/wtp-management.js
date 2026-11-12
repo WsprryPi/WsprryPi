@@ -264,7 +264,7 @@
         }
     }
     function invalidateEditors() {
-        driveEditor?.invalidate(); timingEditor?.invalidate(); filterEditor?.invalidate();
+        driveEditor?.invalidate(); timingEditor?.invalidate(); filterEditor?.invalidate(); grayLineEditor?.invalidate();
         root.WtpUsbSettings?.invalidate();
         root.WsprryMemberUdp?.invalidate();
         invalidateProgress();
@@ -645,6 +645,14 @@
         if (!value || value.contract !== "Wsprry-Control/1") throw Error("The Pico control reply is incompatible. Update both applications and reload saved settings.");
         const result={...value}; delete result.contract; return result;
     }
+    const grayLineEditor = root.WsprryGrayLine?.mount(byId('wtp-gray-line-controls'), {bootstrap:true,
+        exchange:async(method,body,revision)=>{
+            const r=await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/gray-line',{
+                method,cache:'no-store',signal:AbortSignal.timeout(20000),...(body?{headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','If-Match':revision},body:JSON.stringify({...body,contract:'Wsprry-Control/1'})}:{})});
+            const data=await r.json();if(!r.ok)throw Error('Gray-line settings were refused or unconfirmed. Read saved settings and verify the selected Pico.');
+            return {data:controlValue(data),revision:r.headers.get('ETag')||''};
+        },afterSave:()=>{configRevision='';resources=null;render();}
+    });
     const filterEditor = root.WsprryFilters ? root.WsprryFilters.mount(byId('filter-selector-controls'), {
         pi:true,
         exchange:async(method,body,revision)=>{
@@ -682,7 +690,8 @@
         driveSelection = key;
         canSelect = selectable;
         available = !explicitDisconnected && (consumerConnected ? selectable : value);
-        driveEditor?.setAvailability(available); timingEditor?.setAvailability(available); filterEditor?.setAvailability(available);
+        driveEditor?.setAvailability(available); timingEditor?.setAvailability(available); grayLineEditor?.setAvailability(available, available && value);
+        filterEditor?.setAvailability(available);
         render();
         if (selectable && !selectionObserved && !busy) {
             selectionObserved = true;

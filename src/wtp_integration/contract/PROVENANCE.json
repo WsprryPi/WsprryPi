@@ -1,12 +1,13 @@
 {
   "repository": "https://github.com/WsprryPi/WsprryPico",
-  "source_base_revision": "20ff79d78ac4503dd0b14cb7139d04ab47787930",
+  "source_base_revision": "3a13528d94fbfd63ba2c762b8db71315f2e2737e",
   "source_uncommitted": false,
   "upstream": "engineering/protocol/control-1.schema.json",
-  "sha256": "14cf766d63a0167d42416a830e38d04797b77a68fb31329fc048993c074b60da",
-  "javascript_sha256": "df25ca91059e53018cc1991763fee423be9edee1c5ef200bd88373ac913ec0a2",
+  "sha256": "bd31a2329796cbb756ebf4e88b18e0311e9703e33a91f40066390ad17486043f",
+  "javascript_sha256": "f3ca81ff97b3ea48318372ab2195d8d0c5a830deb3b2efebd749b283cb0657e3",
   "si5351_javascript_sha256": "c0325caa6eebb5281bfa92843011312dd9fb87d5adaed86a5bebb7c6a001e889",
   "gps_javascript_sha256": "1d9a53e7e89aa6e12da1c73c65229998d9f10bf2a290185e258bf7db2bc5ad29",
+  "gray_line_javascript_sha256": "7aa36145a1907a31fdc39e906011d3beded461068d0825e1ab048ed8367ff375",
   "policy_sha256": "46a95e635eba9f28a511be54694b78f602e994fb8fa5fccac35218cbe32db9b5",
   "policy_checker_sha256": "e9c2c54cf7dfda629da1904698e035e7b5ded434c1531f3b9ad4a7bd94e200ae"
 }

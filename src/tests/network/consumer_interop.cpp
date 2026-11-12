@@ -955,6 +955,57 @@ void runtime_recovery_admission_cases() {
   }
 }
 
+void gray_line_cases() {
+  Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
+  const auto invoke=[&](const std::string& method,const std::string& body={},const std::string& revision={}) {
+    pi::PicoHttpResponse result;
+    assert(t.app->idle_management([&]{result=pi::pico_resource_request(
+      [&](auto p,auto m,auto b,auto e){return c->request(p,m,b,e);},
+      c->device(),c->boot(),"gray-line",method,body,revision,"consumer_station",c->generation());},true));
+    return result;
+  };
+  const auto before=invoke("GET");assert(before.status==200);
+  const auto original=Json::parse(before.body);auto settings=original.at("saved");
+  settings["morning"]["enabled"]=true;settings["morning"]["wspr_dial_frequency_hz"]=7038600;
+  Json edit={{"contract","Wsprry-Control/1"},{"schema","gray-line"},{"target",original.at("target")},{"settings",settings}};
+  assert(invoke("PUT","{",before.etag).status==400);
+  for(unsigned fault=0;fault<9;++fault) {
+    auto bad=edit;
+    if(fault==0)bad["target"]["boot_id"]=std::string(32,'f');
+    if(fault==1)bad["settings"]["morning"]["upper_mdeg"]=-6000;
+    if(fault==2)bad["settings"]["evening"]["extra"]=1;
+    if(fault==3)bad["contract"]="Wsprry-Control/0";
+    if(fault==4)bad["settings"]["morning"]["message_frequency_nhz"]="18446744073709551616";
+    if(fault==5)bad["schema"]="gray-line/0";
+    if(fault==6)bad["settings"]=Json::array();
+    if(fault==7)bad["settings"]["morning"]["wspr_dial_frequency_hz"]=1234567;
+    if(fault==8)bad["settings"]["evening"]["message_frequency_nhz"]="1";
+    assert(invoke("PUT",bad.dump(),before.etag).status>=400);
+    const auto unchanged=invoke("GET");assert(unchanged.etag==before.etag && Json::parse(unchanged.body).at("saved")==original.at("saved"));
+  }
+  for(unsigned fault=0;fault<3;++fault) {
+    unsigned writes=0;pi::PicoHttpResponse refused;
+    const auto hostile=[&](auto path,auto method,auto body,auto revision) {
+      if(method!="GET")++writes;
+      auto result=c->request(path,method,body,revision);
+      if(path=="capabilities" && result.status==200) {
+        auto value=Json::parse(result.body);
+        if(fault==0)value.erase("gray_line");
+        if(fault==1)value["gray_line"]["maximum"]=90001;
+        if(fault==2)value["gray_line"]["schema"]="gray-line/0";
+        result.body=value.dump();
+      }
+      return result;
+    };
+    assert(t.app->idle_management([&]{refused=pi::pico_resource_request(hostile,c->device(),c->boot(),
+      "gray-line","PUT",edit.dump(),before.etag,"consumer_station",c->generation());},true));
+    assert(refused.status==(fault==0?502U:409U) && writes==0);
+  }
+  const auto saved=invoke("PUT",edit.dump(),before.etag);assert(saved.status==200 && saved.etag!=before.etag);
+  assert(Json::parse(saved.body).at("saved")==settings);
+  assert(invoke("PUT",edit.dump(),before.etag).status==412);
+}
+
 void resource_admission_cases() {
   for (unsigned phase=0;phase<5;++phase) {
     Test t; auto c=t.client(); assert(c->login(device,"consumer_station","test-password").status==200);
@@ -1245,6 +1296,7 @@ int main(int argc, char **argv) {
   session_policy_cases();
   cases(false);
   cases(true);
+  gray_line_cases();
   resource_admission_cases();
   type23_profile_cases();
   {

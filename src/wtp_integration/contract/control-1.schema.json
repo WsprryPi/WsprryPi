@@ -30,7 +30,8 @@
     "consumer/password",
     "consumer/setup/api/owner/v1/public-status",
     "amplifier-timing",
-    "si5351"
+    "si5351",
+    "gray-line"
   ],
   "oneOf": [
     {
@@ -404,6 +405,12 @@
     },
     {
       "$ref": "#/$defs/gps"
+    },
+    {
+      "$ref": "#/$defs/gray-line"
+    },
+    {
+      "$ref": "#/$defs/gray-line-update"
     }
   ],
   "$defs": {
@@ -3788,6 +3795,9 @@
                   "$ref": "#/$defs/gps-settings"
                 }
               ]
+            },
+            "gray_line": {
+              "$ref": "#/$defs/gray-line-settings"
             }
           },
           "required": [
@@ -3866,6 +3876,9 @@
                   "$ref": "#/$defs/gps-settings"
                 }
               ]
+            },
+            "gray_line": {
+              "$ref": "#/$defs/gray-line-settings"
             }
           },
           "not": {
@@ -5277,7 +5290,8 @@
         "max_handshakes",
         "max_body_bytes",
         "si5351",
-        "gps"
+        "gps",
+        "gray_line"
       ],
       "properties": {
         "contract": {
@@ -6424,6 +6438,28 @@
               "const": 5
             }
           }
+        },
+        "gray_line": {
+          "const": {
+            "schema": "gray-line",
+            "read": "/api/control/v1/gray-line",
+            "write": "/api/control/v1/gray-line",
+            "method": "PUT",
+            "activation": "next_occurrence",
+            "recurrence_authority": "member",
+            "elevation_units": "millidegrees",
+            "minimum": -90000,
+            "maximum": 90000,
+            "default_lower": -6000,
+            "default_upper": 6000,
+            "lower_inclusive": true,
+            "upper_inclusive": false,
+            "unavailable_policy": "hold_occurrence",
+            "location_sources": [
+              "manual",
+              "gps"
+            ]
+          }
         }
       },
       "title": "Control/1 capabilities"
@@ -6530,6 +6566,9 @@
                       "$ref": "#/$defs/gps-settings"
                     }
                   ]
+                },
+                "gray_line": {
+                  "$ref": "#/$defs/gray-line-settings"
                 }
               }
             }
@@ -7061,8 +7100,8 @@
           "properties": {
             "GET": {
               "type": "array",
-              "minItems": 32,
-              "maxItems": 32,
+              "minItems": 33,
+              "maxItems": 33,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -7097,14 +7136,15 @@
                   "consumer/field",
                   "consumer/time",
                   "si5351",
-                  "gps"
+                  "gps",
+                  "gray-line"
                 ]
               }
             },
             "PUT": {
               "type": "array",
-              "minItems": 16,
-              "maxItems": 16,
+              "minItems": 17,
+              "maxItems": 17,
               "uniqueItems": true,
               "items": {
                 "enum": [
@@ -7123,7 +7163,8 @@
                   "consumer/password",
                   "message-schedule",
                   "logging",
-                  "consumer/field"
+                  "consumer/field",
+                  "gray-line"
                 ]
               }
             },
@@ -10258,6 +10299,195 @@
           }
         }
       ]
+    },
+    "gray-line-period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "lower_mdeg",
+        "upper_mdeg",
+        "wspr_dial_frequency_hz",
+        "message_frequency_nhz"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "lower_mdeg": {
+          "type": "integer",
+          "minimum": -90000,
+          "maximum": 89999
+        },
+        "upper_mdeg": {
+          "type": "integer",
+          "minimum": -89999,
+          "maximum": 90000
+        },
+        "wspr_dial_frequency_hz": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 6503,
+              "maximum": 159998496
+            }
+          ]
+        },
+        "message_frequency_nhz": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          ]
+        }
+      }
+    },
+    "gray-line-settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location",
+        "morning",
+        "evening"
+      ],
+      "properties": {
+        "location": {
+          "enum": [
+            "manual",
+            "gps"
+          ]
+        },
+        "morning": {
+          "$ref": "#/$defs/gray-line-period"
+        },
+        "evening": {
+          "$ref": "#/$defs/gray-line-period"
+        }
+      }
+    },
+    "gray-line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target",
+        "saved",
+        "storage_healthy",
+        "runtime"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "gray-line"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "device_id",
+            "boot_id"
+          ],
+          "properties": {
+            "scope": {
+              "const": "member"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "boot_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "saved": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/gray-line-settings"
+            }
+          ]
+        },
+        "storage_healthy": {
+          "type": "boolean"
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selection",
+            "prolonged_window"
+          ],
+          "properties": {
+            "selection": {
+              "enum": [
+                "disabled",
+                "ordinary",
+                "morning",
+                "evening",
+                "waiting_for_location",
+                "waiting_for_time"
+              ]
+            },
+            "prolonged_window": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "gray-line-update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "target",
+        "settings"
+      ],
+      "properties": {
+        "schema": {
+          "const": "gray-line"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope",
+            "device_id",
+            "boot_id"
+          ],
+          "properties": {
+            "scope": {
+              "const": "member"
+            },
+            "device_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "boot_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            }
+          }
+        },
+        "settings": {
+          "$ref": "#/$defs/gray-line-settings"
+        }
+      }
     }
   },
   "management_routes": {
@@ -10293,7 +10523,8 @@
       "consumer/field",
       "consumer/time",
       "si5351",
-      "gps"
+      "gps",
+      "gray-line"
     ],
     "PUT": [
       "network",
@@ -10311,7 +10542,8 @@
       "consumer/password",
       "message-schedule",
       "logging",
-      "consumer/field"
+      "consumer/field",
+      "gray-line"
     ],
     "POST": [
       "config/update",
@@ -10351,7 +10583,8 @@
     "filter-selector": 1792,
     "consumer/field": 512,
     "consumer/time/challenge": 512,
-    "consumer/time/submit": 512
+    "consumer/time/submit": 512,
+    "gray-line": 2048
   },
   "resource_descriptors": {
     "gpio_drive": {
@@ -10716,6 +10949,26 @@
       "message_delay_maximum_ms": 1999,
       "message_delay_span_maximum_ms": 999,
       "pulse_history_edges": 5
+    },
+    "gray_line": {
+      "schema": "gray-line",
+      "read": "/api/control/v1/gray-line",
+      "write": "/api/control/v1/gray-line",
+      "method": "PUT",
+      "activation": "next_occurrence",
+      "recurrence_authority": "member",
+      "elevation_units": "millidegrees",
+      "minimum": -90000,
+      "maximum": 90000,
+      "default_lower": -6000,
+      "default_upper": 6000,
+      "lower_inclusive": true,
+      "upper_inclusive": false,
+      "unavailable_policy": "hold_occurrence",
+      "location_sources": [
+        "manual",
+        "gps"
+      ]
     }
   },
   "descriptor_runtime_fields": {
@@ -10819,7 +11072,8 @@
         "filter-selector",
         "progress",
         "si5351",
-        "gps"
+        "gps",
+        "gray-line"
       ],
       "PUT": [
         "udp-logging",
@@ -10829,7 +11083,8 @@
         "hardware",
         "gpio-drive",
         "amplifier-timing",
-        "filter-selector"
+        "filter-selector",
+        "gray-line"
       ],
       "POST": [
         "udp-logging/test",
