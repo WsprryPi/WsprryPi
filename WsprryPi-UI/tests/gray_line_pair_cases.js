@@ -19,6 +19,9 @@ async function grayLineCases(request) {
     {settings:{...settings,morning:{...settings.morning,upper_mdeg:-6500}}},
     {settings:{...settings,morning:{...settings.morning,lower_mdeg:-90001}}},
     {settings:{...settings,morning:{...settings.morning,enabled:1}}},
+    {settings:{...settings,morning:{...settings.morning,wspr_dial_frequency_hz:1234567}}},
+    {settings:{...settings,evening:{...settings.evening,message_frequency_nhz:'1'}}},
+    {settings:{...settings,evening:{...settings.evening,message_frequency_nhz:'18446744073709551615'}}},
     {settings:{...settings,morning:{...settings.morning,message_frequency_nhz:'18446744073709551616'}}}
   ]) {
     const refused=await write(patch);assert(refused.status>=400,JSON.stringify(refused));

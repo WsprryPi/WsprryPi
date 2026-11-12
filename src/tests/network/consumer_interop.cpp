@@ -969,7 +969,7 @@ void gray_line_cases() {
   settings["morning"]["enabled"]=true;settings["morning"]["wspr_dial_frequency_hz"]=7038600;
   Json edit={{"contract","Wsprry-Control/1"},{"schema","gray-line"},{"target",original.at("target")},{"settings",settings}};
   assert(invoke("PUT","{",before.etag).status==400);
-  for(unsigned fault=0;fault<7;++fault) {
+  for(unsigned fault=0;fault<9;++fault) {
     auto bad=edit;
     if(fault==0)bad["target"]["boot_id"]=std::string(32,'f');
     if(fault==1)bad["settings"]["morning"]["upper_mdeg"]=-6000;
@@ -978,6 +978,8 @@ void gray_line_cases() {
     if(fault==4)bad["settings"]["morning"]["message_frequency_nhz"]="18446744073709551616";
     if(fault==5)bad["schema"]="gray-line/0";
     if(fault==6)bad["settings"]=Json::array();
+    if(fault==7)bad["settings"]["morning"]["wspr_dial_frequency_hz"]=1234567;
+    if(fault==8)bad["settings"]["evening"]["message_frequency_nhz"]="1";
     assert(invoke("PUT",bad.dump(),before.etag).status>=400);
     const auto unchanged=invoke("GET");assert(unchanged.etag==before.etag && Json::parse(unchanged.body).at("saved")==original.at("saved"));
   }
