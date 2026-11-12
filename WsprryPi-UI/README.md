@@ -25,7 +25,7 @@ in the [jQuery 4 migration guide](https://jquery.com/upgrade-guide/4.0/).
 That policy is not a qualification of the complete console on every listed
 browser. The browser fixtures use Chromium.
 
-`ws` 8.22.1 is a development-only dependency for browser fixtures; it is not a
+`ws` 8.22.2 is a development-only dependency for browser fixtures; it is not a
 browser library or a requirement on the installed UI host. Node.js remains
 required only for development/testing, with the existing minimum of 18.
 

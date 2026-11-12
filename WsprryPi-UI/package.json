@@ -11,7 +11,7 @@
     "test:browser": "node --test tests/browser_harness_test.js && node tests/rp1_pps_browser_test.js && node tests/linux_i2c_identity_browser_test.js && node tests/browser_fixture_process_test.js && node tests/dependency_browser_test.js && node tests/test_tone_lifecycle_integration_test.js && node tests/conditional_transmit_gpio_integration_test.js && node tests/cw_duration_latch_integration_test.js && node tests/support_intake_ui_integration_test.js"
   },
   "devDependencies": {
-    "ws": "8.22.1"
+    "ws": "8.22.2"
   },
   "engines": {
     "node": ">=18"
