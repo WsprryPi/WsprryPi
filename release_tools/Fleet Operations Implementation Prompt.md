@@ -94,6 +94,16 @@ the existing version-1 assignment file. A controller restart changes the
 incarnation and invalidates every old action/render baseline. A device reboot
 additionally invalidates its boot-bound observation and action eligibility.
 
+Keep a separate decimal-string control_revision per context within the
+incarnation. It advances for each newly accepted mutating intent and for a
+transition that revokes dispatch authority (Pause, takeover, or a real recovery
+latch), including no-op persisted writes. It is not the observation revision,
+configuration ETag, or assignment generation. Duplicate action replay does not
+advance it. All six mutation requests carry reviewed_control_revision (null for
+an uncreated assignment); reject a stale review before acceptance, including
+for Pause, using a fresh host read/review without requiring fresh device status.
+Overflow inhibits admission rather than wrapping or reusing a permit.
+
 Match HELLO's full ID/product to the saved assignment and show the carrier's
 actual trust meaning. Plain LAN is an expected-ID match, not cryptographic
 authentication. USB metadata and negotiated identity are separate evidence;
@@ -212,6 +222,14 @@ matched endpoint evidence confirms Armed. Forecast calculation neither consumes
 a slot nor creates a job. The browser may decrement a supplied countdown from
 the validated UTC/monotonic anchor, but never calculate recurrence or advance to
 another slot itself. An invalid clock anchor hides the countdown until refreshed.
+Retire pending_start when matching authoritative evidence establishes Running
+or terminal completion, or when its owner cancels/invalidates/misses the job.
+Keep the current execution/history separately; a retained request start field
+is not a still-pending start. At zero without matching execution evidence, use
+Awaiting status / start overdue without advancing state. A matching Running
+observation removes that overdue/countdown presentation immediately. Do not
+show a new forecast as if it were the just-finished job's committed next start.
+
 Offer a paused forecast only while Resume is currently eligible; otherwise
 publish null plus the blocking reason. A forecast never promises RF readiness.
 
@@ -344,6 +362,18 @@ software inspection deadline. Deadline expiry invalidates the observation;
 no late completion makes the context ready. This does not qualify physical
 kernel/USB shutdown bounds.
 
+On a genuine failed observation, latch recovery_required and revoke the
+context's dispatch permit before returning to the worker loop. The existing
+tick() calls inspect() before another slot, and connect_idle() can reopen a
+Disconnected session; that path must not bypass the latch or the one-initial-
+inspection limit. Pause the assignment through bounded persistence and report
+uncertainty if it cannot be committed. In the current manager, only explicit
+Reconcile can clear the allowed latch after fresh validation; healthy foreign
+occupancy is excluded from this failure rule. Persisted in-flight/retirement
+barriers remain authoritative across restart. A newly restored paused context
+may receive its approved initial read, but cannot automatically resume or claim
+that an old failed/unconfirmed action was resolved by the new incarnation.
+
 Once Ready and idle, call the existing poll_idle() on that same owner, at most
 once per second. Active/preparing/waiting work uses its existing scheduler's
 STATUS path; never add competing requests. Failed observation retains the
@@ -463,8 +493,8 @@ do not write the assignment file or change that ETag. Do not add compatibility
 views or a shared control major for these host-only changes.
 
 Each mutation carries a browser-generated random 128-bit action_id, the reviewed
-controller_incarnation and assignment_generation, a nullable reviewed_boot_id,
-and decimal-string accept_before_ms, in addition to its existing operation/body
+controller_incarnation, assignment_generation, reviewed_control_revision,
+a nullable reviewed_boot_id, and decimal-string accept_before_ms, in addition to its existing operation/body
 and If-Match. Obtain a fresh host clock/incarnation sample after confirmation
 without replacing the reviewed target/revision; set accept_before_ms to that
 sample plus 30,000 ms. A changed reviewed context requires review again.
@@ -517,6 +547,37 @@ such priority pause in addition to the active action (64 pending records across
 unbounded queue. Record supersession without declaring an outstanding transfer
 cancelled or quiescent. Check pause intent before any future CLAIM/LOAD/ARM.
 
+Give every accepted action a commit/dispatch permit tied to its context,
+control revision, and action ID. Priority Pause atomically revokes older permits
+and inhibits effective scheduling before asynchronous persistence. Check the
+permit before storage preparation/publication, accepting its result, and each
+new CLAIM/LOAD/ARM submission. Configuration ETag/generation checks alone are
+insufficient: writing enabled=false when already false leaves the ETag unchanged.
+A late Enable or Recover cannot commit activation, clear a barrier, or publish
+confirmed success after supersession. Evidence may be retained historically;
+only the current owner may adopt a still-valid cleanup receipt for its exact job.
+
+Already submitted transport or filesystem operations may finish after permit
+revocation. Do not claim they were cancelled: retain their resources/outcome,
+keep dispatch inhibited, and reconcile the saved paused state before confirming
+Pause. A stale enabled value on disk never grants the current process a new
+runtime enable permit. Only a subsequent eligible explicit start (Enable or assign with enabled=true),
+or validated normal startup from committed state without barriers, grants that
+authority.
+Positive start/activation permits are distinct from protective work. A new
+safety/recovery latch must not cancel independent stop or persistence of an
+already accepted Pause. The current owner may adopt that stop-only work under
+its new fence only for the same context/job, with no later authorized start;
+it cannot enable scheduling, clear a newer barrier, act on a foreign job, or
+turn a superseded action into confirmed success. Retain work_pending until all
+old transport/storage callbacks are quiescent before accepting a subsequent
+start. This is continuation of accepted protective work, not acceptance of a
+POST with a stale reviewed_control_revision.
+
+Serialize permit checks with request submission; do not hold admission locks
+over blocking I/O. Expose Pause during pending Enable even while the committed
+enabled flag is still false; it remains a guarded, confirmed action.
+
 Use these postconditions:
 
 - Enable is confirmed when the committed assignment is enabled after the
@@ -566,6 +627,31 @@ action reason to 128 UTF-8 bytes
 and other projected diagnostic text to 512 UTF-8 bytes, with explicit truncation
 indications and the serialized limits also enforced; never include credentials.
 Operations snapshots carry only relevant latest/pending records, not the entire ledger.
+
+Bound the tab's active action-reference journal to 64 entries: 32 ordinary
+slots and 32 reserved priority-Pause slots. Confirmed/refused results leave the
+active query set. Retire an expired/unknown reference only after authoritative
+current-state readback and explicit review, retaining at most one small Earlier
+action unconfirmed summary per displayed context instead of indefinite history.
+Never discard a genuinely pending reference merely because selection changes.
+At ordinary capacity, block another start/edit action until references are
+resolved/reviewed; keep the reserved Pause path available. An older stop reference
+may be retired for a new reviewed Pause only when it is no longer work_pending
+(or server evidence for that binding establishes quiescent retirement with
+no pending/uncertain work). Incarnation change alone is insufficient. Otherwise
+query the existing pending action rather than submit a competing stop.
+
+Use one nonoverlapping browser GET queue. Full Operations/Setup refresh has
+priority; after a full-refresh attempt, allow one action lookup of at most
+32 references before servicing the next due full refresh, provided the current
+incarnation is already established and not invalidated. A failed full refresh
+must not indefinitely starve lookup of known-incarnation actions; lookup still
+cannot establish a new incarnation. Rotate lookup
+batches fairly for the at most 64 references. Share these results with rendering
+and do not start a timer per device, action, or open disclosure. Hidden-page
+suspension and the existing read timeout still apply. Admission-clock reads use
+the same queue and take foreground priority after the current in-flight read;
+background action lookup cannot starve status or stop admission.
 
 The 45,000 ms browser mutation timeout releases the selection freeze but does
 not cancel the server action. Keep unresolved action references in sessionStorage
@@ -772,6 +858,22 @@ Add meaningful behavioral coverage for:
   verified live owner, failure before retirement intent is durable, operator
   Remove cleanup refusal retaining its row, and takeover removal remaining
   removed. Reconcile cannot silently delete a retained paused assignment.
+- Pause racing an accepted Enable with enabled already false and unchanged
+  ETag; late pre-Pause Enable delivery with an unexpired admission window;
+  superseded recovery, storage completion, and transport handoff. A stale
+  control review/permit cannot activate output or erase the current barrier.
+- An enabled idle context losing STATUS: repeated worker ticks never reconnect,
+  prepare, CLAIM, or ARM until explicit recovery. Distinguish healthy foreign
+  occupancy and preserve persisted pause/crash barriers on restart.
+- Recovery/transport failure after Pause acceptance: protective stop and paused
+  persistence continue under the current owner while positive start permits
+  are revoked. No new start is admitted before old callbacks are quiescent.
+- Pending countdown to authoritative Running/terminal, cancellation, and missed
+  start: no simultaneous Running and overdue-start claim, no countdown from
+  last_report, and no forecast promoted into an accepted pending occurrence.
+- Browser action-reference saturation, reserved Pause slots, explicit retirement
+  of unknown references, selection changes, and 64-reference lookup rotation.
+  Action queries/disclosures do not create timers or starve full status refresh.
 - HTTP pool saturation with blocked transport/fsync/join work: cached GET and
   known-owner Pause admission remain responsive through the real HTTP adapter.
   At most the bounded accepted actions wait on owning executors.
