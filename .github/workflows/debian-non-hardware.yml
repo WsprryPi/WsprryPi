@@ -226,6 +226,8 @@ jobs:
           node src/build/network-reference/pico/tests/operator_cleanup_browser.mjs src/build/network-reference/pico-browser/consumer_session_driver
           PROGRESS_BROWSER_NO_CAPTURE=1 node src/build/network-reference/pico/tests/progress_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
           node src/build/network-reference/pico/tests/consumer_recovery_browser.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
+          node src/build/network-reference/pico/tests/organization_routes.test.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver src/build/network-reference/pico-browser/generated/web_assets.cpp
+          node src/build/network-reference/pico/tests/organization_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
       - name: Prove edited Pico source selection and genuine build failures
         run: python3 -B scripts/tests/pico_source_selection_test.py src/build/network-reference/pico src/build/network-reference/mbedtls
       - name: Verify selected-interface WTP replies under equal-metric route changes

@@ -4,6 +4,8 @@ Pi and Pico use one current `Wsprry-Control/1` settings/control contract under
 `/api/control/v1`. Earlier beta settings APIs and resource views are unsupported;
 update both applications together. WTP/1 finite-job compatibility is independent.
 
+Pico’s direct browser controls provide **Wi-Fi/Host → Advanced → Recovery and reset…**. Infrastructure recovery requires the current Pico password and the encrypted consumer session; the public recovery page remains AP-only. Both reset choices require two acknowledgments and an exact typed phrase. These actions use Pico’s existing reset coordinator and are independent of WTP job control or Pi configuration saves. A lost reset reply is uncertain and must not be replayed. The network-pair checks exercise the selected Pico’s production recovery routes and browser confirmations in addition to the independent USB-pair checks.
+
 Pico owns the authoritative contract. Pi validates the current contract,
 capabilities and selected carrier before using a member resource. Unknown
 optional capabilities grant no authority. Known documents remain closed and
