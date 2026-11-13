@@ -4,6 +4,12 @@ Implement WsprryPi issue [#470](https://github.com/WsprryPi/WsprryPi/issues/470)
 
 **This is a Pi-only task. Do not modify WsprryPico.** Pico-connected expanders are separate work. Reading an unchanged Pico checkout and using it in hardware-free interoperability fixtures is permitted; changing its source, configuration, documentation, firmware, or devices is not.
 
+Planning revision: 2026-11-13. The recommendations and both decisions in
+section 12 are approved, including the scoped `WSPR-Transmitter` changes and
+Pi-local amplifier lead/tail controls with 200 ms defaults. This task records,
+commits, and pushes the plan only, with CI skipped; application implementation
+awaits a separate instruction to start.
+
 ## 1. Scope and authority
 
 Implement the feature in `/Users/lbussy/GitHub/WsprryPi`, including its first-party `WsprryPi-UI` component, appropriate tests, and engineering documentation.
@@ -31,6 +37,13 @@ Support only verified-compatible 8574-family eight-bit expanders, in both forms:
 - Eight-channel relay board, using [KRIDA Electronics Amazon ASIN B083LFPCK8](https://www.amazon.com/dp/B083LFPCK8), as the candidate example. Its actual revision, chip, channel mapping, polarity, and electrical connections require verification before board-specific qualification claims.
 
 Use one full-port-byte driver and shared pattern generation for both forms. Do not require mechanical relays to obtain binary logic outputs.
+
+Deliver generic PCF8574 and PCF8574A support for both forms. Initially expose
+identity P0–P7 mapping and configurable inversion, without a named KRIDA preset.
+Withhold definitive KRIDA wiring instructions and any board-specific permutation
+until the actual revision is verified. Generic relay-use software fixtures are
+required for acceptance; physical board verification is a separate qualification
+gate, not evidence to invent or a prerequisite for implementing generic support.
 
 Provide:
 
@@ -74,6 +87,14 @@ If a verified board uses a permutation, define the inversion mask in logical-out
 
 Do not assume logical zero disconnects a filter or represents a safe receiver code. Make the operator’s idle selection explicit. Preserve all eight pattern bits; do not allocate one to PTT.
 
+Represent an unconfirmed idle pattern separately from every byte value,
+including zero. Require an explicitly chosen/confirmed idle byte before saving
+an enabled I²C route. Default between-job behavior to return to idle; hold-last
+remains an explicit choice. Default the intermediate step to disabled, with its
+duration zero. Never describe any offered byte as a universally safe setting.
+Changes to idle, inversion, mapping, or board form invalidate the draft's idle
+confirmation; saving unchanged confirmed settings does not require reconfirmation.
+
 New selector-domain changes must:
 
 - Be validated and committed atomically while idle and unowned.
@@ -87,7 +108,11 @@ Do not restart a service automatically.
 
 Trace and update defaults, parsing, validation, internal copies, persistence, serialization, UI population, and runtime consumption together. Reject malformed types, unknown fields in the new closed configuration object, invalid ranges, unsupported profiles, and conflicting active allocations before persistence or selector writes.
 
-Choose and document finite timing bounds based on scheduler preparation budgets. Do not treat a convenient default as a measured relay requirement. If a material timing or hardware decision cannot be supported by the available evidence, report that specific blocker instead of inventing compatibility.
+Use the timing design in section 5.1. Its numbers are software admission policy,
+not measured relay requirements. Initial release/settling values are draft
+suggestions only; require explicit operator confirmation of timing suitability
+before activating I²C routing. An unavailable board specification prevents a
+board-qualified timing claim, not generic configurable software support.
 
 ## 4. Driver and I²C ownership
 
@@ -119,6 +144,80 @@ Account for coexistence with Si5351 on the same bus: distinct addresses, compati
 
 Prefer existing reusable identity facilities without unrelated component changes. If a necessary change reaches `src/WSPR-Transmitter`, identify the exact interface need, explain why parent-level integration is insufficient, and obtain any approval required by repository instructions before broadening component scope.
 
+### 4.1 Shared-bus ownership design
+
+Use one process-wide registry of Linux adapter leases, shared by the selector,
+the local Si5351 backend, and the Pi endpoint Si5351 backend. Put reusable bus
+primitives in `src/WSPR-Transmitter` without dependencies on application globals,
+configuration, UI, PTT, or selector policy. This component extension is approved
+within the scope recorded in section 12; do not implement a parent-only imitation while
+leaving a production Si5351 path outside coordination.
+
+- Resolve the existing durable identity first. Key an adapter lease by the
+  resolved character-device major/minor and captured sysfs/USB binding, not by
+  the operator's string alone. Numeric and identity aliases of one bus share
+  one lease. A detach/rebind invalidates all associated handles and jobs; it
+  never silently creates a replacement binding for an active owner.
+- Acquire a nonblocking exclusive advisory `flock` on an open descriptor for
+  the resolved `/dev/i2c-N` node before any device transaction. Keep that
+  descriptor in the shared lease until every dependent handle and in-flight
+  operation is retired. Separate device handles retain ordinary `I2C_SLAVE`
+  selection and exact transfer checks. The conservative lease reserves the
+  whole adapter against other cooperating processes for its lifetime, while
+  allowing this process's distinct-address devices to share it. No lock files,
+  forced slave selection, bus reconfiguration, or administrator action is
+  introduced. Failure/unsupported locking refuses dependent RF.
+- Use an additional timed in-process transaction guard on that lease. Hold it
+  across each complete Si5351 operation, including register-pointer write plus
+  read, and across each full-byte expander write. Preserve the existing STOP
+  semantics; do not substitute `I2C_RDWR` as incidental optimization. Keep the
+  existing Si5351 serialization until equivalent production coverage passes.
+- Add a narrow transaction-scope seam to `Si5351Transport` and invoke it from
+  `Si5351Device` around complete operations. The Linux implementation uses the
+  common lease/guard; native macOS and explicitly injected fake transports
+  retain their own semantics. Update paired adapters/tests for the new seam.
+  Use the same primitive in the parent-owned selector driver. A transport-only
+  per-syscall lock cannot protect the existing two-syscall register read.
+- The existing backend `Config.device_adapter` seam is available to the Pi
+  endpoint, but `WsprTransmitter::createBackend()` constructs its local
+  transport internally. Coordinate the native Linux factory itself so local,
+  endpoint, and standalone component users all participate. Do not claim that
+  wrapping only the endpoint factory solves shared ownership.
+- Maintain address claims inside the registry. Different devices cannot claim
+  the same address on one adapter. Local/endpoint handles for the same RF
+  device may share its claim only through the application's single RF-owner
+  token and mutually exclusive execution/configuration lifecycle; otherwise
+  refuse the duplicate. Reject kernel-owned addresses through ordinary slave
+  selection. Advisory locks cannot exclude noncooperating userspace programs
+  or unrelated kernel-device traffic; document that boundary.
+- The parent selector owner and existing local/endpoint authority admit exactly
+  one preparation/execution/cleanup epoch. No selector writes, background
+  hardware discovery/configuration transactions, or idle housekeeping run during
+  the reserved execution
+  interval, including keyed RF gaps and normal PTT tail. Si5351's required RF
+  transactions and required metadata-only binding validation remain allowed.
+  Cleanup can write the selector only after RF
+  stop and independent PTT release are established. Saves never acquire a
+  transaction guard or open hardware. Reads of saved settings and software-only
+  status remain available.
+- Lock ordering is execution ownership, then device-operation serialization,
+  then adapter transaction guard. Never wait for/join a worker while holding
+  a lock it needs. Cancellation first invalidates the epoch and releases PTT
+  independently; it must not wait for an I²C guard to inhibit RF. Registry
+  metadata locks are short-lived and are not held over syscalls or waits.
+
+Require configured/confirmed bus speed no greater than 100 kHz for a bus
+containing PCF8574, including Si5351 coexistence. Use trustworthy read-only host
+metadata where available; otherwise require an explicit operator declaration
+of the externally configured speed and label it as declared, not measured.
+Refuse a known excessive speed or absent declaration. Do not claim portable
+`i2c-dev` speed discovery or set adapter-wide timeout/retry/speed controls.
+
+References: [Linux userspace I²C interface](https://www.kernel.org/doc/html/latest/i2c/dev-interface.html)
+and the chip datasheets in section 8. Validate advisory locking on the supported
+Linux host with hardware-free filesystem/descriptor fixtures and separately
+qualify actual adapter behavior before physical use.
+
 ## 5. Fail-closed sequencing and execution coverage
 
 Do not add an I²C write to the existing transmit-start notification and assume that creates a safety gate. The current Pi callback path can log selector failures and continue to amplifier activation.
@@ -127,7 +226,12 @@ Implement a preparation path whose failure prevents RF admission:
 
 **RF disabled → amplifier/PTT inactive → release interval → optional intermediate pattern → complete target-byte write → settling interval → amplifier lead → scheduled RF.**
 
-Preserve the existing amplifier timing contract. Release and settling are separate intervals, not aliases for amplifier lead or tail.
+Release and settling are separate intervals, not aliases for amplifier lead or
+tail. The current Pi has callback-driven Amp Control but no configurable lead
+or tail durations (`config_types.hpp`, `scheduling_runtime.cpp`). Pico's timing
+controls are not a Pi timing contract. Section 5.1 therefore defines approved
+Pi-local timing within the new selector domain, as recorded in section 12;
+leave existing native-only installations' activation behavior unchanged.
 
 At startup, establish RF inhibition and PTT inactivity, initialize the selected expander to its configured idle pattern, and permit dependent transmission only after initialization succeeds.
 
@@ -159,12 +263,141 @@ On cancellation or fault:
 - Attempt configured idle cleanup without concealing earlier failures.
 - Mark uncertain selector state unknown.
 - Bound retries and invalidate stale pending work.
-- Prevent delayed writes from reasserting outputs after cancellation or shutdown.
+- Prevent queued stale writes after cancellation or shutdown; handle already
+  submitted transactions as specified in section 5.2.
 - Require successful reinitialization before reuse.
 
 For this implementation, recovery may require explicit application restart; do not add an automatic retry loop that resumes transmission after an uncertain write.
 
 A failed cleanup may leave an externally powered expander latched. Preserve that limitation in status and documentation.
+
+### 5.1 Timing budget and admission
+
+Keep the Pi WTP endpoint's advertised minimum arm lead at **2,000 ms**, maximum
+arm uncertainty at **500 ms**, and output-disable timeout at **5,000 ms**.
+Do not change capabilities, WTP messages, shared schemas, or Pico to accommodate
+the selector. Clock uncertainty is an independent admission check, not extra
+time to spend or permission to move the requested RF start.
+
+Use these finite whole-millisecond policy values for an enabled I²C route:
+
+| Quantity | Allowed range | Default / initial draft value | Meaning |
+|---|---|---|---|
+| Release `R` | 0–1,000 ms | 50 ms | Minimum PTT-inactive time before changing selector outputs |
+| Intermediate dwell `I` | 0–1,000 ms | Disabled, 0 ms | Minimum time after an explicitly enabled intermediate write |
+| Settling `S` | 0–1,000 ms | 50 ms | Minimum time after the completed target write |
+| Amplifier lead `L` | 0–1,000 ms | 200 ms default | Minimum asserted-PTT time before first RF |
+| Amplifier tail `H` | 0–1,000 ms | 200 ms default | Normal-completion hold after final RF; faults bypass this hold |
+| Selector operation allowance `W` | Fixed 100 ms | Not operator-editable | Guard wait, identity checks, and one full-byte write together |
+| Dispatch reserve `G` | Fixed 300 ms | Not operator-editable | Unspent scheduling margin before requested RF |
+
+Validate `R + I + S + L <= 1,500 ms` atomically. Reserve two selector operation
+slots even when the intermediate step is disabled, so configuration validation
+and minimum lead do not depend on an optimization:
+
+`B = R + I + S + L + 2W + G <= 2,000 ms`.
+
+With the initial values, `B = 800 ms`; maximum admitted configuration is 2,000 ms.
+These are chosen software limits, not inferred mechanical specifications or
+guaranteed Linux response times. Confirm release, settling, and amplifier
+timing against the attached circuit before use; zero explicitly requests no
+additional hold for that interval. Reject disabled intermediate steps with a
+nonzero dwell, enabled steps without a pattern, and over-budget combinations.
+The approved 200 ms lead/tail defaults do not come from a Pi hardware measurement.
+
+Stage backend compilation, frequency realization, ordinary RF-disabled backend
+configuration, and startup idle initialization before entering this budget.
+The existing WTP `prepare()` configures/realizes before ARM; the local
+`WsprTransmitter` instead configures its backend in its worker, so add the
+narrow staged-preparation/launch seam described in section 12. Revalidate
+realized frequencies and the frozen selector configuration before accepting
+the job. No early compilation implies permission to switch a filter on LOAD.
+Establish selector preparation ownership only for accepted local work/ARM.
+
+For an absolute RF target `T`, map the target once to a monotonic deadline and
+retain the existing UTC/start-window checks. Admission requires at least `B`
+remaining and exclusive execution ownership. WTP also retains its independent
+2,000 ms ARM check. Complete release, intermediate/target writes, and settling
+by `T - L - G`. Assert PTT only with a valid preparation receipt and enough
+remaining time for the full lead. The reserve is scheduling slack, not another
+operator delay. Immediately before RF, require a current receipt, elapsed lead,
+valid clock/window, no cancellation, and no inhibition. A late operation or
+missed deadline refuses RF even if an I²C ACK eventually arrives. Never shorten
+settling/lead, switch after RF starts, or move an accepted absolute target.
+
+Immediate local modes/test tones wait for the same preparation sequence before
+RF; they have no externally promised UTC start. Repeated jobs get a fresh
+epoch/receipt and admission calculation, even if their pattern is unchanged.
+Do not skip release or settling on the assumption that a retained pattern or
+ACK proves the external circuit's state. A later scheduler occurrence may be
+considered normally after a timing-only refusal; uncertain I²C state latches
+inhibition until explicit restart and successful initialization.
+
+Normal completion stops RF, retains selection through `H`, releases PTT, waits
+`R`, then either writes idle once or keeps the last successful pattern. With
+the approved maxima, tail plus release plus one idle allowance is at most
+2,100 ms. RF/backend stop time is accounted independently; this calculation
+does not establish that the 5,000 ms WTP disable timeout always succeeds.
+STOP/fault/shutdown bypass normal tail, invalidate the epoch, inhibit RF,
+attempt PTT release, then observe `R` before best-effort idle. Never extend the
+WTP timeout or report successful cleanup merely because its deadline expired.
+
+Preserve the separate **100 ms RF completion-acknowledgement ceiling** in
+`WTP-Server::RfEngine` and `JobService::poll()`. Do not keep the engine Running
+while waiting for a 200 ms PTT tail or up to 2,100 ms of selector cleanup; that
+would make a normal job fail the existing completion contract. At final RF end,
+obtain the backend's RF-disable/cleanup receipt and publish the RF terminal
+report within the existing acknowledgement contract. If RF confirmation itself
+misses that bound, keep the existing failure behavior; the selector budget
+does not grant an extension.
+
+The parent owns a separate post-RF cleanup receipt/worker. It retains exclusive
+local hardware ownership through tail, PTT release, release interval, and idle
+write, even when WTP has already reported the RF job complete. The Pi endpoint
+engine's terminal `disable()` may acknowledge already-confirmed RF inactivity;
+it must not describe pending selector cleanup as successful or admit a new
+preparation. Both local and endpoint preparation check this retained ownership.
+Expose cleanup-pending/fault separately in Pi-local status; a later selector
+cleanup fault inhibits future RF without rewriting an existing WTP terminal
+record. Successful WTP RF completion alone is not full selector cleanup.
+
+Route explicit STOP/abort/shutdown to cancellation of the post-RF owner as well
+as the RF engine. For network requests, extend the existing Pi-local
+`WtpPiAuthority` `IJobService` decorator:
+preserve existing validation/ownership checks and forward the unchanged
+request, then invalidate the matching selector epoch when an explicit stop is
+accepted. Running-engine disable already stops RF; accepted STOP after RF
+completion bypasses remaining normal tail and releases PTT through this
+parent owner. Rejected or stale stop requests cannot cancel another epoch.
+Normal automatic terminal disable leaves the normal tail worker intact.
+Keep listener/service polling responsive by doing no selector I/O or timed
+tail wait in `poll()` or terminal RF-only `disable()`. This uses the existing
+service interface; it requires no `WTP-Server` or Pico source/schema change.
+
+### 5.2 Blocking transactions and cancellation limits
+
+The 100 ms allowance is a software admission deadline. A synchronous Linux I²C
+syscall may outlive it; elapsed time, a future timeout, or closing a descriptor
+elsewhere does not prove that an in-flight write was cancelled. Use one owned
+I/O worker with at most one operation in flight, an epoch-tagged queue, and
+deadline/cancellation observation independent of that worker. Do not detach a
+worker and release/reuse its handles, retry a short/failed write, or admit RF
+after a late completion. Never start queued stale operations.
+
+On timeout/cancellation, invalidate the receipt immediately, release independent
+PTT, and retain unknown state and the bus lease until the in-flight operation
+has actually returned. Only then may a fresh cleanup operation attempt idle,
+once and with its own deadline. If quiescence cannot be established, retain the
+fault and report cleanup unresolved; do not dispatch another writer. RF stop
+must not depend on the selector's I/O worker. Si5351 shares the bus, so software
+cannot promise its disable transaction will complete while that bus is wedged.
+
+An already submitted write may physically complete after cancellation. The
+requirement to prevent stale writes applies to undispatched work and reuse;
+it cannot promise revocation of a kernel/device operation already in flight.
+Document that limitation and the independently safe PTT/hardware-enable
+requirement. Physical qualification must check adapter timeout behavior and
+external inhibition; no software-only test qualifies bounded physical shutdown.
 
 ## 6. Pi/Pico contract boundary
 
@@ -192,6 +425,12 @@ Present routing first, then I²C hardware details and per-band assignments.
 - Simple mode: a channel selector and explicit unassigned choice.
 - Advanced/Binary mode: eight labeled logical bits and synchronized numeric representation.
 - Common controls: polarity, idle behavior, release, and settling.
+- Require explicit idle confirmation and timing suitability confirmation before
+  enabling the route. Show the calculated preparation budget and identify a
+  sum exceeding 1,500 ms beside the timing fields. Include the approved Pi
+  amplifier lead/tail controls with 200 ms defaults; show units and their
+  independent purpose. Keep bus-speed declaration distinct from
+  measured/discovered information.
 - Clearly label physical channel numbering where relay channels 1–8 correspond to P0–P7.
 
 Keep advanced details in inline disclosures rather than introducing a separate application or dashboard.
@@ -241,7 +480,10 @@ Use the actual chip datasheet and board documentation:
 - [PCF8574A datasheet](https://www.ti.com/lit/ds/symlink/pcf8574a.pdf)
 - [Adafruit wiring guide](https://learn.adafruit.com/adafruit-pcf8574?view=all)
 
-The issue’s original band table and developer example disagree about code 1 being 60 m or 160 m. Do not ship an authoritative G59 preset without resolving that discrepancy. Configurable mappings and explicitly labeled test fixtures can proceed without a preset.
+Ship no G59 preset in this implementation. The issue’s original band table and
+developer example disagree about code 1 being 60 m or 160 m. Configurable
+mappings and explicitly labeled test fixtures proceed without deciding which
+table is correct; a future preset requires separate verified evidence.
 
 Build operator documentation using its repository’s virtual environment and documented Sphinx workflow. Inspect affected rendered pages and replace screenshots only when materially inaccurate. Do not modify Pico documentation.
 
@@ -267,6 +509,23 @@ Add meaningful tests covering:
 - Startup idle, release/settling ordering, insufficient lead, normal completion, hold/idle behavior, cancellation, configuration changes, and shutdown.
 - No stale writes or RF restart after failure.
 - Local and Pi endpoint execution, including isolation from jobs targeting remote devices.
+- Exact timing-budget boundaries, integer overflow/type rejection, both
+  intermediate-step states, all timing confirmations, early/late completion,
+  unchanged-pattern repeated jobs, lead/tail separation, and cancellation
+  during every interval. Test 1,500 ms combined holds as valid and 1,501 ms as
+  refused before writes; preserve the independent WTP 2,000 ms ARM boundary.
+- Bus identity aliases, duplicate-address refusal, same-RF-owner handover,
+  contention between cooperating processes, complete pointer-write/read
+  exclusion, detach/rebind, lock failures, and separate-adapter independence.
+- A deliberately blocked fake transfer whose deadline expires before return:
+  immediate independent inhibition/PTT release, no queued stale write, no
+  receipt from late success, no premature lease reuse, and unresolved cleanup
+  until actual completion. Exercise this through both production RF paths.
+- Normal endpoint completion with the default 200 ms tail and maximum cleanup
+  duration: preserve the 100 ms RF acknowledgement ceiling, responsive STOP,
+  retained selector ownership after RF terminal reporting, rejection of new
+  preparation while cleanup is pending, and latched inhibition if cleanup
+  later fails. Rejected/stale STOP cannot affect another job or cleanup epoch.
 
 Use observable fake I²C/PTT/RF events and deterministic clocks where possible. Verify actual production orchestration, not merely a second model of the intended sequence.
 
@@ -357,3 +616,50 @@ The completion report must state:
 - Confirmation that no commit, push, installation, service operation, or live hardware/RF action occurred.
 
 Distinguish software implementation from physical qualification. If required work remains incomplete, identify the exact next unfinished step.
+
+## 12. Approved implementation decisions
+
+Both decisions were explicitly approved by the maintainer on 2026-11-13.
+No pre-implementation product or scope decisions remain open in this plan.
+
+1. **Approved: the narrow `src/WSPR-Transmitter` extension.** Approved scope is
+   reusable Linux adapter leases and complete-operation guards, their
+   transport/device/factory integration, and typed staged-preparation,
+   pre-RF-admission, and synchronous completion/cleanup handoff at the
+   `WsprTransmitter` facade. The parent supplies selector/PTT policy; the
+   component carries immutable prepared-job tokens, realized frequencies,
+   absolute deadlines, and cancellation epochs without learning band tables
+   or application configuration. A refused/expired callback prevents RF;
+   completion acknowledgement follows physical-backend cleanup before the
+   parent may change selection. Existing notification callbacks retain their
+   reporting role. Local backend creation and worker preparation are private,
+   so parent-only code cannot inject shared ownership or acknowledge every
+   RF/cleanup boundary through the current API. Keep standalone builds, native
+   macOS, explicit fakes, and native-only application behavior intact. Run
+   component and parent tests, plus both unchanged-Pico pairs. No unrelated
+   refactoring or shared Pi/Pico contract change is included. The maintainer's
+   explicit approval satisfies the repository's `src/` component policy for
+   this scope; further scope expansion still requires separate approval.
+2. **Approved: Pi-local amplifier lead/tail controls for the enabled I²C route.**
+   Adopt the section 5.1 ranges and 200 ms defaults for both lead and tail,
+   with timing suitability confirmed by the operator for the circuit. Store
+   them in the new Pi-local
+   selector object, activate on restart, and apply identically to local and
+   inbound Pi WTP jobs. Do not reuse Pico controls or change shared schemas.
+   This adds behavior absent from the Pi today. Zero remains a valid explicit
+   setting within the approved range; it is not the default. Do not infer a
+   timed amplifier contract from the existing notification callbacks.
+
+Hardware identity, actual wiring, electrical compatibility, bus-speed evidence,
+and suitable circuit timing remain requirements before physical operation or
+board-specific claims. They do not require choosing a KRIDA or G59 preset to
+start generic software implementation. No physical operation is authorized.
+
+Planning basis: Pi `949a5c3e6dad6f4bbe465d92055c7243832052dd` on `devel`;
+`src/wtp_endpoint/capabilities.hpp`, `tone_engine.cpp`,
+`src/WTP-Server/src/job_service.cpp`, `src/scheduling_runtime.cpp`,
+`src/config_types.hpp`, and `src/WSPR-Transmitter/src/{wspr_transmit.cpp,
+wspr_transmit.hpp,si5351_device.cpp,si5351_transport.hpp,
+si5351_transport_linux.cpp,wspr_transmit_backend_si5351.hpp}`. Reinspect these
+contracts and the current source pair at implementation start. This is a design
+and validation contract, not implemented or physically qualified behavior.
