@@ -289,6 +289,32 @@ Never expose mutable target pointers to HTTP handlers or hold registry locks
 while waiting for output/transport/store locks. Different contexts can progress
 independently; recheck generation/revision before committing a reserved action.
 
+Fleet HTTP handlers perform only bounded shape/guard checks, immutable reads,
+and short admission/record reservations. Return 202 after reserving an accepted
+action; execute verification, persistence/fsync, stop/join, and retirement on
+bounded owning executors, not the HTTP pool. Splitting the mutex while keeping
+these waits in handlers can still starve every GET. Recheck the reviewed ETag
+and generation before persistence; a later conflict becomes that accepted
+action's refused result, not an overwrite. A Pause admission may signal the
+owner's nonblocking stop intent immediately but cannot run a blocking stop on
+the HTTP thread. Shared-disk serialization may delay commits, yet must not
+prevent cached reads or stop intent. Queue capacity is bounded by the existing
+32 contexts and action reservations; do not add an unbounded persistence queue.
+
+Replacing/restarting the manager is a lifecycle transition, not just publishing
+a new incarnation. Inhibit old start/edit admission while preserving verified
+owner status/stop paths, retire queued work, and fence old store/journal writers
+before a new manager can write or dispatch. Transfer only
+published evidence/recovery duties; never create competing sessions or forget
+an unresolved owner/lease because its generation changed. Pending old I/O keeps
+its resources until quiescent, and if handover cannot finish, publish replacement
+pending/unavailable and block new work. Old HTTP references or delayed callbacks
+cannot write into the new manager's stores. The current start_wtp_fleet()
+constructs/starts candidate workers before replacing manager; inspect and fix
+that path within this feature's owning-runtime changes, preserving independent
+local Operations. Test actual manager replacement, not just JSON incarnation IDs.
+
+
 For a healthy newly loaded/assigned context without an in-flight, fault, or
 retirement barrier, allow **one initial read-only inspection** on its owning
 worker: open the configured carrier, HELLO, STATUS, and CAPS, match expected
@@ -496,11 +522,24 @@ Use these postconditions:
 - Enable is confirmed when the committed assignment is enabled after the
   server eligibility checks. It means future scheduling is enabled, not that RF
   started. A later job failure is a separate execution report.
-- Pause is confirmed only after disabled persistence, dispatch inhibition,
-  owner quiescence, and new matching cleanup/STATUS evidence establish inactive,
-  unowned output. Capture an observation baseline at acceptance; require a
-  later STATUS exchange or action-bound cleanup evidence, not a worker heartbeat.
-  If only the schedule pause is known, report Schedule paused; output unconfirmed.
+- Pause confirms this controller's scope: disabled persistence, dispatch
+  inhibition, and quiescence of any tracked controller-owned work. Record
+  schedule_paused, controller_work_quiescent, tracked_cleanup_confirmed, and
+  current device output/ownership evidence separately. With no tracked job,
+  tracked_cleanup_confirmed is null/not applicable, not a fabricated receipt.
+  If there was no owned job and no persisted in-flight/uncertainty barrier, pausing the schedule can
+  be confirmed while a fresh STATUS reports foreign work, or while device
+  output is unknown. Say Schedule paused; other job on device or Schedule
+  paused; device output unknown, not Device stopped. Known foreign occupancy
+  alone is not an uncertain mutation or a recovery latch.
+- If controller-owned work was tracked, retain existing matching terminal and
+  cleanup requirements; an empty new context after a crash proves nothing.
+  Capture the observation baseline at acceptance and require later STATUS or
+  action-bound cleanup evidence, not a heartbeat. Never weaken backend cleanup
+  criteria to classify a foreign successor as safe. Missing/uncertain tracked
+  cleanup remains outcome_unconfirmed and keeps its barrier. Device stopped /
+  output-off observation requires its own fresh matching inactive evidence;
+  confirmed schedule pause alone cannot establish it or clear another fault.
 - Recover is confirmed only by that action's reconciliation result with fresh
   matching identity/boot and safe inactive/unowned state, cleared allowed
   in-flight barrier, and assignment still paused. Never clear a device fault
@@ -733,6 +772,16 @@ Add meaningful behavioral coverage for:
   verified live owner, failure before retirement intent is durable, operator
   Remove cleanup refusal retaining its row, and takeover removal remaining
   removed. Reconcile cannot silently delete a retained paused assignment.
+- HTTP pool saturation with blocked transport/fsync/join work: cached GET and
+  known-owner Pause admission remain responsive through the real HTTP adapter.
+  At most the bounded accepted actions wait on owning executors.
+- Actual manager replacement with an old delayed store/journal write or owned
+  session: no concurrent writer, identity-lease collision, lost recovery duty,
+  or late old-generation mutation of the new manager.
+- Pause with no tracked owned work and fresh foreign-active, foreign-inactive,
+  stale, and unavailable device observations. Confirm only the achieved scope;
+  do not abort foreign work, invent Device stopped, or latch recovery solely
+  for known foreign occupancy. Preserve all tracked cleanup/crash barriers.
 - Draft-preserving one-use editor handoff, another device's unsaved draft,
   removed/replaced draft, ETag change during navigation, plain-identity wording,
   and This Pi controlling its compatibility WTP backend.
