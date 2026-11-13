@@ -6,9 +6,10 @@ Implement WsprryPi issue [#470](https://github.com/WsprryPi/WsprryPi/issues/470)
 
 Planning revision: 2026-11-13. The recommendations and both decisions in
 section 12 are approved, including the scoped `WSPR-Transmitter` changes and
-Pi-local amplifier lead/tail controls with 200 ms defaults. This task records,
-commits, and pushes the plan only, with CI skipped; application implementation
-awaits a separate instruction to start.
+Pi-local amplifier lead/tail controls with 200 ms defaults. The approved plan
+was committed and pushed separately; that publication does not authorize later
+commits, pushes, or CI runs. This revision is a plan-only review; application
+implementation awaits a separate instruction to start.
 
 ## 1. Scope and authority
 
@@ -77,6 +78,7 @@ Define a typed configuration containing:
 - Explicit startup/shutdown idle pattern.
 - Between-job behavior: return to idle or hold the last successfully selected pattern.
 - Release and settling intervals in whole milliseconds.
+- Pi-local amplifier lead and tail in whole milliseconds, both defaulting to 200 ms.
 - An optional intermediate pattern and its timing only where explicitly configured and meaningful for the attached circuit.
 
 Define logical 1 as an asserted output. For identity mapping:
@@ -107,6 +109,46 @@ New selector-domain changes must:
 Do not restart a service automatically.
 
 Trace and update defaults, parsing, validation, internal copies, persistence, serialization, UI population, and runtime consumption together. Reject malformed types, unknown fields in the new closed configuration object, invalid ranges, unsupported profiles, and conflicting active allocations before persistence or selector writes.
+
+The absence of the new object preserves legacy native table/suffix resolution.
+Once explicitly configured, disabled/manual suppresses automatic selection and
+rejects explicit native selector suffixes; native selects the existing native
+resolver; I²C selects only the new resolver. Retain inactive native assignments
+without claiming their pins or applying them. Reject an I²C-enabled candidate
+containing active local frequency entries with explicit native selector suffixes
+before persistence. Do not erase those entries to make the save succeed.
+
+Use the existing canonical band catalog/correlation for every realized RF-on
+frequency. Permit different bands to share one pattern across a job; reject
+unassigned bands, unresolvable frequencies, or different resulting patterns.
+Simple assignments are explicit unassigned values or integer channels 0–7;
+Binary assignments are explicit unassigned values or integer bytes 0–255.
+Reject booleans, fractional values, unknown band names, and out-of-range values;
+never coerce zero to unassigned. Retain and validate both mode maps on save.
+
+Treat the selector object, routing activation, and the existing Pi PTT
+enable/pin/polarity used by an enabled or boot-active I²C route as one activation
+domain. Saving those PTT values while I²C is active must not hot-swap its GPIO
+owner. Preserve the existing PTT activation behavior outside that domain.
+Confirmations bind to the complete circuit profile (adapter/address/chip,
+mapping/inversion, idle/intermediate values, timing, and PTT allocation);
+material changes invalidate the relevant confirmations. Apply the same typed
+validation/confirmation requirements to INI and API inputs, not just the UI.
+
+Save only after both RF and post-RF selector work are quiescent and ownership
+is released; RF-complete alone is insufficient. Under the shared admission
+lock, persist atomically, then latch process-local inhibition before admitting
+new work. Persist/readback failure preserves the active snapshot and earlier
+inhibition, reports uncertainty, and requires authoritative readback. If a
+write may have changed the saved activation domain, latch inhibition even when
+readback fails; only a failure proven to precede persistence may leave a
+previously clear latch clear. An
+identical normalized save does not create a new restart requirement, and no
+save clears an existing latch. Reloads/file changes cannot hot-activate the
+domain or bypass A/B/A inhibition. Startup uses the validated saved domain.
+Unavailable hardware does not prevent a structurally valid offline save;
+binding/address ownership checks that require opening hardware occur at startup,
+never during save.
 
 Use the timing design in section 5.1. Its numbers are software admission policy,
 not measured relay requirements. Initial release/settling values are draft
@@ -170,8 +212,11 @@ leaving a production Si5351 path outside coordination.
 - Use an additional timed in-process transaction guard on that lease. Hold it
   across each complete Si5351 operation, including register-pointer write plus
   read, and across each full-byte expander write. Preserve the existing STOP
-  semantics; do not substitute `I2C_RDWR` as incidental optimization. Keep the
-  existing Si5351 serialization until equivalent production coverage passes.
+  semantics; do not substitute `I2C_RDWR` as incidental optimization. Preserve
+  same-device/cache serialization. Replace the existing global cross-adapter
+  Si5351 mutex with per-device serialization plus the shared per-adapter guard
+  only when equivalent production-path coverage passes. Do not hold a global
+  mutex over a blocked adapter and claim other adapters remain independent.
 - Add a narrow transaction-scope seam to `Si5351Transport` and invoke it from
   `Si5351Device` around complete operations. The Linux implementation uses the
   common lease/guard; native macOS and explicitly injected fake transports
@@ -200,6 +245,11 @@ leaving a production Si5351 path outside coordination.
   stop and independent PTT release are established. Saves never acquire a
   transaction guard or open hardware. Reads of saved settings and software-only
   status remain available.
+- Register the adapter/address claims before either RF engine performs startup
+  quiescence or configuration. Serialize local and endpoint startup under one
+  RF-owner token; a second constructor cannot independently quiesce a device
+  already reserved by preparation, execution, or cleanup. Backend replacement,
+  endpoint reconfiguration, takeover, and destruction observe the same owner.
 - Lock ordering is execution ownership, then device-operation serialization,
   then adapter transaction guard. Never wait for/join a worker while holding
   a lock it needs. Cancellation first invalidates the epoch and releases PTT
@@ -235,6 +285,17 @@ leave existing native-only installations' activation behavior unchanged.
 
 At startup, establish RF inhibition and PTT inactivity, initialize the selected expander to its configured idle pattern, and permit dependent transmission only after initialization succeeds.
 
+Before startup idle, observe the release interval; after its successful write,
+observe settling before marking initialization ready. Startup is outside an
+accepted job's preparation budget and cannot borrow its scheduled RF time.
+PTT operations return checked receipts; the current log-only GPIO helper is
+not an admission acknowledgement. If requested PTT assertion/release fails,
+inhibit RF, retain the failure, and do not change the selector while RF or requested PTT
+inactivity is unconfirmed. No independently controlled PTT being configured
+must be reported as such, rather than as a successful physical release; the
+documented external enable/interlock requirement remains applicable. Lead/tail
+holds still apply as configured software intervals without asserting a GPIO.
+
 Resolve selection from the actual job’s transmitted frequencies, including custom frequencies, WSPR offsets, modulation shifts, and applicable correction. Do not use an unrelated browser selection or a WSPR dial frequency as the RF frequency.
 
 Freeze the resolved pattern and configuration for the accepted job. Every RF-on event must be compatible with one selection for the complete job. Reject jobs requiring a pattern change during uninterrupted execution.
@@ -254,6 +315,13 @@ Cover every relevant Pi RF entry point:
 The Pi WTP endpoint must use the same owning selector state and preparation gate, rather than bypassing it through its separate engine.
 
 A Pi acting as a controller must not operate its local expander for jobs targeting another Pi or Pico. Unsupported remote-selector combinations must be refused explicitly.
+
+Apply local selector admission only to work executed on this Pi, including its
+inbound WTP endpoint. Do not reject a remote job based on this Pi's unassigned
+band, and do not initialize or open a local selector solely for controller-only
+remote work. A local endpoint may initialize its own configured selector for
+its own execution independently. Never serialize this Pi's selector settings
+or patterns into a remote job or use them as remote filtering evidence.
 
 During a job, retain selection through keyed gaps and normal amplifier tail. At normal completion, stop RF before releasing PTT, then apply the configured between-job behavior.
 
@@ -312,9 +380,18 @@ The existing WTP `prepare()` configures/realizes before ARM; the local
 narrow staged-preparation/launch seam described in section 12. Revalidate
 realized frequencies and the frozen selector configuration before accepting
 the job. No early compilation implies permission to switch a filter on LOAD.
-Establish selector preparation ownership only for accepted local work/ARM.
+RF-disabled backend configuration already needs exclusive hardware ownership;
+acquire a preparation reservation before that work, including on LOAD, without
+selecting a band or asserting PTT. Keep the reservation bound to the prepared
+job until ARM, replacement, valid release/abort, or the existing lease-expiry
+path retires it. Atomically promote it to execution ownership on accepted ARM.
+The synchronous `prepare()` return cannot report success with a still-running
+configure worker: own copied inputs and resources until completion, use a finite bounded wait
+within the caller's preparation deadline, and return failure on expiry without
+blocking independent cancellation or later admitting a late success. A late
+configuration result poisons/cleans its epoch before any backend reuse.
 
-For an absolute RF target `T`, map the target once to a monotonic deadline and
+For an absolute job timeline target `T`, map the target once to a monotonic deadline and
 retain the existing UTC/start-window checks. Admission requires at least `B`
 remaining and exclusive execution ownership. WTP also retains its independent
 2,000 ms ARM check. Complete release, intermediate/target writes, and settling
@@ -324,6 +401,28 @@ operator delay. Immediately before RF, require a current receipt, elapsed lead,
 valid clock/window, no cancellation, and no inhibition. A late operation or
 missed deadline refuses RF even if an I²C ACK eventually arrives. Never shorten
 settling/lead, switch after RF starts, or move an accepted absolute target.
+
+WTP permits leading/trailing RF-off intervals. `T` remains the job's advertised
+timeline origin, not necessarily the first RF-on event. Complete selection
+before `T` conservatively; preserve all event offsets and the existing silent
+start hook without treating that hook as observed RF. Assert PTT only for jobs
+with RF-on events, and require at least `L` before the first actual RF enable.
+Keep one pattern and PTT ownership through the entire accepted timeline,
+including keyed gaps and trailing RF-off intervals. Start normal tail after
+confirmed completion of that timeline, so `H` is a minimum hold after final RF.
+All-RF-off jobs and local skip windows perform no band selection or PTT
+assertion; preserve their existing supported semantics and required RF
+quiescence checks. A path that does not support an RF-off-only job refuses it
+explicitly without selector/PTT writes. They do not resolve a fictitious zero-Hz band
+or pattern.
+
+Recheck the current monotonic time after admission and immediately before each
+write/hold/PTT step; time spent inside `schedule()` or other dispatch code counts.
+A schedule refusal before its ARM response is an admission failure; an accepted
+job that later misses preparation must report the existing missed/failure
+outcome and release PTT. It must not be silently rescheduled or treated as a
+successful job with no RF. Lead/settling use elapsed monotonic time, including
+for zero-duration holds; UTC uncertainty never shortens them.
 
 Immediate local modes/test tones wait for the same preparation sequence before
 RF; they have no externally promised UTC start. Repeated jobs get a fresh
@@ -361,18 +460,50 @@ Expose cleanup-pending/fault separately in Pi-local status; a later selector
 cleanup fault inhibits future RF without rewriting an existing WTP terminal
 record. Successful WTP RF completion alone is not full selector cleanup.
 
-Route explicit STOP/abort/shutdown to cancellation of the post-RF owner as well
-as the RF engine. For network requests, extend the existing Pi-local
-`WtpPiAuthority` `IJobService` decorator:
-preserve existing validation/ownership checks and forward the unchanged
-request, then invalidate the matching selector epoch when an explicit stop is
-accepted. Running-engine disable already stops RF; accepted STOP after RF
-completion bypasses remaining normal tail and releases PTT through this
-parent owner. Rejected or stale stop requests cannot cancel another epoch.
-Normal automatic terminal disable leaves the normal tail worker intact.
+WTP/1 has **ABORT**, not a network STOP operation. `abort_job()` rejects a
+Complete/Missed job with `InvalidState`; preserve that result. A controller
+cannot use ABORT to cancel a completed RF job's remaining tail. Normal tail
+finishes under the parent owner; the Pi-local STOP/shutdown/End now controls
+can still cancel it. Do not invent a wire operation or turn a rejected ABORT
+into a successful physical action.
+
+Extend `WtpPiAuthority` to observe accepted ABORT and the existing local control
+paths while preserving service validation, leases, and replay behavior. The
+engine's nonterminal `disable()` must invalidate the matching selector epoch
+and request independent PTT release **before** waiting for backend stop/join;
+waiting for `handle()` to return first is insufficient. When RF has already
+completed successfully, automatic terminal `disable()` acknowledges its frozen
+RF receipt without cancelling normal tail. An accepted ABORT racing that RF
+completion cancels the original epoch once its accepted result is known.
+
+Capture the boot/job/owner/epoch association before forwarding the request;
+perform post-response actions only for that still-matching association, once.
+A cached successful ABORT response is not a fresh cancellation command.
+Rejected ABORT, different-job ABORT, request-ID conflicts, retained LOAD/ARM
+replays, and reconnects cannot allocate epochs, write outputs, restart jobs,
+or affect a newer epoch. Never wrap `response.ok` alone with hardware effects.
+Observe local STOP/shutdown directly even when WTP ownership was released.
+
+Retained post-RF ownership gates every authority transition: CLAIM and new
+LOAD/ARM, local schedule/tone, configuration/save/reload, backend/endpoint
+replacement, recovery, and local takeover. Continue software status, renewal,
+and protocol-valid release/replay operations without new hardware effects.
+An existing owner's new LOAD receives Busy through the admission callback
+while cleanup is pending, before `prepare()` can overwrite hardware. RELEASE
+or lease expiry does not drop the parent's cleanup resources, clear a selector
+fault, or authorize another RF owner. Finish current waits for cleanup; End now
+cancels it. Recovery of WTP sessions alone cannot clear the restart-only latch.
+Publish selector pending/fault independently of WTP terminal state and retain
+the original job identity until its cleanup worker retires.
+
 Keep listener/service polling responsive by doing no selector I/O or timed
-tail wait in `poll()` or terminal RF-only `disable()`. This uses the existing
-service interface; it requires no `WTP-Server` or Pico source/schema change.
+tail wait in `poll()` or terminal RF-only `disable()`. Parent/engine callbacks
+must not reenter an authority mutex held across `service_.handle()` or `poll()`;
+use an independently cancellable owner and immutable snapshots/receipts, then
+reconcile authority state after the call. Active RF stop still retains its
+existing bounded disable contract and reports an unresolved stop honestly.
+This uses existing service admission and engine interfaces; it requires no
+`WTP-Server` or Pico source/schema change.
 
 ### 5.2 Blocking transactions and cancellation limits
 
@@ -387,7 +518,10 @@ after a late completion. Never start queued stale operations.
 On timeout/cancellation, invalidate the receipt immediately, release independent
 PTT, and retain unknown state and the bus lease until the in-flight operation
 has actually returned. Only then may a fresh cleanup operation attempt idle,
-once and with its own deadline. If quiescence cannot be established, retain the
+once and with its own deadline, after RF and requested PTT inactivity are
+confirmed and `R` has elapsed. A failed independent PTT release prevents the
+idle write; preserve that failure rather than assuming a disconnected filter.
+If quiescence cannot be established, retain the
 fault and report cleanup unresolved; do not dispatch another writer. RF stop
 must not depend on the selector's I/O worker. Si5351 shares the bus, so software
 cannot promise its disable transaction will complete while that bus is wedged.
@@ -436,6 +570,11 @@ Present routing first, then I²C hardware details and per-band assignments.
 Keep advanced details in inline disclosures rather than introducing a separate application or dashboard.
 
 Use explicit save for the complete selector configuration. Mode exploration and preview must remain local drafts and must not trigger the existing generic autosave path.
+
+While the saved or boot-active route is I²C, include its PTT enable/pin/polarity
+drafts in that same explicit-save activation domain. Prevent the existing Amp
+Control autosave handlers from committing only those fields or changing the
+active GPIO owner. Keep unrelated native-only autosave behavior intact.
 
 Preserve drafts after validation errors, unavailable hardware, and uncertain saves. Show restart-required and transmission-inhibited states beside the relevant controls.
 
@@ -493,13 +632,26 @@ Read `docs/simulated-backend.md` before application-level testing. Use explicit 
 
 Neither selecting the simulated backend nor running ordinary tests may open physical I²C hardware, even when a saved configuration enables the selector. Do not rely solely on missing hardware or permissions to make tests safe.
 
+Physical selector transport is Linux `i2c-dev` only. Native macOS selector/HID
+support is out of scope. On other platforms, retain the saved draft and refuse
+physical I²C-route activation explicitly before opening hardware; portable
+fake-transport tests remain supported. A simulated RF run with an enabled
+selector requires explicitly injected fake selector **and fake PTT** ownership;
+without those injections, refuse dependent execution before any hardware open.
+During simulation, never automatically create a physical selector from saved
+settings, silently fall back to no selector, or expose new CLI/INI/environment
+simulator controls.
+Ordinary read-only settings/status operations remain available in this state.
+
 Add meaningful tests covering:
 
 - Both board forms and both modes.
 - All eight output positions.
 - Shared-band assignments.
 - `0x00`, `0xFF`, and multi-output patterns such as `0x05`.
-- Per-output inversion, verified permutations, and exactly-once conversion.
+- Per-output inversion, identity mapping, exactly-once conversion, and refusal
+  of unverified mapping profiles. Add nonidentity board fixtures only when a
+  verified profile is actually included; do not invent a KRIDA permutation.
 - Separate preserved mode assignments and persistence round trips.
 - Missing assignments versus valid zero.
 - Strict refusal before selector writes.
@@ -522,10 +674,25 @@ Add meaningful tests covering:
   receipt from late success, no premature lease reuse, and unresolved cleanup
   until actual completion. Exercise this through both production RF paths.
 - Normal endpoint completion with the default 200 ms tail and maximum cleanup
-  duration: preserve the 100 ms RF acknowledgement ceiling, responsive STOP,
+  duration: preserve the 100 ms RF acknowledgement ceiling, responsive local STOP,
   retained selector ownership after RF terminal reporting, rejection of new
   preparation while cleanup is pending, and latched inhibition if cleanup
-  later fails. Rejected/stale STOP cannot affect another job or cleanup epoch.
+  later fails. Network STOP is unknown; post-completion ABORT remains refused.
+  Rejected/stale/replayed ABORT cannot affect another job or cleanup epoch.
+- Accepted ABORT racing RF completion, local STOP after protocol RELEASE,
+  deferred lease expiry, Finish current/End now takeover, recovery, endpoint
+  replacement, configuration saves, and a new LOAD from the current owner
+  while cleanup is pending. Exercise the actual authority/service/engine path,
+  not just a selector-owner unit model; assert no reentrant-lock deadlocks.
+- Leading/trailing RF-off intervals, RF-off-only/skip requests, multiple bands
+  sharing one pattern, and different-pattern refusal. Preserve timeline origin
+  and offsets while proving the full lead precedes first RF and no selector
+  cleanup runs inside the accepted timeline.
+- Startup ordering between both RF engines and the selector, PTT receipt
+  failures, no-PTT status/interval behavior, active/inactive routing, retained
+  native drafts, domain-bound PTT changes, offline save, unchanged save, A/B/A,
+  persistence/readback failure, and out-of-process INI reload. Simulated RF
+  with missing fake selector/PTT injections refuses before physical access.
 
 Use observable fake I²C/PTT/RF events and deterministic clocks where possible. Verify actual production orchestration, not merely a second model of the intended sequence.
 
@@ -613,14 +780,18 @@ The completion report must state:
 - Remaining hardware qualification and other unresolved validation.
 - Final branches and working-tree state.
 - Confirmation that Pico was not modified.
-- Confirmation that no commit, push, installation, service operation, or live hardware/RF action occurred.
+- Actual commit/push status and confirmation that no installation, service
+  operation, or live hardware/RF action occurred. Distinguish previously
+  authorized plan publication from any implementation publication authority.
 
 Distinguish software implementation from physical qualification. If required work remains incomplete, identify the exact next unfinished step.
 
 ## 12. Approved implementation decisions
 
 Both decisions were explicitly approved by the maintainer on 2026-11-13.
-No pre-implementation product or scope decisions remain open in this plan.
+Those approvals remain valid for the stated scope. No additional product
+decision is identified by this plan review; implementation still must prove
+the production-path gates and report any newly discovered scope dependency.
 
 1. **Approved: the narrow `src/WSPR-Transmitter` extension.** Approved scope is
    reusable Linux adapter leases and complete-operation guards, their
@@ -643,8 +814,8 @@ No pre-implementation product or scope decisions remain open in this plan.
 2. **Approved: Pi-local amplifier lead/tail controls for the enabled I²C route.**
    Adopt the section 5.1 ranges and 200 ms defaults for both lead and tail,
    with timing suitability confirmed by the operator for the circuit. Store
-   them in the new Pi-local
-   selector object, activate on restart, and apply identically to local and
+   them in the new Pi-local selector object, activate on restart, and apply
+   identically to local and
    inbound Pi WTP jobs. Do not reuse Pico controls or change shared schemas.
    This adds behavior absent from the Pi today. Zero remains a valid explicit
    setting within the approved range; it is not the default. Do not infer a
