@@ -60,6 +60,7 @@ Relevant WsprryPi starting points include:
 - src/wtp_integration/scheduler.cpp
 - src/wtp_integration/status.cpp
 - src/wtp_integration/backend.cpp and target_runtime.hpp
+- src/wtp_integration/fleet_store.cpp and pi_status_client.cpp
 - src/web_server_control_routes.cpp and privileged_network_policy.cpp
 - docs/wtp-fleet.md
 - docs/wtp-status-recovery.md
@@ -256,6 +257,21 @@ results; do not try to order opaque ETags. Per-context observation_revision
 advances for accepted STATUS or invalidation, not a worker heartbeat. All
 projections/query results carry their publication/incarnation binding. A GET's
 current clock sample may increase age without advancing either revision.
+A controller monotonic-clock discontinuity inhibits new admission and requires
+a fresh incarnation before accepting commands again; do not make expired
+admission windows valid by rewinding their clock. Preserve owned/pending work
+as unresolved until its existing stop/reconciliation path establishes an outcome.
+
+Use one read coordinator for Operations, Setup's fleet projection, and action
+lookups. Only a designated, serialized full-snapshot GET may establish a new
+incarnation. On change, invalidate the browser read generation, retire old
+render requests, preserve their action references as unconfirmed, and confirm
+with a fresh full GET before enabling controls. Late POST/action responses may
+resolve only their original action; they cannot switch the current incarnation
+back. Every callback checks its captured read/selection/context generation.
+Use no-store response/cache policy; a 304 or cached body without a valid current
+age sample cannot renew freshness. Within one publication, a decreasing clock
+sample cannot reset the age baseline or revive eligibility.
 
 Handle controller process restart, monotonic-clock discontinuity, device reboot, identity change, revision reset, and reconnect without reusing invalid observation baselines or pending-action results. Add minimal controller-incarnation metadata if existing evidence cannot distinguish these cases reliably.
 
@@ -286,8 +302,15 @@ from this observation path. Existing separately owned scheduling/time activity
 retains its own authority and must not be mistaken for a viewing side effect.
 
 Consume the initial-attempt permission for the assignment context, not each
-replacement transport object. A failed initial attempt, later disconnect, or
-identity/fault latch requires explicit Reconcile; no retry/reconnect loop.
+replacement transport object. Separate a successful observation from readiness
+to transmit: inspect()/poll_idle() use startup-quiescence checks and can report
+not ready solely because a valid STATUS shows a foreign owner or active job.
+That is a healthy observed-but-ineligible session, not a failed inspection.
+Keep observing it read-only; when the foreign work ends, fresh safe evidence
+can restore eligibility without reconnecting, taking over, or demanding recovery
+for occupancy alone. A failed handshake/transaction, later disconnect, or real
+identity/protocol/safety latch still requires explicit Reconcile. Check the
+published session/evidence, not a single readiness boolean; no retry loop.
 Do not perform the initial inspection for a persisted in-flight or unresolved
 removed context. Restoring a worker cannot bypass its safety barrier.
 Use existing bounded connect/transaction limits, plus a 45,000 ms aggregate
@@ -349,6 +372,24 @@ Recompute age against the current server monotonic time, rather than trust a
 previously published can_resume boolean. Uncertain persistence/readback keeps
 that context's dispatch inhibited until authoritative readback resolves its
 current saved state; a refresh receipt alone does not clear the barrier.
+For a Pi target, also require a fresh read-only host/wtp-endpoint observation
+matching the WTP device and boot, the assignment's takeover generation,
+local_requested=false, output_unknown=false, and healthy revocation storage.
+Publish its age separately; a changed generation starts retirement rather than
+enabling the row. Collect this existing protected GET on the owning runtime at
+most once every 5,000 ms while idle, independently of browser count, retaining
+its existing bounded 8,000 ms transport deadline. Stateless HTTP connection
+setup for that read is not WTP reconnection or recovery. It must not stall WTP
+observation, other outputs, or cached GET. Keep the existing forced takeover
+checks before CLAIM and ARM. Both evidence sources must be fresh; the 15-second
+policy does not promise eligibility under worst-case combined channel latency.
+
+Apply equivalent eligibility to assign with enabled=true before committing its
+start-after-save choice, not just to the enable operation. The assignment's
+explicit start request may bind the freshly inspected boot before commit; it
+cannot skip occupancy, policy, identity, or journal gates. Existing enabled rows
+restored at startup still pass all current initial/admission and pre-CLAIM/ARM
+checks; loading their enabled flag is not evidence of device readiness.
 Reject stale/unavailable evidence with an explicit reason; do not reconnect or
 silently recover as part of enable. Keep all existing fresh pre-CLAIM/ARM and
 endpoint ownership checks; a fresh snapshot does not reserve the remote device.
@@ -373,6 +414,11 @@ These additions are Pi-host resources, not Pico Control/1 or WTP messages:
 | GET /api/control/v1/host/fleet/actions?ids=... | Query at most 32 explicit action IDs; return their records or explicit unknown/expired indications with the current incarnation |
 | POST /api/control/v1/host/fleet | Existing mutation resource with strict correlated request fields and If-Match; acknowledge acceptance separately from completion |
 
+The actions query permits only ids, with 1–32 distinct 32-character lowercase
+hex IDs separated by commas, and at most 2 KiB of encoded query data. Reject
+unknown/duplicate query keys, malformed encoding, invalid IDs, and excess
+capacity before ledger access. It cannot select a transport or device endpoint.
+
 Keep the Operations response at most 512 KiB for all 32 contexts. Project only
 the required evidence and latest report summaries, not complete event lists,
 certificate paths, full capability documents, or the action ledger. Bound a
@@ -391,31 +437,51 @@ do not write the assignment file or change that ETag. Do not add compatibility
 views or a shared control major for these host-only changes.
 
 Each mutation carries a browser-generated random 128-bit action_id, the reviewed
-controller_incarnation and assignment_generation, and a nullable reviewed_boot_id,
-in addition to its existing operation/body and If-Match. For assign, generation
-is null until the new context is created; target identity still comes from the
-strictly validated saved-profile settings. Enable requires a current non-null
+controller_incarnation and assignment_generation, a nullable reviewed_boot_id,
+and decimal-string accept_before_ms, in addition to its existing operation/body
+and If-Match. Obtain a fresh host clock/incarnation sample after confirmation
+without replacing the reviewed target/revision; set accept_before_ms to that
+sample plus 30,000 ms. A changed reviewed context requires review again.
+A new command is admitted only before that deadline and no more than 45,000 ms
+into the current server monotonic future. This admission window does not bound
+accepted work's completion or authorize cancelling it on expiry. For assign,
+generation is null until the new context is created; target identity still
+comes from the strictly validated saved-profile settings. Enable requires a current non-null
 boot. Pause/recover can use null or last-known boot without granting permission
 to abort foreign work or substitute a different device. Update all six existing
 mutation consumers (assign, enable, pause, schedule, recover, remove); do not
 leave Setup bypassing the new admission/correlation rules.
+
+Use crypto.getRandomValues for 16 random bytes encoded as 32 lowercase hex
+characters; do not depend on secure-context-only randomUUID for the ordinary
+HTTP UI or fall back to Math.random. Refuse mutations with an explanatory
+message if suitable randomness is unavailable. Validate canonical decimal
+accept_before_ms and checked 64-bit addition on both sides.
 
 An action record binds action ID, operation, canonical request digest, reviewed
 ETag, incarnation/generation/device, reviewed and result boot/job identities,
 acceptance/completion monotonic times, state, work_pending, result evidence,
 and a bounded reason. States are accepted, pending, confirmed, refused,
 superseded, and outcome_unconfirmed. Return 202 for accepted pending work and
-200 for a confirmed result; malformed/conflicting/refused requests retain
-appropriate existing 4xx errors and cannot perform partial transport actions.
-An uncertain persistence result must be reported as unconfirmed, not refused
-with an implication that nothing changed.
+200 for a confirmed result; synchronous guard refusals retain appropriate
+existing 4xx errors. Read-only identity/CAPS/STATUS verification may precede a
+refusal, but it cannot partially apply settings or issue unauthorized mutating
+device operations. An accepted asynchronous action may later publish refused
+with its reason; do not pretend a 202 was retrospectively a synchronous 4xx.
+If persistence or stop effects may already have occurred, report the achieved
+and unconfirmed postconditions rather than imply that nothing changed.
 
 After authentication/intent and shape validation, recognize an existing action
 ID before applying the current If-Match to a new mutation. The exact original
 request returns its retained action result without repeating side effects;
-reuse with different payload/binding is a conflict. New actions require the
-current ETag and context. An accepted result echoed from an old action is not a
-new worker command. No automatic mutating HTTP retries are introduced.
+reuse with different payload/binding is a conflict. The digest includes the
+fixed admission deadline, original If-Match, and reviewed identity/context.
+An unknown action with an expired admission window
+is refused without mutation even if its ETag still matches; changing the
+window is a new logical request and requires a new action ID. New actions
+require the current ETag and context. An accepted result echoed from an old
+action is not a new worker command. No automatic mutating HTTP retries are
+introduced.
 
 Keep one ordinary action in progress per context. A validated Pause may persist
 disabled immediately and supersede a queued enable/recovery with a nonblocking
@@ -443,9 +509,21 @@ Use these postconditions:
   with a correlated result. Removal cannot claim cleanup from stopping a fresh
   empty context after a crash.
 
-Keep at most 256 terminal records, each at most 2 KiB, for 15 minutes after
-completion; evict oldest terminal records first. Pending/unquiesced work is
-never evicted to accept more work. Bound an action reason to 128 UTF-8 bytes
+Keep a terminal-history pool of at most 256 records, each at most 2 KiB,
+for up to 15 minutes after completion, in addition to the 64 per-context
+active/window-protected slots. Total retained action records never exceed 320.
+Evict oldest eligible terminal records first, but never evict
+one before its original admission window has expired: otherwise an exact late
+POST could execute again while the old ETag is still valid. Reserve record
+capacity before side effects; refuse ordinary new work as Busy at capacity.
+Pending/unquiesced work is never evicted. The existing 64 active/priority slots
+also retain completed window-protected results when the terminal pool is full;
+these slots are not reusable until safely retired. Keep one priority Pause slot
+per context available, and do not admit another enable while that context's
+reserved stop capacity is occupied. A full ledger cannot remove the first safe
+Pause path for an active context. Never infer work_pending=true just because a
+completed record is temporarily held in an active-capacity slot. Bound an
+action reason to 128 UTF-8 bytes
 and other projected diagnostic text to 512 UTF-8 bytes, with explicit truncation
 indications and the serialized limits also enforced; never include credentials.
 Operations snapshots carry only relevant latest/pending records, not the entire ledger.
@@ -481,22 +559,59 @@ historical notices, not enough to restore an unresolved target after a crash.
 Add a minimal private, atomic, independently versioned version-1 pending-cleanup
 journal at `<active-INI-path>.wtp-fleet-contexts.json`. This is recovery authority,
 not durable action history or analytics. Store the frozen target binding,
-retirement ID/reason, source assignment/ETag, last known execution association,
+retirement ID/reason, operator-remove versus takeover kind, resolution
+disposition, source assignment/ETag, last known execution association,
 and unresolved barrier. Bound the journal to 32 contexts and 1 MiB, counting
 overlapping assignment/journal entries as one logical context for admission.
-Apply the assignment store's ownership, permissions, strict shape validation, atomic rename, and fsync discipline; never store
-credential contents or automatically reuse a retired WTP session.
+Apply the assignment store's ownership, permissions, strict shape validation,
+atomic rename, and fsync discipline; never store credential contents or
+automatically reuse a retired WTP session.
 
-Persist retirement intent before deleting an assignment or discarding its
-recoverable context. On restart, a matching journal intent blocks automatic
-dispatch even if the assignment still exists. A half-completed removal remains
+Under the context reservation, inhibit new dispatch before persistence,
+then persist retirement intent before deleting an assignment or discarding its
+recoverable context. If intent persistence fails, retain the saved row, endpoint,
+and process-local barrier; do not report removal accepted/complete or guess
+whether a rename succeeded. Resolve storage uncertainty by authoritative
+readback. Distinguish the intent's cause and disposition:
+
+- Operator Remove preserves its current cleanup gate: durable intent, committed
+  pause, confirmed owned-output cleanup, committed assignment deletion, then
+  durable journal-entry removal. A cleanup refusal keeps the assignment paused
+  and the recovery barrier intact; it does not claim the assignment was removed.
+- Target-local takeover is authoritative independently of this controller's
+  cleanup: durable takeover intent, committed assignment revocation, confirmed
+  safe reconciliation/cleanup, then durable journal-entry removal. Retain the
+  frozen removed context while unresolved; never stop a new foreign owner.
+
+Every step is idempotent by the retirement ID and captured source binding.
+Late internal worker callbacks also check generation/job/retirement identity,
+not device_id alone, before clearing
+in_flight or updating a row; another output's ETag change does not authorize
+replacing that output's data with an old document. On restart, a matching
+journal intent blocks automatic dispatch even if the assignment still exists.
+A half-completed removal remains
 paused/unresolved until explicit Reconcile; it must not resurrect a removed
 assignment or erase a different replacement. Reject reassignment while an old
 context is unresolved. If the saved row conflicts with the captured source
 binding, hold the conflict for explicit review rather than overwrite either.
-Remove the journal entry only after confirmed cleanup and committed retirement;
-failed writes retain the barrier. A corrupt journal blocks fleet mutation and
-dispatch with a visible error while leaving This Pi's independent runtime alone.
+Remove the journal entry only after confirmed cleanup and a committed
+resolution disposition. An existing assignment remains paused after an explicit
+Reconcile of a failed Remove; require a new reviewed Remove to delete it rather
+than silently finish an old failed request. An assignment whose deletion was
+already committed remains removed and is never resurrected. The original
+pending Remove may finish its requested deletion when its own cleanup succeeds;
+if explicit recovery supersedes it, stale callbacks cannot later delete the
+retained assignment. Failed writes retain the barrier. A corrupt/unavailable
+journal blocks new
+fleet dispatch, Resume, assignment, schedule edits, and removal, with a visible
+error; it does not disable a safe Pause/owned-job stop for an already verified
+in-memory context. Such a stop uses only that existing owner/binding and never
+guesses an endpoint from corrupt storage. Report which pause/cleanup persistence
+postconditions succeeded and which remain unconfirmed. Reconciliation may
+observe a known retained context but cannot erase or rebuild a corrupt journal
+as an automatic repair. At startup without a trusted restored binding, do not
+open guessed targets. Preserve This Pi's independent runtime. A storage fault
+requires explicit maintenance/review if authoritative readback cannot resolve it.
 Legacy removal notices without recovery metadata cannot be represented as
 reconciled contexts or used to guess an endpoint.
 
@@ -544,8 +659,12 @@ draft. Do not silently overwrite it or update its reviewed revision while
 retaining edits. A removed/replaced draft remains inspectable but cannot save
 to its replacement. Consume only the handoff once, not the preserved draft;
 clear a draft on confirmed save or explicit discard. Return navigation can
-restore the initiating control's focus when it still exists, while a full
-Operations load continues to default to This Pi.
+restore focus only when that control remains visible, enabled, and bound to
+the current context. Otherwise focus the Device selector or Operations heading;
+never select a remote device or focus a hidden controller action just to restore
+focus. A full Operations load continues to default to This Pi. Announce semantic
+state/action changes politely; do not announce every countdown tick or repeat
+unchanged status on each poll.
 
 ## 7. Pi/Pico coordination
 
@@ -601,6 +720,19 @@ Add meaningful behavioral coverage for:
 - Crash between retirement intent, assignment deletion, cleanup, and journal
   removal; corrupt/conflicting journal; no guessed endpoint, lost barrier, empty
   context cleanup claim, or automatic replay after restart.
+- Successful foreign-owned observation versus actual handshake/STATUS failure;
+  healthy occupancy becoming idle without Reconcile or reconnect. Preserve
+  fault and identity latches instead of inferring health from readiness alone.
+- An evicted action's identical POST with unchanged ETag: its admission window
+  must have expired, and no new side effects occur. Cover protected-result
+  saturation, reserved priority Pause, and mutation-clock discontinuity.
+- Late old-incarnation POST/action/GET replies after restart, no-store/304 and
+  decreasing-age samples, aggregate query limits, and protected Pi takeover
+  observations with stale/mismatched boot or changed generation.
+- Start-after-save assignment bypass attempts, corrupt-journal Pause for a
+  verified live owner, failure before retirement intent is durable, operator
+  Remove cleanup refusal retaining its row, and takeover removal remaining
+  removed. Reconcile cannot silently delete a retained paused assignment.
 - Draft-preserving one-use editor handoff, another device's unsaved draft,
   removed/replaced draft, ETag change during navigation, plain-identity wording,
   and This Pi controlling its compatibility WTP backend.
