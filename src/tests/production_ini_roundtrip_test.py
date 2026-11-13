@@ -15,6 +15,7 @@ import struct
 import tempfile
 import time
 import urllib.request
+import urllib.error
 
 from production_browser_load import normal_browser_schedule
 
@@ -111,6 +112,25 @@ def main():
                 assert operation['Transmit'] is False and operation['Enable on Boot'] == 'Never'
                 assert all(operation[name] is False for name in ('Use LED', 'Use Amp', 'Use Shutdown'))
                 assert operation['Web Port'] == web_port and operation['Socket Port'] == control_port
+                # Actual host route/guard coverage: published reads never open
+                # this configured external endpoint or mutate assignment state.
+                fleet_path = '/api/control/v1/host/fleet'
+                snapshot = json.loads(get(fleet_path + '/operations'))
+                assert snapshot['maximum_outputs'] == 32 and snapshot['assignments'] == []
+                assert len(snapshot['controller_incarnation']) == 32
+                action_id = '1' * 32
+                action = json.loads(get(fleet_path + '/actions?ids=' + action_id))
+                assert action['actions'][action_id]['state'] == 'unknown_or_expired'
+                for suffix in ('/operations?unknown=1', '/actions', '/actions?unknown=1',
+                               '/actions?ids=' + action_id + '&ids=' + action_id,
+                               '/actions?ids=' + action_id + '&',
+                               '/actions?ids=' + action_id + ',' + action_id):
+                    try:
+                        get(fleet_path + suffix)
+                        raise AssertionError('Malformed Fleet query accepted: ' + suffix)
+                    except urllib.error.HTTPError as error:
+                        assert 400 <= error.code < 500
+                assert json.loads(get(fleet_path + '/operations'))['assignments'] == []
                 before = hashlib.sha256(ini.read_bytes()).digest()
                 for seconds in (180, 300):
                     now, requests, events = [0.0], [], []

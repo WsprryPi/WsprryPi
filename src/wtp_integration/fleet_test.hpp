@@ -13,6 +13,10 @@ struct WtpFleetTestHooks {
     std::function<std::unique_ptr<WtpTargetRuntime>(WtpSettings,
         std::function<bool()>, std::shared_ptr<void>)> create_target;
     std::function<nlohmann::json(const WtpSettings&, unsigned)> revocation_status;
+    // Deterministic blocked-filesystem tests; never runs under HTTP/publication locks.
+    std::function<void()> before_persist;
+    // Host policy clock only; transport clocks remain the intended fixture's.
+    std::function<std::uint64_t()> monotonic_now;
 };
 void start_wtp_fleet_for_test(const std::string& ini_path,
     const std::string& self_id, WtpFleetTestHooks hooks);

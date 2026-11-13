@@ -123,6 +123,8 @@ PrivilegedOperationClass classify_privileged_http_operation(
         if ((method == "GET" && (path == "/api/control/v1/host/devices" ||
                                  path == "/api/control/v1/host/discovery" ||
                                  path == "/api/control/v1/host/fleet" ||
+                                 path == "/api/control/v1/host/fleet/operations" ||
+                                 path == "/api/control/v1/host/fleet/actions" ||
                                  path == "/api/control/v1/host/wtp-endpoint")) ||
             (method == "POST" && (path == "/api/control/v1/host/devices" ||
                                   path == "/api/control/v1/host/devices/use" ||

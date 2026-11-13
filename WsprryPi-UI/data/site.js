@@ -7724,6 +7724,7 @@ function showSystemModal(action, pause = true) {
 
 // Show the “Are you sure?” question
 function openConfirmModal(action, confirmModal) {
+    if (window.FleetOperation?.remote()) return;
     if (window.PicoFirmwareSafety?.locked === true || pendingSystemAction !== null || machinePowerCapabilities[action === "reboot" ? "reboot" : "power_off"] !== true) {
         syncMachinePowerControls();
         return;

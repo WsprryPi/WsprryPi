@@ -47,13 +47,16 @@ int main() {
         expect_http("DELETE", path, PrivilegedOperationClass::reject);
         expect_http("GET", std::string(path) + "/other", PrivilegedOperationClass::reject);
     }
-    for (const auto* path : {"/api/control/v1/host/fleet", "/api/control/v1/host/wtp-endpoint"}) {
+    for (const auto* path : {"/api/control/v1/host/fleet", "/api/control/v1/host/fleet/operations", "/api/control/v1/host/fleet/actions", "/api/control/v1/host/wtp-endpoint"}) {
         expect_http("GET", path, Classification::protected_operation);
         expect_http("DELETE", path, Classification::reject);
     }
     for (const auto* path : {"/api/control/v1/host/fleet", "/api/control/v1/host/wtp-endpoint/enable", "/api/control/v1/host/wtp-endpoint/recover"}) {
         expect_http("POST", path, Classification::protected_operation);
         expect_http("PUT", path, Classification::reject);
+    }
+    for(const auto* path:{"/api/control/v1/host/fleet/operations","/api/control/v1/host/fleet/actions"}) {
+        expect_http("POST",path,Classification::reject);expect_http("PUT",path,Classification::reject);
     }
     expect_http("GET", "/api/control/v1/host/wtp-endpoint/enable", Classification::reject);
     expect_http("POST", "/api/control/v1/host/wtp-endpoint", Classification::reject);

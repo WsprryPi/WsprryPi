@@ -10,7 +10,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css', 'operation.css'],
-        'js' => ['local-wtp.js', 'operation.js'],
+        'js' => ['fleet-client.js', 'local-wtp.js', 'operation.js', 'fleet-operation.js'],
         'partial' => __DIR__ . '/views/operation.php',
     ],
     'config' => [
@@ -22,7 +22,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css'],
-        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'control-contract.js', 'si5351.js', 'gps.js', 'gray-line.js', 'gpio-drive.js', 'amplifier-timing.js', 'filter-selector.js', 'wtp-management.js', 'wtp-usb-settings.js', 'wtp-firmware.js', 'fleet-schedules.js', 'index.js'],
+        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'control-contract.js', 'si5351.js', 'gps.js', 'gray-line.js', 'gpio-drive.js', 'amplifier-timing.js', 'filter-selector.js', 'wtp-management.js', 'wtp-usb-settings.js', 'wtp-firmware.js', 'fleet-client.js', 'fleet-schedules.js', 'index.js'],
         'partial' => __DIR__ . '/views/config.php',
     ],
     'logs' => [

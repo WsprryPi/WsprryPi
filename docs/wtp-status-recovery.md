@@ -118,3 +118,11 @@ uses the same authority with TLS and shared API status/cancellation. No physical
 service behavior is qualified by these tests. Device UTC must satisfy admission
 limits; GET_CLOCK observes rather than sets it. Supporting firmware can receive
 qualified controller time through [USB management](wtp-usb-management.md).
+
+## Fleet observation and action recovery
+
+Fleet Operations distinguishes committed schedule state from device evidence and historical reports. Current observation expires at 15 seconds, measured conservatively from STATUS request or negotiation start. Refreshing the browser never reconnects a failed WTP session. A healthy foreign owner is observed without takeover; actual transport or identity failure requires explicit Reconcile.
+
+Use the correlated action result to establish completion. Accepted, pending, superseded and outcome-unconfirmed results do not prove output-off. A browser timeout releases navigation while preserving its action reference. After a controller restart or an unknown/expired action, read current state and explicitly review it; never infer the original result or blindly repeat it. Reconcile unresolved tracked work before Resume. A confirmed schedule Pause can coexist with foreign work or unknown output when no controller-owned cleanup was outstanding.
+
+The private `.wtp-fleet-contexts.json` beside the active INI preserves frozen removal/takeover recovery bindings across restart. Corrupt storage inhibits new fleet dispatch and edits, while an existing verified live owner retains its safe Pause path. Restore/review the actual recovery authority through maintenance; do not delete a journal or edit away an in-flight marker to resume.

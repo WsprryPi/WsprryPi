@@ -318,6 +318,7 @@ function finishOperationRetryFeedback() {
 }
 
 function retryOperationRuntimeLoad() {
+    if (window.FleetOperation?.remote()) return;
     if (operationRetryInFlight) {
         return;
     }
@@ -431,6 +432,7 @@ function syncTransmitAvailabilityUi() {
 }
 
 function requestTransmitEnabledChange(enabled, previousEnabled) {
+    if (window.FleetOperation?.remote()) return;
     const $transmit = $("#transmit");
 
     if (enabled) {
@@ -503,6 +505,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled) {
 }
 
 function patchTransmitControl() {
+    if (window.FleetOperation?.remote()) return;
     if (isUpdatingTransmitFromBackend) {
         return;
     }
@@ -512,6 +515,7 @@ function patchTransmitControl() {
 }
 
 function patchRebootBehaviorControl() {
+    if (window.FleetOperation?.remote()) return;
     if (isUpdatingRebootBehaviorFromBackend) {
         return;
     }
@@ -575,6 +579,7 @@ function patchRebootBehaviorControl() {
 }
 
 function stopTransmission(options = {}) {
+    if (window.FleetOperation?.remote()) return;
     const $stop = $("#stop_transmit");
     if ($stop.prop("disabled")) {
         return false;

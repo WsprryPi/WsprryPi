@@ -100,7 +100,10 @@ void WtpScheduler::publish() {
     next.capabilities = session.capabilities();
     if (!session.needs_status()) {
       next.remote = session.status();
+      next.status_sequence=backend_.status_sequence_;
       next.status_observed_ms = backend_.status_observed_ms_;
+      next.status_age_origin_ms=backend_.status_age_origin_ms_;
+      next.status_age_origin_kind=backend_.status_age_origin_kind_;
       next.owns = session.owns();
       next.lease_valid = session.lease_valid(next.observed_ms);
       if (const auto &e = session.job_evidence();

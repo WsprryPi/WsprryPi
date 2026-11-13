@@ -72,15 +72,20 @@ bool WtpTransmitBackend::settle(std::uint64_t end, bool cancellable) {
     if (clock_.now_ms() >= end)
       return fail("WTP operation deadline expired; output may be unknown");
     const bool needed_status = session_.needs_status();
+    if (needed_status && !status_request_origin_ms_)
+      status_request_origin_ms_=clock_.now_ms();
     session_.poll(clock_.now_ms());
-    if (needed_status && !session_.needs_status())
-      status_observed_ms_ = clock_.now_ms();
+    bool accepted_status=needed_status && !session_.needs_status();
     while (auto result = session_.take_result()) {
       if (result->operation == wtp::Operation::Status &&
           result->kind == wtp::ResultKind::Acknowledged &&
           !session_.needs_status())
-        status_observed_ms_ = clock_.now_ms();
+        accepted_status=true;
       result_ = std::move(result);
+    }
+    if(accepted_status) {
+      if(status_sequence_==UINT64_MAX){session_.disconnect();return fail("WTP observation revision exhausted");}
+      ++status_sequence_;status_observed_ms_=clock_.now_ms();status_age_origin_ms_=status_request_origin_ms_;
     }
     observed();
     auto phase = session_.phase();
@@ -104,8 +109,20 @@ bool WtpTransmitBackend::transact(wtp::Operation op, wtp::RequestBody body,
   result_.reset();
   if (op == wtp::Operation::Arm && arm_admission_ && !arm_admission_())
     return fail("WTP scheduler declined ARM admission");
-  if (!session_.request(op, std::move(body), clock_.now_ms()))
-    return fail(session_.diagnostic());
+  if (op == wtp::Operation::Status) {
+    status_request_origin_ms_=clock_.now_ms();
+    status_age_origin_kind_="status_request";
+  }
+  const bool dispatch=op==wtp::Operation::Claim || op==wtp::Operation::Load || op==wtp::Operation::Arm;
+  {
+    std::unique_lock<std::mutex> permit;
+    if(dispatch && dispatch_permit_) {
+      permit=std::unique_lock(dispatch_permit_->mutex);
+      if(!dispatch_permit_->allowed) return fail("Output dispatch authority was revoked");
+    }
+    if (!session_.request(op, std::move(body), clock_.now_ms()))
+      return fail(session_.diagnostic());
+  }
   observed();
   if (!settle(end, cancellable))
     return false;
@@ -124,6 +141,9 @@ bool WtpTransmitBackend::fresh(std::uint64_t end, bool cancellable) {
 }
 bool WtpTransmitBackend::connect(wtp::ByteStream &stream) {
   error_.clear();
+  status_request_origin_ms_=clock_.now_ms();
+  status_age_origin_kind_="negotiation_start";
+  status_age_origin_ms_.reset();
   if (!session_.connect(stream, clock_.now_ms()))
     return fail(session_.diagnostic());
   status_observed_ms_.reset();

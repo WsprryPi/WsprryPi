@@ -1,11 +1,26 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/browser_api.hpp"
+#include "wtp_integration/browser_http.hpp"
 #include "privileged_network_policy.hpp"
 #include <iostream>
 using namespace wsprrypi;
 #define CHECK(x) do { if (!(x)) throw std::runtime_error(#x); } while (false)
 int main() {
   try {
+    httplib::Request query;
+    query.method="GET";query.path="/api/control/v1/host/fleet/actions";
+    query.target=query.path+"?ids="+std::string(32,'a');query.params.emplace("ids",std::string(32,'a'));
+    query.headers.emplace("Host","localhost");
+    CHECK(wtp_browser_http_request(query).has_value());
+    query.params.emplace("ids",std::string(32,'b'));
+    CHECK(!wtp_browser_http_request(query));
+    query.params.erase("ids");query.params.emplace("ids",std::string(32,'a'));
+    query.target+="&";CHECK(!wtp_browser_http_request(query));
+    query.target=query.path+"?ids=%zz";CHECK(!wtp_browser_http_request(query));
+    query.target=query.path+"?ids="+std::string(32,'a');query.method="POST";
+    CHECK(!wtp_browser_http_request(query));
+    query.method="GET";query.path="/api/control/v1/status";query.target=query.path+"?ids="+std::string(32,'a');
+    CHECK(!wtp_browser_http_request(query));
     int reads = 0, mutations = 0, management = 0;
     WtpBrowserApi api([&] { ++reads; return nlohmann::json{{"transport", "network"}, {"start_utc_ns", "18446744073709551615"}}; },
       [&](auto resource, auto method, auto, auto revision, auto) {

@@ -13,7 +13,76 @@
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <optional>
 namespace wsprrypi {
+namespace {
+std::optional<nlohmann::json> load_private_json(const std::string& path,std::size_t limit) {
+    nlohmann::json data;
+    const int fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (fd < 0) {
+        if (errno != ENOENT) throw std::runtime_error("Cannot read fleet assignments");
+        return std::nullopt;
+    } else {
+        struct Guard { int fd; ~Guard() { close(fd); } } guard{fd};
+        struct stat info{};
+        if (fstat(fd,&info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != geteuid() ||
+            (info.st_mode & 0077) != 0 || info.st_size > static_cast<off_t>(limit))
+            throw std::runtime_error("Fleet assignments must be a private host-owned regular file within the Fleet size limit");
+        std::string bytes;
+        std::array<char,4096> buffer{};
+        for (;;) {
+            const auto n = read(fd,buffer.data(),buffer.size());
+            if (n == 0) break;
+            if (n < 0) { if (errno == EINTR) continue; throw std::runtime_error("Fleet assignment read failed"); }
+            bytes.append(buffer.data(),static_cast<std::size_t>(n));
+            if (bytes.size() > limit) throw std::runtime_error("Fleet assignments exceed size limit");
+        }
+        std::vector<std::set<std::string>> keys;
+        data = nlohmann::json::parse(bytes,[&](int, nlohmann::json::parse_event_t e,nlohmann::json& v) {
+            if (e == nlohmann::json::parse_event_t::object_start) keys.emplace_back();
+            if (e == nlohmann::json::parse_event_t::key && !keys.back().insert(v.get<std::string>()).second)
+                throw std::runtime_error("Duplicate fleet assignment key");
+            if (e == nlohmann::json::parse_event_t::object_end) keys.pop_back();
+            return true;
+        });
+    }
+    return data;
+}
+void save_private_json(const std::string& path,const nlohmann::json& data,std::size_t limit) {
+    const auto bytes = data.dump(2) + "\n";
+    if (bytes.size() > limit)
+        throw std::runtime_error("Fleet assignments exceed size limit");
+    std::string pattern = path + ".tmp.XXXXXX";
+    std::vector<char> filename(pattern.begin(),pattern.end()); filename.push_back(0);
+    int fd = mkstemp(filename.data());
+    if (fd < 0) throw std::runtime_error("Cannot create fleet assignment file");
+    try {
+        std::size_t offset = 0;
+        while (offset < bytes.size()) {
+            const auto n = write(fd,bytes.data()+offset,bytes.size()-offset);
+            if (n < 0 && errno == EINTR) continue;
+            if (n <= 0) throw std::runtime_error("Cannot write fleet assignments");
+            offset += static_cast<std::size_t>(n);
+        }
+        if (fsync(fd) != 0) throw std::runtime_error("Cannot sync fleet assignments");
+        const int closed = close(fd); fd = -1;
+        if (closed != 0 || rename(filename.data(),path.c_str()) != 0)
+            throw std::runtime_error("Cannot publish fleet assignments");
+        auto directory = std::filesystem::path(path).parent_path();
+        if (directory.empty()) directory = ".";
+        const int dir = open(directory.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
+        if (dir < 0) throw std::runtime_error("Cannot open fleet state directory");
+        const int synced = fsync(dir); close(dir);
+        if (synced != 0) throw std::runtime_error("Cannot sync fleet state directory");
+    } catch (...) {
+        if (fd >= 0) close(fd);
+        unlink(filename.data());
+        // Rename may already have succeeded. Reload authoritative disk contents
+        // on the next request; the failed caller must never dispatch work.
+        throw;
+    }
+}
+} // namespace
 std::uint64_t wtp_fleet_decimal(const nlohmann::json& value) {
     const auto text = value.get<std::string>();
     std::uint64_t result{};
@@ -65,72 +134,16 @@ void WtpFleetStore::validate(const nlohmann::json& data, const std::string& self
 }
 void WtpFleetStore::load() {
     if (loaded_) return;
-    const int fd = open(path_.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-    if (fd < 0) {
-        if (errno != ENOENT) throw std::runtime_error("Cannot read fleet assignments");
-        data_ = {{"version",1},{"assignments",nlohmann::json::array()},{"removals",nlohmann::json::array()}};
-    } else {
-        struct Guard { int fd; ~Guard() { close(fd); } } guard{fd};
-        struct stat info{};
-        if (fstat(fd,&info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != geteuid() ||
-            (info.st_mode & 0077) != 0 || info.st_size > static_cast<off_t>(kMaximumFleetFileBytes))
-            throw std::runtime_error("Fleet assignments must be a private host-owned regular file within the Fleet size limit");
-        std::string bytes;
-        std::array<char,4096> buffer{};
-        for (;;) {
-            const auto n = read(fd,buffer.data(),buffer.size());
-            if (n == 0) break;
-            if (n < 0) { if (errno == EINTR) continue; throw std::runtime_error("Fleet assignment read failed"); }
-            bytes.append(buffer.data(),static_cast<std::size_t>(n));
-            if (bytes.size() > kMaximumFleetFileBytes) throw std::runtime_error("Fleet assignments exceed size limit");
-        }
-        std::vector<std::set<std::string>> keys;
-        data_ = nlohmann::json::parse(bytes,[&](int, nlohmann::json::parse_event_t e,nlohmann::json& v) {
-            if (e == nlohmann::json::parse_event_t::object_start) keys.emplace_back();
-            if (e == nlohmann::json::parse_event_t::key && !keys.back().insert(v.get<std::string>()).second)
-                throw std::runtime_error("Duplicate fleet assignment key");
-            if (e == nlohmann::json::parse_event_t::object_end) keys.pop_back();
-            return true;
-        });
-    }
+    data_=load_private_json(path_,kMaximumFleetFileBytes).value_or(nlohmann::json{
+        {"version",1},{"assignments",nlohmann::json::array()},{"removals",nlohmann::json::array()}});
     validate(data_, self_id_);
     loaded_ = true;
 }
 void WtpFleetStore::save(const nlohmann::json& data) {
-    const auto bytes = data.dump(2) + "\n";
-    if (bytes.size() > kMaximumFleetFileBytes)
-        throw std::runtime_error("Fleet assignments exceed size limit");
-    std::string pattern = path_ + ".tmp.XXXXXX";
-    std::vector<char> filename(pattern.begin(),pattern.end()); filename.push_back(0);
-    int fd = mkstemp(filename.data());
-    if (fd < 0) throw std::runtime_error("Cannot create fleet assignment file");
-    try {
-        std::size_t offset = 0;
-        while (offset < bytes.size()) {
-            const auto n = write(fd,bytes.data()+offset,bytes.size()-offset);
-            if (n < 0 && errno == EINTR) continue;
-            if (n <= 0) throw std::runtime_error("Cannot write fleet assignments");
-            offset += static_cast<std::size_t>(n);
-        }
-        if (fsync(fd) != 0) throw std::runtime_error("Cannot sync fleet assignments");
-        const int closed = close(fd); fd = -1;
-        if (closed != 0 || rename(filename.data(),path_.c_str()) != 0)
-            throw std::runtime_error("Cannot publish fleet assignments");
-        auto directory = std::filesystem::path(path_).parent_path();
-        if (directory.empty()) directory = ".";
-        const int dir = open(directory.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW);
-        if (dir < 0) throw std::runtime_error("Cannot open fleet state directory");
-        const int synced = fsync(dir); close(dir);
-        if (synced != 0) throw std::runtime_error("Cannot sync fleet state directory");
-    } catch (...) {
-        if (fd >= 0) close(fd);
-        unlink(filename.data());
-        // Rename may already have succeeded. Reload authoritative disk contents
-        // on the next request; the failed caller must never dispatch work.
-        loaded_ = false;
-        throw;
-    }
+    try { save_private_json(path_,data,kMaximumFleetFileBytes); }
+    catch(...) {loaded_=false;throw;}
 }
+
 std::pair<nlohmann::json,std::string> WtpFleetStore::snapshot() {
     std::lock_guard lock(mutex_); load(); return {data_,wtp_catalog_revision(data_)};
 }
@@ -153,4 +166,69 @@ void WtpFleetStore::revoke(const std::string& id,const std::string& generation) 
         notices.push_back({{"device_id",id},{"revocation_generation",generation}});
     });
 }
+WtpFleetJournal::WtpFleetJournal(std::string path,std::string self_id)
+    :path_(std::move(path)),self_id_(std::move(self_id)){}
+void WtpFleetJournal::load() {
+    if(loaded_)return;
+    auto candidate=load_private_json(path_,1024*1024).value_or(nlohmann::json{
+        {"version",1},{"contexts",nlohmann::json::array()}});
+    validate(candidate);
+    data_=std::move(candidate);loaded_=true;
+}
+void WtpFleetJournal::validate(const nlohmann::json& candidate) const {
+    if(!candidate.is_object() || candidate.size()!=2 || !candidate.at("version").is_number_integer() ||
+       candidate.at("version")!=1 || !candidate.at("contexts").is_array() || candidate.at("contexts").size()>32)
+        throw std::runtime_error("Invalid pending-cleanup journal");
+    std::set<std::string> ids,retirements;
+    for(const auto& e:candidate.at("contexts")) {
+        if(!e.is_object() || e.size()!=8 || !e.at("retirement_id").is_string() ||
+           e.at("retirement_id").get<std::string>().size()!=32 || !e.at("source_etag").is_string() ||
+           !e.at("unresolved").is_boolean() || !e.at("unresolved").get<bool>() ||
+           (e.at("kind")!="operator_remove" && e.at("kind")!="takeover") ||
+           (e.at("disposition")!="pending" && e.at("disposition")!="removed" && e.at("disposition")!="retain_paused") ||
+           !(e.at("last_boot").is_null() || e.at("last_boot").is_string()) ||
+           !(e.at("last_job").is_null() || e.at("last_job").is_string()))
+            throw std::runtime_error("Invalid retained context fields");
+        WtpFleetStore::validate({{"version",1},{"assignments",nlohmann::json::array({e.at("assignment")})},
+            {"removals",nlohmann::json::array()}},self_id_);
+        if(!ids.insert(e.at("assignment").at("device_id").get<std::string>()).second ||
+           !retirements.insert(e.at("retirement_id").get<std::string>()).second)
+            throw std::runtime_error("Duplicate retained context");
+    }
+    const auto identifier=[](const nlohmann::json& value){
+        if(!value.is_string())return false;
+        const auto text=value.get<std::string>();return text.size()==32 && text.find_first_not_of("0123456789abcdef")==std::string::npos;
+    };
+    for(const auto& e:candidate.at("contexts"))
+        if(!identifier(e.at("retirement_id")) || (!e.at("last_boot").is_null() && !identifier(e.at("last_boot"))) ||
+           (!e.at("last_job").is_null() && !identifier(e.at("last_job"))) || e.at("source_etag").get<std::string>().size()>128)
+            throw std::runtime_error("Invalid retained recovery binding");
+}
+nlohmann::json WtpFleetJournal::snapshot(){std::lock_guard lock(mutex_);load();return data_;}
+void WtpFleetJournal::put(const nlohmann::json& entry) {
+    std::lock_guard lock(mutex_);load();auto candidate=data_;
+    auto& entries=candidate["contexts"];
+    auto found=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return e.at("retirement_id")==entry.at("retirement_id");});
+    if(found==entries.end())entries.push_back(entry);
+    else {
+        auto old_binding=*found,new_binding=entry;
+        old_binding.erase("disposition");new_binding.erase("disposition");
+        old_binding.erase("kind");new_binding.erase("kind");
+        if(old_binding!=new_binding || (found->at("kind")!=entry.at("kind") &&
+           !(found->at("kind")=="operator_remove" && entry.at("kind")=="takeover")))
+            throw std::runtime_error("Retirement identity cannot replace its frozen binding");
+        *found=entry;
+    }
+    validate(candidate);
+    try {save_private_json(path_,candidate,1024*1024);data_=std::move(candidate);}
+    catch(...){loaded_=false;throw;}
+}
+void WtpFleetJournal::erase(const std::string& id) {
+    std::lock_guard lock(mutex_);load();auto candidate=data_;
+    auto& entries=candidate["contexts"];
+    for(auto it=entries.begin();it!=entries.end();++it)if(it->at("retirement_id")==id){entries.erase(it);break;}
+    try {save_private_json(path_,candidate,1024*1024);data_=std::move(candidate);}
+    catch(...){loaded_=false;throw;}
+}
+
 }

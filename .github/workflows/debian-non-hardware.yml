@@ -200,7 +200,7 @@ jobs:
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Validate 32 independent Fleet outputs with deterministic clocks
         run: |
-          make -C src wtp-fleet-test wtp-fleet-capacity-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make -C src wtp-fleet-test wtp-fleet-capacity-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Parent TLS, shared API and actual Pico interoperability
         working-directory: src
         run: |
@@ -214,6 +214,7 @@ jobs:
           make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+          node ../WsprryPi-UI/tests/fleet_operations_pair_test.js build/bin/wtp_fleet_operations_driver network "$PWD/build/wtp-network/pico_tls_server" "$PWD/build/wtp-network/credentials-v3"
       - name: Shipped Pico controls through actual public and encrypted HTTP handlers
         env:
           CHROME_BIN: /usr/bin/google-chrome
@@ -301,13 +302,14 @@ jobs:
       - name: Build actual production Pico USB endpoint without SDK or network
         run: |
           cmake -S src/build/usb-reference/pico -B src/build/usb-reference/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-          cmake --build src/build/usb-reference/pico-host --target usb_management_driver -j2
+          cmake --build src/build/usb-reference/pico-host --target usb_management_driver endpoint_driver -j2
       - name: Build Pi USB clients and negative contract checks
-        run: make -C src wtp-usb-pair-client-build wtp-usb-management-test SUDO=
+        run: make -C src wtp-usb-pair-client-build wtp-usb-management-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Actual UI producer through production Pi and Pico USB handlers
         run: |
           node WsprryPi-UI/tests/wtp_usb_settings_test.js
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
+          WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/endpoint_driver" "$PWD/src/build/wtp-network/credentials-v3"
 
   strict-i2c-profile:
     needs: change_scope

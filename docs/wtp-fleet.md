@@ -110,11 +110,34 @@ offline. Local Enable never waits for this controller. Losing network contact
 pauses progress; it does not prove output-off, select another device, or remove
 an assignment as if the operator had taken over.
 
-`GET/POST /api/control/v1/host/fleet` returns the assignment document, per-output runtime
-observations and a quoted ETag. POST requires `If-Match` and the existing host
-request guard. Operations are `assign`, `enable`, `pause`, `schedule`, `recover`,
-and `remove`. See [Pi endpoint operation](wtp-pi-operation.md) for inbound
-listener and target-side takeover controls.
+## Fleet Operations and host actions
+
+Operations offers a Device selector when an assigned or unresolved retained remote context exists. This Pi always means the controller and is the initial selection after a full page load. Selecting an assignment only changes the displayed context. It does not change the compatibility WTP route, persist configuration, claim output, synchronize a clock or start a job. The remote view keeps assigned schedule state, current device/job evidence, pending occurrence, forecast and historical reports distinct. Local websocket/config updates continue updating the hidden local view; remote actions cannot invoke its handlers. Plain LAN identity is an expected-ID match, not authentication.
+
+Each owner performs one initial read-only HELLO/STATUS/CAPS inspection for a healthy restored or new context. Crash/retirement barriers inhibit that inspection until explicit reconciliation. Foreign occupancy is healthy observation but prevents starting; it is not a reconnect failure. Healthy idle owners poll STATUS at most once per second. Actual negotiation, transaction, identity or safety failure latches recovery and inhibits dispatch; periodic ticks cannot reconnect around it. The aggregate initial inspection limit is 45 seconds. Initialization is staggered by 30 ms per context, at most 930 ms for 32 outputs.
+
+Device evidence becomes stale at 15,000 ms. Age begins at the STATUS request or conservative negotiation start, preserves the separate receipt timestamp, includes browser round-trip time, and increases with browser monotonic elapsed time. A GET, worker heartbeat or stale historical report cannot renew it. The 1-second idle cadence, 8-second transaction timeout and 3-second browser poll leave 3 seconds of policy margin; this is a software policy, not a measured timing guarantee. Pi targets also need fresh, matching boot-bound takeover evidence. Ownership is checked again before dispatch.
+
+| Protected host resource | Behavior |
+| --- | --- |
+| `GET /api/control/v1/host/fleet` | Cached committed assignments, ETag, bounded output projections and correlation metadata for Setup |
+| `GET /api/control/v1/host/fleet/operations` | Cached Operations projection without endpoint/settings paths; at most 512 KiB |
+| `GET /api/control/v1/host/fleet/actions?ids=...` | At most 32 distinct lowercase 128-bit hex action IDs, at most 2 KiB encoded query and 128 KiB response |
+| `POST /api/control/v1/host/fleet` | Strict guarded admission of `assign`, `enable`, `pause`, `schedule`, `recover` or `remove`; acceptance is separate from completion |
+
+All six mutations require `If-Match`, the existing request intent guard, a random 128-bit lowercase-hex `action_id`, `controller_incarnation`, `assignment_generation`, decimal-string `reviewed_control_revision`, nullable `reviewed_boot_id`, and decimal-string `accept_before_ms`, alongside the operation's fields. An uncreated assignment uses null generation/control revision. Capture the reviewed context and ETag before confirmation; obtain a fresh controller clock sample afterward, then use its `now_ms` plus 30,000 ms as the fixed admission deadline. A changed context requires review again. New admission must be before that deadline and within 45 seconds of the current controller clock. Completion can take longer. Never automatically retry mutations.
+
+The controller incarnation and per-assignment generation are opaque 128-bit identities. A per-context control revision advances on accepted intent and dispatch revocation, including a no-op paused write. It is independent of configuration ETag, publication revision and observation revision. Every positive action has a fenced commit/dispatch permit; Pause revokes older activation permits before asynchronous storage. CLAIM, LOAD and ARM submission share the permit's short revocation lock. Already submitted operations retain their resources until quiescent. Protective owned-job stop and paused persistence can continue under the current owner after a safety fence; they cannot revive activation or establish a superseded action's success.
+
+POST returns 202 with a correlated accepted/pending action, or 200 for retained confirmed replay. Action states are accepted, pending, confirmed, refused, superseded and outcome_unconfirmed; `work_pending` separately records whether callbacks/work remain outstanding. Exact retained replay of the original request, ETag and fixed deadline returns its record without repeating effects. A conflicting reuse is refused. Unknown expired requests cannot execute again. The volatile ledger retains up to 256 terminal records plus 64 active/window-protected slots, at most 320 records of 2 KiB each, for up to 15 minutes. Active or unquiesced work and results whose admission window remains open cannot be evicted. Each context reserves a priority Pause path. The browser retains at most 32 ordinary and 32 priority references and uses one nonoverlapping read queue; changing selection never loses pending tracking.
+
+A confirmed Pause establishes disabled persistence, inhibited dispatch and quiescence of tracked controller work. It does not by itself establish Device stopped or measured RF-off. With no tracked job/barrier, Pause can confirm the schedule while another job is present or output is unknown. Tracked cleanup must satisfy the existing matching terminal/ownership criteria. Reconciliation requires fresh safe identity/boot evidence, clears only allowed barriers and leaves the schedule paused. Resume only schedules future eligible slots. Start-after-save assignment has the same eligibility requirements as Resume.
+
+Recovery authority for pending removals is stored separately at `<active-INI-path>.wtp-fleet-contexts.json`: private, host-owned, atomic version 1, at most 32 contexts and 1 MiB. The closed assignment document remains version 1. Durable frozen retirement intent precedes row deletion or loss of a recoverable binding. Operator removal retains a paused row when cleanup fails; explicit reconciliation does not silently delete that retained row. Target takeover revokes the row independently, retaining the frozen context until reconciliation proves cleanup. Corrupt/unavailable recovery storage inhibits starts and edits; safe Pause of an already verified live owner remains available. Do not repair recovery authority by deleting files or guessing an endpoint. Old manager writers/sessions retire before replacement workers can dispatch or write.
+
+Schedule-editor handoff is a one-use same-origin tab-local reference to the reviewed assignment. Unsaved entries retain their target and revision; opening another schedule requires an explicit continue/discard/cancel choice. Confirmation, progress and uncertain results remain beside the selected action. Controller power controls are hidden in remote views; displayed header clocks remain controller clocks.
+
+See [Pi endpoint operation](wtp-pi-operation.md) for inbound listener and target-side takeover controls.
 
 ## Attached USB Picos
 
@@ -319,3 +342,16 @@ readiness. The completion handler consumes confirmed cleanup before handling a
 paused assignment; uncertain outcomes retain their barriers. Reassessment uses
 fixed logical launch instants and explicit ARM/completion evidence without
 relaxing protocol validation or substituting older companion sources.
+
+### Fleet Operations paired fixture
+
+Build `wtp-fleet-operations-driver-build` with the simulated-only profile. Run the shipped browser client through the actual selected Pico drivers after the two canonical integration builds:
+
+```sh
+make -C src wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver network "$PWD/src/build/wtp-network/pico_tls_server" "$PWD/src/build/wtp-network/credentials-v3"
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/endpoint_driver" "$PWD/src/build/wtp-network/credentials-v3"
+node WsprryPi-UI/tests/fleet_operation_ui_test.js
+```
+
+The owning coordinator and browser correlation run unchanged. The network case uses the actual Pico TLS server; the framed USB case uses the actual Pico endpoint driver over a pipe carrier. A separate production Pi authority/engine uses an explicitly constructed simulated backend. Both cases check selected-target isolation, saved scheduling intent, priority Pause and owned cleanup. The canonical USB management pair separately covers production UMP framing/ACK, serialization and journals. The rendered Operations fixture checks presentation, keyboard/modal behavior, freshness and replacement safety in both themes and sizes; it does not qualify the carrier. These are hardware-free software fixtures, not physical USB, clock, GPIO, service or RF evidence.

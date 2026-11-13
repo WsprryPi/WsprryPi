@@ -4,6 +4,8 @@
 #include "wtp_integration/output_lease.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/fleet_recovery.hpp"
+#include "wtp_integration/fleet_test.hpp"
+#include "wtp_integration/target_runtime.hpp"
 #include "wtp_settings_json.hpp"
 #include "WSPR-Transmitter/src/execution_plan_compiler.hpp"
 #include <cmath>
@@ -13,6 +15,8 @@
 #include <stdexcept>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <atomic>
+#include <thread>
 using namespace wsprrypi;
 using Json=nlohmann::json;
 void check(bool yes,const char* why){if(!yes)throw std::runtime_error(why);}
@@ -174,6 +178,64 @@ int main(){
         Json morse={{"mode",mode},{"frequency_hz",14097000},{"message","E"},{"dot_ms",3000},{"period_seconds",60},{"phase_seconds",0}};
         if(std::string(mode)!="qrss")morse["shift_hz"]=4;
         validate_wtp_fleet_schedule(morse);
+    }
+    // Frozen cleanup authority is a private, independently versioned store.
+    {
+        const auto journal_path=std::string(path)+"/contexts.json";
+        WtpFleetJournal journal(journal_path,self);
+        check(journal.snapshot().at("contexts").empty(),"missing journal starts empty without guessing targets");
+        const auto row=assignment('a');
+        Json entry={{"retirement_id",std::string(32,'1')},{"kind","operator_remove"},{"assignment",row},
+            {"source_etag",first},{"last_boot",std::string(32,'2')},{"last_job",std::string(32,'3')},
+            {"disposition","pending"},{"unresolved",true}};
+        journal.put(entry);
+        WtpFleetJournal restored(journal_path,self);
+        check(restored.snapshot().at("contexts").at(0)==entry,"frozen cleanup target and job survive reload");
+        auto wrong=entry;wrong["extra"]=true;
+        rejects([&]{journal.put(wrong);},"closed journal entry rejects extra fields before write");
+        wrong=entry;wrong["last_boot"]="wrong";
+        rejects([&]{journal.put(wrong);},"journal rejects malformed boot binding");
+        wrong=entry;wrong["assignment"]=assignment('b');
+        rejects([&]{journal.put(wrong);},"retirement ID cannot replace a frozen target");
+        WtpFleetJournal unchanged(journal_path,self);
+        check(unchanged.snapshot().at("contexts").at(0)==entry,"refused journal writes preserve disk recovery authority");
+        journal.erase(entry.at("retirement_id").get<std::string>());
+        WtpFleetJournal empty_journal(journal_path,self);
+        check(empty_journal.snapshot().at("contexts").empty(),"confirmed disposition can retire exactly its entry");
+    }
+    // Restart at each durable retirement boundary. No carrier factory may run
+    // until explicit recovery; frozen authority survives both sides of deletion.
+    for(unsigned scenario=0;scenario<4;++scenario) {
+        const auto ini=std::string(path)+"/retirement-"+std::to_string(scenario);
+        auto row=assignment('a');row["enabled"]=false;
+        WtpFleetStore saved(ini+".wtp-assignments.json",self);
+        const auto state=saved.update({},[&](Json& d){if(scenario!=1)d["assignments"].push_back(row);});
+        WtpFleetJournal journal(ini+".wtp-fleet-contexts.json",self);
+        const Json entry={{"retirement_id",std::string(32,'1')},{"kind","operator_remove"},{"assignment",row},
+            {"source_etag",state.second},{"last_boot",std::string(32,'2')},{"last_job",std::string(32,'3')},
+            {"disposition",scenario==1?"removed":"pending"},{"unresolved",true}};
+        journal.put(entry);
+        if(scenario==2)saved.update({},[](Json& d){d["assignments"][0]["settings"]["Hostname"]="substituted.local";});
+        if(scenario==3){std::ofstream corrupt(ini+".wtp-fleet-contexts.json");corrupt<<"{broken";}
+        std::atomic<unsigned> contacts{0};WtpFleetTestHooks hooks;
+        hooks.create_target=[&](auto,auto,auto)->std::unique_ptr<WtpTargetRuntime>{++contacts;throw std::runtime_error("Unrequested carrier work");};
+        hooks.revocation_status=[&](auto,auto)->Json{++contacts;throw std::runtime_error("Unrequested host observation");};
+        start_wtp_fleet_for_test(ini,self,hooks);
+        struct StopFleet {~StopFleet(){stop_wtp_fleet();}} stop;
+        Json snapshot;
+        for(unsigned attempt=0;attempt<100;++attempt) {
+            snapshot=Json::parse(wtp_fleet_api("GET","","").body);
+            if(snapshot.at("outputs").at(std::string(32,'a')).at("state")== (scenario==1?"removed":"recovery_required"))break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        const auto output=snapshot.at("outputs").at(std::string(32,'a'));
+        check(output.at("state")== (scenario==1?"removed":"recovery_required") && !output.at("can_resume").get<bool>(),"restored retirement blocks automatic dispatch");
+        check(contacts==0,"restored or corrupt authority never guesses a target or starts initial inspection");
+        check(snapshot.at("assignments").size()==(scenario==1?0U:1U),"restart preserves assignment deletion boundary");
+        if(scenario==1)check(output.at("revoked")==true,"deleted unresolved output remains visible and consumes capacity");
+        if(scenario==2)check(output.at("can_reconcile")==false,"conflicting frozen endpoint refuses recovery before contact");
+        if(scenario==3)check(!snapshot.at("storage_error").get<std::string>().empty() && output.at("can_pause")==false && output.at("can_reconcile")==false,"corrupt journal cannot authorize guessed cleanup");
+        if(scenario!=3)check(journal.snapshot().at("contexts").at(0)==entry,"read-only restart cannot retire cleanup authority");
     }
     store.revoke(std::string(32,'a'),"8");
     WtpFleetStore restarted(file,self);

@@ -41,7 +41,20 @@ async function main() {
                 {device_id:'d'.repeat(32),name:'Bench Pi',schedule,enabled:true,in_flight:true,settings:window.__settings},
                 {device_id:'e'.repeat(32),name:'Garden Pico',schedule:{...schedule,mode:'qrss',message:'TEST',dot_ms:3000},enabled:false,in_flight:false,settings:window.__settings}],
                 removals:[],outputs:{['d'.repeat(32)]:{state:'scheduled',message:'',wtp:{status_observed_ms:'11000'}},['e'.repeat(32)]:{state:'paused',message:'',wtp:{status_observed_ms:'10000'}}}};
-            window.__fleetRevision=1;
+            window.__fleetRevision=1;window.__fleetActions={};
+            const fleetReply=()=>{
+                window.__fleet.controller_incarnation='f'.repeat(32);window.__fleet.publication_revision=String(window.__fleetRevision);
+                window.__fleet.now_ms=String(BigInt(window.__fleet.now_ms)+1n);
+                for(const [id,o] of Object.entries(window.__fleet.outputs))if(!o.revoked && !window.__fleet.assignments.some(row=>row.device_id===id))delete window.__fleet.outputs[id];
+                for(const row of window.__fleet.assignments) {
+                    const o=window.__fleet.outputs[row.device_id] ||= {state:'paused',message:''};
+                    Object.assign(o,{assignment_generation:row.device_id,control_revision:o.control_revision||'0',observation_revision:'1',observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
+                }
+                for(const [id,o] of Object.entries(window.__fleet.outputs)) {
+                    Object.assign(o,{assignment_generation:id,control_revision:o.control_revision||'0',observation_revision:'1',observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
+                }
+                return window.__fleet;
+            };
             window.fetch=async (url, options={}) => {
                 window.__requests.push({url:String(url),options});
                 const path=String(url), body=options.body?JSON.parse(options.body):{};
@@ -64,6 +77,7 @@ async function main() {
                 }
                 if(path.endsWith('/host/wtp-endpoint/recover')){window.__endpoint.output_unknown=false;window.__endpoint.remote_owner='';return reply(window.__endpoint);}
                 if(path.endsWith('/host/wtp-endpoint'))return reply(window.__endpoint);
+                if(path.includes('/host/fleet/actions?'))return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetRevision),actions:window.__fleetActions});
                 if(path.endsWith('/host/fleet')){
                     if(options.method==='GET' && window.__fleetLoadFailure)throw new Error('Controller disconnected');
                     if(options.method==='POST'){
@@ -72,9 +86,16 @@ async function main() {
                         if(body.operation==='schedule')window.__fleet.assignments.find(row=>row.device_id===body.device_id).schedule=body.schedule;
                         if(body.operation==='pause')Object.assign(window.__fleet.assignments.find(row=>row.device_id===body.device_id),{enabled:false,in_flight:false});
                         if(body.operation==='remove')window.__fleet.assignments=window.__fleet.assignments.filter(row=>row.device_id!==body.device_id);
-                        ++window.__fleetRevision;
+                        ++window.__fleetRevision;fleetReply();
+                        const id=body.device_id || body.settings['Device ID'];
+                        const output=window.__fleet.outputs[id];
+                        if(output)output.control_revision=String(BigInt(output.control_revision)+1n);
+                        const action={action_id:body.action_id,operation:body.operation,reviewed_boot_id:body.reviewed_boot_id,device_id:id,controller_incarnation:'f'.repeat(32),assignment_generation:id,control_revision:output?.control_revision || '1',state:'confirmed',work_pending:false,reason:'Committed'};
+                        window.__fleetActions[body.action_id]=action;if(output)output.actions=[action];
+                        if(body.operation==='remove')delete window.__fleet.outputs[id];
+                        return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetRevision),action},200,'"fleet-'+window.__fleetRevision+'"');
                     }
-                    return reply(window.__fleet,200,'"fleet-'+window.__fleetRevision+'"');
+                    return reply(fleetReply(),200,'"fleet-'+window.__fleetRevision+'"');
                 }
                 if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings},{id:'2'.repeat(32),name:'Selected Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{...window.__settings,Transport:'usb','Device ID':'b'.repeat(32),Endpoint:'/dev/serial/by-id/fixture-pico-if02','USB Serial':'fixture-pico','USB Vendor ID':51966,'USB Product ID':16402}}]},200,'"catalog-r1"');}
                 if(path.endsWith('/host/discovery'))return reply({available:true,candidates:[]});
@@ -163,7 +184,7 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-duration').value='4';document.getElementById('fleet-schedule-plain').checked=true;window.__fleetConflict=true;document.getElementById('fleet-schedule-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("draft is preserved")'), 'revision conflict');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'), '4');
-        await evaluate(`window.__fleetConflict=false;document.getElementById('fleet-schedule-save').click();`);
+        await evaluate(`window.__fleetConflict=false;document.getElementById('fleet-schedule-editor-review').click();document.getElementById('fleet-schedule-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor").hidden'), 'assignment saved');
         assert.equal(await evaluate('__host.Operation.Transmit'), false);
         assert.equal(await evaluate('__fleet.assignments.length'), 3);
@@ -173,7 +194,8 @@ async function main() {
         for (const editing of [true,false]) {
             await evaluate(editing
                 ? `Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`
-                : `document.getElementById('fleet-schedule-new').click()`);
+                : `document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+            await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
             await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft ready');
             const draftRevision=await evaluate('__fleetRevision');
             await evaluate(`document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='6';document.getElementById('fleet-schedule-plain').checked=true;++window.__fleetRevision;document.getElementById('fleet-schedule-refresh').click();`);
@@ -190,12 +212,13 @@ async function main() {
         // Opening another editor may fail before its fields are populated.
         // The still-visible draft must retain its original target authority.
         await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`);
+        await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'original target draft');
-        await evaluate(`window.__catalogLoadFailure=true;document.getElementById('fleet-schedule-new').click()`);
-        await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable") && !document.getElementById("fleet-schedule-save").disabled'),'failed editor switch');
+        await evaluate(`window.__catalogLoadFailure=true;document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await waitFor(async()=>await evaluate('(document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Catalog unavailable") || document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable")) && !document.getElementById("fleet-schedule-save").disabled'),'failed editor switch');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").disabled'),true);
-        await evaluate(`window.__catalogLoadFailure=false;document.getElementById('fleet-schedule-save').click()`);
+        await evaluate(`window.__catalogLoadFailure=false;document.getElementById('fleet-schedule-editor-review').click();document.getElementById('fleet-schedule-save').click()`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-editor").hidden'),'original draft saved');
         assert.equal(await evaluate('JSON.parse(__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").at(-1).options.body).device_id'),'e'.repeat(32));
         const viewports=[{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}];
@@ -256,6 +279,7 @@ async function main() {
         await waitFor(async()=>await evaluate('!__fleet.assignments[0].enabled'),'confirmed Pause');
         assert.equal(await fleetPosts(),originalPosts+2,'one stale request and one confirmed request');
         await waitFor(dialogClosed,'Pause completed');
+        await evaluate("document.querySelectorAll('#fleet-output-list section')[0].querySelectorAll('button')[5].click()");
         await clickBench(4);
         await waitFor(dialogOpen,'confirmed Remove dialog');
         await evaluate('document.getElementById("fleet-action-confirm").click()');
@@ -264,7 +288,7 @@ async function main() {
         await waitFor(dialogClosed,'Remove completed');
         assert.equal(await evaluate('document.activeElement.id'),'fleet-schedule-refresh');
         await capture('outputs','fleet-schedules');
-        await evaluate(`document.getElementById('fleet-schedule-new').click()`);
+        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden'),'editor reopened');
         await capture('assignment','fleet-schedule-editor');
         for (const mode of ['wspr','qrss','fskcw','dfcw']) {
@@ -275,7 +299,7 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=true;`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-listener-feedback").textContent.includes("Listening")'),'listener status');
         await capture('listener','fleet-listener');
-        await evaluate(`document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-new').click();`);
+        await evaluate(`document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
         await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'unselected assignment');
         assert.equal(await evaluate(`document.getElementById('fleet-schedule-device').value`),'','No catalog selection must not silently choose the first device');
         const beforeUnselected=await fleetPosts();
@@ -313,7 +337,7 @@ async function main() {
                 };
                 assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Fleet '+theme+' overflow');
                 await screenshot('fleet');
-                await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-new').click();`);
+                await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
                 await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'USB draft visual state');
                 await evaluate(`document.getElementById('fleet-schedule-editor').scrollIntoView({block:'start'});window.scrollBy(0,-180);`);
                 assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').getBoundingClientRect().height`),0,'USB port removed from layout');
@@ -349,7 +373,7 @@ async function main() {
         // Capacity is advertised, never inferred from the historical UI bound.
         await evaluate(`window.__originalFleet=structuredClone(__fleet);__fleet.assignments=Array.from({length:31},(_,i)=>({...__originalFleet.assignments[0],device_id:i.toString(16).padStart(32,'0'),name:'Remote '+(i+1)+' '+('Long device name ').repeat(3),enabled:false,in_flight:false}));__fleet.outputs={};document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===31 && !document.getElementById("fleet-schedule-new").disabled'),'31 allows final assignment');
-        await evaluate(`document.getElementById('fleet-schedule-new').click();`);
+        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'32nd assignment editor');
         await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='3';document.getElementById('fleet-schedule-plain').checked=true;document.getElementById('fleet-schedule-save').click();`);
         await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===32 && document.getElementById("fleet-schedule-new").disabled'),'32 prevents 33rd assignment');
@@ -387,8 +411,8 @@ async function main() {
             const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
             fs.writeFileSync(path.join(output,viewport.name+'-fleet-unreadable.png'),Buffer.from(shot.data,'base64'));
         }
-        await evaluate(`__fleet.maximum_outputs=40;document.getElementById('fleet-schedule-refresh').click();`);
-        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 40")'),'UI derives capacity from server');
+        await evaluate(`__fleet.maximum_outputs=32;document.getElementById('fleet-schedule-refresh').click();`);
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 32")'),'UI derives capacity from server');
         assert.equal(await evaluate('Array.from(document.querySelectorAll("#fleet-output-list button")).some(button=>!button.disabled)'),true,'valid refresh restores row actions');
         // The keyboard interaction grants native user activation. This fixture
         // has no host config readback, so establish its synthetic baseline before

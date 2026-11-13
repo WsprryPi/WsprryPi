@@ -21,5 +21,20 @@ private:
     nlohmann::json data_;
     std::mutex mutex_;
 };
+// Independently versioned recovery authority; never changes assignment v1.
+class WtpFleetJournal {
+public:
+    WtpFleetJournal(std::string path, std::string self_id);
+    nlohmann::json snapshot();
+    void put(const nlohmann::json& entry);
+    void erase(const std::string& retirement_id);
+private:
+    void load();
+    void validate(const nlohmann::json&) const;
+    std::string path_, self_id_;
+    bool loaded_{};
+    nlohmann::json data_;
+    std::mutex mutex_;
+};
 std::uint64_t wtp_fleet_decimal(const nlohmann::json& value);
 }

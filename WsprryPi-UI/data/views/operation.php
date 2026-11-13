@@ -1,10 +1,14 @@
 <?php
 $cardTitleId = 'operationPageTitle';
 $cardTitleText = 'Wsprry Pi Operation';
+$cardFleetSelector = true;
 require __DIR__ . '/../card_header.php';
+unset($cardFleetSelector);
 ?>
 
             <div class="card-body operation-card-body">
+                <div id="operationLocalView">
+                <p id="operationLocalRoute" class="form-text" hidden></p>
                 <section class="operation-hero" aria-labelledby="operationPageTitle">
                     <div class="operation-hero__status">
                         <div
@@ -114,4 +118,6 @@ require __DIR__ . '/../card_header.php';
                 </section>
 
                 <div id="backendStatus" class="alert operation-backend-status" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+                </div>
+                <?php require __DIR__ . '/fleet-operation.php'; ?>
             </div>

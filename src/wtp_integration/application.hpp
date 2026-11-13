@@ -22,6 +22,8 @@ public:
   std::uint64_t preparation_lead_ns() const;
   bool skipping() const noexcept { return skip_pending_.load(); }
   void start();
+  void request_stop() noexcept { scheduler_.request_stop(); skip_stop_=true; }
+  void set_dispatch_permit(std::shared_ptr<WtpDispatchPermit> permit) { scheduler_.set_dispatch_permit(std::move(permit)); }
   CleanupResult stop();
   CleanupResult recover();
   bool idle_management(const std::function<void()> &, bool authenticated_management = false,

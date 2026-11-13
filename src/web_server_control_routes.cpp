@@ -237,9 +237,19 @@ void register_control(
             result = request.method != "GET" && !context
                 ? wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}}
                 : wsprrypi::usb_logging_api(request.method, request.body, request.get_header_value("If-Match"));
-        } else if (request.path == "/api/control/v1/host/fleet") {
-            result = request.method == "GET" || context
-                ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"))
+        } else if (request.path == "/api/control/v1/host/fleet" ||
+                   request.path == "/api/control/v1/host/fleet/operations" ||
+                   request.path == "/api/control/v1/host/fleet/actions") {
+            const bool actions=request.path.ends_with("/actions");
+            const bool operations=request.path.ends_with("/operations");
+            const auto query=request.target.find('?');
+            const auto action_ids=wsprrypi::wtp_fleet_action_query(request);
+            const bool valid_query=actions? action_ids.has_value():query==std::string::npos && request.params.empty();
+            if(!valid_query)result={400,R"({"error":{"code":"invalid_fleet_query"}})",{}};
+            else if((actions || operations) && request.method!="GET")result={405,R"({"error":{"code":"method_not_allowed"}})",{}};
+            else result = request.method == "GET" || context
+                ? wsprrypi::wtp_fleet_api(request.method, request.body, request.get_header_value("If-Match"),
+                    actions?"actions":operations?"operations":"fleet",actions?*action_ids:"")
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
         } else if (request.path == "/api/control/v1/host/wtp-endpoint" && request.method == "GET") {
             result = {200, wsprrypi::wtp_pi_endpoint_status_json(), {}};

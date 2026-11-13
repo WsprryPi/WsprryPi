@@ -78,10 +78,15 @@
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
             <button type="button" id="fleet-schedule-save" class="btn btn-primary">Save assignment</button>
+                <button type="button" class="btn btn-outline-secondary" id="fleet-schedule-editor-review">Review current state</button>
             <button type="button" id="fleet-schedule-cancel" class="btn btn-outline-secondary">Cancel</button>
         </div>
         <p id="fleet-schedule-editor-feedback" class="form-text mt-2" role="status" aria-live="polite"></p>
     </div>
+<div id="fleet-draft-choice" class="alert alert-secondary" hidden role="group" aria-label="Unsaved schedule entries">
+    <p>An unsaved schedule already exists. Keep its target and entries, or explicitly discard it before opening another.</p>
+    <div class="d-flex flex-wrap gap-2"><button type="button" id="fleet-draft-continue" class="btn btn-primary">Continue existing draft</button><button type="button" id="fleet-draft-discard" class="btn btn-outline-danger">Discard draft and open selected schedule</button><button type="button" id="fleet-draft-cancel" class="btn btn-secondary">Cancel</button></div>
+</div>
 </section>
 <details id="fleet-listener" class="mb-4" data-independent-wtp>
     <summary>This Pi's WTP listener</summary>

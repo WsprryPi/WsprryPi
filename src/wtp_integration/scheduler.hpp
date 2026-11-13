@@ -79,7 +79,10 @@ struct WtpRuntimeStatus {
   std::optional<wtp::HelloResponse> identity; // Last verified identity, even offline.
   std::optional<wtp::Capabilities> capabilities; // Current negotiation only.
   std::optional<wtp::Status> remote; // Absent on invalidation/disconnect.
+  std::uint64_t status_sequence{};
   std::optional<std::uint64_t> status_observed_ms;
+  std::optional<std::uint64_t> status_age_origin_ms;
+  std::string status_age_origin_kind;
   std::optional<wtp::JobEvidence> job{}; // Only the selected request's job identity.
   std::vector<wtp::Adjustment> adjustments{};
   std::optional<WtpScheduleReport> last_report;
@@ -96,6 +99,7 @@ std::string wtp_runtime_status_json(const WtpRuntimeStatus &);
 class WtpScheduler {
 public:
   WtpScheduler(WtpScheduleClock &, wtp::SessionOptions, std::function<bool()> dispatch_admission = {});
+  void set_dispatch_permit(std::shared_ptr<WtpDispatchPermit> permit) { backend_.dispatch_permit_=std::move(permit); }
   bool connect(wtp::ByteStream &);
   bool disconnect(); // local closure only, while Idle/Blocked
   bool submit(TransmissionRequest, std::string job_id,

@@ -30,7 +30,7 @@ wtp_tls_probe_SOURCES := tests/wtp_tls_probe.cpp wtp_integration/tls.cpp
 wtp_tls_contract_test_SOURCES := tests/wtp_tls_contract_test.cpp wtp_integration/tls.cpp
 wtp_plain_tcp_test_SOURCES := tests/wtp_plain_tcp_test.cpp wtp_integration/plain_tcp.cpp wtp_integration/tls.cpp
 wtp_configuration_test_SOURCES := tests/wtp_configuration_test.cpp WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp
-wtp_browser_api_test_SOURCES := tests/wtp_browser_api_test.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp
+wtp_browser_api_test_SOURCES := tests/wtp_browser_api_test.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp httplib.cpp
 wtp_usb_management_test_SOURCES := tests/wtp_usb_management_test.cpp wtp_integration/usb_management.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp
 NETWORK_OBJECTS := $(addprefix $(NETWORK_OBJECT_DIR)/,$(sort $(foreach name,$(NETWORK_NAMES),$($(name)_SOURCES:.cpp=.o))))
 $(foreach source,$(sort $(foreach name,$(NETWORK_NAMES),$($(name)_SOURCES))),$(eval $(NETWORK_OBJECT_DIR)/$(source:.cpp=.o): $(source)))

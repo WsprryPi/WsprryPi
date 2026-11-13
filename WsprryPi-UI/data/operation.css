@@ -352,3 +352,20 @@
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+.operation-device-selector { display: flex; align-items: center; gap: .5rem; margin: .5rem 1rem; max-width: 24rem; min-width: 0; }
+.operation-device-selector select { min-width: 0; text-overflow: ellipsis; }
+.fleet-remote-selected .machine-power-group .icons-wrapper,
+.fleet-remote-selected #machine-power-status { display: none !important; }
+#operationFleetView .operation-hero__controls { gap: .5rem; }
+#operationFleetView .btn:disabled {
+    color: var(--bs-body-color);
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+    opacity: 1;
+}
+#operationFleetView .operation-panel__value { overflow-wrap: anywhere; }
+@media (max-width: 767.98px) {
+    .operation-device-selector { flex-basis: 100%; max-width: 100%; margin: .75rem 0; }
+    .operation-device-selector select { flex: 1; }
+}

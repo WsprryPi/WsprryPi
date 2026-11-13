@@ -7,6 +7,8 @@
 #include <atomic>
 #include <functional>
 #include <set>
+#include <memory>
+#include <mutex>
 
 namespace wsprrypi {
 // One monotonic domain, including across reconnect. wait_ms must return after
@@ -26,6 +28,13 @@ public:
   void wait_ms(std::uint64_t duration) override;
 };
 
+// Submission fencing is application-local, independent of the WTP contract.
+// Admission revocation and enqueueing CLAIM/LOAD/ARM share this short lock.
+struct WtpDispatchPermit {
+  std::mutex mutex;
+  bool allowed{true};
+  void revoke() { std::lock_guard lock(mutex); allowed=false; }
+};
 // Explicit developer construction, not a production factory registration.
 // Clock and connected stream outlive this object. Only stop() is thread safe.
 class WtpTransmitBackend final : public ITransmissionBackend {
@@ -56,7 +65,11 @@ private:
   friend class WtpScheduler;
   // Owner-thread publication hook; no caller callback or transport activity.
   std::function<void()> observation_;
-  std::optional<std::uint64_t> status_observed_ms_;
+  std::optional<std::uint64_t> status_observed_ms_, status_age_origin_ms_;
+  std::uint64_t status_sequence_{};
+  std::optional<std::uint64_t> status_request_origin_ms_;
+  std::string status_age_origin_kind_;
+  std::shared_ptr<WtpDispatchPermit> dispatch_permit_;
   void observed();
   bool settle(std::uint64_t deadline, bool cancellable);
   bool pause(std::uint64_t deadline, bool cancellable);

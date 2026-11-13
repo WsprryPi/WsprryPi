@@ -79,10 +79,19 @@ void idle_observation() {
   auto count = [&] { return std::count(f.clock.peer.operations.begin(),
       f.clock.peer.operations.end(), Operation::Status); };
   const auto initial = count();
+  const auto first_observation=f.app.status();
+  CHECK(first_observation.status_age_origin_ms && first_observation.status_observed_ms);
+  CHECK(*first_observation.status_age_origin_ms<=*first_observation.status_observed_ms);
+  const auto first_sequence=first_observation.status_sequence;
   CHECK(!f.app.poll_idle());
+  CHECK(f.app.status().status_sequence==first_sequence);
   for (int second = 0; second < 8; ++second) {
     f.clock.peer.advance(f.clock.peer.now + 1000);
     CHECK(f.app.poll_idle());
+    CHECK(f.app.status().status_sequence==first_sequence+second+1);
+    const auto observation=f.app.status();
+    CHECK(observation.status_age_origin_ms && observation.status_observed_ms &&
+          *observation.status_age_origin_ms<=*observation.status_observed_ms);
     CHECK(!f.app.poll_idle());
     CHECK(f.app.ready() && f.app.status().session_id == sid);
   }

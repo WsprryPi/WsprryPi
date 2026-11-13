@@ -268,6 +268,10 @@ Borders are structural and complete. Avoid decorative side stripes, arbitrary cl
 - **Validation and Focus:** Use one uniquely identified polite validation summary, aria-invalid on each affected field and aria-describedby linking invalid fields to its explanation. Shared conflicts identify every affected field; editing clears stale invalid state. Valid fields retain their help association. Adding a row focuses its name; removing a row returns focus to the relevant add action. Keep the existing Bootstrap focus treatment and disabled states.
 - **Operational Meaning:** Each selector names a Pico GPIO and polarity; each declared range names a selector and inclusive whole-Hz limits. Keep units, fixed / manual versus required policy, restart activation and release/settling guidance beside the form. Saved policy, boot-active settings, restart need and current selection remain distinct observations, including unknown selection. Saving never switches a relay or starts a job. Declared coverage and GPIO observations do not establish relay position or measured filtering.
 
+### Fleet Operations
+
+Keep Device beside the Operations heading on desktop and beneath it on mobile. This Pi remains the initial selection. A remote selection uses the established state, control and summary layout, with its full identity nearby and controller power/reboot controls hidden. Assigned schedule state, device evidence, pending start, forecast and historical reports remain distinct. Use explicit Resume schedule, Pause and stop, Reconcile and Edit schedule actions; place correlated progress and recovery feedback beside them. Confirmation names the captured device, selection freezes through confirmation/request admission, and uncertain work remains tracked when navigating. A removed or replaced context requires an explicit return to This Pi. Header clocks identify the controller while viewing a remote output.
+
 ## Do's and Don'ts
 
 ### Do:

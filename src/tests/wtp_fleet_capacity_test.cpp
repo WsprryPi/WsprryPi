@@ -8,11 +8,14 @@
 #include "WTP-Server/include/wtp_server/endpoint.hpp"
 #include "wtp_settings_json.hpp"
 #include "config_handler.hpp"
+#include "web_server_routes.hpp"
+#include "httplib.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -68,7 +71,7 @@ struct Peer {
  server::JobService service{clock,engine,identity};WtpPiAuthority authority{service};
  std::string id,product;std::atomic<bool> online{true};std::atomic<std::uint64_t> events{0};
  Peer(std::string device,bool pico):id(std::move(device)),product(pico?"WsprryPico":"WsprryPi"){}
- Json revocation(){const auto s=authority.snapshot();return {{"schema","wsprrypi-wtp-endpoint/1"},{"device_id",id},{"revocation_unavailable",false},{"local_requested",s.requested_local_enable},{"output_unknown",s.output_unknown},{"revocation_generation",std::to_string(s.revocation_generation)}};}
+ Json revocation(){const auto s=authority.snapshot();return {{"schema","wsprrypi-wtp-endpoint/1"},{"device_id",id},{"boot_id",s.remote.boot_id},{"revocation_unavailable",false},{"local_requested",s.requested_local_enable},{"output_unknown",s.output_unknown},{"revocation_generation",std::to_string(s.revocation_generation)}};}
 };
 // Real protocol endpoint and framing; only the byte carrier is an in-memory
 // fixture. Each runtime owns a fresh connection, sharing the actual job service.
@@ -94,8 +97,43 @@ public:
  void close()noexcept override{open_=false;endpoint_.disconnect();}
 };
 Json snapshot(){const auto result=wtp_fleet_api("GET","","");check(result.status==200,result.body);return Json::parse(result.body);}
-PicoHttpResponse command(const Json& body){for(unsigned attempt=0;;++attempt){const auto before=wtp_fleet_api("GET","","");auto result=wtp_fleet_api("POST",body.dump(),before.etag);if(result.status!=412 || attempt==20)return result;std::this_thread::yield();}}
-void succeeds(const Json& body){const auto result=command(body);check(result.status==200,body.dump()+": "+result.body);}
+PicoHttpResponse submit(const Json& body, Json* retained=nullptr){
+ const auto before=wtp_fleet_api("GET","","");const auto state=Json::parse(before.body);
+ auto request=body;const auto assigning=body.at("operation")=="assign";
+ const auto id=assigning?body.at("settings").at("Device ID").get<std::string>():body.at("device_id").get<std::string>();
+ const auto output=state.at("outputs").contains(id)?state.at("outputs").at(id):Json(nullptr);
+ request["action_id"]=wtp_random_identity();request["controller_incarnation"]=state.at("controller_incarnation");
+ request["assignment_generation"]=assigning?Json(nullptr):output.at("assignment_generation");
+ request["reviewed_control_revision"]=assigning?Json(nullptr):output.at("control_revision");
+ request["reviewed_boot_id"]=assigning?Json(nullptr):output.at("boot_id");
+ request["accept_before_ms"]=std::to_string(wtp_fleet_decimal(state.at("now_ms"))+30000);
+ if(retained)*retained={{"request",request},{"etag",before.etag}};
+ return wtp_fleet_api("POST",request.dump(),before.etag);
+}
+PicoHttpResponse finish(const PicoHttpResponse& accepted) {
+ auto result=accepted;
+ if(result.status!=202)return result;
+ const auto action_id=Json::parse(result.body).at("action").at("action_id").get<std::string>();
+ const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+ while(std::chrono::steady_clock::now()<deadline) {
+  const auto reply=wtp_fleet_api("GET","","","actions",action_id);
+  const auto record=Json::parse(reply.body).at("actions").at(action_id);
+  if(record.value("work_pending",true)==false)return {record.at("state")=="confirmed"?200U:409U,record.dump(),reply.etag};
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+ }
+ throw std::runtime_error("Fleet action completion watchdog: "+accepted.body+" result="+wtp_fleet_api("GET","","","actions",action_id).body);
+}
+PicoHttpResponse command(const Json& body){return finish(submit(body));}
+void succeeds(const Json& body){
+ for(unsigned review=0;review<32;++review) {
+  const auto result=command(body);
+  if(result.status==200)return;
+  // This fixture explicitly reads/reviews between new logical requests when
+  // another output consumes its slot; production never retries mutations.
+  if(result.body.find("revision_conflict")==std::string::npos)check(false,body.dump()+": "+result.body);
+ }
+ throw std::runtime_error("Repeated revision conflict after explicit fixture review");
+}
 // Wall time bounds a hung test only. It never advances a protocol clock or
 // chooses a launch instant. Logical clocks move only through explicit gates.
 template<class F>void await(F predicate,const char* why){const auto watchdog=std::chrono::steady_clock::now()+std::chrono::seconds(30);while(!predicate()){if(std::chrono::steady_clock::now()>=watchdog){std::cerr<<snapshot().dump(2)<<'\n';throw std::runtime_error(why);}std::this_thread::sleep_for(std::chrono::milliseconds(1));}}
@@ -108,7 +146,12 @@ int main(){
  std::vector<std::shared_ptr<Peer>> ordered;
  for(unsigned i=0;i<32;++i){auto id=std::string(30,'0')+"0123456789abcdef"[i/16]+"0123456789abcdef"[i%16];auto peer=std::make_shared<Peer>(id,i%2!=0);peers.emplace(id,peer);ordered.push_back(std::move(peer));}
  std::mutex streams_mutex;std::vector<std::shared_ptr<MemoryStream>> streams;
+ std::mutex storage_mutex;std::condition_variable storage_cv;bool block_storage=false,storage_entered=false;
+ std::mutex host_mutex;std::condition_variable host_cv;bool block_host=false,host_entered=false;
+ std::atomic<std::uint64_t> policy_offset{0};
  WtpFleetTestHooks hooks;
+ hooks.monotonic_now=[&]{return WtpSteadyClock{}.now_ms()+policy_offset.load();};
+ hooks.before_persist=[&]{std::unique_lock lock(storage_mutex);if(block_storage){storage_entered=true;storage_cv.notify_all();storage_cv.wait(lock,[&]{return !block_storage;});}};
  hooks.create_target=[&](WtpSettings settings,std::function<bool()> admission,std::shared_ptr<void> lease){
   auto& peer=*peers.at(settings.device_id);auto stream=std::make_shared<MemoryStream>(peer);
   auto target=std::make_unique<WtpTargetRuntime>(settings,peer.clock,*stream,
@@ -117,12 +160,134 @@ int main(){
   else check(target->reserve_output(settings.device_id),"fixture preserves identity exclusion");
   {std::lock_guard lock(streams_mutex);streams.push_back(std::move(stream));}return target;
  };
- hooks.revocation_status=[&](const WtpSettings& settings,unsigned){return peers.at(settings.device_id)->revocation();};
+ hooks.revocation_status=[&](const WtpSettings& settings,unsigned){
+  if(settings.device_id==ordered[0]->id){std::unique_lock lock(host_mutex);if(block_host){host_entered=true;host_cv.notify_all();host_cv.wait(lock,[&]{return !block_host;});}}
+  return peers.at(settings.device_id)->revocation();
+ };
  struct Cleanup{std::string path;~Cleanup(){stop_wtp_fleet();std::filesystem::remove_all(path);}}cleanup{path};
  start_wtp_fleet_for_test(ini,self,hooks);check(snapshot().at("maximum_outputs")==32,"advertised capacity is 32");
  Json schedule={{"mode","tone"},{"frequency_hz",14097100},{"duration_ms",1000},{"period_seconds",60},{"phase_seconds",0}};
  for(const auto& peer:ordered){WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=peer->id;settings.allow_frequency_adjustment=true;
   succeeds({{"operation","assign"},{"name","Output "+peer->id},{"settings",wtp_settings_json(settings)},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",31415}});}
+ // A no-op Pause must revoke an accepted Enable even though its ETag has
+ // not changed. Admission and immutable GET remain responsive during fsync.
+ await([]{return snapshot().at("outputs").begin().value().value("can_resume",false);},"first output ready");
+ const auto first_id=ordered[0]->id;
+ Json original;
+ {std::lock_guard lock(storage_mutex);block_storage=true;storage_entered=false;}
+ const auto enabling=submit({{"operation","enable"},{"device_id",first_id}},&original);
+ check(enabling.status==202,"Enable admission is asynchronous");
+ {std::unique_lock lock(storage_mutex);check(storage_cv.wait_for(lock,std::chrono::seconds(5),[&]{return storage_entered;}),"storage barrier reached");}
+ const auto read_start=std::chrono::steady_clock::now();const auto during=snapshot();
+ check(std::chrono::steady_clock::now()-read_start<std::chrono::milliseconds(250),"cached GET does not wait for storage");
+ // More requests than HTTP workers while the owner is blocked in persistence:
+ // exercise the registered production routes, adapter and real worker pool.
+ PicoHttpResponse pausing;
+ {
+  httplib::Server http;http.new_task_queue=[] {return new httplib::ThreadPool(4);};
+  web_server_routes::register_control(http,[](auto&){});
+  const auto port=http.bind_to_any_port("127.0.0.1");check(port>0,"private HTTP fixture bound");
+  std::thread listener([&]{http.listen_after_bind();});
+  struct HttpCleanup {httplib::Server& server;std::thread& listener;~HttpCleanup(){server.stop();if(listener.joinable())listener.join();}} http_cleanup{http,listener};
+  std::vector<std::future<void>> reads;
+  for(unsigned n=0;n<24;++n)reads.push_back(std::async(std::launch::async,[&,n]{
+   httplib::Client browser("127.0.0.1",port);browser.set_read_timeout(2,0);
+   const auto result=browser.Get(n%2?"/api/control/v1/host/fleet/operations":"/api/control/v1/host/fleet");
+   check(result && result->status==200,"real HTTP cached reads cannot wait for fsync or transport");
+   check(Json::parse(result->body).at("outputs").size()==32,"HTTP projection retains all contexts");
+  }));
+  auto request=original.at("request");request["operation"]="pause";request["action_id"]=wtp_random_identity();
+  request["reviewed_control_revision"]=during.at("outputs").at(first_id).at("control_revision");
+  httplib::Client browser("127.0.0.1",port);browser.set_read_timeout(2,0);
+  const auto result=browser.Post("/api/control/v1/host/fleet",{{"Origin","http://127.0.0.1:"+std::to_string(port)},
+   {"X-WsprryPico-Request","1"},{"If-Match",original.at("etag").get<std::string>()}},request.dump(),"application/json");
+  check(result && result->status==202,"real HTTP priority Pause bypasses a blocked owner");
+  pausing={static_cast<unsigned>(result->status),result->body,result->get_header_value("ETag")};
+  for(auto& read:reads)read.get();
+ }
+ check(pausing.status==202,"priority Pause admitted while Enable storage blocked");
+ {std::lock_guard lock(storage_mutex);block_storage=false;storage_cv.notify_all();}
+ check(finish(enabling).body.find("superseded")!=std::string::npos,"late Enable cannot publish confirmation");
+ check(finish(pausing).status==200,"Pause persistence and owned cleanup confirmed");
+ check(wtp_fleet_api("POST",original.at("request").dump(),original.at("etag")).body.find("superseded")!=std::string::npos,"exact replay has no new effects");
+ auto delayed=original.at("request");delayed["action_id"]=wtp_random_identity();
+ const auto current_snapshot=wtp_fleet_api("GET","","");
+ check(wtp_fleet_api("POST",delayed.dump(),current_snapshot.etag).status==409,"late pre-Pause control review refused even when ETag matches");
+ check(ordered[0]->engine.starts==0,"race never dispatches a job");
+ const auto invalid_query=wtp_fleet_api("GET","","","actions",std::string(32,'a')+","+std::string(32,'a'));
+ check(invalid_query.status==409,"duplicate query IDs rejected");
+ const auto projection=Json::parse(wtp_fleet_api("GET","","","operations").body);
+ check(!projection.at("assignments")[0].contains("settings"),"Operations redacts endpoint and credential paths");
+ // Foreign ownership is healthy evidence, not an automatic recovery fault.
+ auto foreign_request=[&](const std::string& op,server::RequestBody body,char unique){
+  server::Request r;r.operation=op;r.session_id=std::string(32,'8');r.request_id=std::string(32,unique);r.principal="foreign-fixture";r.body=std::move(body);r.payload_digest.fill(static_cast<unsigned char>(unique));return ordered[0]->authority.handle(r);
+ };
+ check(foreign_request("HELLO",server::HelloBody{{"WTP/1"}},'1').ok,"foreign HELLO");
+ check(foreign_request("CLAIM",server::ClaimBody{std::string(32,'9'),10000},'2').ok,"foreign claim");
+ ordered[0]->clock.advance_paused(ordered[0]->clock.now_ms()+1000);
+ await([&]{return snapshot().at("outputs").at(first_id).at("state")=="foreign";},"healthy foreign work observed");
+ succeeds({{"operation","pause"},{"device_id",first_id}});
+ check(ordered[0]->authority.snapshot().remote.owner_id==std::string(32,'9'),"Pause cannot release foreign ownership");
+ check(command({{"operation","recover"},{"device_id",first_id}}).status==409,"Reconcile cannot displace a healthy foreign owner");
+ check(snapshot().at("outputs").at(first_id).at("state")!="recovery_required","foreign occupancy alone never creates a recovery latch");
+ check(foreign_request("RELEASE",std::monostate{},'3').ok,"foreign owner releases itself");
+ ordered[0]->clock.advance_paused(ordered[0]->clock.now_ms()+1000);
+ await([&]{return snapshot().at("outputs").at(first_id).value("can_resume",false);},"same healthy session becomes eligible without reconnect or Reconcile");
+ // A blocked stateless Pi HTTP observation cannot stall its WTP STATUS owner.
+ {std::lock_guard lock(host_mutex);block_host=true;host_entered=false;}
+ {std::unique_lock lock(host_mutex);check(host_cv.wait_for(lock,std::chrono::seconds(8),[&]{return host_entered;}),"periodic host probe reached barrier");}
+ const auto before_host_wait=wtp_fleet_decimal(snapshot().at("outputs").at(first_id).at("observation_revision"));
+ ordered[0]->clock.advance_paused(ordered[0]->clock.now_ms()+1000);
+ await([&]{return wtp_fleet_decimal(snapshot().at("outputs").at(first_id).at("observation_revision"))>before_host_wait;},"idle WTP observations continue while same-output host HTTP is blocked");
+ {std::lock_guard lock(host_mutex);block_host=false;host_cv.notify_all();}
+ // Actual manager replacement must wait for a blocked old writer and
+ // release the old owner leases before constructing replacement sessions.
+ Json old_enable;
+ {std::lock_guard lock(storage_mutex);block_storage=true;storage_entered=false;}
+ const auto replacing_enable=submit({{"operation","enable"},{"device_id",first_id}},&old_enable);
+ check(replacing_enable.status==202,"old manager Enable admitted");
+ {std::unique_lock lock(storage_mutex);check(storage_cv.wait_for(lock,std::chrono::seconds(5),[&]{return storage_entered;}),"old manager store barrier reached");}
+ const auto old_incarnation=snapshot().at("controller_incarnation");
+ std::thread replacing([&]{start_wtp_fleet_for_test(ini,self,hooks);});
+ await([]{return snapshot().value("replacement_pending",false);},"old start admission fenced during replacement");
+ check(snapshot().at("controller_incarnation")==old_incarnation,"blocked old writer prevents new incarnation/session publication");
+ {std::lock_guard lock(storage_mutex);block_storage=false;storage_cv.notify_all();}
+ replacing.join();
+ check(snapshot().at("controller_incarnation")!=old_incarnation,"new incarnation published only after old quiescence");
+ check(snapshot().at("assignments")[0].at("enabled")==false,"old callback cannot enable the replacement manager");
+ check(wtp_fleet_api("POST",old_enable.at("request").dump(),old_enable.at("etag")).status==409,"old-incarnation mutation refused");
+ // Volatile action history is bounded, exact replay is side-effect-free,
+ // the first safe Pause keeps reserved capacity, and evicted IDs cannot rerun.
+ Json retained_schedule;
+ auto replayable=submit({{"operation","schedule"},{"device_id",first_id},{"schedule",schedule}},&retained_schedule);
+ check(finish(replayable).status==200,"no-op schedule action confirmed");
+ const auto replay_baseline=snapshot().at("outputs").at(first_id).at("control_revision");
+ check(wtp_fleet_api("POST",retained_schedule.at("request").dump(),retained_schedule.at("etag")).status==200,"exact retained replay returns its original result");
+ check(snapshot().at("outputs").at(first_id).at("control_revision")==replay_baseline,"replay never advances control intent");
+ auto conflicting=retained_schedule.at("request");conflicting["schedule"]["frequency_hz"]=14097200;
+ check(wtp_fleet_api("POST",conflicting.dump(),retained_schedule.at("etag")).status==409,"action ID cannot be reused for another payload");
+ unsigned admitted=0;
+ for(;admitted<321;++admitted) {
+  const auto action=command({{"operation","schedule"},{"device_id",first_id},{"schedule",schedule}});
+  if(action.status==409 && action.body.find("Busy")!=std::string::npos)break;
+  check(action.status==200,"bounded no-op action admitted or explicitly Busy");
+ }
+ check(admitted>100 && admitted<320,"terminal/protected action capacity is finite");
+ succeeds({{"operation","pause"},{"device_id",first_id}});
+ policy_offset=946000;
+ succeeds({{"operation","schedule"},{"device_id",first_id},{"schedule",schedule}}); // owning admission prunes eligible history
+ const auto replay_before=wtp_fleet_api("GET","","");
+ const auto expired=wtp_fleet_api("POST",retained_schedule.at("request").dump(),retained_schedule.at("etag"));
+ check(expired.status==409 && expired.body.find("window")!=std::string::npos,"evicted identical request is refused after its original deadline");
+ check(wtp_fleet_api("GET","","").etag==replay_before.etag,"expired request cannot change saved state");
+ check(Json::parse(wtp_fleet_api("GET","","","actions",retained_schedule.at("request").at("action_id")).body).at("actions").begin().value().at("state")=="unknown_or_expired","evicted action outcome is explicitly unknown");
+ policy_offset=0;
+ check(wtp_fleet_api("GET","","").status==409,"monotonic rewind invalidates admission");
+ policy_offset=946000;
+ check(snapshot().value("clock_fault",false),"clock fault remains latched after raw time catches up");
+ check(command({{"operation","pause"},{"device_id",first_id}}).status==409,"new admission requires a fresh incarnation even for a delayed stop request");
+ start_wtp_fleet_for_test(ini,self,hooks);
+ check(!snapshot().value("clock_fault",true),"fresh manager establishes a new clock/incarnation boundary");
  const auto full=wtp_fleet_api("GET","","");
  auto extra=Json{{"operation","assign"},{"name","33rd"},{"settings",snapshot().at("assignments")[0].at("settings")},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",1}};
  extra["settings"]["Device ID"]=std::string(32,'e');
@@ -134,6 +299,7 @@ int main(){
  // Derive that barrier from the production scheduler's published plan.
  auto drain_current=[&](unsigned first,unsigned end){const auto state=snapshot();for(unsigned i=first;i<end;++i){const auto& output=state.at("outputs").at(ordered[i]->id).at("wtp");const auto dispatch=wtp_fleet_decimal(output.at("dispatch_utc_ns"));const auto next_dispatch=dispatch+schedule.at("period_seconds").get<std::uint64_t>()*1000000000ULL;ordered[i]->clock.horizon((next_dispatch-utc_base)/1000000-1);}};
 
+ await([]{const auto state=snapshot();for(const auto& [id,o]:state.at("outputs").items()){(void)id;if(!o.value("can_resume",false))return false;}return true;},"initial read-only inspections make all outputs eligible");
  for(auto& peer:ordered){peer->clock.horizon(59999);succeeds({{"operation","enable"},{"device_id",peer->id}});}
  await([&]{return all_armed(32);},"all 32 acknowledge ARM before time advances");
 #ifdef __linux__
@@ -152,9 +318,26 @@ int main(){
  // healthy targets acknowledge ARM. No sleep or latency allowance models it.
  ordered[28]->clock.hold(true);ordered[30]->online=false;
  check(ordered[31]->authority.recover_remote_output(),"Pico fixture restart establishes a new boot");
- for(auto& peer:ordered)succeeds({{"operation","enable"},{"device_id",peer->id}});
+ PicoHttpResponse held_enable;
+ for(unsigned i=0;i<ordered.size();++i) {
+  if(i==28) {
+   // Another peer may consume a slot between the fixture's GET and POST.
+   // Review anew only for a definite pre-admission revision conflict; never
+   // resend accepted or uncertain work, and preserve every other refusal.
+   for(unsigned review=0;review<32;++review) {
+    held_enable=submit({{"operation","enable"},{"device_id",ordered[i]->id}});
+    if(held_enable.status!=412)break;
+    check(held_enable.body.find("revision_conflict")!=std::string::npos,"only definite revision conflicts permit fixture review");
+   }
+  }
+  else if(i<30)succeeds({{"operation","enable"},{"device_id",ordered[i]->id}});
+ }
+ await([&]{const auto state=snapshot();return state.at("outputs").at(ordered[30]->id).at("state")=="recovery_required" && state.at("outputs").at(ordered[31]->id).at("state")=="recovery_required";},"failed observation and changed boot latch recovery");
+ for(unsigned i=30;i<32;++i){const auto refused_start=command({{"operation","enable"},{"device_id",ordered[i]->id}});check(refused_start.status==409 || refused_start.status==412,"direct API refuses failed observation or concurrent configuration revision before activation");}
+ check(held_enable.status==202,"held owner admits an action without HTTP transport waits: "+held_enable.body);
  await([&]{for(unsigned i=0;i<30;++i)if(i!=28 && (!ordered[i]->clock.at_barrier() || ordered[i]->authority.snapshot().remote.state!=server::State::Armed))return false;return true;},"held peer cannot block healthy ARM admission");
  check(ordered[28]->engine.starts==1,"held peer cannot launch");ordered[28]->clock.hold(false);
+ if(finish(held_enable).status!=200)succeeds({{"operation","enable"},{"device_id",ordered[28]->id}});
  await([&]{return all_armed(30);},"released slow peer acknowledges the same intended slot");
  for(unsigned i=0;i<30;++i)ordered[i]->clock.horizon(180000);
  await([&]{for(unsigned i=0;i<30;++i)if(ordered[i]->engine.starts!=2)return false;return true;},"30 healthy/slow peers launch at second logical boundary");
@@ -169,7 +352,7 @@ int main(){
  check(command({{"operation","recover"},{"device_id",ordered[0]->id}}).status==409,"unreachable retired context cannot release capacity");ordered[0]->online=true;
  await([&]{return command({{"operation","recover"},{"device_id",ordered[0]->id}}).status==200;},"successful cleanup reclaims capacity");
  succeeds({{"operation","recover"},{"device_id",ordered[31]->id}});
- await([&]{return snapshot().at("outputs").at(ordered[31]->id).value("message","").find("Output reconciled")!=std::string::npos;},"explicit changed-boot recovery");
+ await([&]{return snapshot().at("outputs").at(ordered[31]->id).value("can_resume",false);},"explicit changed-boot recovery");
  const auto recovered=snapshot();
  for(const auto& row:recovered.at("assignments"))if(row.at("device_id")==ordered[31]->id)
   check(row.at("enabled")==false && row.at("in_flight")==false,"reconciled restart remains paused without replay");

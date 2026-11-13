@@ -21,7 +21,30 @@
     const text = name => byId("fleet-schedule-" + name).value.trim();
     let data = null, revision = "", editorRevision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
     const rows = new Map();
-    let pendingConfirmation = null;
+    let pendingConfirmation = null, editorContext = null, draftTarget = null, draftDirty = false, editorAction = null;
+    const draftKey = "wsprrypi.fleet.editor.draft.1";
+    function preserveDraft() {
+        if (byId("fleet-schedule-editor").hidden) return;
+        const fields = {};
+        byId("fleet-schedule-editor").querySelectorAll("input,select").forEach(node => {fields[node.id] = node.type === "checkbox" ? node.checked : node.value;});
+        root.sessionStorage.setItem(draftKey, JSON.stringify({fields, editId, editorRevision, editorContext, draftTarget, editorAction}));
+        draftDirty = true;
+    }
+    async function restoreDraft() {
+        let saved;try {saved = JSON.parse(root.sessionStorage.getItem(draftKey) || "null");} catch (_) {return;}
+        if (!saved || typeof saved !== "object" || !saved.fields || typeof saved.editId !== "string") return;
+        try {
+            const catalog = await fetchJson("devices");profiles = catalog.value.profiles.filter(p => !p.legacy_unverified);
+            const selector = byId("fleet-schedule-device");selector.replaceChildren();
+            for (const profile of profiles) {const option = root.document.createElement("option");option.value = profile.id;option.textContent = profile.name;selector.append(option);}
+            if (saved.editId) {const option = root.document.createElement("option");option.value = "assigned";option.textContent = saved.draftTarget?.name || saved.editId;selector.append(option);}
+        } catch (error) {message(`Draft retained; saved-device catalog unavailable: ${error.message}`, true);return;}
+        editorAction = saved.editorAction || null;
+        editId = saved.editId;editorRevision = saved.editorRevision;editorContext = saved.editorContext;draftTarget = saved.draftTarget;
+        for (const [id, value] of Object.entries(saved.fields)) {const node = byId(id);if (node && node.closest("#fleet-schedule-editor")) {if (node.type === "checkbox") node.checked = value === true;else if (typeof value === "string") node.value = value;}}
+        byId("fleet-schedule-editor").hidden = false;draftDirty = true;modeFields();
+        message("Unsaved entries restored with their original target and revision. Review current state before saving.", true);
+    }
     function confirmMutation(operation, assignment, trigger) {
         const panel = byId("fleet-action-confirmation");
         const label = operation === "remove" ? "Remove assignment" : "Pause and stop";
@@ -43,7 +66,7 @@
         pendingConfirmation.accepted = false;
         pendingConfirmation.modal.hide();
     }
-    function message(value, editor = false) {byId(editor ? "fleet-schedule-editor-feedback" : "fleet-schedule-feedback").textContent = value;}
+    function message(value, editor = false) {const node=byId(editor ? "fleet-schedule-editor-feedback" : "fleet-schedule-feedback");if(node.textContent!==value)node.textContent=value;}
     async function fetchJson(suffix, method = "GET", body, etag) {
         const response = await root.fetch(url(suffix), {method, cache: "no-store", signal: AbortSignal.timeout(method === "GET" ? 7000 : 45000),
             ...(body ? {headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": etag}, body: JSON.stringify(body)} : {})});
@@ -76,12 +99,13 @@
         const status = root.document.createElement("p");status.className = "form-text text-break mb-2";
         const actions = root.document.createElement("div");actions.className = "d-flex flex-wrap gap-2";
         const buttons = {};
-        for (const [action, label] of [["enable", "Resume"], ["pause", "Pause and stop"], ["recover", "Reconcile"], ["edit", "Edit schedule"], ["remove", "Remove assignment"]]) {
+        for (const [action, label] of [["enable", "Resume"], ["pause", "Pause and stop"], ["recover", "Reconcile"], ["edit", "Edit schedule"], ["remove", "Remove assignment"], ["review", "Review current state"]]) {
             const button = root.document.createElement("button");button.type = "button";
             button.className = "btn btn-sm " + (action === "remove" ? "btn-outline-danger" : "btn-outline-secondary");
             button.textContent = label;
-            button.addEventListener("click", () => action === "edit" ? openEditor(id) : mutate(action, id, button));
+            button.addEventListener("click", () => action === "edit" ? openEditor(id) : action === "review" ? undefined : mutate(action, id, button));
             actions.append(button);buttons[action] = button;
+            if (action === "review") button.addEventListener("click", () => {try {root.FleetClient.review(id);message("Current state reviewed; any unknown earlier result remains historical.");} catch (error) {message(error.message);}});
         }
         row.append(name, description, status, actions);
         return {row, name, description, status, buttons};
@@ -112,13 +136,15 @@
             elements.name.textContent = memberName?.saved || assignment.name;
             if (memberName?.saved) elements.name.textContent += output?.usb?.management?.connected && output?.usb?.name_confirmed ? "" : " (last confirmed)";
             elements.description.textContent = `${schedule.mode.toUpperCase()} · ${Number(schedule.frequency_hz).toLocaleString()} Hz · every ${schedule.period_seconds} s · phase ${schedule.phase_seconds} s UTC`;
-            const observed = output?.wtp?.status_observed_ms;
-            const age = observed && data.now_ms ? `${Math.max(0, Math.round((Number(data.now_ms) - Number(observed) + Date.now() - observedAt) / 1000))} s ago` : "age unknown";
-            elements.status.textContent = `${assignment.enabled ? "Schedule enabled" : "Schedule paused"} · ${output?.state || "unavailable"}. ${output?.message || ""} WTP observation: ${age}.`;
+            const observedAge = root.FleetClient.age(output);
+            const age = observedAge === null ? "age unknown" : `${observedAge / 1000n} s ago`;
+            const action = root.FleetClient.outcome(id, {controller_incarnation: data.controller_incarnation, assignment_generation: output?.assignment_generation}) || output?.actions?.at(-1);
+            elements.status.textContent = `${assignment.enabled ? "Schedule enabled" : "Schedule paused"} · ${output?.state || "unavailable"}. ${output?.message || ""} WTP observation: ${age}.${action ? ` Action ${root.FleetClient.actionLabel(action)}: ${action.reason || ""}` : ""}`;
             for (const button of Object.values(elements.buttons)) {button.hidden = false;button.disabled = !visible || busy;}
-            elements.buttons.enable.disabled ||= assignment.enabled || assignment.in_flight;
-            elements.buttons.pause.disabled ||= !assignment.enabled && !assignment.in_flight;
-            elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight;
+            elements.buttons.enable.disabled ||= assignment.enabled || assignment.in_flight || !output?.can_resume || observedAge === null || observedAge >= 15000n || output?.actions?.some(a => a.work_pending);
+            elements.buttons.pause.disabled ||= output?.can_pause === false || output?.actions?.some(a => a.operation === "pause" && a.work_pending);
+            elements.buttons.recover.disabled ||= output?.can_reconcile === false;
+            elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight || output?.state === "recovery_required" || output?.actions?.some(a => a.work_pending);
         }
         for (const [id, output] of retired) {
             if (!rows.has(id)) {const elements = createRow(id);rows.set(id, elements);list.append(elements.row);}
@@ -141,16 +167,8 @@
     }
     async function load() {
         if (closed || busy || !visible) return;
-        clearTimeout(timer);
-        try {
-            const result = await fetchJson("fleet");
-            if (closed || busy || !visible) return;
-            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();
-            if (byId("fleet-schedule-feedback").textContent.startsWith("Fleet status unavailable:")) message("");
-            if (!rows.size) byId("fleet-output-list").replaceChildren();
-            render();
-        } catch (error) {if (!closed && !busy && visible) {data = null;render();message(`Fleet status unavailable: ${error.message}`);}}
-        finally {if (!closed) timer = setTimeout(load, 3000);}
+        try {await root.FleetClient.refresh();}
+        catch (error) {message(`Fleet status unavailable: ${error.message}`);}
     }
     async function mutate(operation, id, trigger) {
         if (closed || busy || !visible) return;
@@ -158,16 +176,15 @@
         if (!assignment && !(operation === "recover" && data?.outputs?.[id]?.revoked)) return;
         // The confirmation refers to this revision, even if another operator
         // changes the assignment while the dialog is open.
-        const reviewedRevision = revision;
+        const reviewedContext = root.FleetClient.capture(id);
         busy = true;clearTimeout(timer);setVisible(visible);
         try {
             if (["pause", "remove"].includes(operation) &&
                 !await confirmMutation(operation, assignment, trigger)) return;
             if (closed || !visible) return;
             message(`${operation === "recover" ? "Requesting reconciliation" : "Updating assignment"}…`);
-            const result = await fetchJson("fleet", "POST", {operation, device_id: id}, reviewedRevision);
-            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();
-            message(operation === "recover" ? "Reconciliation requested. Review the output status before resuming." : "Assignment updated.");
+            const action = await root.FleetClient.mutate({operation, device_id: id}, reviewedContext);
+            message(action.state === "confirmed" ? "Requested postconditions confirmed." : "Action accepted. Review its correlated result before resuming.");
         } catch (error) {message(`${error.message} Read status before repeating an unconfirmed action.`);}
         finally {
             busy = false;setVisible(visible);
@@ -211,11 +228,28 @@
     async function openEditor(id = "") {
         if (closed || busy || !visible || !data) return;
         if (!id && !canAssign()) return;
+        if (draftDirty || root.sessionStorage.getItem(draftKey)) {
+            const captured = id ? root.FleetClient.capture(id) : null;
+            byId("fleet-draft-choice").hidden = false;
+            byId("fleet-draft-discard").onclick = () => {
+                if (closed || busy || !visible) return;
+                try {
+                    if (captured) {const current = root.FleetClient.capture(id);
+                        if (current.controller_incarnation !== captured.controller_incarnation || current.assignment_generation !== captured.assignment_generation || current.reviewed_control_revision !== captured.reviewed_control_revision)
+                            throw new Error("Selected output changed. Read and review before discarding entries for another schedule.");}
+                    root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-draft-choice").hidden = true;openEditor(id);
+                } catch (error) {message(error.message, true);}
+            };
+            byId("fleet-draft-continue").onclick = () => {if (closed || busy || !visible) return;byId("fleet-draft-choice").hidden = true;restoreDraft();};
+            byId("fleet-draft-cancel").onclick = () => {if (!closed && !busy && visible) byId("fleet-draft-choice").hidden = true;};
+            byId("fleet-draft-continue").focus();return;
+        }
         const assignment = id ? data.assignments.find(row => row.device_id === id) : null;
         if (id && (!assignment || assignment.enabled || assignment.in_flight)) return;
         // Bind the draft to the schedule displayed when it was opened. Status
         // polling must not silently authorize overwriting another operator.
         const reviewedRevision = revision;
+        const reviewedContext = id ? root.FleetClient.capture(id) : null;
         const catalogChoice = byId("fleet-device")?.value || "";
         busy = true;clearTimeout(timer);setVisible(visible);
         try {
@@ -226,6 +260,7 @@
             // A failed catalog refresh must leave any existing draft bound to
             // its original target and revision.
             profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;
+            editorContext = reviewedContext;draftTarget = assignment;editorAction = null;
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
             const placeholder = root.document.createElement("option");
             placeholder.value = "";placeholder.textContent = "Choose a saved output";selector.append(placeholder);
@@ -268,9 +303,13 @@
             management_port: number("management")};
         busy = true;setVisible(visible);message("Checking the output and saving…", true);
         try {
-            const result = await fetchJson("fleet", "POST", command, editorRevision);
-            data = validateFleet(result.value);revision = result.etag;observedAt = Date.now();byId("fleet-schedule-editor").hidden = true;
-            message("Output schedule saved.");byId("fleet-schedule-new").focus();
+            const reviewed = editorContext || {device_id: profile.settings["Device ID"], controller_incarnation: data.controller_incarnation,
+                assignment_generation: null, reviewed_control_revision: null, reviewed_boot_id: null, etag: editorRevision};
+            const action = await root.FleetClient.mutate(command, reviewed);
+            editorAction = {action_id: action.action_id, device_id: action.device_id};
+            preserveDraft();
+            if (action.state === "confirmed") {root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;}
+            message("Save accepted. Entries remain available until its correlated result confirms persistence.", true);
         } catch (error) {
             const detail = error.status === 412 ? "Schedules changed. Cancel this draft, reopen the editor, and review the current settings." : error.message;
             message(`${detail} Your draft is preserved.`, true);
@@ -306,13 +345,35 @@
     }
     function init() {
         if (!byId("fleet-schedules")) return;
+        root.FleetClient.subscribe(state => {
+            if (closed) return;
+            if (state.valid && state.data) {data = validateFleet(state.data);revision = state.etag;observedAt = Date.now();
+                if (byId("fleet-schedule-feedback").textContent.startsWith("Fleet status unavailable:")) message("");
+            }
+            else {data = null;if (state.error) message(`Fleet status unavailable: ${state.error}`);}
+            if (visible) render();
+            if (draftDirty && editorAction) {
+                const result = root.FleetClient.outcome(editorAction.device_id);
+                if (result?.action_id === editorAction.action_id && result.state === "confirmed") {
+                    root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;message("Output schedule saved.");
+                } else if (result && ["refused", "superseded", "outcome_unconfirmed"].includes(result.state)) {
+                    message(`${result.state.replaceAll("_", " ")}: ${result.reason || "Review the current output state."} Your draft is preserved. Read and review before another save.`, true);
+                }
+            }
+        });
+        byId("fleet-schedule-editor").addEventListener("input", preserveDraft);
+        byId("fleet-schedule-editor").addEventListener("change", preserveDraft);
         byId("fleet-tab").addEventListener("shown.bs.tab", load);
         byId("fleet-schedule-refresh").addEventListener("click", load);
         byId("fleet-schedule-new").addEventListener("click", () => openEditor());
         byId("fleet-schedule-mode").addEventListener("change", modeFields);
         byId("fleet-schedule-device").addEventListener("change", modeFields);
         byId("fleet-schedule-save").addEventListener("click", save);
-        byId("fleet-schedule-cancel").addEventListener("click", () => {byId("fleet-schedule-editor").hidden = true;byId("fleet-schedule-new").focus();});
+        byId("fleet-schedule-editor-review").addEventListener("click", () => {
+            const id = editId || profiles.find(p => p.id === text("device"))?.settings["Device ID"];
+            try {root.FleetClient.review(id);message("Current state reviewed. Entries retain their original revision; reopen them if the assignment changed.", true);} catch (error) {message(error.message, true);}
+        });
+        byId("fleet-schedule-cancel").addEventListener("click", () => {preserveDraft();byId("fleet-schedule-editor").hidden = true;byId("fleet-schedule-new").focus();});
         byId("fleet-listener").addEventListener("toggle", () => {if (byId("fleet-listener").open) loadListener();});
         byId("fleet-listener-save").addEventListener("click", saveListener);
         const confirmation = byId("fleet-action-confirmation");
@@ -336,6 +397,9 @@
         });
         root.addEventListener("pagehide", () => {closed = true;clearTimeout(timer);cancelConfirmation();});
         setVisible(true);
+        let handoff;try {handoff = JSON.parse(root.sessionStorage.getItem("wsprrypi.fleet.editor.handoff") || "null");root.sessionStorage.removeItem("wsprrypi.fleet.editor.handoff");} catch (_) {}
+        if (handoff) openAssignedEditor(handoff).catch(error => message(error.message));
+        else if (root.sessionStorage.getItem(draftKey)) restoreDraft();
     }
     function setVisible(value) {
         visible = value === true;
@@ -348,6 +412,14 @@
         if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || !!editId;render();}
         else {clearTimeout(timer);cancelConfirmation();}
     }
-    root.FleetSchedules = {setVisible};
+    async function openAssignedEditor(target) {
+        await root.FleetClient.refresh();
+        const current = root.FleetClient.capture(target.device_id);
+        if (current.controller_incarnation !== target.controller_incarnation || current.assignment_generation !== target.assignment_generation || current.etag !== target.etag)
+            throw new Error("Selected schedule changed during navigation. Read and review before editing.");
+        root.sessionStorage.setItem("wsprrypi.fleet.return_focus", "operationDevice");
+        await openEditor(target.device_id);
+    }
+    root.FleetSchedules = {setVisible, openAssignedEditor};
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init); else init();
 })(window);

@@ -2301,3 +2301,9 @@ $(BIN_DIR)/wtp_fleet_capacity_test: tests/wtp_fleet_capacity_test.cpp $(SEMANTIC
 # Explicit typed memory carriers and deterministic logical clocks; no hardware.
 wtp-fleet-capacity-test: $(BIN_DIR)/wtp_fleet_capacity_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_fleet_capacity_test
+
+.PHONY: wtp-fleet-operations-driver-build
+$(BIN_DIR)/wtp_fleet_operations_driver: tests/wtp_fleet_operations_driver.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+wtp-fleet-operations-driver-build: $(BIN_DIR)/wtp_fleet_operations_driver

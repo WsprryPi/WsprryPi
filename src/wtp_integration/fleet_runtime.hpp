@@ -8,5 +8,6 @@ namespace wsprrypi {
 void start_wtp_fleet(const std::string& ini_path, const std::string& self_id = {});
 void stop_wtp_fleet() noexcept;
 PicoHttpResponse wtp_fleet_api(const std::string& method, const std::string& body,
-                              const std::string& revision);
+                              const std::string& revision,
+                              const std::string& resource = "fleet", const std::string& ids = {});
 }
