@@ -27,6 +27,7 @@ async function main() {
     }
     try {
         await readyPromise;
+        let ambiguousPost = false, ambiguousId = "";const posted = [];
         root = {document: {readyState: "loading", hidden: false, getElementById: () => null, addEventListener: (event, fn) => events.set("document:" + event, fn)},
             performance, crypto: crypto.webcrypto, sessionStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)},
             addEventListener: (event, fn) => events.set(event, fn), console,
@@ -35,6 +36,14 @@ async function main() {
                 const result = await exchange({method: options.method || "GET", resource: query.pathname.endsWith("/actions") ? "actions" : query.pathname.endsWith("/operations") ? "operations" : "fleet",
                     ids: query.searchParams.get("ids") || "", body: options.body || "", etag: options.headers?.["If-Match"] || ""});
                 if (result.error) throw new Error(result.error);
+                if (options.method === "POST") {
+                    const command = JSON.parse(options.body);posted.push(command);
+                    if (ambiguousPost && result.status === 202) {
+                        ambiguousPost = false;ambiguousId = command.action_id;
+                        // The real owner accepted it; lose only the host reply.
+                        return {status: 500, ok: false, json: async () => ({error: {message: "Ambiguous accepted response"}}), headers: {get: () => null}};
+                    }
+                }
                 return {status: result.status, ok: result.status >= 200 && result.status < 300, json: async () => result.body, headers: {get: () => result.etag}};
             }};
         const context = vm.createContext({window: root, AbortSignal, Uint8Array, setTimeout, clearTimeout, setInterval, clearInterval});
@@ -58,8 +67,11 @@ async function main() {
             }
             throw new Error("Fixture explicit read/review conflict budget exhausted");
         };
-        const enable = await mutate("enable", pico);assert.ok(["accepted", "pending", "confirmed"].includes(enable.state));
-        await wait(state => state.data.assignments.find(r => r.device_id === pico).enabled, "Pico enable committed");
+        ambiguousPost = true;
+        await assert.rejects(mutate("enable", pico), /Ambiguous accepted response/);
+        assert.match(ambiguousId, /^[0-9a-f]{32}$/);
+        await wait(state => state.data.assignments.find(r => r.device_id === pico).enabled && client.outcome(pico)?.action_id === ambiguousId && client.outcome(pico)?.state === "confirmed", "ambiguous accepted Enable reconciled by its original action ID");
+        assert.equal(posted.filter(c => c.operation === "enable" && c.device_id === pico).length, 1, "ambiguous response cannot cause another mutating POST");
         assert.equal(client.snapshot().data.assignments.find(r => r.device_id === pi).enabled, false, "selected Pico cannot enable the Pi");
         const pause = await mutate("pause", pico);
         await wait(() => client.outcome(pico)?.action_id === pause.action_id && client.outcome(pico)?.state === "confirmed", "Pico pause confirmed through owning coordinator");

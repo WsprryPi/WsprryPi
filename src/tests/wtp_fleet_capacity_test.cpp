@@ -149,9 +149,17 @@ int main(){
  std::mutex storage_mutex;std::condition_variable storage_cv;bool block_storage=false,storage_entered=false;
  std::mutex host_mutex;std::condition_variable host_cv;bool block_host=false,host_entered=false;
  std::atomic<std::uint64_t> policy_offset{0};
+ std::atomic_bool fail_deleted_publication{false};
  WtpFleetTestHooks hooks;
  hooks.monotonic_now=[&]{return WtpSteadyClock{}.now_ms()+policy_offset.load();};
  hooks.before_persist=[&]{std::unique_lock lock(storage_mutex);if(block_storage){storage_entered=true;storage_cv.notify_all();storage_cv.wait(lock,[&]{return !block_storage;});}};
+ hooks.after_persist=[&]{
+  if(!fail_deleted_publication)return;
+  WtpFleetStore durable(ini+".wtp-assignments.json",self);
+  const auto rows=durable.snapshot().first.at("assignments");
+  if(std::none_of(rows.begin(),rows.end(),[&](const auto& row){return row.at("device_id")==ordered[2]->id;}) && fail_deleted_publication.exchange(false))
+   throw std::runtime_error("Injected failure after durable assignment deletion");
+ };
  hooks.create_target=[&](WtpSettings settings,std::function<bool()> admission,std::shared_ptr<void> lease){
   auto& peer=*peers.at(settings.device_id);auto stream=std::make_shared<MemoryStream>(peer);
   auto target=std::make_unique<WtpTargetRuntime>(settings,peer.clock,*stream,
@@ -357,7 +365,12 @@ int main(){
  for(const auto& row:recovered.at("assignments"))if(row.at("device_id")==ordered[31]->id)
   check(row.at("enabled")==false && row.at("in_flight")==false,"reconciled restart remains paused without replay");
  check(ordered[31]->engine.starts==1,"recovery never launches a job");
- succeeds({{"operation","remove"},{"device_id",ordered[2]->id}});
+ fail_deleted_publication=true;
+ const auto uncertain_remove=command({{"operation","remove"},{"device_id",ordered[2]->id}});
+ check(uncertain_remove.status==409 && uncertain_remove.body.find("outcome_unconfirmed")!=std::string::npos,"post-deletion publication failure remains uncertain");
+ check(snapshot().at("assignments").size()==30 && snapshot().at("outputs").contains(ordered[2]->id),"durably deleted row retains cleanup authority until reconciliation");
+ succeeds({{"operation","recover"},{"device_id",ordered[2]->id}});
+ await([&]{return !snapshot().at("outputs").contains(ordered[2]->id);},"reconciliation reclaims a deleted context without resurrecting its assignment");
  stop_wtp_fleet();WtpFleetStore stopped(ini+".wtp-assignments.json",self);check(stopped.snapshot().first.at("assignments").size()==30,"takeover and removal persist");
 #ifdef __linux__
  rusage usage{};getrusage(RUSAGE_SELF,&usage);

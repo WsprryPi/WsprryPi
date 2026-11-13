@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <atomic>
 #include <thread>
+#include <condition_variable>
 using namespace wsprrypi;
 using Json=nlohmann::json;
 void check(bool yes,const char* why){if(!yes)throw std::runtime_error(why);}
@@ -65,12 +66,65 @@ void restarted_output_admission() {
     auto different=previous;different.identity->device_id=std::string(32,'b');
     check(!allowed(different,fresh),"retired identity must match the assignment");
 }
+void concurrent_pause_publication(const std::string& ini,const std::string& self) {
+    auto a=assignment('a'),b=assignment('b');a["in_flight"]=true;b["in_flight"]=true;
+    WtpFleetStore disk(ini+".wtp-assignments.json",self);
+    disk.update({},[&](Json& data){data["assignments"]=Json::array({a,b});});
+    std::mutex mutex;std::condition_variable changed;unsigned before=0,after=0;bool release=false;
+    WtpFleetTestHooks hooks;
+    hooks.create_target=[](auto,auto,auto)->std::unique_ptr<WtpTargetRuntime>{throw std::runtime_error("Crash barriers forbid carrier contact");};
+    hooks.revocation_status=[](auto,auto)->Json{throw std::runtime_error("Crash barriers forbid host contact");};
+    hooks.before_persist=[&]{std::lock_guard lock(mutex);++before;changed.notify_all();};
+    hooks.after_persist=[&]{std::unique_lock lock(mutex);++after;changed.notify_all();if(after==1)changed.wait(lock,[&]{return release;});};
+    std::atomic_bool shutdown_seen{false};
+    hooks.before_shutdown_join=[&]{
+        if(shutdown_seen.exchange(true))return;
+        const auto read=Json::parse(wtp_fleet_api("GET","","").body);
+        check(read.at("replacement_pending")==true,"shutdown fences HTTP admission before its first executor join");
+        for(const auto& output:read.at("outputs"))check(output.at("can_resume")==false && output.at("can_pause")==false,"shutdown retires context action authority before waiting");
+    };
+    start_wtp_fleet_for_test(ini,self,hooks);
+    struct Cleanup {std::mutex& mutex;std::condition_variable& changed;bool& release;~Cleanup(){ {std::lock_guard lock(mutex);release=true;changed.notify_all();}stop_wtp_fleet();}} cleanup{mutex,changed,release};
+    {
+        const auto read=wtp_fleet_api("GET","","");const auto data=Json::parse(read.body),candidate=assignment('c');
+        Json command={{"operation","assign"},{"settings",candidate.at("settings")},{"name","Invalid port"},{"schedule",candidate.at("schedule")},
+            {"enabled",false},{"consent_plain",true},{"management_port",4294967297ULL},{"action_id",wtp_random_identity()},
+            {"controller_incarnation",data.at("controller_incarnation")},{"assignment_generation",nullptr},{"reviewed_control_revision",nullptr},
+            {"reviewed_boot_id",nullptr},{"accept_before_ms",std::to_string(wtp_fleet_decimal(data.at("now_ms"))+30000)}};
+        check(wtp_fleet_api("POST",command.dump(),read.etag).status==409,"oversized management port refuses before narrowed conversion or carrier admission");
+    }
+    const auto submit_pause=[&](char id) {
+        const auto read=wtp_fleet_api("GET","","");const auto data=Json::parse(read.body);const auto device=std::string(32,id);
+        const auto& output=data.at("outputs").at(device);const auto action=wtp_random_identity();
+        const Json command={{"operation","pause"},{"device_id",device},{"action_id",action},{"controller_incarnation",data.at("controller_incarnation")},
+            {"assignment_generation",output.at("assignment_generation")},{"reviewed_control_revision",output.at("control_revision")},
+            {"reviewed_boot_id",output.at("boot_id")},{"accept_before_ms",std::to_string(wtp_fleet_decimal(data.at("now_ms"))+30000)}};
+        check(wtp_fleet_api("POST",command.dump(),read.etag).status==202,"Pause admitted before unrelated publication");return action;
+    };
+    const auto first=submit_pause('a');
+    {std::unique_lock lock(mutex);check(changed.wait_for(lock,std::chrono::seconds(5),[&]{return after==1;}),"first commit held before publication");}
+    const auto second=submit_pause('b');
+    {std::unique_lock lock(mutex);
+     check(changed.wait_for(lock,std::chrono::seconds(5),[&]{return before>=2;}),"second owner reaches persistence independently");
+     changed.wait_for(lock,std::chrono::milliseconds(100),[&]{return after>=2;});
+     check(after==1,"later commit cannot overtake unpublished earlier commit");release=true;changed.notify_all();}
+    Json result;
+    for(unsigned attempt=0;attempt<5000;++attempt) {
+        result=Json::parse(wtp_fleet_api("GET","","","actions",first+","+second).body).at("actions");
+        if(!result.at(first).at("work_pending").get<bool>() && !result.at(second).at("work_pending").get<bool>())break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    for(const auto& id:{first,second})check(result.at(id).at("postconditions").value("schedule_paused",false),"accepted protective Pause continues despite another output's changed ETag");
+    const auto cached=wtp_fleet_api("GET","","");WtpFleetStore restored(ini+".wtp-assignments.json",self);
+    check(Json::parse(cached.body).at("assignments")==restored.snapshot().first.at("assignments") && cached.etag==restored.snapshot().second,"last published assignments and ETag equal latest durable state");
+}
 int main(){
     restarted_output_admission();
     char path[]="/tmp/wsprrypi-fleet-test.XXXXXX";check(mkdtemp(path)!=nullptr,"temporary directory");
     struct Cleanup{std::string path;~Cleanup(){std::filesystem::remove_all(path);}}cleanup{path};
     const std::string file=std::string(path)+"/fleet.json";
     const std::string self(32,'f');
+    concurrent_pause_publication(std::string(path)+"/publication.ini",self);
     WtpFleetStore store(file,self);
     auto [empty,first]=store.snapshot();check(empty.at("assignments").empty(),"zero targets valid");
     check(kMaximumFleetOutputs==32,"supported capacity is independently specified as 32");

@@ -95,6 +95,16 @@ async function main() {
             assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
             assert.equal(await run("document.getElementById('operationFleetPause').disabled"), false, "staleness cannot disable scoped Pause");
         }
+        await run(`(()=>{const o=__fleet.outputs['a'.repeat(32)];o.state='recovery_required';o.can_resume=false;__fleet.assignments[0].in_flight=true;
+            const action=__actions[__posts[0].action_id];action.state='outcome_unconfirmed';action.work_pending=false;action.reason='Owned cleanup remains unknown';
+            __fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);return __refresh();})()`);
+        await run("document.getElementById('operationFleetReview').click()");
+        assert.equal(await run("FleetClient.snapshot().actions.length"), 0, "quiescent uncertain results can be retired to free recovery capacity");
+        assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Recovery required");
+        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true, "review cannot clear the server's recovery barrier");
+        assert.equal(await run("__posts.length"), 1, "review is browser-local and submits no recovery or start");
+        assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /earlier action unconfirmed/);
+        await capture("review-recovery");
         await run("__fleet.outputs['a'.repeat(32)].observation_age_ms='0'");
         // Current running evidence retires a pending countdown and wins the headline.
         await run(`const o=__fleet.outputs['a'.repeat(32)];o.state='running';o.pending_start=null;o.wtp.job_id='e'.repeat(32);o.wtp.job={device_id:'a'.repeat(32),boot_id:'d'.repeat(32),job_id:'e'.repeat(32),authoritative:true,state:'running'};o.wtp.remote={state:'running',output_active:false,owner_id:'c'.repeat(32),job_id:'e'.repeat(32)};__refresh()`);
@@ -105,7 +115,7 @@ async function main() {
         await run("__fleet.outputs['a'.repeat(32)].assignment_generation='c'.repeat(32);__fleet.outputs['a'.repeat(32)].actions=[];__refresh()");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Removed output");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, running evidence, replacement safety and twenty visual captures passed.");
+        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, replacement safety and twenty-four visual captures passed.");
     } catch (error) {failure = error;}
     await finishFixture({client, browser: chrome, php, profile, failure});
 }

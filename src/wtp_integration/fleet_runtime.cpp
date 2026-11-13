@@ -156,11 +156,13 @@ public:
     }
     ~Fleet(){shutdown();}
     void shutdown() noexcept {
-        exiting_=true;if(reaper_.joinable())reaper_.join();
+        exiting_=true;
         std::vector<std::shared_ptr<FleetContext>> owners;
         {std::lock_guard lock(mutex_);accepting_=false;
          for(auto& [id,c]:contexts_){(void)id;c->quit=true;c->permit->revoke();owners.push_back(c);}}
         for(auto& c:owners)signal_stop(*c);
+        if(hooks_.before_shutdown_join)hooks_.before_shutdown_join();
+        if(reaper_.joinable())reaper_.join();
         for(auto& c:owners)if(c->thread.joinable())c->thread.join();
     }
     PicoHttpResponse request(const std::string& method,const std::string& body,const std::string& revision,
@@ -336,7 +338,7 @@ private:
             const auto settings=parse_wtp_settings(c.at("settings"),true);
             if(!fleet_id(settings.device_id) || !c.at("enabled").is_boolean() || !c.at("consent_plain").is_boolean() ||
                (settings.transport=="network_plain" && c.at("consent_plain")!=true) ||
-               !c.at("management_port").is_number_integer() || c.at("management_port").get<int>()<1 || c.at("management_port").get<int>()>65535 ||
+               !c.at("management_port").is_number_integer() || c.at("management_port")<1 || c.at("management_port")>65535 ||
                !c.at("name").is_string() || c.at("name").get<std::string>().empty() || c.at("name").get<std::string>().size()>80)
                 throw std::runtime_error("Invalid assignment fields or Plain LAN consent");
         }
@@ -410,7 +412,11 @@ private:
     }
     void update_config(const std::string& revision,const std::function<void(Json&)>& mutation) {
         if(hooks_.before_persist)hooks_.before_persist();
+        // Commit and publication form one owner-ordered transaction. Never
+        // hold the HTTP snapshot mutex across filesystem work.
+        std::lock_guard persistence(persistence_mutex_);
         auto saved=store_.update(revision,mutation);
+        if(hooks_.after_persist)hooks_.after_persist();
         std::lock_guard lock(mutex_);config_=std::move(saved.first);etag_=std::move(saved.second);++publication_;
     }
     void pause_saved(FleetContext& c) {
@@ -499,14 +505,18 @@ private:
             c.permit->revoke();
             if(!c.removed){std::lock_guard lock(mutex_);if(c.control==UINT64_MAX)accepting_=false;else ++c.control;++publication_;}
             retire(c,"takeover");
-            store_.revoke(c.id,state.at("revocation_generation").get<std::string>());
-            sync_saved();c.removed=true;c.recovery=true;c.message="Local takeover removed the saved assignment";
+            revoke_saved(c.id,state.at("revocation_generation").get<std::string>());
+            c.removed=true;c.recovery=true;c.message="Local takeover removed the saved assignment";
             return false;
         }
         if(state.value("local_requested",true) || state.value("output_unknown",true))throw std::runtime_error("Target under local control or output unresolved");
         c.host=std::move(state);c.host_origin=start;return true;
     }
-    void sync_saved(){auto saved=store_.snapshot();std::lock_guard lock(mutex_);config_=saved.first;etag_=saved.second;++publication_;}
+    void revoke_saved(const std::string& id,const std::string& generation) {
+        std::lock_guard persistence(persistence_mutex_);
+        store_.revoke(id,generation);
+        auto saved=store_.snapshot();std::lock_guard lock(mutex_);config_=saved.first;etag_=saved.second;++publication_;
+    }
     bool eligible(FleetContext& c,const Json& row,std::string& reason) {
         try {
             if(c.quit || c.recovery || c.removed || !c.retirement.is_null())throw std::runtime_error("Reconcile unresolved work before resuming");
@@ -633,9 +643,15 @@ private:
                 update_config(a.etag,[&](Json& d){if(!current(c,a))throw std::runtime_error("Action superseded");effects=true;d["assignments"].push_back(c.row);});
             } else {
                 auto saved=store_.snapshot();auto row=row_for(saved.first,c.id);
+                // A durable deletion may precede a failed publication/fsync
+                // acknowledgment. Frozen retirement authority remains valid,
+                // but recovery must retire rather than resurrect that row.
+                if(!row && !c.retirement.is_null())c.removed=true;
                 if(!row && a.operation!="recover" && a.operation!="pause")throw std::runtime_error("Assignment no longer exists");
                 if(row)c.row=*row;
-                if(saved.second!=a.etag)throw std::runtime_error("revision_conflict");
+                // Pause was already guarded at admission. A later unrelated
+                // commit must not cancel its protective persistence/cleanup.
+                if(a.operation!="pause" && saved.second!=a.etag)throw std::runtime_error("revision_conflict");
                 if(a.operation=="enable") {
                     std::string why;if(!eligible(c,c.row,why))throw std::runtime_error(why);
                     const auto s=target(c)->app->status();if(cmd.at("reviewed_boot_id")!=s.identity->boot_id)throw std::runtime_error("Boot changed");
@@ -872,7 +888,7 @@ private:
     std::string self_id_;WtpFleetTestHooks hooks_;std::string incarnation_;
     WtpSteadyClock clock_;std::uint64_t last_clock_{},publication_{1};bool accepting_{true},clock_fault_{};
     std::atomic_bool exiting_{false};std::thread reaper_;
-    std::mutex mutex_;Json config_;std::string etag_,journal_error_;
+    std::mutex mutex_,persistence_mutex_;Json config_;std::string etag_,journal_error_;
     std::map<std::string,std::shared_ptr<FleetContext>> contexts_;
     std::map<std::string,std::shared_ptr<FleetAction>> actions_;
 };

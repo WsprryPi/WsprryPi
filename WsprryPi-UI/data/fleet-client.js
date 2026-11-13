@@ -3,6 +3,8 @@
 (function (root) {
     "use strict";
     const idPattern = /^[0-9a-f]{32}$/, decimal = /^(0|[1-9][0-9]*)$/;
+    const isId = value => typeof value === "string" && idPattern.test(value);
+    const isDecimal = value => typeof value === "string" && value.length <= 20 && decimal.test(value) && BigInt(value) <= 18446744073709551615n;
     const listeners = new Set(), refs = new Map(), reviews = new Set();
     const storageKey = "wsprrypi.fleet.actions.1";
     let data = null, etag = "", baseline = 0, latency = 0, valid = false, baselineValid = false, closed = false;
@@ -18,7 +20,7 @@
     try {
         const saved = JSON.parse(root.sessionStorage.getItem(storageKey) || "[]");
         if (Array.isArray(saved) && saved.length <= 64) for (const r of saved) {
-            if (idPattern.test(r.action_id) && idPattern.test(r.device_id) && (r.assignment_generation === null || idPattern.test(r.assignment_generation)) && idPattern.test(r.controller_incarnation) &&
+            if (isId(r.action_id) && isId(r.device_id) && (r.assignment_generation === null || isId(r.assignment_generation)) && isId(r.controller_incarnation) &&
                 typeof r.priority === "boolean" && [...refs.values()].filter(x => x.priority === r.priority).length < 32)
                 refs.set(r.action_id, {...r, state: "outcome_unconfirmed", work_pending: null});
         }
@@ -53,17 +55,17 @@
     function validate(value) {
         if (value.scope !== "wsprrypi-wtp-fleet/1" || value.maximum_outputs !== 32 || !Array.isArray(value.assignments) || value.assignments.length > 32 ||
             !value.outputs || typeof value.outputs !== "object" || Array.isArray(value.outputs) || Object.keys(value.outputs).length > 32 ||
-            !idPattern.test(value.controller_incarnation) || !decimal.test(value.publication_revision) || !decimal.test(value.now_ms)) throw new Error("Invalid Fleet status or capacity; refresh before operating.");
+            !isId(value.controller_incarnation) || !isDecimal(value.publication_revision) || !isDecimal(value.now_ms)) throw new Error("Invalid Fleet status or capacity; refresh before operating.");
         const seen = new Set();
         for (const row of value.assignments) {
-            if (!idPattern.test(row.device_id) || seen.has(row.device_id) || typeof row.name !== "string" || !row.schedule || typeof row.schedule !== "object" ||
+            if (!isId(row.device_id) || seen.has(row.device_id) || typeof row.name !== "string" || !row.schedule || typeof row.schedule !== "object" ||
                 typeof row.enabled !== "boolean" || typeof row.in_flight !== "boolean") throw new Error("Invalid Fleet assignment.");
             seen.add(row.device_id);
         }
         for (const [id, output] of Object.entries(value.outputs)) {
-            if (!idPattern.test(id) || !output || !idPattern.test(output.assignment_generation) || !decimal.test(output.control_revision) ||
-                !decimal.test(output.observation_revision) || typeof output.can_resume !== "boolean" ||
-                !(output.observation_age_ms === null || decimal.test(output.observation_age_ms)) || !Array.isArray(output.actions) || output.actions.length > 2) throw new Error("Invalid Fleet observation binding.");
+            if (!isId(id) || !output || !isId(output.assignment_generation) || !isDecimal(output.control_revision) ||
+                !isDecimal(output.observation_revision) || typeof output.can_resume !== "boolean" ||
+                !(output.observation_age_ms === null || isDecimal(output.observation_age_ms)) || !Array.isArray(output.actions) || output.actions.length > 2) throw new Error("Invalid Fleet observation binding.");
             for (const action of output.actions) {
                 validateAction(action);
                 if (action.device_id !== id || action.controller_incarnation !== value.controller_incarnation || action.assignment_generation !== output.assignment_generation)
@@ -73,17 +75,17 @@
         return value;
     }
     function validateAction(record) {
-        if (!record || typeof record !== "object" || !idPattern.test(record.action_id) || !idPattern.test(record.device_id) ||
-            !idPattern.test(record.controller_incarnation) || !idPattern.test(record.assignment_generation) || !decimal.test(record.control_revision) ||
+        if (!record || typeof record !== "object" || !isId(record.action_id) || !isId(record.device_id) ||
+            !isId(record.controller_incarnation) || !isId(record.assignment_generation) || !isDecimal(record.control_revision) ||
             !["accepted", "pending", "confirmed", "refused", "superseded", "outcome_unconfirmed"].includes(record.state) || typeof record.work_pending !== "boolean" ||
             !["assign", "enable", "pause", "schedule", "recover", "remove"].includes(record.operation) ||
-            !(record.reviewed_boot_id === null || idPattern.test(record.reviewed_boot_id)))
+            !(record.reviewed_boot_id === null || isId(record.reviewed_boot_id)))
             throw new Error("Invalid Fleet action identity or completion evidence.");
     }
     function mergeAction(record) {
         if (record?.state !== "unknown_or_expired") validateAction(record);
         const r = refs.get(record?.action_id);
-        if (r && r.assignment_generation === null && record.device_id === r.device_id && record.controller_incarnation === r.controller_incarnation && idPattern.test(record.assignment_generation)) r.assignment_generation = record.assignment_generation;
+        if (r && r.assignment_generation === null && record.device_id === r.device_id && record.controller_incarnation === r.controller_incarnation && isId(record.assignment_generation)) r.assignment_generation = record.assignment_generation;
         if (!r || (record.controller_incarnation && record.controller_incarnation !== r.controller_incarnation) ||
             (record.assignment_generation && record.assignment_generation !== r.assignment_generation) || (record.device_id && record.device_id !== r.device_id)) return;
         if (record.state !== "unknown_or_expired" && ((r.reviewed_boot_id !== undefined && record.reviewed_boot_id !== r.reviewed_boot_id) ||
@@ -92,7 +94,7 @@
             refs.delete(r.action_id);setOutcome(r.device_id, record);
         } else if (["accepted", "pending", "superseded", "outcome_unconfirmed", "unknown_or_expired"].includes(record.state)) {
             Object.assign(r, record);
-            if (record.state === "unknown_or_expired") r.state = "outcome_unconfirmed";
+            if (record.state === "unknown_or_expired") {r.state = "outcome_unconfirmed";r.work_pending = null;}
             setOutcome(r.device_id, {...r});
         }
     }
@@ -102,7 +104,7 @@
         if (old?.controller_incarnation === incarnation && old.assignment_generation === currentGeneration &&
             (record.controller_incarnation !== incarnation || record.assignment_generation !== currentGeneration)) return;
         if (old && old.action_id !== record.action_id && old.controller_incarnation === record.controller_incarnation && old.assignment_generation === record.assignment_generation &&
-            decimal.test(old.control_revision) && (!decimal.test(record.control_revision) || BigInt(record.control_revision) < BigInt(old.control_revision))) return;
+            isDecimal(old.control_revision) && (!isDecimal(record.control_revision) || BigInt(record.control_revision) < BigInt(old.control_revision))) return;
         outcomes.set(id, record);
     }
     const outcomes = new Map(); // At most one summary per context; no historical ledger.
@@ -142,7 +144,7 @@
         const batch = [];for (let n = 0; n < Math.min(32, all.length); n++) batch.push(all[(cursor + n) % all.length]);
         cursor = (cursor + batch.length) % all.length;
         const {value} = await request("/actions?ids=" + batch.map(r => r.action_id).join(","));
-        if (value.controller_incarnation !== incarnation || !decimal.test(value.publication_revision) || !value.actions || BigInt(value.publication_revision) < publication) return;
+        if (value.controller_incarnation !== incarnation || !isDecimal(value.publication_revision) || !value.actions || BigInt(value.publication_revision) < publication) return;
         const requested = new Set(batch.map(r => r.action_id));
         if (Object.keys(value.actions).length !== requested.size || Object.keys(value.actions).some(id => !requested.has(id)))
             throw new Error("Action lookup returned a different reference set.");
@@ -167,13 +169,13 @@
         }
     }
     function elapsedAge(value) {
-        if (!valid || !decimal.test(value)) return null;
+        if (!valid || !isDecimal(value)) return null;
         const elapsed = mono() - baseline;
         if (elapsed < 0 || !Number.isFinite(elapsed)) return null;
         return BigInt(value) + BigInt(Math.ceil(latency + elapsed));
     }
     function age(output) {
-        if (!baselineValid || !output || !decimal.test(output.observation_age_ms)) return null;
+        if (!baselineValid || !output || !isDecimal(output.observation_age_ms)) return null;
         const elapsed = mono() - baseline;
         if (elapsed < 0 || !Number.isFinite(elapsed)) return null;
         return BigInt(output.observation_age_ms) + BigInt(Math.ceil(latency + elapsed));
@@ -216,24 +218,49 @@
             refs.set(action_id, reference);setOutcome(device_id, reference);persist();
             try {
                 const result = await request("", {method: "POST", headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": reviewed.etag}, body: JSON.stringify(body)});
-                if (command.operation === "assign" && result.value.action?.device_id === device_id && idPattern.test(result.value.action.assignment_generation))
+                if (command.operation === "assign" && result.value.action?.device_id === device_id && isId(result.value.action.assignment_generation))
                     refs.get(action_id).assignment_generation = result.value.action.assignment_generation;
                 mergeAction(result.value.action);persist();notify();return result.value.action;
             } catch (error) {
+                const known = outcomes.get(device_id);
+                if (known?.action_id === action_id && known.controller_incarnation === reference.controller_incarnation &&
+                    known.assignment_generation === reference.assignment_generation && !["outcome_unconfirmed", "unknown_or_expired"].includes(known.state)) {
+                    // A concurrent protected GET may resolve admission or even
+                    // completion before the delayed POST response is lost.
+                    if (["accepted", "pending", "confirmed"].includes(known.state)) return known;
+                    reviews.add(device_id);throw error;
+                }
                 reviews.add(device_id);
-                if (error.status && error.status >= 400) {refs.delete(action_id);persist();}
+                const refused = [400, 401, 403, 404, 405, 409, 412, 413, 415, 422, 428, 429].includes(error.status);
+                const outcome = {...reference, state: refused ? "refused" : "outcome_unconfirmed", work_pending: refused ? false : null, reason: error.message};
+                if (refused) refs.delete(action_id);
+                else Object.assign(reference, outcome);
+                setOutcome(device_id, outcome);persist();notify();
                 throw error;
             }
-        } finally {busy--;notify();poll();}
+        } finally {
+            // A pre-POST GET cannot authorize review of a newly submitted
+            // action. Fence outstanding reads and require a later full sample.
+            sequence++;valid = false;busy--;notify();poll();
+        }
     }
     function review(id) {
-        if (!idPattern.test(id)) throw new Error("Select the intended saved output before review.");
+        if (!isId(id)) throw new Error("Select the intended saved output before review.");
         if (!valid || data.replacement_pending) throw new Error("Refresh current controller state before review.");
+        if (busy) throw new Error("Wait for the current request before reviewing earlier actions.");
         const output = data.outputs[id];
-        if (output && ((output.actions || []).some(a => a.work_pending) || ["starting", "recovery_required"].includes(output.state) || data.assignments.find(r => r.device_id === id)?.in_flight)) throw new Error("Current work remains unresolved. Reconcile before retiring an earlier action.");
-        for (const [key, r] of refs) if (r.device_id === id && r.work_pending !== true) refs.delete(key);
-        reviews.delete(id);
-        outcomes.set(id, {state: "earlier_action_unconfirmed", reason: "Current state reviewed; the earlier action's outcome remains unconfirmed."});persist();notify();
+        // Recovery/in-flight device duty is independent of tab-local results.
+        // Only live controller callbacks prevent retiring current references.
+        const unresolved = output && ((output.actions || []).some(a => a.work_pending) || output.state === "starting");
+        const retired = [...refs].filter(([, r]) => r.device_id === id &&
+            (r.controller_incarnation !== incarnation || r.assignment_generation !== output?.assignment_generation || !unresolved));
+        if (unresolved && !retired.length) throw new Error("Current work remains unresolved. Reconcile before retiring an earlier action.");
+        for (const [key] of retired) refs.delete(key);
+        if (!unresolved) reviews.delete(id);
+        outcomes.set(id, {device_id: id, controller_incarnation: incarnation, assignment_generation: output?.assignment_generation ?? null,
+            state: "earlier_action_unconfirmed", reason: unresolved
+            ? "Earlier context references retired; current work still requires reconciliation. The earlier outcome remains unconfirmed."
+            : "Current state reviewed; the earlier action's outcome remains unconfirmed."});persist();notify();
     }
     function actionLabel(action) {
         return action.work_pending && ["accepted", "pending"].includes(action.state)

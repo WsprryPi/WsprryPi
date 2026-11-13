@@ -15,6 +15,10 @@ struct WtpFleetTestHooks {
     std::function<nlohmann::json(const WtpSettings&, unsigned)> revocation_status;
     // Deterministic blocked-filesystem tests; never runs under HTTP/publication locks.
     std::function<void()> before_persist;
+    // Hold a committed write before publication to exercise owner ordering.
+    std::function<void()> after_persist;
+    // Observe admission fencing before shutdown waits for any old executor.
+    std::function<void()> before_shutdown_join;
     // Host policy clock only; transport clocks remain the intended fixture's.
     std::function<std::uint64_t()> monotonic_now;
 };
