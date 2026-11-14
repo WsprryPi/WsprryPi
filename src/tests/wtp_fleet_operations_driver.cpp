@@ -15,9 +15,11 @@
 #include <csignal>
 #include <deque>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <poll.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 using namespace wsprrypi;
 using Json=nlohmann::json;
@@ -131,6 +133,12 @@ int main(int argc,char** argv) {
   std::cout<<"READY"<<std::endl;
   std::string line;while(std::getline(std::cin,line)) {
    try {const auto request=Json::parse(line);
+    if(request.value("fail_replace",false)) {
+      const auto broken=ini+".broken";
+      {std::ofstream file(broken+".wtp-assignments.json");file<<"{broken";}
+      if(chmod((broken+".wtp-assignments.json").c_str(),0600)!=0)throw std::runtime_error("private corrupt fixture");
+      start_wtp_fleet(broken,std::string(32,'f'));
+    }
     if(request.value("replace",false))start_wtp_fleet_for_test(ini,std::string(32,'f'),hooks);
     const auto result=wtp_fleet_api(request.value("method","GET"),request.value("body",""),request.value("etag",""),request.value("resource","operations"),request.value("ids",""));
     std::cout<<Json{{"status",result.status},{"body",Json::parse(result.body)},{"etag",result.etag}}.dump()<<std::endl;

@@ -118,6 +118,56 @@ void concurrent_pause_publication(const std::string& ini,const std::string& self
     const auto cached=wtp_fleet_api("GET","","");WtpFleetStore restored(ini+".wtp-assignments.json",self);
     check(Json::parse(cached.body).at("assignments")==restored.snapshot().first.at("assignments") && cached.etag==restored.snapshot().second,"last published assignments and ETag equal latest durable state");
 }
+void unbound_takeover_observation(const std::string& ini,const std::string& self) {
+    auto row=assignment('a');row["enabled"]=false;
+    WtpFleetStore store(ini+".wtp-assignments.json",self);store.update({},[&](Json& d){d["assignments"].push_back(row);});
+    struct ClosedStream:wtp::ByteStream {
+        wtp::IoResult read(std::span<std::uint8_t>)override{return {wtp::IoState::Closed,0};}
+        wtp::IoResult write(std::span<const std::uint8_t>)override{return {wtp::IoState::Closed,0};}
+        void close()noexcept override{}
+    } stream;
+    struct Clock:WtpScheduleClock {
+        std::uint64_t now_ms()const override{return WtpSteadyClock{}.now_ms();}
+        std::optional<std::uint64_t> utc_now_ns()const override{return std::nullopt;}
+        void wait_ms(std::uint64_t ms)override{std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
+    } clock;
+    std::atomic<unsigned> host_reads{0};WtpFleetTestHooks hooks;
+    hooks.create_target=[&](WtpSettings settings,std::function<bool()> admission,std::shared_ptr<void>){
+        return std::make_unique<WtpTargetRuntime>(settings,clock,stream,
+            wtp::SessionOptions{wtp_random_identity(),wtp_random_identity(),settings.device_id},[]{return false;},std::move(admission));
+    };
+    hooks.revocation_status=[&](const WtpSettings&,unsigned)->Json{
+        ++host_reads;return {{"schema","wsprrypi-wtp-endpoint/1"},{"device_id",std::string(32,'a')},{"boot_id",std::string(32,'2')},
+            {"revocation_unavailable",false},{"local_requested",false},{"output_unknown",false},{"revocation_generation","8"}};
+    };
+    start_wtp_fleet_for_test(ini,self,hooks);struct Stop {~Stop(){stop_wtp_fleet();}} stop;
+    Json data;
+    for(unsigned attempt=0;attempt<5000;++attempt) {
+        data=Json::parse(wtp_fleet_api("GET","","").body);
+        if(host_reads && (data.at("assignments").empty() || data.at("outputs").at(std::string(32,'a')).value("message",std::string{}).find("Pi takeover boot differs")!=std::string::npos))break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(host_reads>0,"Pi takeover HTTP observation was attempted after failed WTP inspection");
+    check(data.at("assignments").size()==1,"unbound Pi HTTP boot cannot remove an assignment");
+    check(data.at("outputs").at(std::string(32,'a')).value("message",std::string{}).find("Pi takeover boot differs")!=std::string::npos,"unbound host result was consumed and explicitly refused");
+    WtpFleetJournal journal(ini+".wtp-fleet-contexts.json",self);
+    check(journal.snapshot().at("contexts").empty(),"unbound HTTP observation cannot create retirement authority");
+}
+void failed_manager_replacement(const std::string& ini,const std::string& self) {
+    start_wtp_fleet(ini,self);struct Stop {~Stop(){stop_wtp_fleet();}} stop;
+    const auto previous=Json::parse(wtp_fleet_api("GET","","").body).at("controller_incarnation");
+    const auto broken=ini+".broken";
+    {std::ofstream file(broken+".wtp-assignments.json");file<<"{broken";}
+    check(chmod((broken+".wtp-assignments.json").c_str(),0600)==0,"private corrupt assignment fixture");
+    start_wtp_fleet(broken,self);
+    const auto failed=wtp_fleet_api("GET","","");
+    check(failed.status==503,"failed replacement cannot masquerade as a healthy stopped manager");
+    const auto error=Json::parse(failed.body).at("error");
+    check(error.at("code")=="fleet_unavailable" && !error.at("message").get<std::string>().empty(),"failed replacement exposes its bounded startup cause");
+    start_wtp_fleet(ini,self);
+    const auto fresh=wtp_fleet_api("GET","","");
+    check(fresh.status==200 && Json::parse(fresh.body).at("controller_incarnation")!=previous,"corrected configuration establishes a fresh working manager");
+}
 int main(){
     restarted_output_admission();
     char path[]="/tmp/wsprrypi-fleet-test.XXXXXX";check(mkdtemp(path)!=nullptr,"temporary directory");
@@ -125,6 +175,8 @@ int main(){
     const std::string file=std::string(path)+"/fleet.json";
     const std::string self(32,'f');
     concurrent_pause_publication(std::string(path)+"/publication.ini",self);
+    unbound_takeover_observation(std::string(path)+"/unbound-host.ini",self);
+    failed_manager_replacement(std::string(path)+"/replacement.ini",self);
     WtpFleetStore store(file,self);
     auto [empty,first]=store.snapshot();check(empty.at("assignments").empty(),"zero targets valid");
     check(kMaximumFleetOutputs==32,"supported capacity is independently specified as 32");

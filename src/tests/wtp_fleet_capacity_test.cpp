@@ -150,6 +150,8 @@ int main(){
  std::mutex host_mutex;std::condition_variable host_cv;bool block_host=false,host_entered=false;
  std::atomic<std::uint64_t> policy_offset{0};
  std::atomic_bool fail_deleted_publication{false};
+ std::atomic_bool invalid_assignment_host{false};
+ std::mutex exit_mutex;std::condition_variable exit_cv;bool block_exit=false,exit_entered=false;
  WtpFleetTestHooks hooks;
  hooks.monotonic_now=[&]{return WtpSteadyClock{}.now_ms()+policy_offset.load();};
  hooks.before_persist=[&]{std::unique_lock lock(storage_mutex);if(block_storage){storage_entered=true;storage_cv.notify_all();storage_cv.wait(lock,[&]{return !block_storage;});}};
@@ -159,6 +161,10 @@ int main(){
   const auto rows=durable.snapshot().first.at("assignments");
   if(std::none_of(rows.begin(),rows.end(),[&](const auto& row){return row.at("device_id")==ordered[2]->id;}) && fail_deleted_publication.exchange(false))
    throw std::runtime_error("Injected failure after durable assignment deletion");
+ };
+ hooks.before_owner_exit=[&](const std::string& id){
+  if(id!=ordered[2]->id)return;
+  std::unique_lock lock(exit_mutex);if(block_exit){exit_entered=true;exit_cv.notify_all();exit_cv.wait(lock,[&]{return !block_exit;});}
  };
  hooks.create_target=[&](WtpSettings settings,std::function<bool()> admission,std::shared_ptr<void> lease){
   auto& peer=*peers.at(settings.device_id);auto stream=std::make_shared<MemoryStream>(peer);
@@ -170,11 +176,25 @@ int main(){
  };
  hooks.revocation_status=[&](const WtpSettings& settings,unsigned){
   if(settings.device_id==ordered[0]->id){std::unique_lock lock(host_mutex);if(block_host){host_entered=true;host_cv.notify_all();host_cv.wait(lock,[&]{return !block_host;});}}
-  return peers.at(settings.device_id)->revocation();
+  auto status=peers.at(settings.device_id)->revocation();
+  // The HTTP client validates schema/ID/generation but does not require boot.
+  // The assignment consumer must reject this before seeding any state.
+  if(settings.device_id==ordered[0]->id && invalid_assignment_host.exchange(false)) {status.erase("boot_id");status["revocation_generation"]="17";}
+  return status;
  };
  struct Cleanup{std::string path;~Cleanup(){stop_wtp_fleet();std::filesystem::remove_all(path);}}cleanup{path};
  start_wtp_fleet_for_test(ini,self,hooks);check(snapshot().at("maximum_outputs")==32,"advertised capacity is 32");
  Json schedule={{"mode","tone"},{"frequency_hz",14097100},{"duration_ms",1000},{"period_seconds",60},{"phase_seconds",0}};
+ {
+  WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=ordered[0]->id;
+  invalid_assignment_host=true;
+  const auto invalid=command({{"operation","assign"},{"name","Malformed Pi probe"},{"settings",wtp_settings_json(settings)},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",31415}});
+  check(invalid.status==409,"malformed initial Pi host observation refuses assignment");
+  await([&]{return !snapshot().at("outputs").contains(ordered[0]->id);},"refused new assignment releases its temporary context");
+  check(snapshot().at("storage_error")=="","malformed host observation cannot poison unrelated Fleet journal health");
+  WtpFleetJournal journal(ini+".wtp-fleet-contexts.json",self);
+  check(journal.snapshot().at("contexts").empty(),"refused uncreated assignment cannot leave frozen retirement authority");
+ }
  for(const auto& peer:ordered){WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=peer->id;settings.allow_frequency_adjustment=true;
   succeeds({{"operation","assign"},{"name","Output "+peer->id},{"settings",wtp_settings_json(settings)},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",31415}});}
  // A no-op Pause must revoke an accepted Enable even though its ETag has
@@ -369,7 +389,16 @@ int main(){
  const auto uncertain_remove=command({{"operation","remove"},{"device_id",ordered[2]->id}});
  check(uncertain_remove.status==409 && uncertain_remove.body.find("outcome_unconfirmed")!=std::string::npos,"post-deletion publication failure remains uncertain");
  check(snapshot().at("assignments").size()==30 && snapshot().at("outputs").contains(ordered[2]->id),"durably deleted row retains cleanup authority until reconciliation");
- succeeds({{"operation","recover"},{"device_id",ordered[2]->id}});
+ {std::lock_guard lock(exit_mutex);block_exit=true;exit_entered=false;}
+ const auto recovered_removal=command({{"operation","recover"},{"device_id",ordered[2]->id}});
+ check(recovered_removal.status==200,"deleted assignment cleanup reconciled");
+ {std::unique_lock lock(exit_mutex);check(exit_cv.wait_for(lock,std::chrono::seconds(5),[&]{return exit_entered;}),"removed owner held after exit decision");}
+ Json late_request;const auto late_recovery=submit({{"operation","recover"},{"device_id",ordered[2]->id}},&late_request);
+ check(late_recovery.status==409 && late_recovery.body.find("Owner retirement")!=std::string::npos,"an exiting removed owner refuses work before admission");
+ const auto late_id=late_request.at("request").at("action_id").get<std::string>();
+ const auto rejected_record=Json::parse(wtp_fleet_api("GET","","","actions",late_id).body).at("actions").at(late_id);
+ check(rejected_record.at("state")=="unknown_or_expired","retiring owner refusal cannot leak a permanently pending ledger record");
+ {std::lock_guard lock(exit_mutex);block_exit=false;exit_cv.notify_all();}
  await([&]{return !snapshot().at("outputs").contains(ordered[2]->id);},"reconciliation reclaims a deleted context without resurrecting its assignment");
  stop_wtp_fleet();WtpFleetStore stopped(ini+".wtp-assignments.json",self);check(stopped.snapshot().first.at("assignments").size()==30,"takeover and removal persist");
 #ifdef __linux__

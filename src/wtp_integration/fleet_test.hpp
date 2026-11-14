@@ -19,6 +19,8 @@ struct WtpFleetTestHooks {
     std::function<void()> after_persist;
     // Observe admission fencing before shutdown waits for any old executor.
     std::function<void()> before_shutdown_join;
+    // Hold a removed owner after its exit decision, before resource teardown.
+    std::function<void(const std::string&)> before_owner_exit;
     // Host policy clock only; transport clocks remain the intended fixture's.
     std::function<std::uint64_t()> monotonic_now;
 };

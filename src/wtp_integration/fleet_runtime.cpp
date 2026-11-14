@@ -499,7 +499,8 @@ private:
         auto t=target(c);
         if(state.at("device_id")!=c.id || state.value("revocation_unavailable",true))throw std::runtime_error("Pi takeover storage or identity unavailable");
         const auto status=t->app->status();
-        if(state.contains("boot_id") && status.identity && state.at("boot_id")!=status.identity->boot_id)
+        if(!status.identity || status.identity->device_id!=c.id || status.identity->product!="WsprryPi" ||
+           state.at("boot_id")!=status.identity->boot_id)
             throw std::runtime_error("Pi takeover boot differs from WTP observation");
         if(state.at("revocation_generation")!=row.at("revocation_generation")) {
             c.permit->revoke();
@@ -632,9 +633,12 @@ private:
                 c.row["product"]=s.identity->product;
                 if(!observed_healthy(s,c.row))throw std::runtime_error(result.error);
                 if(c.row.at("product")=="WsprryPi") {
-                    auto state=revocation_status(hooks_,settings,c.row.at("management_port").get<unsigned>());
+                    // Seed from one closed, boot-bound observation. An
+                    // uncreated assignment has no cleanup authority to retire
+                    // if a second, unchecked sample differs from the first.
+                    c.last_host=now_ms();auto state=host_read(c,c.row);
                     c.row["revocation_generation"]=state.at("revocation_generation");
-                    if(!refresh_host(c,c.row,true))throw std::runtime_error("Pi assignment was revoked");
+                    if(!apply_host(c,c.row,std::move(state),c.last_host))throw std::runtime_error("Pi assignment was revoked");
                 }
                 check_caps(c.row,s);
                 if(cmd.at("enabled").get<bool>()){std::string why;if(!eligible(c,c.row,why))throw std::runtime_error(why);}
@@ -863,13 +867,14 @@ private:
                 }
                 if(c.removed && c.retirement.is_null()) {
                     std::lock_guard lock(mutex_);
-                    if((!c.ordinary || !c.ordinary->pending) && (!c.pause || !c.pause->pending)){c.reclaimable=true;break;}
+                    if((!c.ordinary || !c.ordinary->pending) && (!c.pause || !c.pause->pending)){c.quit=true;c.reclaimable=true;break;}
                 }
             }catch(const std::exception& e){try{latch(c,e.what());publish(c);}catch(...) {}}
             catch(...){c.permit->revoke();c.recovery=true;}
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
         try {
+            if(c.reclaimable && hooks_.before_owner_exit)hooks_.before_owner_exit(c.id);
             c.cleanup_ok=stop_owned(c);
             // Existing in-flight/retirement authority survives unconfirmed cleanup.
             publish(c);
@@ -899,13 +904,19 @@ void replace_manager(const std::string& ini,const std::string& self,WtpFleetTest
     std::lock_guard lifecycle(lifecycle_mutex);
     std::shared_ptr<Fleet> old;{std::lock_guard lock(manager_mutex);old=manager;}
     if(old)old->shutdown(); // No candidate sessions/writers before old quiescence.
-    auto candidate=std::make_shared<Fleet>(ini,self,std::move(hooks));
-    {std::lock_guard lock(manager_mutex);manager=std::move(candidate);startup_error.clear();}
+    try {
+        auto candidate=std::make_shared<Fleet>(ini,self.empty()?wtp_pi_device_id():self,std::move(hooks));
+        std::lock_guard lock(manager_mutex);manager=std::move(candidate);startup_error.clear();
+    }catch(const std::exception& e) {
+        // The old owner is already quiescent. Do not publish its stopped
+        // projection as a working manager or overwrite a later startup result.
+        std::lock_guard lock(manager_mutex);manager.reset();startup_error=bounded(e.what(),512);throw;
+    }
 }
 } // namespace
 void start_wtp_fleet(const std::string& ini,const std::string& self) {
-    try{replace_manager(ini,self.empty()?wtp_pi_device_id():self);}
-    catch(const std::exception& e){std::lock_guard lock(manager_mutex);startup_error=e.what();}
+    try{replace_manager(ini,self);}
+    catch(const std::exception&){ /* The lifecycle owner published the failure. */ }
 }
 void start_wtp_fleet_for_test(const std::string& ini,const std::string& self,WtpFleetTestHooks hooks) {
     if(!hooks.create_target || !hooks.revocation_status)throw std::runtime_error("Explicit Fleet fixture providers required");

@@ -23,6 +23,7 @@ async function main() {
             window.__fleet={scope:'wsprrypi-wtp-fleet/1',maximum_outputs:32,controller_incarnation:'f'.repeat(32),publication_revision:'1',now_ms:'100000',replacement_pending:false,storage_error:'',assignments:[row('a','Long shared station name beside the laboratory amplifier'),row('b','Long shared station name beside the laboratory amplifier')],outputs:{['a'.repeat(32)]:observation('a'),['b'.repeat(32)]:observation('b')}};
             window.fetch=async(url,options={})=>{
                 const path=String(url);const reply=(value,status=200)=>({ok:status>=200&&status<300,status,headers:{get:()=> '"fleet-ui"'},json:async()=>structuredClone(value)});
+                if(window.__fleetUnavailable && path.includes('/host/fleet'))return reply({error:{code:'fleet_unavailable',message:'Invalid fleet assignment document'}},503);
                 if(path.includes('/host/fleet/actions'))return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,actions:Object.fromEntries(new URL(path,location.href).searchParams.get('ids').split(',').map(id=>[id,__actions[id]||{action_id:id,state:'unknown_or_expired'}]))});
                 if(path.endsWith('/host/fleet') && options.method==='POST') {
                     const command=JSON.parse(options.body);__posts.push(command);
@@ -111,11 +112,19 @@ async function main() {
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Running", "intentional output-off interval retains Running");
         assert.equal(await run("document.getElementById('operationFleetStart').textContent"), "No committed pending start");
         assert.match(await run("document.getElementById('operationFleetRealized').textContent"), /accepted the requested RF targets/);
+        await run("__fleetUnavailable=true;__refresh().catch(()=>{})");
+        assert.equal(await run("FleetClient.snapshot().valid"), false, "failed controller initialization cannot leave a valid old snapshot");
+        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /Invalid fleet assignment document/);
+        for (const control of ["Pause", "Recover", "Edit"])
+            assert.equal(await run(`document.getElementById('operationFleet${control}').disabled`), true, "controller failure disables " + control);
+        await capture("controller-unavailable");
+        await run("__fleetUnavailable=false;__refresh()");
         // Same ID with a different assignment generation never retargets selection.
         await run("__fleet.outputs['a'.repeat(32)].assignment_generation='c'.repeat(32);__fleet.outputs['a'.repeat(32)].actions=[];__refresh()");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Removed output");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, replacement safety and twenty-four visual captures passed.");
+        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety and twenty-eight visual captures passed.");
     } catch (error) {failure = error;}
     await finishFixture({client, browser: chrome, php, profile, failure});
 }

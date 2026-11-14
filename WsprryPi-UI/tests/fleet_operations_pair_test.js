@@ -81,12 +81,20 @@ async function main() {
         const stopPi = await mutate("pause", pi);
         await wait(() => client.outcome(pi)?.action_id === stopPi.action_id && client.outcome(pi)?.state === "confirmed", "simulated Pi pause confirmed");
         assert.equal(client.snapshot().data.assignments.some(r => r.enabled), false);
+        const failedIncarnation = client.snapshot().data.controller_incarnation;
+        const failedReplacement = await exchange({fail_replace: true});
+        assert.equal(failedReplacement.status, 503);
+        assert.equal(failedReplacement.body.error.code, "fleet_unavailable");
+        await assert.rejects(client.refresh());
+        assert.equal(client.snapshot().valid, false, "a failed replacement cannot leave a valid stopped-controller projection");
+        await exchange({replace: true});
+        await wait(state => state.data.controller_incarnation !== failedIncarnation && Object.values(state.data.outputs).every(o => o.can_resume), "corrected configuration restores actual target owners with a fresh incarnation");
         const old = client.capture(pi), oldIncarnation = client.snapshot().data.controller_incarnation;
         await exchange({replace: true});
         await wait(state => state.data.controller_incarnation !== oldIncarnation && Object.values(state.data.outputs).every(o => o.can_resume), "manager replacement retires old sessions/identity leases");
         await assert.rejects(client.mutate({operation: "enable", device_id: pi}, old), /changed after review/);
         const readStart = performance.now();await client.refresh();assert.ok(performance.now() - readStart < 1000, "published read remains bounded");
-        console.log(`Fleet Operations ${carrier}: shipped browser correlation/selection, actual Pico handlers, independent simulated Pi, committed enable, priority pause and owned cleanup passed.`);
+        console.log(`Fleet Operations ${carrier}: shipped browser correlation/selection, actual Pico handlers, independent simulated Pi, committed enable, priority pause, owned cleanup, explicit failed replacement and fresh-owner restoration passed.`);
     } finally {
         events.get("pagehide")?.();clearTimeout(deadline);child.stdin.end();
         if (child.exitCode === null && child.signalCode === null) {
