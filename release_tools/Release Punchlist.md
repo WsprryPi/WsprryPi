@@ -1,6 +1,6 @@
 # Wsprry Pi Release Punchlist
 
-⏳ **RC.1 publication in progress.** The six Beta 7 items below remain complete.
+✅ **RC.1 publication complete.** The six Beta 7 items below remain complete.
 The selected RC.1 cycle reuses published Pico RC.3 and RP1 1.0.0; it does not
 publish companions or qualify hardware.
 
@@ -8,10 +8,10 @@ publish companions or qualify hardware.
   operator guidance, local production carrier recipes, and submitted-source review.
 - ✅ Release-note proofreading and AI Detector review through Grammarly;
   recommended editorial changes applied without changing protected terms.
-- ⏳ Freeze the RC.1 source and complete exact-tag CI, four-target exports,
+- ✅ Freeze the RC.1 source and complete exact-tag CI, four-target exports,
   executable identity, dependency, and simulated smoke checks.
-- ⏳ Publish and verify the matching versioned Read the Docs manual.
-- ▧ Verify the six draft assets, publish the prerelease, verify public bytes
+- ✅ Publish and verify the matching versioned Read the Docs manual.
+- ✅ Verify the six draft assets, publish the prerelease, verify public bytes
   and all four production installer consumers, and record closeout.
 
 Beta 1 acceptance, source identities, publication, and
@@ -21,7 +21,9 @@ qualification limits remain in the [release evidence](4.0.0-Release-Evidence.md)
 
 Status key: ✅ Complete · ⏳ In progress · ▧ Not started
 
-Latest completed cycle: [WsprryPi 4.0 Beta 7](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.7), application source `3db74d7b5311d904a56f8b7ad0543bed4020e6df`, with published Pico RC.2 source `971f7bf9f8075d64ff086f777356bdd06c3d8b53` and unchanged published RP1 RC.2. All nine exact-source tag CI jobs, four executable exports, draft/public byte verification and four production installer-consumer checks passed. The [versioned manual](https://wsprry-pi.readthedocs.io/v4.0.0-beta.7-docs.1/Install/beta7.html) and [release evidence](4.0.0-Release-Evidence.md#beta-7-publication) record the selected cycle and retained qualification limits. Companion releases were reused, not republished. Final stable acceptance remains separate.
+Latest completed cycle: [WsprryPi 4.0 RC.1](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-rc.1), application `f88c951dcfcb03abf5cf236a02a2d9688ad49b57`, Pico RC.3 `b4e966797cf016f6b8ed873dbe638522fc4d81c7`, and RP1 `v1.0.0`. All nine exact-tag checks, four exports and simulated smoke checks, six-asset draft/public verification, four production installer consumers, and the versioned manual passed. ARMv6 dependency tracing used the documented emulator adapter. See the [RC.1 evidence](4.0.0-Release-Evidence.md#rc-1-publication). Final stable and hardware qualification remain separate.
+
+Previous completed cycle: [WsprryPi 4.0 Beta 7](https://github.com/WsprryPi/WsprryPi/releases/tag/v4.0.0-beta.7), application source `3db74d7b5311d904a56f8b7ad0543bed4020e6df`, with published Pico RC.2 source `971f7bf9f8075d64ff086f777356bdd06c3d8b53` and unchanged published RP1 RC.2. All nine exact-source tag CI jobs, four executable exports, draft/public byte verification and four production installer-consumer checks passed. The [versioned manual](https://wsprry-pi.readthedocs.io/v4.0.0-beta.7-docs.1/Install/beta7.html) and [release evidence](4.0.0-Release-Evidence.md#beta-7-publication) record the selected cycle and retained qualification limits. Companion releases were reused, not republished. Final stable acceptance remains separate.
 
 <a id="saved-items"></a>
 
