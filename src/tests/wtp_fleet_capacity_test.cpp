@@ -330,6 +330,7 @@ int main(){
  await([]{const auto state=snapshot();for(const auto& [id,o]:state.at("outputs").items()){(void)id;if(!o.value("can_resume",false))return false;}return true;},"initial read-only inspections make all outputs eligible");
  for(auto& peer:ordered){peer->clock.horizon(59999);succeeds({{"operation","enable"},{"device_id",peer->id}});}
  await([&]{return all_armed(32);},"all 32 acknowledge ARM before time advances");
+ await([]{const auto state=snapshot();for(const auto& output:state.at("outputs"))if(output.at("state")!="armed")return false;return true;},"current owned ARM evidence remains current rather than foreign");
 #ifdef __linux__
  const auto threads=std::distance(std::filesystem::directory_iterator("/proc/self/task"),std::filesystem::directory_iterator{});
  const auto descriptors=std::distance(std::filesystem::directory_iterator("/proc/self/fd"),std::filesystem::directory_iterator{});
@@ -337,6 +338,10 @@ int main(){
  for(auto& peer:ordered){check(peer->engine.starts==0,"arming never launches early");peer->clock.horizon(60000);}
  await([&]{for(auto& peer:ordered)if(peer->engine.starts!=1)return false;return true;},"32 launches at shared logical boundary");
  for(auto& peer:ordered)check(peer->engine.launched==60000000000ULL,"exact first monotonic launch");
+ // Let the next STATUS exchange observe execution, while holding within
+ // the one-second finite job. An engine start alone is not remote evidence.
+ for(auto& peer:ordered)peer->clock.horizon(60500);
+ await([]{const auto state=snapshot();for(const auto& output:state.at("outputs"))if(output.at("state")!="running")return false;return true;},"current owned Running evidence remains current rather than foreign");
  drain_current(0,32);
  await([&]{return all_complete(0,32);},"all 32 complete through production session cleanup");
  for(auto& peer:ordered)succeeds({{"operation","pause"},{"device_id",peer->id}});
@@ -400,10 +405,42 @@ int main(){
  check(rejected_record.at("state")=="unknown_or_expired","retiring owner refusal cannot leak a permanently pending ledger record");
  {std::lock_guard lock(exit_mutex);block_exit=false;exit_cv.notify_all();}
  await([&]{return !snapshot().at("outputs").contains(ordered[2]->id);},"reconciliation reclaims a deleted context without resurrecting its assignment");
+ // Preserve a terminal record for this owner's job, without preparing a
+ // subsequent recurrence. Another principal may then claim the endpoint.
+ const auto history_peer=ordered[1];
+ const auto history_id=history_peer->id;
+ const auto history_rows=snapshot().at("assignments");
+ const auto history_row=std::find_if(history_rows.begin(),history_rows.end(),[&](const auto& row){return row.at("device_id")==history_id;});
+ const auto history_start=wtp_fleet_decimal(history_row->at("last_start_ns"))+60000000000ULL;
+ history_peer->clock.horizon((history_start-utc_base)/1000000-1);
+ succeeds({{"operation","enable"},{"device_id",history_id}});
+ await([&]{return history_peer->clock.at_barrier() && history_peer->authority.snapshot().remote.state==server::State::Armed;},"history fixture owns an armed finite job");
+ succeeds({{"operation","pause"},{"device_id",history_id}});
+ const auto history_request=[&](const std::string& op,server::RequestBody body,char unique){
+  server::Request r;r.operation=op;r.session_id=std::string(32,'8');r.request_id=std::string(32,unique);r.principal="foreign-history-fixture";r.body=std::move(body);r.payload_digest.fill(static_cast<unsigned char>(unique));return history_peer->authority.handle(r);
+ };
+ check(history_request("HELLO",server::HelloBody{{"WTP/1"}},'1').ok,"foreign history HELLO");
+ check(history_request("CLAIM",server::ClaimBody{std::string(32,'9'),10000},'2').ok,"foreign claim after owned terminal job");
+ history_peer->clock.advance_paused(history_peer->clock.now_ms()+1000);
+ await([&]{const auto o=snapshot().at("outputs").at(history_id);return o.at("wtp").at("remote").at("owner_id")==std::string(32,'9');},"foreign ownership observed alongside terminal evidence");
+ const auto occupied=snapshot().at("outputs").at(history_id);
+ check(occupied.at("wtp").at("job").is_object() && occupied.at("wtp").at("job").at("authoritative")==true,"old owned terminal evidence remains authoritative");
+ check(occupied.at("state")=="foreign","historical owned completion cannot mask current foreign ownership");
+ const server::Job foreign_job{std::string(32,'7'),"rf-events/1","tone",1000000000ULL,{{0,1000000000ULL,true,14097100000000000ULL}},false};
+ check(history_request("LOAD",foreign_job,'3').ok,"foreign principal loads its own job");
+ history_peer->clock.advance_paused(history_peer->clock.now_ms()+1000);
+ await([&]{const auto o=snapshot().at("outputs").at(history_id);return o.at("wtp").at("remote").at("job_id")==foreign_job.job_id;},"foreign job observed alongside owned terminal history");
+ check(snapshot().at("outputs").at(history_id).at("state")=="foreign","owned terminal record cannot describe a different current job");
+ succeeds({{"operation","pause"},{"device_id",history_id}});
+ check(history_peer->authority.snapshot().remote.owner_id==std::string(32,'9') && history_peer->authority.snapshot().remote.job_id==foreign_job.job_id,"Pause preserves foreign owner and job after owned terminal history");
+ check(history_request("ABORT",server::AbortBody{foreign_job.job_id},'4').ok,"foreign principal aborts only its own job");
+ check(history_request("RELEASE",std::monostate{},'5').ok,"foreign history owner releases itself");
+ history_peer->clock.advance_paused(history_peer->clock.now_ms()+1000);
+ await([&]{return snapshot().at("outputs").at(history_id).value("can_resume",false);},"terminal history does not block fresh unowned eligibility");
  stop_wtp_fleet();WtpFleetStore stopped(ini+".wtp-assignments.json",self);check(stopped.snapshot().first.at("assignments").size()==30,"takeover and removal persist");
 #ifdef __linux__
  rusage usage{};getrusage(RUSAGE_SELF,&usage);
  std::cout<<"Fixture resources: threads="<<threads<<"; descriptors="<<descriptors<<"; max_rss_kib="<<usage.ru_maxrss<<"; user_s="<<usage.ru_utime.tv_sec<<"; system_s="<<usage.ru_stime.tv_sec<<'\n';
 #endif
- std::cout<<"Deterministic Fleet: 32 ARM acknowledgments, exact 60 s launch and completion; 29 healthy ARM acknowledgments while one peer is held; 30 exact 180 s launches; failed-peer exclusion, pause, takeover, retained capacity, reconciliation, and shutdown passed.\n";
+ std::cout<<"Deterministic Fleet: 32 ARM acknowledgments, exact 60 s launch and completion; 29 healthy ARM acknowledgments while one peer is held; 30 exact 180 s launches; failed-peer exclusion, pause, takeover, retained capacity, reconciliation, terminal-history/foreign-ownership separation, and shutdown passed.\n";
 }

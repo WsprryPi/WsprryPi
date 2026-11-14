@@ -780,7 +780,9 @@ private:
                 std::string why;p["can_resume"]=eligible(c,c.row,why);p["resume_reason"]=why;
                 if(!c.recovery && !c.removed && c.retirement.is_null() && storage_error().empty()) {
                     if(!observed_healthy(s,c.row))p["state"]="unavailable";
-                    else if(!observed_idle(s) && (!s.job || !s.job->authoritative))p["state"]="foreign";
+                    // Authoritative terminal history is not current ownership.
+                    else if(!observed_idle(s) && (!s.owns || !s.job || !s.job->authoritative ||
+                            s.remote->job_id!=s.job->job_id))p["state"]="foreign";
                     else if(s.job && s.job->state)p["state"]=p["wtp"]["job"]["state"];
                     else if(c.dispatched && t->app->active())p["state"]="waiting";
                     else p["state"]="idle";

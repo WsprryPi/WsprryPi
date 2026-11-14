@@ -112,6 +112,15 @@ async function main() {
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Running", "intentional output-off interval retains Running");
         assert.equal(await run("document.getElementById('operationFleetStart').textContent"), "No committed pending start");
         assert.match(await run("document.getElementById('operationFleetRealized').textContent"), /accepted the requested RF targets/);
+        // Current foreign ownership wins over authoritative terminal evidence
+        // for this controller's earlier job, as in the coordinator regression.
+        await run(`(()=>{window.__beforeForeignHistory=structuredClone(__fleet);const o=__fleet.outputs['a'.repeat(32)];__fleet.assignments[0].in_flight=false;o.state='foreign';o.can_resume=false;o.wtp.job.state='aborted';o.wtp.remote={boot_id:'d'.repeat(32),state:'empty',output_active:false,owner_id:'9'.repeat(32),job_id:null};o.wtp.last_report={outcome:'cancelled',job_id:o.wtp.job_id,error:''};__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);return __refresh();})()`);
+        assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Other job on device");
+        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.match(await run("document.getElementById('operationFleetRealized').textContent"), /No current job-bound/);
+        assert.match(await run("document.getElementById('operationFleetHistory').textContent"), /Historical cancelled/);
+        await capture("foreign-history");
+        await run("__fleet=__beforeForeignHistory;__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+2n);__refresh()");
         await run("__fleetUnavailable=true;__refresh().catch(()=>{})");
         assert.equal(await run("FleetClient.snapshot().valid"), false, "failed controller initialization cannot leave a valid old snapshot");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
@@ -141,7 +150,7 @@ async function main() {
         await run("__fleet.outputs['a'.repeat(32)].assignment_generation='c'.repeat(32);__fleet.outputs['a'.repeat(32)].actions=[];__refresh()");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Removed output");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety, cached-reply expiry, bounded controller churn and thirty-six visual captures passed.");
+        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety, cached-reply expiry, bounded controller churn, foreign ownership alongside terminal history and forty visual captures passed.");
     } catch (error) {failure = error;}
     await finishFixture({client, browser: chrome, php, profile, failure});
 }
