@@ -14,14 +14,14 @@
     const base = () => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/fleet";
     const mono = () => root.performance.now();
     function persist() {
-        try { root.sessionStorage.setItem(storageKey, JSON.stringify([...refs.values()].map(({action_id, device_id, assignment_generation, controller_incarnation, reviewed_boot_id, operation, priority, state}) =>
-            ({action_id, device_id, assignment_generation, controller_incarnation, reviewed_boot_id, operation, priority, state})))); } catch (_) { /* In-memory tracking remains authoritative for this page. */ }
+        try { root.sessionStorage.setItem(storageKey, JSON.stringify([...refs.values()].map(({action_id, device_id, assignment_generation, controller_incarnation, reviewed_boot_id, operation, control_revision, priority, state}) =>
+            ({action_id, device_id, assignment_generation, controller_incarnation, reviewed_boot_id, operation, control_revision, priority, state})))); } catch (_) { /* In-memory tracking remains authoritative for this page. */ }
     }
     try {
         const saved = JSON.parse(root.sessionStorage.getItem(storageKey) || "[]");
         if (Array.isArray(saved) && saved.length <= 64) for (const r of saved) {
             if (isId(r.action_id) && isId(r.device_id) && (r.assignment_generation === null || isId(r.assignment_generation)) && isId(r.controller_incarnation) &&
-                typeof r.priority === "boolean" && [...refs.values()].filter(x => x.priority === r.priority).length < 32)
+                (r.control_revision === undefined || isDecimal(r.control_revision)) && typeof r.priority === "boolean" && [...refs.values()].filter(x => x.priority === r.priority).length < 32)
                 refs.set(r.action_id, {...r, state: "outcome_unconfirmed", work_pending: null});
         }
     } catch (_) { /* Invalid browser storage is not controller evidence. */ }
@@ -81,15 +81,28 @@
             !["assign", "enable", "pause", "schedule", "recover", "remove"].includes(record.operation) ||
             !(record.reviewed_boot_id === null || isId(record.reviewed_boot_id)))
             throw new Error("Invalid Fleet action identity or completion evidence.");
+        if ((["accepted", "pending"].includes(record.state) && !record.work_pending) ||
+            (["confirmed", "refused"].includes(record.state) && record.work_pending))
+            throw new Error("Invalid Fleet action completion evidence.");
+    }
+    function referencedAction(record) {
+        if (record?.state === "unknown_or_expired") {
+            if (!isId(record.action_id) || Object.keys(record).length !== 2 ||
+                Object.keys(record).some(key => !["action_id", "state"].includes(key)))
+                throw new Error("Invalid Fleet action lookup result.");
+        } else validateAction(record);
+        const r = refs.get(record?.action_id);
+        if (!r || (record.controller_incarnation && record.controller_incarnation !== r.controller_incarnation) ||
+            (r.assignment_generation !== null && record.assignment_generation && record.assignment_generation !== r.assignment_generation) || (record.device_id && record.device_id !== r.device_id)) return;
+        if (record.state !== "unknown_or_expired" && ((r.reviewed_boot_id !== undefined && record.reviewed_boot_id !== r.reviewed_boot_id) ||
+            (r.operation !== undefined && record.operation !== r.operation) ||
+            (isDecimal(r.control_revision) && record.control_revision !== r.control_revision))) throw new Error("Action result changed its reviewed boot, operation or control revision.");
+        return r;
     }
     function mergeAction(record) {
-        if (record?.state !== "unknown_or_expired") validateAction(record);
-        const r = refs.get(record?.action_id);
-        if (r && r.assignment_generation === null && record.device_id === r.device_id && record.controller_incarnation === r.controller_incarnation && isId(record.assignment_generation)) r.assignment_generation = record.assignment_generation;
-        if (!r || (record.controller_incarnation && record.controller_incarnation !== r.controller_incarnation) ||
-            (record.assignment_generation && record.assignment_generation !== r.assignment_generation) || (record.device_id && record.device_id !== r.device_id)) return;
-        if (record.state !== "unknown_or_expired" && ((r.reviewed_boot_id !== undefined && record.reviewed_boot_id !== r.reviewed_boot_id) ||
-            (r.operation !== undefined && record.operation !== r.operation))) throw new Error("Action result changed its reviewed boot or operation.");
+        const r = referencedAction(record);
+        if (!r) return;
+        if (r.assignment_generation === null && isId(record.assignment_generation)) r.assignment_generation = record.assignment_generation;
         if (["confirmed", "refused"].includes(record.state) && record.work_pending === false) {
             refs.delete(r.action_id);setOutcome(r.device_id, record);
         } else if (["accepted", "pending", "superseded", "outcome_unconfirmed", "unknown_or_expired"].includes(record.state)) {
@@ -114,6 +127,9 @@
         const result = await request(root.document.getElementById("fleet-schedules") ? "" : "/operations");
         const value = validate(result.value);
         if (generation !== sequence || closed || root.document.hidden) throw new Error("Fleet read retired; refresh status.");
+        // Validate every referenced action before installing authority metadata
+        // or learning a new assignment generation from this sample.
+        for (const output of Object.values(value.outputs)) for (const action of output.actions) referencedAction(action);
         if (value.controller_incarnation !== incarnation) {
             valid = false;baselineValid = false;
             if (candidate !== value.controller_incarnation) {
@@ -170,8 +186,9 @@
             throw new Error("Action lookup returned a different reference set.");
         for (const [id, action] of Object.entries(value.actions)) {
             if (action.action_id !== id) throw new Error("Action lookup identity changed.");
-            mergeAction(action);
+            referencedAction(action);
         }
+        for (const action of Object.values(value.actions)) mergeAction(action);
         persist();notify();
     }
     async function poll() {
@@ -238,9 +255,15 @@
             refs.set(action_id, reference);setOutcome(device_id, reference);persist();
             try {
                 const result = await request("", {method: "POST", headers: {"Content-Type": "application/json", "X-WsprryPico-Request": "1", "If-Match": reviewed.etag}, body: JSON.stringify(body)});
-                if (command.operation === "assign" && result.value.action?.device_id === device_id && isId(result.value.action.assignment_generation))
-                    refs.get(action_id).assignment_generation = result.value.action.assignment_generation;
-                mergeAction(result.value.action);persist();notify();return result.value.action;
+                const record = result.value.action;
+                validateAction(record);
+                if (result.value.controller_incarnation !== reference.controller_incarnation || !isDecimal(result.value.publication_revision) ||
+                    record.action_id !== action_id || record.device_id !== device_id || record.controller_incarnation !== reference.controller_incarnation ||
+                    (reference.assignment_generation !== null && record.assignment_generation !== reference.assignment_generation) ||
+                    record.operation !== reference.operation || record.reviewed_boot_id !== reference.reviewed_boot_id || record.control_revision !== reference.control_revision)
+                    throw new Error("Fleet action reply does not match this request. Read and review status.");
+                if (command.operation === "assign" && reference.assignment_generation === null) reference.assignment_generation = record.assignment_generation;
+                mergeAction(record);persist();notify();return record;
             } catch (error) {
                 const known = outcomes.get(device_id);
                 if (known?.action_id === action_id && known.controller_incarnation === reference.controller_incarnation &&

@@ -173,18 +173,18 @@
             for (const button of Object.values(elements.buttons)) {button.hidden = false;button.disabled = !visible || busy;}
             elements.buttons.enable.disabled ||= assignment.enabled || assignment.in_flight || !output?.can_resume || observedAge === null || observedAge >= 15000n || output?.actions?.some(a => a.work_pending);
             elements.buttons.pause.disabled ||= output?.can_pause === false || output?.actions?.some(a => a.operation === "pause" && a.work_pending);
-            elements.buttons.recover.disabled ||= output?.can_reconcile === false;
+            elements.buttons.recover.disabled ||= output?.can_reconcile === false || output?.actions?.some(a => a.work_pending);
             elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight || output?.state === "recovery_required" || output?.actions?.some(a => a.work_pending);
         }
         for (const [id, output] of retired) {
             if (!rows.has(id)) {const elements = createRow(id);rows.set(id, elements);list.append(elements.row);}
             const elements = rows.get(id);
             elements.name.textContent = "Removed output " + id.slice(0, 8);
-            elements.description.textContent = "The saved assignment was removed after local takeover. Controller cleanup is still unresolved.";
+            elements.description.textContent = "The saved assignment was removed. Controller cleanup is still unresolved.";
             elements.status.textContent = output.message || "Reconcile this context before assigning the output again.";
             for (const [action, button] of Object.entries(elements.buttons)) {
                 button.hidden = action !== "recover";
-                button.disabled = !visible || busy;
+                button.disabled = !visible || busy || output.can_reconcile === false || output.actions?.some(a => a.work_pending);
             }
         }
         if (!current.size) {
@@ -214,7 +214,7 @@
             if (closed || !visible) return;
             message(`${operation === "recover" ? "Requesting reconciliation" : "Updating assignment"}…`);
             const action = await root.FleetClient.mutate({operation, device_id: id}, reviewedContext);
-            message(action.state === "confirmed" ? "Requested postconditions confirmed." : "Action accepted. Review its correlated result before resuming.");
+            message(action.state === "confirmed" ? "Requested postconditions confirmed." : ["accepted", "pending"].includes(action.state) ? "Action accepted. Review its correlated result before resuming." : `${root.FleetClient.actionLabel(action)}. ${action.reason || "Read status and review before another action."}`);
         } catch (error) {message(`${error.message} Read status before repeating an unconfirmed action.`);}
         finally {
             busy = false;setVisible(visible);
@@ -340,7 +340,7 @@
             editorAction = {action_id: action.action_id, device_id: action.device_id};
             preserveDraft();
             if (action.state === "confirmed") {root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;}
-            message("Save accepted. Entries remain available until its correlated result confirms persistence.", true);
+            message(action.state === "confirmed" ? "Output schedule saved." : ["accepted", "pending"].includes(action.state) ? "Save accepted. Entries remain available until its correlated result confirms persistence." : `${root.FleetClient.actionLabel(action)}. ${action.reason || "Read status and review before another save."} Your draft is preserved.`, true);
         } catch (error) {
             const detail = error.status === 412 ? "Schedules changed. Cancel this draft, reopen the editor, and review the current settings." : error.message;
             message(`${detail} Your draft is preserved.`, true);

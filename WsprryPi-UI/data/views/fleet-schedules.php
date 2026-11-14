@@ -8,7 +8,7 @@
         <button type="button" id="fleet-schedule-refresh" class="btn btn-outline-secondary">Refresh schedules</button>
     </div>
     <p id="fleet-schedule-feedback" class="form-text" role="status" aria-live="polite"></p>
-    <div id="fleet-output-list" aria-busy="true"><p class="form-text">Open Fleet to load output schedules.</p></div>
+    <div id="fleet-output-list" aria-busy="true"><p class="form-text" data-empty>Open Fleet to load output schedules.</p></div>
     <div id="fleet-schedule-editor" class="fleet-editor mt-3" hidden>
         <h5 id="fleet-schedule-editor-heading" class="cw-control-section__title">Assign a schedule</h5>
         <div class="row gx-3 gy-3">

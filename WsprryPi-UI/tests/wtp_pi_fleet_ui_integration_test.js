@@ -81,6 +81,7 @@ async function main() {
                 if(path.endsWith('/host/fleet')){
                     if(options.method==='GET' && window.__fleetLoadFailure)throw new Error('Controller disconnected');
                     if(options.method==='POST'){
+                        if(window.__corruptFleetReply)return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetPublication),action:{action_id:'0'.repeat(32),device_id:body.device_id||body.settings['Device ID'],assignment_generation:'6'.repeat(32),controller_incarnation:'f'.repeat(32),control_revision:String(BigInt(body.reviewed_control_revision||'0')+1n),reviewed_boot_id:body.reviewed_boot_id,operation:body.operation,state:'confirmed',work_pending:false}},200);
                         if(window.__fleetConflict || options.headers['If-Match']!=='"fleet-'+window.__fleetRevision+'"')return reply({error:{code:'revision_conflict'}},412);
                         if(body.operation==='assign')window.__fleet.assignments.push({device_id:body.settings['Device ID'],name:body.name,schedule:body.schedule,settings:body.settings,enabled:body.enabled,in_flight:false});
                         if(body.operation==='schedule')window.__fleet.assignments.find(row=>row.device_id===body.device_id).schedule=body.schedule;
@@ -422,6 +423,40 @@ async function main() {
             }
         }
 
+        await evaluate(`window.__busyId=__fleet.assignments[0].device_id;const o=__fleet.outputs[__busyId];o.can_reconcile=true;o.actions=[{action_id:'7'.repeat(32),device_id:__busyId,assignment_generation:__busyId,controller_incarnation:'f'.repeat(32),control_revision:o.control_revision,reviewed_boot_id:'c'.repeat(32),operation:'enable',state:'pending',work_pending:true}];document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('FleetClient.snapshot().data.outputs[__busyId].actions.length===1'),'normal owner callback pending');
+        assert.equal(await evaluate('document.querySelector("#fleet-output-list section").querySelectorAll("button")[2].disabled'),true,'pending work keeps ordinary Reconcile disabled');
+        await evaluate(`__fleet.outputs[__busyId].actions=[];document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('!document.querySelector("#fleet-output-list section").querySelectorAll("button")[2].disabled'),'ordinary Reconcile restored after callback');
+        // A retained cleanup row is still subject to the published owner
+        // admission guard and outstanding callbacks, just like Operations.
+        await evaluate(`window.__retainedId='9'.repeat(32);__fleet.outputs[__retainedId]={state:'recovery_required',message:'Owner admission inhibited',revoked:true,can_reconcile:false,actions:[]};document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('Array.from(document.querySelectorAll("#fleet-output-list section")).some(row=>row.textContent.includes("Removed output 99999999"))'),'inhibited retained cleanup row');
+        const retainedButton=`Array.from(document.querySelectorAll('#fleet-output-list section')).find(row=>row.textContent.includes('Removed output 99999999')).querySelectorAll('button')[2]`;
+        assert.equal(await evaluate(retainedButton+'.disabled'),true,'retained Reconcile honors can_reconcile=false');
+        assert.equal(await evaluate('document.getElementById("fleet-output-list").textContent.includes("Open Fleet to load")'),false,'accepted snapshots replace the initial loading placeholder');
+        assert.equal(await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).find(row=>row.textContent.includes('Removed output 99999999')).querySelector('p').textContent`),'The saved assignment was removed. Controller cleanup is still unresolved.','a retained row must not invent a takeover cause');
+        for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('retained-inhibited-'+theme,'fleet-schedules');}
+        await evaluate(`__fleet.outputs[__retainedId].can_reconcile=true;__fleet.outputs[__retainedId].control_revision='1';__fleet.outputs[__retainedId].actions=[{action_id:'8'.repeat(32),device_id:__retainedId,assignment_generation:__retainedId,controller_incarnation:'f'.repeat(32),control_revision:'1',reviewed_boot_id:'c'.repeat(32),operation:'recover',state:'pending',work_pending:true}];document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('FleetClient.snapshot().data.outputs[__retainedId].actions.length===1'),'pending retained cleanup callback');
+        assert.equal(await evaluate(retainedButton+'.disabled'),true,'pending controller work keeps retained Reconcile disabled');
+        await evaluate(`__fleet.outputs[__retainedId].actions=[];document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate(retainedButton+'.disabled===false'),'quiescent admitted retained Reconcile enabled');
+        await evaluate(`delete __fleet.outputs[__retainedId];document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('!Array.from(document.querySelectorAll("#fleet-output-list section")).some(row=>row.textContent.includes("Removed output 99999999"))'),'retained fixture retired');
+        // A foreign success body is not evidence that this save persisted.
+        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft before uncorrelated save reply');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-duration').value='5';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-plain').checked=true;document.getElementById('fleet-schedule-plain').dispatchEvent(new Event('change',{bubbles:true}));window.__uncorrelatedDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__uncorrelatedRows=JSON.stringify(__fleet.assignments);window.__uncorrelatedPosts=__requests.filter(r=>r.url.endsWith('/host/fleet')&&r.options.method==='POST').length;window.__corruptFleetReply=true;document.getElementById('fleet-schedule-save').click()`);
+        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("does not match this request") && FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-new").disabled'),'foreign save success remains unconfirmed');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),false);
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__uncorrelatedDraft'));
+        assert.equal(await evaluate('JSON.stringify(__fleet.assignments)'),await evaluate('__uncorrelatedRows'));
+        assert.equal(await evaluate('FleetClient.snapshot().actions.filter(a=>a.operation==="assign").length'),1);
+        assert.equal(await evaluate('FleetClient.snapshot().actions.find(a=>a.operation==="assign").assignment_generation'),null,'foreign success cannot bind an uncreated assignment');
+        assert.equal(await evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").length'),await evaluate('__uncorrelatedPosts+1'),'no automatic retry of the uncertain save');
+        for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('uncorrelated-reply-'+theme,'fleet-schedule-editor');}
+        await evaluate(`window.__corruptFleetReply=false;document.getElementById('fleet-schedule-editor-review').click();document.getElementById('fleet-schedule-cancel').click()`);
         // Capacity is advertised, never inferred from the historical UI bound.
         await evaluate(`window.__originalFleet=structuredClone(__fleet);__fleet.assignments=Array.from({length:31},(_,i)=>({...__originalFleet.assignments[0],device_id:i.toString(16).padStart(32,'0'),name:'Remote '+(i+1)+' '+('Long device name ').repeat(3),enabled:false,in_flight:false}));__fleet.outputs={};document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===31 && !document.getElementById("fleet-schedule-new").disabled'),'31 allows final assignment');

@@ -13,11 +13,12 @@ async function main() {
             controller_incarnation: incarnation, reviewed_boot_id: boot, operation: priority ? "pause" : "enable", priority, state: "outcome_unconfirmed"});
     }
     const fleet = {scope: "wsprrypi-wtp-fleet/1", maximum_outputs: 32, controller_incarnation: incarnation, publication_revision: "1", now_ms: "1000", assignments, outputs};
+    let savedReferences = JSON.stringify(references);
     const timeouts = new Map(), intervals = new Map(), events = new Map(), documentEvents = new Map(), calls = [], batches = [];
-    let timerId = 0, releaseRead, releasePost, blockRead = true, now = 0, postStatus = 200, churn = false, churnReads = 0, receiptDelay = 0;
+    let timerId = 0, releaseRead, releasePost, blockRead = true, now = 0, postStatus = 200, churn = false, churnReads = 0, receiptDelay = 0, transformPost = value => value, transformLookup = value => value;
     const root = {document: {hidden: false, readyState: "complete", getElementById: () => null, addEventListener: (name, fn) => documentEvents.set(name, fn)},
         performance: {now: () => now}, crypto: crypto.webcrypto,
-        sessionStorage: {getItem: () => JSON.stringify(references), setItem: () => {}},
+        sessionStorage: {getItem: () => savedReferences, setItem: (_key, value) => {savedReferences = value;}},
         addEventListener: (name, fn) => events.set(name, fn),
         fetch: async (url, options) => {
             calls.push({url, method: options.method});
@@ -26,12 +27,13 @@ async function main() {
             if (options.method === "POST") {
                 const command = JSON.parse(options.body);
                 const output = outputs[command.device_id];output.control_revision = String(BigInt(output.control_revision) + 1n);
-                value = {action: {...command, control_revision: output.control_revision, state: "pending", work_pending: true}};
+                value = {controller_incarnation: incarnation, publication_revision: fleet.publication_revision, action: {...command, control_revision: output.control_revision, state: "pending", work_pending: true}};
                 output.actions = [value.action];
                 await new Promise(resolve => {releasePost = resolve;});
+                value = transformPost(structuredClone(value));
             } else if (String(url).includes("/actions?")) {
                 const ids = new URL(url, "http://fixture").searchParams.get("ids").split(",");batches.push(ids);
-                value = {controller_incarnation: incarnation, publication_revision: fleet.publication_revision, actions: Object.fromEntries(ids.map(id => [id, {action_id: id, state: "unknown_or_expired"}]))};
+                value = transformLookup({controller_incarnation: incarnation, publication_revision: fleet.publication_revision, actions: Object.fromEntries(ids.map(id => [id, {action_id: id, state: "unknown_or_expired"}]))});
             } else if (blockRead) {
                 blockRead = false;await new Promise(resolve => {releaseRead = resolve;});
             }
@@ -75,6 +77,7 @@ async function main() {
     await settle();assert.ok(releasePost, "POST is held after reference creation");
     assert.throws(() => root.FleetClient.review(hex(1)), /current request/, "review cannot discard an in-flight POST reference");
     assert.equal(root.FleetClient.snapshot().actions.filter(r => r.device_id === hex(1)).length, 1);
+    assert.equal(JSON.parse(savedReferences).find(r => r.device_id === hex(1)).control_revision, "1", "the immutable action revision survives browser journal serialization");
     blockRead = true;releasePost();await pending;await settle();
     assert.equal(root.FleetClient.snapshot().valid, false, "pre-POST state cannot authorize immediate reference retirement");
     assert.throws(() => root.FleetClient.review(hex(1)), /Refresh/);
@@ -102,6 +105,44 @@ async function main() {
     await root.FleetClient.refresh();assert.equal(root.FleetClient.outcome(hex(6)).state, "confirmed");
     releasePost();assert.equal((await lateFailure).state, "confirmed", "a delayed HTTP error cannot overwrite already verified completion");
     await settle();assert.equal(root.FleetClient.outcome(hex(6)).state, "confirmed");
+    const corruptReplies = [
+        value => ({...value, action: {...value.action, action_id: hex(999), state: "confirmed", work_pending: false}}),
+        value => ({...value, action: {...value.action, device_id: hex(8)}}),
+        value => ({...value, action: {...value.action, controller_incarnation: hex(9)}}),
+        value => ({...value, action: {...value.action, assignment_generation: hex(9)}}),
+        value => ({...value, action: {...value.action, operation: "pause"}}),
+        value => ({...value, action: {...value.action, reviewed_boot_id: null}}),
+        value => ({...value, action: {...value.action, control_revision: "999"}}),
+        value => ({...value, controller_incarnation: hex(9)}),
+        value => ({...value, publication_revision: 1}),
+        value => ({...value, action: {...value.action, state: "confirmed", work_pending: true}}),
+        value => ({...value, action: {...value.action, state: "accepted", work_pending: false}})
+    ];
+    postStatus = 200;
+    for (const corrupt of corruptReplies) {
+        outputs[hex(7)].actions = [];await root.FleetClient.refresh();root.FleetClient.review(hex(7));
+        transformPost = corrupt;
+        const invalidReply = root.FleetClient.mutate({operation: "enable", device_id: hex(7)}, root.FleetClient.capture(hex(7)));
+        const rejected = assert.rejects(invalidReply, /Fleet action|Invalid Fleet/);
+        await settle();releasePost();await rejected;await settle();
+        assert.equal(root.FleetClient.snapshot().actions.filter(r => r.device_id === hex(7)).length, 1, "invalid POST success retains the submitted action's reference");
+        assert.notEqual(root.FleetClient.outcome(hex(7)).state, "confirmed", "a different or inconsistent action cannot confirm this request");
+    }
+    for (const [state, work_pending] of [["refused", false], ["superseded", true], ["outcome_unconfirmed", false]]) {
+        outputs[hex(7)].actions = [];await root.FleetClient.refresh();root.FleetClient.review(hex(7));
+        transformPost = value => {const record = {...value.action, state, work_pending};outputs[hex(7)].actions = [record];return {...value, action: record};};
+        const legitimate = root.FleetClient.mutate({operation: "enable", device_id: hex(7)}, root.FleetClient.capture(hex(7)));
+        await settle();releasePost();assert.equal((await legitimate).state, state, "correlated non-success states remain valid action evidence");await settle();
+    }
+    transformPost = value => value;
+    const trustedPublication = fleet.publication_revision, trustedClock = fleet.now_ms;
+    const immutableControl = outputs[hex(7)].actions[0].control_revision;
+    outputs[hex(7)].actions[0].control_revision = "888";fleet.publication_revision = "999";fleet.now_ms = "999999";
+    await assert.rejects(root.FleetClient.refresh(), /control revision/, "one action ID cannot change its immutable control revision");
+    assert.equal(root.FleetClient.snapshot().actions.find(r => r.device_id === hex(7)).control_revision, immutableControl);
+    assert.equal(root.FleetClient.snapshot().data.publication_revision, trustedPublication, "invalid action evidence cannot install a new publication");
+    assert.equal(root.FleetClient.snapshot().data.now_ms, trustedClock, "invalid action evidence cannot poison the trusted clock");
+    outputs[hex(7)].actions[0].control_revision = immutableControl;fleet.publication_revision = trustedPublication;fleet.now_ms = trustedClock;await root.FleetClient.refresh();
     now = 14999;assert.equal(root.FleetClient.age(outputs[hex(1)]), 14999n);
     now = 15000;assert.equal(root.FleetClient.age(outputs[hex(1)]), 15000n);
     await root.FleetClient.refresh();
@@ -123,6 +164,14 @@ async function main() {
     churn = false;await root.FleetClient.refresh();
     const priorBatches = batches.length;await tick();
     assert.ok(batches.length > priorBatches, "return to the established incarnation clears a stranded candidate and resumes lookups");
+    const retainedBindings = root.FleetClient.snapshot().actions.map(({action_id, device_id, controller_incarnation, assignment_generation}) => ({action_id, device_id, controller_incarnation, assignment_generation}));
+    transformLookup = value => ({...value, actions: Object.fromEntries(Object.entries(value.actions).map(([id, action]) => [id, {...action, device_id: null, controller_incarnation: null, assignment_generation: null}]))});
+    await tick();
+    for (const expected of retainedBindings) {
+        const actual = root.FleetClient.snapshot().actions.find(r => r.action_id === expected.action_id);
+        assert.ok(actual && actual.device_id === expected.device_id && actual.controller_incarnation === expected.controller_incarnation && actual.assignment_generation === expected.assignment_generation, "an unknown-result stub cannot erase a retained reference's bindings");
+    }
+    transformLookup = value => value;await tick();
     const beforeHide = calls.length;
     root.document.hidden = true;documentEvents.get("visibilitychange")();await settle();
     assert.equal(timeouts.size, 0);await assert.rejects(root.FleetClient.refresh(), /suspended/);
