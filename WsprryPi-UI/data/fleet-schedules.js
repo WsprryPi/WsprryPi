@@ -28,13 +28,35 @@
         return {id: profile.id, name: profile.name,
             settings: Object.fromEntries(Object.entries(profile.settings).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))};
     }
-    function preserveDraft() {
-        if (byId("fleet-schedule-editor").hidden) return;
+    function editorFields() {
         const fields = {};
         byId("fleet-schedule-editor").querySelectorAll("input,select").forEach(node => {fields[node.id] = node.type === "checkbox" ? node.checked : node.value;});
+        return fields;
+    }
+    function preserveDraft(force = false) {
+        if (byId("fleet-schedule-editor").hidden && force !== true) return;
+        const fields = editorFields();
         if (!editId && !draftProfileChanged) draftProfileBinding = profileBinding(profiles.find(p => p.id === fields["fleet-schedule-device"]));
         root.sessionStorage.setItem(draftKey, JSON.stringify({fields, editId, editorRevision, editorContext, draftTarget, editorAction, draftProfileBinding}));
         draftDirty = true;
+    }
+    const saveBindingFields = ["action_id", "device_id", "controller_incarnation", "assignment_generation", "control_revision", "reviewed_boot_id", "operation"];
+    function matchesEditorAction(result) {
+        return !!editorAction && !!result && result.action_id === editorAction.action_id && result.device_id === editorAction.device_id &&
+            saveBindingFields.every(key => editorAction[key] === undefined || result[key] === editorAction[key]);
+    }
+    function confirmDraftSave(result) {
+        if (!matchesEditorAction(result) || result.state !== "confirmed") return false;
+        const verified = saveBindingFields.every(key => editorAction[key] !== undefined && result[key] === editorAction[key]);
+        const unchanged = verified && typeof editorAction.submitted_fields === "string" && editorAction.submitted_fields === JSON.stringify(editorFields());
+        editorAction = null;
+        if (unchanged) {
+            root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;message("Output schedule saved.");
+        } else {
+            preserveDraft(true);
+            message(`${verified ? "Earlier save confirmed." : "The earlier save binding cannot be verified."} Current entries are preserved for inspection; reopen the current assignment and review it before another save.`, true);
+        }
+        return true;
     }
     async function restoreDraft() {
         if (closed || busy || !visible) return;
@@ -332,15 +354,15 @@
             operation: "assign", name: profile.name, settings: profile.settings, schedule: schedule(),
             enabled: byId("fleet-schedule-enabled").checked, consent_plain: byId("fleet-schedule-plain").checked,
             management_port: number("management")};
+        const submittedFields = JSON.stringify(editorFields());
         busy = true;setVisible(visible);message("Checking the output and saving…", true);
         try {
             const reviewed = editorContext || {device_id: profile.settings["Device ID"], controller_incarnation: data.controller_incarnation,
                 assignment_generation: null, reviewed_control_revision: null, reviewed_boot_id: null, etag: editorRevision};
             const action = await root.FleetClient.mutate(command, reviewed);
-            editorAction = {action_id: action.action_id, device_id: action.device_id};
+            editorAction = {...Object.fromEntries(saveBindingFields.map(key => [key, action[key]])), submitted_fields: submittedFields};
             preserveDraft();
-            if (action.state === "confirmed") {root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;}
-            message(action.state === "confirmed" ? "Output schedule saved." : ["accepted", "pending"].includes(action.state) ? "Save accepted. Entries remain available until its correlated result confirms persistence." : `${root.FleetClient.actionLabel(action)}. ${action.reason || "Read status and review before another save."} Your draft is preserved.`, true);
+            if (!confirmDraftSave(action)) message(["accepted", "pending"].includes(action.state) ? "Save accepted. Entries remain available until its correlated result confirms persistence." : `${root.FleetClient.actionLabel(action)}. ${action.reason || "Read status and review before another save."} Your draft is preserved.`, true);
         } catch (error) {
             const detail = error.status === 412 ? "Schedules changed. Cancel this draft, reopen the editor, and review the current settings." : error.message;
             message(`${detail} Your draft is preserved.`, true);
@@ -384,10 +406,10 @@
             else {data = null;if (state.error) message(`Fleet status unavailable: ${state.error}`);}
             if (visible) render();
             if (draftDirty && editorAction) {
-                const result = root.FleetClient.outcome(editorAction.device_id);
-                if (result?.action_id === editorAction.action_id && result.state === "confirmed") {
-                    root.sessionStorage.removeItem(draftKey);draftDirty = false;byId("fleet-schedule-editor").hidden = true;message("Output schedule saved.");
-                } else if (result && ["refused", "superseded", "outcome_unconfirmed"].includes(result.state)) {
+                const result = [root.FleetClient.outcome(editorAction.device_id), ...state.actions,
+                    ...(data?.outputs[editorAction.device_id]?.actions || [])].find(matchesEditorAction);
+                if (!confirmDraftSave(result) && matchesEditorAction(result) &&
+                    ["refused", "superseded", "outcome_unconfirmed"].includes(result.state)) {
                     message(`${result.state.replaceAll("_", " ")}: ${result.reason || "Review the current output state."} Your draft is preserved. Read and review before another save.`, true);
                 }
             }
