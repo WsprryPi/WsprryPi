@@ -12,8 +12,8 @@ The version field accepts a version with or without a leading `v`.
 
 For the supported published prerelease, choose **Specific version** and enter
 `1.0.0-rc.3` (or `v1.0.0-rc.3`). Review firmware source
-`c89b5b7ab288c17a9ea83e2fdeb80cdbdf8dfa3b` and canonical build
-[43641717593](https://github.com/WsprryPi/WsprryPico/actions/runs/43641717593).
+`a986d67f51139b523a00b0d2db858b4af94d944d` and canonical build
+[43642452589](https://github.com/WsprryPi/WsprryPico/actions/runs/43642452589).
 The shared installer verifies the canonical publication and the manifest’s
 firmware UF2 SHA-256 before accepting the public bytes.
 The embedded canonical control-schema digest must equal
