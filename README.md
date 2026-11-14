@@ -24,7 +24,7 @@ Firmware erase is a separate explicit action. Saving settings and applying
 saved station progress remain separate from transmit readiness.
 
 A Pi can also serve as a network transmitter while running its own schedule.
-The controller supports up to eight independent remote output schedules.
+The controller supports up to 32 independent remote output schedules.
 Select Fleet in Setup to manage remote transmitters. Ownership, output
 capabilities and recovery state govern whether a job can start.
 

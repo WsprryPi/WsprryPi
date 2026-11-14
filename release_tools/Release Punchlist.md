@@ -1,8 +1,19 @@
-# Wsprry Pi Release Punchlist — Complete
+# Wsprry Pi Release Punchlist
 
-✅ **Complete.** All six selected items are complete; this punchlist has no
-remaining TODOs. It is retained as a completed release-cycle record, with
-future release requirements below kept separate from the completed work.
+⏳ **RC.1 publication in progress.** The six Beta 7 items below remain complete.
+The selected RC.1 cycle reuses published Pico RC.3 and RP1 1.0.0; it does not
+publish companions or qualify hardware.
+
+- ✅ Current Pi/Pico software support, strict parsing, explicit image planning,
+  operator guidance, local production carrier recipes, and submitted-source review.
+- ✅ Release-note proofreading and AI Detector review through Grammarly;
+  recommended editorial changes applied without changing protected terms.
+- ⏳ Freeze the RC.1 source and complete exact-tag CI, four-target exports,
+  executable identity, dependency, and simulated smoke checks.
+- ⏳ Publish and verify the matching versioned Read the Docs manual.
+- ▧ Verify the six draft assets, publish the prerelease, verify public bytes
+  and all four production installer consumers, and record closeout.
+
 Beta 1 acceptance, source identities, publication, and
 qualification limits remain in the [release evidence](4.0.0-Release-Evidence.md),
 [source inventory](4.0-Beta-1-Source-Inventory.json), and
