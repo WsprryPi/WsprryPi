@@ -120,7 +120,13 @@ async function main() {
         assert.match(await run("document.getElementById('operationFleetRealized').textContent"), /No current job-bound/);
         assert.match(await run("document.getElementById('operationFleetHistory').textContent"), /Historical cancelled/);
         await capture("foreign-history");
-        await run("__fleet=__beforeForeignHistory;__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+2n);__refresh()");
+        // A successful background read can advance metadata during screenshots.
+        // Force that interleaving so restoration cannot depend on render speed.
+        await run("__fleet.now_ms=String(BigInt(__fleet.now_ms)+100n);__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+5n);__refresh()");
+        // Restore scene payload, never the older publication authority.
+        await run("(()=>{const {now_ms,publication_revision}=__fleet;__fleet=__beforeForeignHistory;__fleet.now_ms=now_ms;__fleet.publication_revision=String(BigInt(publication_revision)+1n);return __refresh();})()");
+        assert.equal(await run("FleetClient.snapshot().valid"), true, "restoring scene data preserves current controller clock and publication authority");
+        assert.equal(await run("FleetClient.snapshot().data.outputs['a'.repeat(32)].state"), "running", "the original scene is restored after the intervening read");
         await run("__fleetUnavailable=true;__refresh().catch(()=>{})");
         assert.equal(await run("FleetClient.snapshot().valid"), false, "failed controller initialization cannot leave a valid old snapshot");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
