@@ -3,7 +3,7 @@
 ## Published RC.3 companion
 
 Current `devel` supports the published **WsprryPico 1.0.0-rc.3** prerelease,
-firmware source `b4e966797cf016f6b8ed873dbe638522fc4d81c7`.
+firmware source `5d94243b4db653cc908286e7ea046d565cd42905`.
 The [release](https://github.com/WsprryPi/WsprryPico/releases/tag/v1.0.0-rc.3)
 and [Pico release notes](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
 identify its firmware and limits. A later Pico documentation commit does not

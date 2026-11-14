@@ -12,11 +12,10 @@ The version field accepts a version with or without a leading `v`.
 
 For the supported published prerelease, choose **Specific version** and enter
 `1.0.0-rc.3` (or `v1.0.0-rc.3`). Review firmware source
-`b4e966797cf016f6b8ed873dbe638522fc4d81c7` and canonical build
-[43598991515](https://github.com/WsprryPi/WsprryPico/actions/runs/43598991515).
-The shared installer verifies the retained-artifact publication receipt and its
-trusted publisher before accepting the public bytes. The firmware UF2 SHA-256 is
-`160dc236a3e7911498b196f0937fe13c31c47b687ce20c7590c7d499d5c522c4`.
+`5d94243b4db653cc908286e7ea046d565cd42905` and canonical build
+[43641199952](https://github.com/WsprryPi/WsprryPico/actions/runs/43641199952).
+The shared installer verifies the canonical publication and the manifest’s
+firmware UF2 SHA-256 before accepting the public bytes.
 The embedded canonical control-schema digest must equal
 `a71d09fc1086bf7fd9bafd397a852717da53afa8dd4f43eae313549c3a0f8feb`.
 RC.3 remains a prerelease: **Stable release** does not select it. The firmware
