@@ -35,9 +35,9 @@ class Tests(unittest.TestCase):
             return {'tag_name':tag,'draft':False,'prerelease':'-' in tag,'published_at':'2026-11-06T00:00:00Z',
                     'assets':[{'name':name} for name in ['SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json']],**extra}
         releases=[release('v0.9.0'),release('v1.0.0-rc.1'),release('v1.0.0-rc.10'),
-                  release('v1.0.0-rc.2'),release('v1.0.0'),release('v2.0.0-rc.10'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
+                  release('v1.0.0-rc.2'),release('v1.0.0'),release('v1.0.1'),release('v2.0.0-rc.10'),release('v9.0.0',draft=True),release('ci-devel'),release('v2.0.0-rc.01')]
         for selector,policy in [('auto','development'),('auto','production'),('release','explicit-source'),('release:v1.0.0-rc.1','explicit-source'),('release:1.0.0-rc.1','explicit-source')]:
-            expected='v2.0.0-rc.10' if selector=='release' else 'v1.0.0' if selector=='auto' else 'v1.0.0-rc.1'
+            expected='v2.0.0-rc.10' if selector=='release' else 'v1.0.1' if selector=='auto' else 'v1.0.0-rc.1'
             response=releases if selector=='release' else release(expected)
             with tempfile.TemporaryDirectory() as raw,patch.object(client,'fetch_json',return_value=response), \
                  patch.object(client.subprocess,'run') as run,patch.object(client,'run_git',return_value='a'*40), \
@@ -48,12 +48,12 @@ class Tests(unittest.TestCase):
                 self.assertEqual(selected,'release:'+expected)
                 if selector!='release':
                     self.assertTrue(client.fetch_json.call_args.args[0].endswith('/releases/tags/'+expected))
-                self.assertEqual(run.call_args_list[-1].args[0][-1],'origin/devel')
+                self.assertEqual(run.call_args_list[-1].args[0][-1],'refs/tags/'+expected)
         self.assertGreater(client.release_precedence('v1.0.0'),client.release_precedence('v1.0.0-rc.10'))
         self.assertEqual(client.release_precedence('v1.0.0+build'),client.release_precedence('v1.0.0'))
 
     def test_default_release_failures_do_not_clone_or_fall_back(self):
-        good={'tag_name':'v1.0.0','draft':False,'prerelease':False,
+        good={'tag_name':'v1.0.1','draft':False,'prerelease':False,
               'published_at':'2026-11-11T17:47:05Z',
               'assets':[{'name':name} for name in
                         ['SHA256SUMS','rp1-gpclk-dkms-installation-manifest-v1.json']]}
@@ -66,7 +66,7 @@ class Tests(unittest.TestCase):
                      patch.object(client,'fetch_json',return_value=response) as fetch, \
                      patch.object(client.subprocess,'run') as run:
                     with self.assertRaises(client.ContractError):client.bootstrap(Path(raw),'auto',policy)
-                    fetch.assert_called_once_with('https://api.github.com/repos/'+client.REPOSITORY+'/releases/tags/v1.0.0')
+                    fetch.assert_called_once_with('https://api.github.com/repos/'+client.REPOSITORY+'/releases/tags/v1.0.1')
                     run.assert_not_called()
             with tempfile.TemporaryDirectory() as raw, \
                  patch.object(client,'fetch_json',side_effect=OSError('release unavailable')) as fetch, \

@@ -71,7 +71,7 @@ not assert current-boot ownership.
 
 `RP1_GPCLK_DKMS_SOURCE` accepts exactly:
 
-- `auto` (default): select published `v1.0.0`, independently of the
+- `auto` (default): select published `v1.0.1`, independently of the
   WsprryPi branch;
 - `release`: select the latest eligible published release, including prereleases;
 - `release:TAG`: select an exact published release, including prereleases;
@@ -114,17 +114,22 @@ sudo INSTALL_RP1_GPCLK_DKMS=true \
 An explicit release selector accepts `release:1.0.0-rc.1` or
 `release:v1.0.0-rc.1`. Both select the published tag `v1.0.0-rc.1`.
 
-Automatic selection uses `v1.0.0`. Explicit `release` selection uses the
+Automatic selection uses `v1.0.1`. Explicit `release` selection uses the
 highest semantic version among eligible published releases, including prereleases,
 from `WsprryPi/RP1-GPIO-CLK-DKMS`. The application authenticates the source and selects a
 release; the provider verifies its manifest, checksums, package, compatibility,
 and native installation identity. Failed selection or verification stops the
 installation without falling back to development source.
 
-Installer tooling is resolved once from the provider's maintained `devel` branch
-and frozen at that exact commit. The selected package and runtime source remain
-bound to their published release tag and manifest commit. Updating installer
-tooling does not change the selected provider product version.
+Installer tooling is resolved from the selected release's exact tag. The
+package, recovery adapter, and runtime source remain bound to that release and
+its manifest commit. Release installation does not depend on the provider's
+moving development branch.
+
+The v1.0.1 recovery adapter supports an exact inactive v1.0.0 runtime after a
+kernel update. Keep transmission disabled and retain the previous kernel's
+module files and recovery records until maintenance completes. Missing or
+changed recovery inputs still require reviewed recovery.
 
 ## Development sources
 

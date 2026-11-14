@@ -22,7 +22,7 @@ sys.dont_write_bytecode = True
 REPOSITORY = 'WsprryPi/RP1-GPIO-CLK-DKMS'
 REPOSITORY_URL='https://github.com/'+REPOSITORY+'.git'
 PUBLIC_CONTRACT='rp1-gpclk-provider-lifecycle-v1'
-DEFAULT_RELEASE_TAG='v1.0.0'
+DEFAULT_RELEASE_TAG='v1.0.1'
 RECORD_SCHEMA='rp1-gpclk-dkms-provider-installation-v1'
 RUNTIME_READINESS_CONTRACT='rp1-gpclk-runtime-readiness-v1'
 RUNTIME_PROVIDER=pathlib.Path('/usr/lib/rp1-gpclk-dkms/runtime_provider.py')
@@ -396,10 +396,9 @@ def bootstrap(state, selector, policy):
         tag=max(candidates)[1]
         if requested_tag: require(tag==requested_tag,'published release tag differs from selected release')
         selected='release:'+tag
-        # Installer tooling and the selected package have independent revisions.
-        # Freeze the maintained tooling once; it verifies the exact published
-        # package/tag below instead of executing an older tag's selector policy.
-        reference='origin/devel'
+        # The selected release owns its recovery adapter. Pin tooling to that
+        # exact tag so a package upgrade cannot execute an older branch helper.
+        reference='refs/tags/'+tag
         origin=REPOSITORY_URL
     elif selector=='devel': reference='origin/devel'; origin=REPOSITORY_URL
     elif selector.startswith('commit:'):
