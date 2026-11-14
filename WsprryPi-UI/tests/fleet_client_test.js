@@ -8,13 +8,13 @@ async function main() {
     for (let n = 1; n <= 32; n++) {
         const id = hex(n);
         assignments.push({device_id: id, name: "Output " + n, schedule: {}, enabled: false, in_flight: false});
-        outputs[id] = {assignment_generation: id, control_revision: "0", observation_revision: "1", observation_age_ms: "0", boot_id: boot, can_resume: true, state: "idle", actions: []};
+        outputs[id] = {assignment_generation: id, control_revision: "0", observation_revision: "1", observation_age_ms: "0", host_observation_age_ms: "500", utc_anchor_age_ms: "0", boot_id: boot, can_resume: true, state: "idle", actions: []};
         for (const priority of [false, true]) references.push({action_id: hex(100 + n + (priority ? 32 : 0)), device_id: id, assignment_generation: id,
             controller_incarnation: incarnation, reviewed_boot_id: boot, operation: priority ? "pause" : "enable", priority, state: "outcome_unconfirmed"});
     }
     const fleet = {scope: "wsprrypi-wtp-fleet/1", maximum_outputs: 32, controller_incarnation: incarnation, publication_revision: "1", now_ms: "1000", assignments, outputs};
     const timeouts = new Map(), intervals = new Map(), events = new Map(), documentEvents = new Map(), calls = [], batches = [];
-    let timerId = 0, releaseRead, releasePost, blockRead = true, now = 0, postStatus = 200;
+    let timerId = 0, releaseRead, releasePost, blockRead = true, now = 0, postStatus = 200, churn = false, churnReads = 0, receiptDelay = 0;
     const root = {document: {hidden: false, readyState: "complete", getElementById: () => null, addEventListener: (name, fn) => documentEvents.set(name, fn)},
         performance: {now: () => now}, crypto: crypto.webcrypto,
         sessionStorage: {getItem: () => JSON.stringify(references), setItem: () => {}},
@@ -31,12 +31,16 @@ async function main() {
                 await new Promise(resolve => {releasePost = resolve;});
             } else if (String(url).includes("/actions?")) {
                 const ids = new URL(url, "http://fixture").searchParams.get("ids").split(",");batches.push(ids);
-                value = {controller_incarnation: incarnation, publication_revision: "1", actions: Object.fromEntries(ids.map(id => [id, {action_id: id, state: "unknown_or_expired"}]))};
+                value = {controller_incarnation: incarnation, publication_revision: fleet.publication_revision, actions: Object.fromEntries(ids.map(id => [id, {action_id: id, state: "unknown_or_expired"}]))};
             } else if (blockRead) {
                 blockRead = false;await new Promise(resolve => {releaseRead = resolve;});
             }
+            if (churn && options.method === "GET" && !String(url).includes("/actions?")) {
+                if (++churnReads > 3) throw new Error("Fixture stopped unbounded churn");
+                value = {...fleet, controller_incarnation: (churnReads % 2 ? "a" : "b").repeat(32)};
+            }
             const status = options.method === "POST" ? postStatus : 200;
-            return {ok: status === 200, status, headers: {get: () => '"fleet"'}, json: async () => structuredClone(value)};
+            return {ok: status === 200, status, headers: {get: () => {now += receiptDelay;receiptDelay = 0;return '"fleet"';}}, json: async () => structuredClone(value)};
         }};
     const context = vm.createContext({window: root, AbortSignal, Uint8Array,
         setTimeout: (fn, delay) => {const id = ++timerId;timeouts.set(id, {fn, delay});return id;}, clearTimeout: id => timeouts.delete(id),
@@ -100,6 +104,25 @@ async function main() {
     await settle();assert.equal(root.FleetClient.outcome(hex(6)).state, "confirmed");
     now = 14999;assert.equal(root.FleetClient.age(outputs[hex(1)]), 14999n);
     now = 15000;assert.equal(root.FleetClient.age(outputs[hex(1)]), 15000n);
+    await root.FleetClient.refresh();
+    assert.ok(root.FleetClient.age(root.FleetClient.snapshot().data.outputs[hex(1)]) >= 15000n, "a replayed publication/clock cannot reset the browser's stale age");
+    assert.ok(root.FleetClient.elapsedAge(root.FleetClient.snapshot().data.outputs[hex(1)].host_observation_age_ms) >= 15500n, "cached takeover evidence keeps its elapsed age");
+    assert.ok(root.FleetClient.elapsedAge(root.FleetClient.snapshot().data.outputs[hex(1)].utc_anchor_age_ms) >= 15000n, "cached UTC anchors keep their elapsed age");
+    fleet.publication_revision = "2";fleet.now_ms = "2000";outputs[hex(1)].observation_age_ms = "15000";
+    await root.FleetClient.refresh();
+    fleet.now_ms = "2001";outputs[hex(1)].observation_age_ms = "0";
+    await assert.rejects(root.FleetClient.refresh(), /age regressed/, "the same observation cannot return a younger raw age");
+    outputs[hex(1)].observation_age_ms = "15001";await root.FleetClient.refresh();
+    for (const output of Object.values(outputs)) output.actions = [];
+    fleet.publication_revision = "3";fleet.now_ms = "2002";outputs[hex(1)].observation_age_ms = "0";
+    receiptDelay = 20000;await root.FleetClient.refresh();
+    assert.ok(root.FleetClient.age(root.FleetClient.snapshot().data.outputs[hex(1)]) >= 20000n, "delay between receipt timing and snapshot installation cannot rejuvenate a new publication");
+    churn = true;
+    await assert.rejects(root.FleetClient.refresh(), /changed again/);
+    assert.equal(churnReads, 2, "controller churn gets at most one confirmation per refresh");
+    churn = false;await root.FleetClient.refresh();
+    const priorBatches = batches.length;await tick();
+    assert.ok(batches.length > priorBatches, "return to the established incarnation clears a stranded candidate and resumes lookups");
     const beforeHide = calls.length;
     root.document.hidden = true;documentEvents.get("visibilitychange")();await settle();
     assert.equal(timeouts.size, 0);await assert.rejects(root.FleetClient.refresh(), /suspended/);

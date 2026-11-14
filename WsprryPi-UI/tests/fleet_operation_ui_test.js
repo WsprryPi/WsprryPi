@@ -35,7 +35,7 @@ async function main() {
                     if(!__pending)row.enabled=command.operation==='enable';
                     return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,action},__pending?202:200);
                 }
-                if(path.endsWith('/host/fleet/operations') || path.endsWith('/host/fleet')) {__reads++;__fleet.now_ms=String(BigInt(__fleet.now_ms)+1n);return reply(__fleet);}
+                if(path.endsWith('/host/fleet/operations') || path.endsWith('/host/fleet')) {if(window.__churn){if(++window.__churnReads>3)throw new Error('Fixture stopped unbounded churn');return reply({...__fleet,controller_incarnation:(__churnReads%2?'a':'b').repeat(32)});}__reads++;__fleet.now_ms=String(BigInt(__fleet.now_ms)+1n);return reply(__fleet);}
                 return reply({});
             };
             window.__refresh=()=>FleetClient.refresh();
@@ -120,11 +120,28 @@ async function main() {
             assert.equal(await run(`document.getElementById('operationFleet${control}').disabled`), true, "controller failure disables " + control);
         await capture("controller-unavailable");
         await run("__fleetUnavailable=false;__refresh()");
+        // Advance only the browser clock and replay the same cached body. A
+        // successful GET must not restore eligibility from expired evidence.
+        await run(`for(const o of Object.values(__fleet.outputs))o.actions=[];
+            Object.assign(__fleet.outputs['a'.repeat(32)],{state:'idle',can_resume:true,observation_age_ms:'0'});
+            __fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);__refresh()`);
+        await run(`const nativeNow=performance.now.bind(performance);Object.defineProperty(performance,'now',{value:()=>nativeNow()+15000});__refresh()`);
+        assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Device status stale");
+        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.equal(await run("document.getElementById('operationFleetPause').disabled"), false);
+        await capture("cached-stale");
+        await run("window.__churn=true;window.__churnReads=0;__refresh().catch(()=>{})");
+        assert.equal(await run("__churnReads"), 2);
+        assert.equal(await run("FleetClient.snapshot().valid"), false);
+        assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /Controller changed again/);
+        await capture("controller-changed");
+        await run("__churn=false;__refresh()");
+        assert.equal(await run("FleetClient.snapshot().valid"), true);
         // Same ID with a different assignment generation never retargets selection.
         await run("__fleet.outputs['a'.repeat(32)].assignment_generation='c'.repeat(32);__fleet.outputs['a'.repeat(32)].actions=[];__refresh()");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Removed output");
         assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety and twenty-eight visual captures passed.");
+        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety, cached-reply expiry, bounded controller churn and thirty-six visual captures passed.");
     } catch (error) {failure = error;}
     await finishFixture({client, browser: chrome, php, profile, failure});
 }

@@ -5,6 +5,7 @@
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/fleet_recovery.hpp"
 #include "wtp_integration/fleet_test.hpp"
+#include "wtp_integration/fleet_observation_age.hpp"
 #include "wtp_integration/target_runtime.hpp"
 #include "wtp_settings_json.hpp"
 #include "WSPR-Transmitter/src/execution_plan_compiler.hpp"
@@ -169,6 +170,16 @@ void failed_manager_replacement(const std::string& ini,const std::string& self) 
     check(fresh.status==200 && Json::parse(fresh.body).at("controller_incarnation")!=previous,"corrected configuration establishes a fresh working manager");
 }
 int main(){
+    {
+        std::uint64_t controller=100000,transport=1000;
+        const auto origin=wtp_fleet_observation_origin([&]{return controller;},[&]{
+            const auto sampled=transport;controller+=20000;transport+=20000;return sampled;
+        },900);
+        check(origin && controller-*origin>=20100,"preemption between clock samples cannot rejuvenate an observation");
+        check(!wtp_fleet_observation_origin([]{return 1000ULL;},[]{return 500ULL;},600),"regressed transport clock has no valid age origin");
+        check(!wtp_fleet_observation_origin([]{return 100ULL;},[]{return 1000ULL;},0),"publication-origin underflow is unknown");
+        check(wtp_fleet_observation_origin([]{return 10ULL;},[]{return 20ULL;},10)==0,"zero is a valid mapped monotonic origin");
+    }
     restarted_output_admission();
     char path[]="/tmp/wsprrypi-fleet-test.XXXXXX";check(mkdtemp(path)!=nullptr,"temporary directory");
     struct Cleanup{std::string path;~Cleanup(){std::filesystem::remove_all(path);}}cleanup{path};

@@ -7,7 +7,7 @@
     const isDecimal = value => typeof value === "string" && value.length <= 20 && decimal.test(value) && BigInt(value) <= 18446744073709551615n;
     const listeners = new Set(), refs = new Map(), reviews = new Set();
     const storageKey = "wsprrypi.fleet.actions.1";
-    let data = null, etag = "", baseline = 0, latency = 0, valid = false, baselineValid = false, closed = false;
+    let data = null, etag = "", baseline = 0, latency = 0n, valid = false, baselineValid = false, closed = false;
     let timer, reading = false, polling = false, pollAgain = false, fullPending, sequence = 0, cursor = 0, busy = 0;
     const foregroundReads = [], backgroundReads = [];
     let incarnation = "", candidate = "", publication = 0n, lastClock = 0n;
@@ -48,9 +48,9 @@
             throw new Error(response.ok ? "The controller returned an unreadable reply. Refresh and review before another action." : `The controller is unavailable (HTTP ${response.status}). Read and review status.`);
         if (!response.ok)
             throw Object.assign(new Error(response.status === 412 ? "Schedules changed (revision_conflict). Refresh and review before trying again." : value?.error?.message || value?.error?.code || `Controller request failed (${response.status}).`), {status: response.status});
-        const elapsed = mono() - start;
+        const received = mono(), elapsed = received - start;
         if (!Number.isFinite(elapsed) || elapsed < 0) throw new Error("Browser clock changed; refresh status.");
-        return {value, etag: response.headers.get("ETag"), elapsed};
+        return {value, etag: response.headers.get("ETag"), elapsed, received};
     }
     function validate(value) {
         if (value.scope !== "wsprrypi-wtp-fleet/1" || value.maximum_outputs !== 32 || !Array.isArray(value.assignments) || value.assignments.length > 32 ||
@@ -108,7 +108,7 @@
         outcomes.set(id, record);
     }
     const outcomes = new Map(); // At most one summary per context; no historical ledger.
-    async function full() {
+    async function full(confirmation = false) {
         if (closed || root.document.hidden) throw new Error("Fleet read suspended; refresh on return.");
         const generation = sequence;
         const result = await request(root.document.getElementById("fleet-schedules") ? "" : "/operations");
@@ -118,14 +118,34 @@
             valid = false;baselineValid = false;
             if (candidate !== value.controller_incarnation) {
                 candidate = value.controller_incarnation;sequence++;notify();
-                return full(); // Serialized confirmation, never established by action/POST replies.
+                if (confirmation) throw new Error("Controller changed again; refresh and review.");
+                return full(true); // At most one serialized confirmation per poll.
             }
             incarnation = candidate;candidate = "";publication = 0n;lastClock = 0n;
             for (const r of refs.values()) if (r.controller_incarnation !== incarnation) {r.state = "outcome_unconfirmed";r.work_pending = null;setOutcome(r.device_id, {...r});}
         }
+        candidate = "";
         const revision = BigInt(value.publication_revision), clock = BigInt(value.now_ms);
         if (revision < publication || clock < lastClock) {valid = false;baselineValid = false;throw new Error("Fleet publication or clock regressed; refresh and review.");}
-        publication = revision;lastClock = clock;data = value;etag = result.etag;baseline = mono();latency = result.elapsed;
+        const received = result.received;
+        let nextLatency = BigInt(Math.ceil(result.elapsed));
+        if (data?.controller_incarnation === incarnation && revision === publication) {
+            const elapsed = received - baseline;
+            if (!Number.isFinite(elapsed) || elapsed < 0) throw new Error("Browser clock changed; refresh status.");
+            // A repeated publication cannot renew any retained observation.
+            // Keep one conservative age envelope across cached full replies.
+            for (const [id, output] of Object.entries(value.outputs)) {
+                const old = data.outputs[id];
+                if (!old || old.assignment_generation !== output.assignment_generation || old.observation_revision !== output.observation_revision || old.boot_id !== output.boot_id) continue;
+                for (const field of ["observation_age_ms", "host_observation_age_ms", "utc_anchor_age_ms"]) {
+                    if (!isDecimal(old[field]) || !isDecimal(output[field])) continue;
+                    if (BigInt(output[field]) < BigInt(old[field])) throw new Error("Fleet observation age regressed; refresh and review.");
+                    const retained = BigInt(old[field]) + latency + BigInt(Math.ceil(elapsed)) - BigInt(output[field]);
+                    if (retained > nextLatency) nextLatency = retained;
+                }
+            }
+        }
+        publication = revision;lastClock = clock;data = value;etag = result.etag;baseline = received;latency = nextLatency;
         baselineValid = true;valid = !!etag;lastError = "";
         for (const output of Object.values(data.outputs)) for (const action of output.actions || []) mergeAction(action);
         for (const key of outcomes.keys()) if (!data.outputs[key]) outcomes.delete(key);
@@ -172,13 +192,13 @@
         if (!valid || !isDecimal(value)) return null;
         const elapsed = mono() - baseline;
         if (elapsed < 0 || !Number.isFinite(elapsed)) return null;
-        return BigInt(value) + BigInt(Math.ceil(latency + elapsed));
+        return BigInt(value) + latency + BigInt(Math.ceil(elapsed));
     }
     function age(output) {
         if (!baselineValid || !output || !isDecimal(output.observation_age_ms)) return null;
         const elapsed = mono() - baseline;
         if (elapsed < 0 || !Number.isFinite(elapsed)) return null;
-        return BigInt(output.observation_age_ms) + BigInt(Math.ceil(latency + elapsed));
+        return BigInt(output.observation_age_ms) + latency + BigInt(Math.ceil(elapsed));
     }
     function capture(id) {
         const c = data?.outputs[id];

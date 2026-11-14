@@ -7,6 +7,7 @@
 #include "fleet_store.hpp"
 #include "fleet_schedule.hpp"
 #include "fleet_recovery.hpp"
+#include "fleet_observation_age.hpp"
 #include "target_runtime.hpp"
 #include "browser_api.hpp"
 #include "wtp_settings_json.hpp"
@@ -753,8 +754,8 @@ private:
         if(const auto error=storage_error();!error.empty()){p["state"]="recovery_required";p["message"]=error;}
         if(t && s.status_age_origin_ms && s.status_observed_ms) {
             // Fixture clocks may differ from the controller publication domain.
-            const auto elapsed=t->clock.now_ms()>=*s.status_age_origin_ms?t->clock.now_ms()-*s.status_age_origin_ms:UINT64_MAX;
-            const auto now=now_ms();if(elapsed<now)p["age_origin_ms"]=std::to_string(now-elapsed-1);
+            if(const auto origin=wtp_fleet_observation_origin([this]{return now_ms();},[&]{return t->clock.now_ms();},*s.status_age_origin_ms))
+                p["age_origin_ms"]=std::to_string(*origin);
         }
         if(t) {
             auto status=Json::parse(wtp_runtime_status_json(s));status.erase("capabilities");

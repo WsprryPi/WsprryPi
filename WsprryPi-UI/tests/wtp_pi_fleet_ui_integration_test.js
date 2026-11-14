@@ -41,17 +41,17 @@ async function main() {
                 {device_id:'d'.repeat(32),name:'Bench Pi',schedule,enabled:true,in_flight:true,settings:window.__settings},
                 {device_id:'e'.repeat(32),name:'Garden Pico',schedule:{...schedule,mode:'qrss',message:'TEST',dot_ms:3000},enabled:false,in_flight:false,settings:window.__settings}],
                 removals:[],outputs:{['d'.repeat(32)]:{state:'scheduled',message:'',wtp:{status_observed_ms:'11000'}},['e'.repeat(32)]:{state:'paused',message:'',wtp:{status_observed_ms:'10000'}}}};
-            window.__fleetRevision=1;window.__fleetActions={};
+            window.__fleetRevision=1;window.__fleetPublication=0;window.__fleetActions={};
             const fleetReply=()=>{
-                window.__fleet.controller_incarnation='f'.repeat(32);window.__fleet.publication_revision=String(window.__fleetRevision);
+                window.__fleet.controller_incarnation='f'.repeat(32);window.__fleet.publication_revision=String(++window.__fleetPublication); // Each presentation read synthesizes fresh STATUS, independently of assignment ETag.
                 window.__fleet.now_ms=String(BigInt(window.__fleet.now_ms)+1n);
                 for(const [id,o] of Object.entries(window.__fleet.outputs))if(!o.revoked && !window.__fleet.assignments.some(row=>row.device_id===id))delete window.__fleet.outputs[id];
                 for(const row of window.__fleet.assignments) {
                     const o=window.__fleet.outputs[row.device_id] ||= {state:'paused',message:''};
-                    Object.assign(o,{assignment_generation:row.device_id,control_revision:o.control_revision||'0',observation_revision:'1',observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
+                    Object.assign(o,{assignment_generation:row.device_id,control_revision:o.control_revision||'0',observation_revision:String(window.__fleetPublication),observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
                 }
                 for(const [id,o] of Object.entries(window.__fleet.outputs)) {
-                    Object.assign(o,{assignment_generation:id,control_revision:o.control_revision||'0',observation_revision:'1',observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
+                    Object.assign(o,{assignment_generation:id,control_revision:o.control_revision||'0',observation_revision:String(window.__fleetPublication),observation_age_ms:'1000',boot_id:'c'.repeat(32),can_resume:o.state!=='recovery_required',actions:o.actions||[]});
                 }
                 return window.__fleet;
             };
@@ -77,7 +77,7 @@ async function main() {
                 }
                 if(path.endsWith('/host/wtp-endpoint/recover')){window.__endpoint.output_unknown=false;window.__endpoint.remote_owner='';return reply(window.__endpoint);}
                 if(path.endsWith('/host/wtp-endpoint'))return reply(window.__endpoint);
-                if(path.includes('/host/fleet/actions?'))return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetRevision),actions:window.__fleetActions});
+                if(path.includes('/host/fleet/actions?'))return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetPublication),actions:window.__fleetActions});
                 if(path.endsWith('/host/fleet')){
                     if(options.method==='GET' && window.__fleetLoadFailure)throw new Error('Controller disconnected');
                     if(options.method==='POST'){
@@ -93,7 +93,7 @@ async function main() {
                         const action={action_id:body.action_id,operation:body.operation,reviewed_boot_id:body.reviewed_boot_id,device_id:id,controller_incarnation:'f'.repeat(32),assignment_generation:id,control_revision:output?.control_revision || '1',state:'confirmed',work_pending:false,reason:'Committed'};
                         window.__fleetActions[body.action_id]=action;if(output)output.actions=[action];
                         if(body.operation==='remove')delete window.__fleet.outputs[id];
-                        return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetRevision),action},200,'"fleet-'+window.__fleetRevision+'"');
+                        return reply({controller_incarnation:'f'.repeat(32),publication_revision:String(window.__fleetPublication),action},200,'"fleet-'+window.__fleetRevision+'"');
                     }
                     return reply(fleetReply(),200,'"fleet-'+window.__fleetRevision+'"');
                 }
