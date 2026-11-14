@@ -94,7 +94,8 @@
 }
 
 /* Connection indicator */
-#fleet-output-list .btn:disabled {
+#fleet-output-list .btn:disabled,
+#fleet-schedule-editor .btn:disabled {
     color: var(--bs-secondary-color);
     background-color: var(--bs-secondary-bg);
     border-color: var(--bs-border-color);

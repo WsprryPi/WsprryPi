@@ -58,7 +58,7 @@ async function main() {
             window.fetch=async (url, options={}) => {
                 window.__requests.push({url:String(url),options});
                 const path=String(url), body=options.body?JSON.parse(options.body):{};
-                const reply=(value,status=200,etag='"host-r1"')=>({ok:status>=200&&status<300,status,headers:{get:()=>etag},json:async()=>value});
+                const reply=(value,status=200,etag='"host-r1"')=>({ok:status>=200&&status<300,status,headers:{get:()=>etag},json:async()=>structuredClone(value)});
                 if(window.__badJsonSuffix && path.endsWith(window.__badJsonSuffix)) {
                     window.__badReplyCount=(window.__badReplyCount||0)+1;
                     return {ok:window.__badJsonStatus===200,status:window.__badJsonStatus,headers:{get:()=>null},json:async()=>{
@@ -97,7 +97,7 @@ async function main() {
                     }
                     return reply(fleetReply(),200,'"fleet-'+window.__fleetRevision+'"');
                 }
-                if(path.endsWith('/host/devices')){if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:window.__settings},{id:'2'.repeat(32),name:'Selected Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{...window.__settings,Transport:'usb','Device ID':'b'.repeat(32),Endpoint:'/dev/serial/by-id/fixture-pico-if02','USB Serial':'fixture-pico','USB Vendor ID':51966,'USB Product ID':16402}}]},200,'"catalog-r1"');}
+                if(path.endsWith('/host/devices')){if(window.__holdNextCatalog){window.__holdNextCatalog=false;await new Promise(resolve=>{window.__releaseCatalog=resolve;});}if(window.__catalogLoadFailure)throw new Error('Catalog unavailable');return reply({scope:'wsprrypi-wtp-catalog/1',version:1,active_id:'',profiles:[{id:'1'.repeat(32),name:'New Pi',method:'manual',discovery_id:'',legacy_unverified:false,settings:{...window.__settings,'Device ID':window.__catalogDeviceOverride||window.__settings['Device ID']}},{id:'2'.repeat(32),name:'Selected Pico',method:'manual',discovery_id:'',legacy_unverified:false,settings:{...window.__settings,Transport:'usb','Device ID':'b'.repeat(32),Endpoint:'/dev/serial/by-id/fixture-pico-if02','USB Serial':'fixture-pico','USB Vendor ID':51966,'USB Product ID':16402}}]},200,'"catalog-r1"');}
                 if(path.endsWith('/host/discovery'))return reply({available:true,candidates:[]});
                 if(path.endsWith('/status'))return reply({host:{selected:false,firmware_maintenance:false,ready:false,phase:'idle',session_phase:'disconnected'}});
                 return reply({});
@@ -222,6 +222,50 @@ async function main() {
         await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-editor").hidden'),'original draft saved');
         assert.equal(await evaluate('JSON.parse(__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").at(-1).options.body).device_id'),'e'.repeat(32));
         const viewports=[{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}];
+        // Continuing a retained draft owns the editor until its catalog read
+        // completes. A competing New/Edit must not overwrite that target.
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`);
+        await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft for delayed restoration');
+        await evaluate(`document.getElementById('fleet-schedule-duration').value='8';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-cancel').click();window.__draftBeforeRestore=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');document.getElementById('fleet-schedule-feedback').textContent='';document.getElementById('fleet-schedule-new').click();window.__catalogLoadFailure=true;document.getElementById('fleet-draft-continue').click();`);
+        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable") && !document.getElementById("fleet-schedule-new").disabled'),'visible retained-draft restore failure');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),true,'failed restoration does not expose an unpopulated editor');
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__draftBeforeRestore'),'failed restore retains original draft');
+        await evaluate(`window.__catalogLoadFailure=false;document.getElementById('fleet-schedule-new').click();window.__holdNextCatalog=true;document.getElementById('fleet-draft-continue').click();`);
+        await waitFor(()=>evaluate('typeof __releaseCatalog==="function"'),'held draft catalog read');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-new").disabled'),true,'restoring a draft must block competing editor actions');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true,'no save while restoration is pending');
+        await evaluate("document.getElementById('fleet-schedule-new').click();__releaseCatalog()");
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-save").disabled && !document.getElementById("fleet-schedule-editor").hidden'),'restored draft ready');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'8');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-editor-heading").textContent'),'Edit output schedule');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").textContent'),'Save schedule');
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__draftBeforeRestore'),'restoration preserves original target and revision');
+        await evaluate("document.getElementById('fleet-schedule-cancel').click()");
+        // A catalog profile ID is not a frozen output identity. Continuing a
+        // new-assignment draft must not inherit a changed profile's settings.
+        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'new target-bound draft');
+        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-duration').value='9';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-cancel').click();window.__newBoundDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__beforeRebindPosts=__requests.filter(r=>r.options.method==='POST').length;window.__catalogDeviceOverride='6'.repeat(32);document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Saved output changed") && !document.getElementById("fleet-schedule-new").disabled'),'changed catalog profile cannot retarget retained draft');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),false,'changed draft stays inspectable');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true);
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").disabled'),true);
+        for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('changed-draft-'+theme,'fleet-schedule-editor');}
+        assert.match(await evaluate('document.getElementById("fleet-schedule-device").selectedOptions[0].textContent'),/changed/);
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__newBoundDraft'));
+        assert.equal(await evaluate("__requests.filter(r=>r.options.method==='POST').length"),await evaluate('__beforeRebindPosts'));
+        await evaluate(`window.__catalogDeviceOverride='';document.getElementById('fleet-schedule-cancel').click();const unbound=JSON.parse(__newBoundDraft);delete unbound.draftProfileBinding;sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',JSON.stringify(unbound));document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Saved output changed") && document.getElementById("fleet-output-list").getAttribute("aria-busy")==="false"'),'unbound earlier draft cannot infer current profile authority');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true);
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'9','unbound entries remain inspectable');
+        assert.equal(await evaluate("__requests.filter(r=>r.options.method==='POST').length"),await evaluate('__beforeRebindPosts'));
+        await evaluate(`document.getElementById('fleet-schedule-cancel').click();sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',__newBoundDraft);document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'unchanged profile restores original draft');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'9');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'1'.repeat(32));
+        await evaluate("document.getElementById('fleet-schedule-cancel').click()");
         async function capture(section, element) {
             for(const viewport of viewports){
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
@@ -232,6 +276,14 @@ async function main() {
                 await client.settleRendering();
                 await evaluate(`document.getAnimations().forEach(a=>a.finish());`);
                 assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'),true,section+' overflow');
+                const disabled=await evaluate(`Array.from(document.querySelectorAll('#fleet-schedule-editor .btn:disabled')).map(button=>{const s=getComputedStyle(button);return {color:s.color,bg:s.backgroundColor,opacity:s.opacity};})`);
+                for(const style of disabled) {
+                    const rgb=value=>value.match(/[\d.]+/g).map(Number),fg=rgb(style.color),bg=rgb(style.bg),alpha=fg[3]??1;
+                    const luminance=values=>values.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+                    const f=luminance(fg.map((v,i)=>v*alpha+bg[i]*(1-alpha))),b=luminance(bg);
+                    assert.equal(style.opacity,'1','disabled editor action labels retain full opacity');
+                    assert.ok((Math.max(f,b)+.05)/(Math.min(f,b)+.05)>=4.5,'disabled editor action labels remain readable');
+                }
                 const height=await evaluate('document.documentElement.scrollHeight');
                 const shot=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,
                     clip:{x:0,y:0,width:viewport.width,height,scale:1}});
@@ -414,6 +466,21 @@ async function main() {
         await evaluate(`__fleet.maximum_outputs=32;document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 32")'),'UI derives capacity from server');
         assert.equal(await evaluate('Array.from(document.querySelectorAll("#fleet-output-list button")).some(button=>!button.disabled)'),true,'valid refresh restores row actions');
+        // A persisted page return resumes the Setup consumer as well as the
+        // shared client. Existing drafts retain their original review binding.
+        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft before persisted page return');
+        await evaluate(`document.getElementById('fleet-schedule-duration').value='7';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));window.__returnDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__returnPosts=__requests.filter(r=>r.options.method==='POST').length;window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));__fleet.assignments[0].name='Updated while away';window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));`);
+        await waitFor(()=>evaluate('FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-new").disabled'),'Setup resumes after persisted page return');
+        assert.equal(await evaluate("document.querySelector('#fleet-output-list section h5').textContent"),'Updated while away','Setup consumer must render the newly accepted snapshot after return');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'7');
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__returnDraft'),'return does not rebase or discard the draft');
+        assert.equal(await evaluate("__requests.filter(r=>r.options.method==='POST').length"),await evaluate('__returnPosts'),'return never retries a mutation');
+        const returnReads=await evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="GET").length');
+        await evaluate("document.getElementById('fleet-schedule-refresh').click()");
+        await waitFor(()=>evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="GET").length>'+returnReads),'manual refresh after persisted page return');
+        for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('persisted-return-'+theme,'fleet-schedule-editor');}
+        await evaluate("document.getElementById('fleet-schedule-cancel').click()");
         // The keyboard interaction grants native user activation. This fixture
         // has no host config readback, so establish its synthetic baseline before
         // leaving Setup; otherwise the real unsaved-edit guard correctly blocks.
@@ -439,7 +506,7 @@ async function main() {
         await waitFor(async()=>await evaluate('!document.getElementById("local-wtp-confirmation").hidden'),'end-now confirmation');
         await evaluate('document.getElementById("local-wtp-end-now").click()');
         await waitFor(async()=>await evaluate('__endpoint.local_effective && !__endpoint.remote_owner'),'end-now local control');
-        console.log('Fleet in-page confirmation, cancellation, Escape, feature hiding, stale revisions, duplicate prevention, Pi takeover choices and independent assignments passed.');
+        console.log('Fleet in-page confirmation, cancellation, Escape, feature hiding, stale revisions, duplicate prevention, Pi takeover choices, independent assignments, persisted-page return and bound exclusive draft restoration passed.');
         console.log('Mocked desktop/mobile visual evidence: '+output);
     } catch (error) { failure = error; }
     finally {

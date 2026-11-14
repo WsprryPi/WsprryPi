@@ -21,29 +21,59 @@
     const text = name => byId("fleet-schedule-" + name).value.trim();
     let data = null, revision = "", editorRevision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
     const rows = new Map();
-    let pendingConfirmation = null, editorContext = null, draftTarget = null, draftDirty = false, editorAction = null;
+    let pendingConfirmation = null, editorContext = null, draftTarget = null, draftDirty = false, editorAction = null, draftProfileBinding = null, draftProfileChanged = false;
     const draftKey = "wsprrypi.fleet.editor.draft.1";
+    function profileBinding(profile) {
+        if (!profile?.settings || typeof profile.settings !== "object") return null;
+        return {id: profile.id, name: profile.name,
+            settings: Object.fromEntries(Object.entries(profile.settings).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))};
+    }
     function preserveDraft() {
         if (byId("fleet-schedule-editor").hidden) return;
         const fields = {};
         byId("fleet-schedule-editor").querySelectorAll("input,select").forEach(node => {fields[node.id] = node.type === "checkbox" ? node.checked : node.value;});
-        root.sessionStorage.setItem(draftKey, JSON.stringify({fields, editId, editorRevision, editorContext, draftTarget, editorAction}));
+        if (!editId && !draftProfileChanged) draftProfileBinding = profileBinding(profiles.find(p => p.id === fields["fleet-schedule-device"]));
+        root.sessionStorage.setItem(draftKey, JSON.stringify({fields, editId, editorRevision, editorContext, draftTarget, editorAction, draftProfileBinding}));
         draftDirty = true;
     }
     async function restoreDraft() {
+        if (closed || busy || !visible) return;
         let saved;try {saved = JSON.parse(root.sessionStorage.getItem(draftKey) || "null");} catch (_) {return;}
         if (!saved || typeof saved !== "object" || !saved.fields || typeof saved.editId !== "string") return;
+        busy = true;setVisible(visible);message("Restoring unsaved entries…");
         try {
-            const catalog = await fetchJson("devices");profiles = catalog.value.profiles.filter(p => !p.legacy_unverified);
+            const catalog = await fetchJson("devices");
+            if (closed || !visible) return;
+            profiles = catalog.value.profiles.filter(p => !p.legacy_unverified);
+            const selectedId = saved.fields["fleet-schedule-device"];
+            draftProfileBinding = saved.draftProfileBinding || null;
+            draftProfileChanged = !saved.editId && !!selectedId && (!draftProfileBinding ||
+                JSON.stringify(draftProfileBinding) !== JSON.stringify(profileBinding(profiles.find(p => p.id === selectedId))));
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
-            for (const profile of profiles) {const option = root.document.createElement("option");option.value = profile.id;option.textContent = profile.name;selector.append(option);}
+            const placeholder = root.document.createElement("option");placeholder.value = "";placeholder.textContent = "Choose a saved output";selector.append(placeholder);
+            for (const profile of profiles) {
+                if (draftProfileChanged && profile.id === selectedId) continue;
+                const option = root.document.createElement("option");option.value = profile.id;option.textContent = profile.name;selector.append(option);
+            }
+            if (draftProfileChanged) {
+                const option = root.document.createElement("option");option.value = selectedId;
+                option.textContent = draftProfileBinding ? `${draftProfileBinding.name} · ${draftProfileBinding.settings["Device ID"]} (changed)` : "Earlier output identity unavailable";
+                selector.append(option);
+            }
             if (saved.editId) {const option = root.document.createElement("option");option.value = "assigned";option.textContent = saved.draftTarget?.name || saved.editId;selector.append(option);}
-        } catch (error) {message(`Draft retained; saved-device catalog unavailable: ${error.message}`, true);return;}
-        editorAction = saved.editorAction || null;
-        editId = saved.editId;editorRevision = saved.editorRevision;editorContext = saved.editorContext;draftTarget = saved.draftTarget;
-        for (const [id, value] of Object.entries(saved.fields)) {const node = byId(id);if (node && node.closest("#fleet-schedule-editor")) {if (node.type === "checkbox") node.checked = value === true;else if (typeof value === "string") node.value = value;}}
-        byId("fleet-schedule-editor").hidden = false;draftDirty = true;modeFields();
-        message("Unsaved entries restored with their original target and revision. Review current state before saving.", true);
+            editorAction = saved.editorAction || null;
+            editId = saved.editId;editorRevision = saved.editorRevision;editorContext = saved.editorContext;draftTarget = saved.draftTarget;
+            for (const [id, value] of Object.entries(saved.fields)) {const node = byId(id);if (node && node.closest("#fleet-schedule-editor")) {if (node.type === "checkbox") node.checked = value === true;else if (typeof value === "string") node.value = value;}}
+            byId("fleet-schedule-editor-heading").textContent = editId ? "Edit output schedule" : "Assign a schedule";
+            byId("fleet-schedule-save").textContent = editId ? "Save schedule" : "Save assignment";
+            byId("fleet-schedule-editor").hidden = false;draftDirty = true;modeFields();
+            message(draftProfileChanged ? "Saved output changed or its original review is unavailable. Entries remain available for inspection. Discard this draft and reopen the intended output before saving." : "Unsaved entries restored with their original target and revision. Review current state before saving.", true);
+        } catch (error) {message(`Draft retained; entries could not be restored: ${error.message}`, !byId("fleet-schedule-editor").hidden);}
+        finally {
+            busy = false;
+            if (byId("fleet-schedule-feedback").textContent === "Restoring unsaved entries…") message("");
+            if (!closed) {setVisible(visible);if (visible) load();}
+        }
     }
     function confirmMutation(operation, assignment, trigger) {
         const panel = byId("fleet-action-confirmation");
@@ -259,7 +289,7 @@
             if (!id && !nextProfiles.length) {message("Add and identify a device in Known and nearby devices first.");return;}
             // A failed catalog refresh must leave any existing draft bound to
             // its original target and revision.
-            profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;
+            profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;draftProfileBinding = null;draftProfileChanged = false;
             editorContext = reviewedContext;draftTarget = assignment;editorAction = null;
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
             const placeholder = root.document.createElement("option");
@@ -291,6 +321,7 @@
     }
     async function save() {
         if (busy || !visible) return;
+        if (draftProfileChanged) {message("Saved output changed. Discard this draft and reopen the intended output before saving.", true);return;}
         if (!editId && !canAssign()) {message("Capacity unavailable or reached. Refresh schedules and review before saving. Your draft is preserved.", true);return;}
         const fields = [...byId("fleet-schedule-editor").querySelectorAll("input,select")].filter(field => !field.disabled && !field.closest("[hidden]"));
         for (const field of fields) if (!field.reportValidity()) return;
@@ -396,6 +427,10 @@
             for (const event of ["input", "change"]) panel.addEventListener(event, e => e.stopPropagation());
         });
         root.addEventListener("pagehide", () => {closed = true;clearTimeout(timer);cancelConfirmation();});
+        root.addEventListener("pageshow", event => {
+            if (!event.persisted) return;
+            closed = false;data = null;setVisible(visible);load();
+        });
         setVisible(true);
         let handoff;try {handoff = JSON.parse(root.sessionStorage.getItem("wsprrypi.fleet.editor.handoff") || "null");root.sessionStorage.removeItem("wsprrypi.fleet.editor.handoff");} catch (_) {}
         if (handoff) openAssignedEditor(handoff).catch(error => message(error.message));
@@ -409,7 +444,7 @@
             panel.inert = !visible;
             panel.querySelectorAll("input,select,button").forEach(control => {control.disabled = !visible || busy || (id === "fleet-listener" && listenerBusy);});
         }
-        if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || !!editId;render();}
+        if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || !!editId || draftProfileChanged;byId("fleet-schedule-save").disabled ||= draftProfileChanged;render();}
         else {clearTimeout(timer);cancelConfirmation();}
     }
     async function openAssignedEditor(target) {
