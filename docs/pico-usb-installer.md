@@ -10,6 +10,19 @@ Select an image source explicitly. The firmware branch defaults to **main**, ind
 
 The version field accepts a version with or without a leading `v`.
 
+For the supported published prerelease, choose **Specific version** and enter
+`1.0.0-rc.3` (or `v1.0.0-rc.3`). Review firmware source
+`b4e966797cf016f6b8ed873dbe638522fc4d81c7` and canonical build
+[43598991515](https://github.com/WsprryPi/WsprryPico/actions/runs/43598991515).
+The shared installer verifies the retained-artifact publication receipt and its
+trusted publisher before accepting the public bytes. The firmware UF2 SHA-256 is
+`160dc236a3e7911498b196f0937fe13c31c47b687ce20c7590c7d499d5c522c4`.
+The embedded canonical control-schema digest must equal
+`a71d09fc1086bf7fd9bafd397a852717da53afa8dd4f43eae313549c3a0f8feb`.
+RC.3 remains a prerelease: **Stable release** does not select it. The firmware
+branch selector applies to CI image selection and remains independent of this
+exact release choice and the shared installer update channel.
+
 Download and check image resolves the canonical public image without touching
 the device. The shared installer compares the verified image's embedded
 settings schema digest with the digest compiled into WsprryPi. A mismatch,
@@ -208,9 +221,9 @@ Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The 
 ## Validation boundary
 
 The [shared installer contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md)
-and [acceptance scope](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer-results.md)
-define software compatibility, publication checks and board-specific physical
-limits. The imported noninteractive entry point retains contract 1; interactive
+and [published release limits](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
+describe software compatibility, publication checks, and qualification limits.
+The imported noninteractive entry point retains contract 1; interactive
 standalone menus do not change the Pi adapter's protocol.
 
 Preservation verification requires exact firmware identity, reserved flash,

@@ -23,11 +23,11 @@ async function main() {
     assert(el("upgrade").disabled);await click("upgrade");assert.equal(requests.length,oldPlanReads);
     el("source").value="version";el("source").listeners.change();
     assert(el("plan").disabled);await click("plan");assert.equal(requests.length,oldPlanReads);
-    el("version").value="1.0.0-rc.1";el("version").listeners.input();
+    el("version").value="1.0.0-rc.3";el("version").listeners.input();
     assert.equal(el("plan").disabled,false);await click("plan");
     assert.equal(JSON.parse(requests.at(-1).body).branch,"main");assert.equal(el("upgrade").disabled,false);
-    assert.equal(JSON.parse(requests.at(-1).body).version,"1.0.0-rc.1");
-    for (const version of ["v1.0.0-rc.1", "  v1.0.0-rc.1  ", "1.0.0-rc.1", "vv1.0.0-rc.1"]) {
+    assert.equal(JSON.parse(requests.at(-1).body).version,"1.0.0-rc.3");
+    for (const version of ["v1.0.0-rc.3", "  v1.0.0-rc.3  ", "1.0.0-rc.3", "vv1.0.0-rc.3"]) {
         el("version").value=version;el("version").listeners.change();await click("plan");
         const normalized=version.trim().replace(/^v/, "");
         assert.equal(JSON.parse(requests.at(-1).body).version,normalized);

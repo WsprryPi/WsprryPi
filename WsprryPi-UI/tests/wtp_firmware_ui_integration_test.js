@@ -178,14 +178,14 @@ async function main() {
         await evaluate("document.getElementById('wtp-firmware-source').value='version';document.getElementById('wtp-firmware-source').dispatchEvent(new Event('change'))");
         assert.equal(await evaluate("document.getElementById('wtp-firmware-plan').disabled"),true);
         assert.equal(await evaluate("window.__requests.length"),0);
-        for (const version of ["v1.0.0-rc.1", "1.0.0-rc.1"]) {
+        for (const version of ["v1.0.0-rc.3", "1.0.0-rc.3"]) {
             await evaluate(`document.getElementById('wtp-firmware-version').value=${JSON.stringify(version)};document.getElementById('wtp-firmware-version').dispatchEvent(new Event('change'));document.getElementById('wtp-firmware-plan').click()`);
             await waitFor(async()=>await evaluate("!document.getElementById('wtp-firmware-plan').disabled"),"version normalization");
-            assert.equal(await evaluate("window.__requests.at(-1).version"),"1.0.0-rc.1");
-            assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.1");
+            assert.equal(await evaluate("window.__requests.at(-1).version"),"1.0.0-rc.3");
+            assert.equal(await evaluate("document.getElementById('wtp-firmware-version').value"),"1.0.0-rc.3");
         }
         const states={
-            checked:{operation:'plan',plan_id:'fixture-plan',result:{ok:true,branch:'main',version:'0.1.0-ci.40000000000.1',source:'a'.repeat(40),workflow:{run_id:40000000000,attempt:1}}},
+            checked:{operation:'plan',plan_id:'fixture-plan',result:{ok:true,branch:'main',version:'1.0.0-rc.3',source:'b4e966797cf016f6b8ed873dbe638522fc4d81c7',workflow:{run_id:43598991515,attempt:1}}},
             pending:{operation:'upgrade',running:true,maintenance:true,result:null},
             bootstrap_pending:{operation:'plan',running:true,result:null},
             bootstrap_unavailable:{operation:'plan',result:{ok:false,recovery_required:false,error:'No verified compatible Pico USB installer is available in recent devel CI runs; retry after compatible software verification completes'}},
@@ -217,6 +217,11 @@ async function main() {
                 }
                 assert(!observed.overflow,`${name}/${theme}/${state} horizontal overflow`);assert(observed.buttonHeight>=36);
                 assert.equal(observed.installDisabled,state!=="checked",`${name}/${theme}/${state} installation gate`);assert.equal(observed.recoverHidden,!value.maintenance);
+                if(state==="checked") {
+                    assert.match(observed.text,/Checked 1\.0\.0-rc\.3/);
+                    assert.match(observed.text,/b4e966797cf016f6b8ed873dbe638522fc4d81c7/);
+                    assert.match(observed.text,/43598991515\/1/);
+                }
                 findings.push({name,theme,state,...observed});
                 const shot=await client.send("Page.captureScreenshot",{format:"png"});fs.writeFileSync(path.join(output,`${name}-${theme}-${state}.png`),Buffer.from(shot.data,"base64"));
                 if(name==="mobile" && ["erase_waiting","erased","bootstrap_pending","bootstrap_unavailable"].includes(state)) {

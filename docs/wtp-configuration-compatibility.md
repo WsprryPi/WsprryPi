@@ -1,5 +1,27 @@
 # Pico control compatibility
 
+## Published RC.3 companion
+
+Current `devel` supports the published **WsprryPico 1.0.0-rc.3** prerelease,
+firmware source `b4e966797cf016f6b8ed873dbe638522fc4d81c7`.
+The [release](https://github.com/WsprryPi/WsprryPico/releases/tag/v1.0.0-rc.3)
+and [Pico release notes](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
+identify its firmware and limits. A later Pico documentation commit does not
+change that firmware identity. Beta 7 remains a separate published source pair;
+these instructions describe current development support.
+
+The maintained generator vendors the exact RC.3 schema, lifecycle guard and
+shared controls. Capability admission still checks the current descriptors,
+carrier, target, and revision; a matching firmware version alone grants no
+authority. RC.3 does not require a control migration or a new major version.
+WTP/1, authentication/transport, and storage remain independently versioned.
+
+Select RC.3 explicitly through the [USB firmware interface](pico-usb-installer.md).
+Software source-pair checks and image planning do not qualify physical USB,
+installation, services, timing, or RF.
+
+## Current control contract
+
 Pi and Pico use one current `Wsprry-Control/1` settings/control contract under
 `/api/control/v1`. Earlier beta settings APIs and resource views are unsupported;
 update both applications together. WTP/1 finite-job compatibility is independent.
