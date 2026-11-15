@@ -70,19 +70,34 @@ complete [#412](https://github.com/WsprryPi/WsprryPi/issues/412) at its proper
 publication boundary. Beta acceptance does not establish final stable readiness.
 
 - ▧ **Remove Pico prerelease setup guidance before stable publication.** Owner:
-  documentation/release maintainer. Complete the
+  documentation/release maintainer. Follow the
   [Pico documentation cleanup gate](https://github.com/WsprryPi/WsprryPi-Docs/blob/devel/TODO.md#high-priority)
-  before publishing the final stable release and its manual. Review
+  for the stable release's documentation candidate. Review
   `docs/Install/pico.md`, the active Pico connection and USB-update sections in
   `docs/User_Interface/Setup/Transmitter/index.md`, and directly linked current
-  setup references in WsprryPi-Docs. Remove beta/RC version-pairing guidance,
-  raw candidate hashes, and prerelease-only image-selection workarounds from
-  those active instructions. Replace them with the verified supported stable
-  firmware selection and actual stable installation links. Close this gate only
-  after checking the stable image/channel and installation destinations and
-  reviewing the stable-rendered pages and links for stale prerelease setup
-  guidance. Preserve historical release/install records, exact artifact
+  setup references in WsprryPi-Docs.
+
+  - **Before publication:** remove beta/RC version-pairing guidance, raw
+    candidate hashes, and prerelease-only image-selection workarounds from
+    the active stable instructions. Use the verified supported stable Pico
+    image/channel and the intended stable Pi installation links; do not label
+    an unavailable or incompatible image as stable. Build the exact manual
+    candidate with its intended stable-version metadata and review the rendered
+    pages, navigation, and link targets. Complete this review before publishing
+    either the final stable Pi release or its manual. Validate unpublished
+    release destinations against the intended artifacts and publication plan;
+    a not-yet-public destination is not a completed public-link check.
+  - **Publication closeout:** verify the served stable manual contains the
+    reviewed changes and its installation, firmware, and section links resolve.
+    Close this item and the linked documentation TODO only after that check.
+    Record the documentation revision, selected stable Pi/Pico artifact
+    identities, validation commands/results, served URLs, and reviewer sign-off
+    in the existing release evidence. Changed candidate inputs require renewed
+    affected review before publication; a served mismatch leaves closeout open.
+
+  Preserve historical versioned manuals, release/install records, exact artifact
   provenance, compatibility safeguards, and required recovery procedures.
+  This gate does not authorize publication or change runtime compatibility policy.
 
 ## RP1 dependency order
 
