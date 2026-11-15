@@ -11,6 +11,16 @@ the issue nor this plan authorizes beginning implementation.
 See the [brief phase list and individual execution prompts](issue-473-phases.md).
 The prompts expand each slice; this plan remains authoritative.
 
+Phase-1 decisions D01–D12 were approved on 2026-11-15. The
+[decision register](issue-473/phase-1-decisions.md),
+[automatic pairing workflow](issue-473/phase-1-pairing.md), and
+[normative contract details](issue-473/phase-1-contract-details.md) specify their
+approved design. D02 requires device-managed UI pairing with automatic keys and
+ownership replacement; no manual certificates. D07 automates known-authority
+retirement/reconciliation, leaves offline/unknown migrations pending, and preserves
+existing WTP claims when local Transmit is off. Management replacement and RF
+ownership remain independent. These decisions authorize no phase-2 implementation.
+
 ## Objective and authority
 
 Provide shared Setup controls for local Pis, remote Pis, and Picos. Each target
@@ -276,10 +286,10 @@ the repository's separate scope approval and standalone tests.
 - Require explicit review to migrate an assignment: inhibit new controller
   dispatch, reconcile pending/accepted jobs and ownership, confirm retirement,
   then save the target schedule disabled and verify it before explicit enable.
-- Use a cross-authority generation/fencing design that prevents an old controller
-  from restarting dispatch after migration. An offline previous controller or
-  unknown outstanding work blocks enablement until its authority is positively
-  retired; merely hiding the old assignment is insufficient. A clean target's
+- Use the approved D07 generation/retirement design to prevent automatic restart
+  of a retired saved assignment after migration, without changing WTP admission.
+  An offline previous controller or unknown outstanding work blocks enablement
+  until its authority is positively retired; merely hiding the old assignment is insufficient. A clean target's
   authoritative ownership record must establish that no legacy retirement is
   required; an empty catalog in the current browser is not proof.
 - Partial failure leaves the new schedule disabled with a recoverable record.
@@ -418,6 +428,6 @@ Plan review passes completed:
 3. Added preservation of unsupported saved values without allowing their use,
    and transactional enable/save semantics that cannot launch stale saved entries.
 
-The final reassessment found no remaining actionable plan defect. Slice 1 design
-decisions remain explicit implementation gates; this disposition is not a claim
-that their designs, implementation, security, or runtime behavior are qualified.
+The phase-1 decision register records the approved design and its final design
+assessment. Later phases must revalidate those contracts against their candidate
+sources. Design approval is not implementation, security, or runtime qualification.

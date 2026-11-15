@@ -2,17 +2,19 @@
 
 Status: ▧ not started · ⏳ in progress · ✅ complete.
 
-These indicators track implementation, not prompt preparation. All eight prompts
-have been prepared and reviewed. At preparation (2026-11-15), no implementation
+These indicators track phase execution, not prompt preparation. Phase 1 is
+design-only; its completion does not claim application implementation. All eight
+prompts have been prepared and reviewed. At preparation (2026-11-15), no implementation
 phase had started.
 
 Follow the [authoritative plan](device-owned-solar-scheduling-plan.md) for
 [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473). Each prompt requires
 separate authorization to execute and successful prerequisite gates.
 
-1. ▧ **Define contracts and decisions:** Resolve security, capabilities,
+1. ✅ **Define contracts and decisions:** Resolve security, capabilities,
    migration, ownership, persistence, and time/location requirements.
-   [Phase 1 prompt](issue-473/01-contracts-and-decisions.md)
+   [Phase 1 prompt](issue-473/01-contracts-and-decisions.md) ·
+   [Approved decisions and phase-1 acceptance](issue-473/phase-1-decisions.md)
 2. ▧ **Separate target management:** Manage local Pis, remote Pis, and Picos
    independently of the controller's transmitter backend.
    [Phase 2 prompt](issue-473/02-target-management.md)
