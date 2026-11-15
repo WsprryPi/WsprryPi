@@ -866,18 +866,6 @@ legend {
     white-space: pre-line;
 }
 
-#configSaveStatusDetail[role="button"] {
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 0.14em;
-}
-
-#configSaveStatusDetail[role="button"]:focus-visible {
-    outline: none;
-    border-radius: 0.2rem;
-    box-shadow: var(--focus-ring);
-}
-
 @media (max-width: 767.98px) {
     .page-shell {
         padding-block: var(--page-space-lg);

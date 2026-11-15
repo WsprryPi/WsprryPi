@@ -265,12 +265,6 @@
     display: none;
 }
 
-#configSaveStatusDetail[role="button"] {
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 0.16em;
-}
-
 .config-header-actions {
     display: flex;
     flex-wrap: wrap;

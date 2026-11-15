@@ -497,7 +497,7 @@
             const fleet = byId("fleet-tab")?.classList.contains("active");
             if (title) title.textContent = fleet ? "Fleet" : "Signal setup";
             if (saveHint) saveHint.textContent = fleet
-                ? "Device profiles, output schedules, and Pico settings use their own save buttons. This Pi's Use Pico and connection fields save automatically."
+                ? "Fleet changes use Save buttons. This Pi's Use Pico and connection settings autosave."
                 : originalHint;
         };
         byId("configTabs")?.addEventListener("shown.bs.tab", updateHeader);

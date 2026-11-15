@@ -564,6 +564,9 @@ function bindIndexActions() {
     $('input[name="cw_speed"]').on("change", handleCwSpeedChange);
     $('input[name="cw_spacing"]').on("change", handleCwSpacingChange);
     $(".cw-repair-close").on("click", handleCwRepairClose);
+    $(".cw-repair-open").on("click", function () {
+        revealCwTimingRepair(this.dataset.group);
+    });
 
     // Bind the GPIO system-clock frequency-estimate switch.
     $("#use_system_clock_frequency_estimate").on("change", clickUseSystemClockFrequencyEstimate);
@@ -626,8 +629,6 @@ function bindIndexActions() {
     });
     $("#si5351-power-range").on("input", updateSi5351PowerLabel);
     $("#si5351_reference_source").on("change", syncSi5351ReferenceControls);
-    $("#configSaveStatusDetail").on("click", navigateToFirstInvalidConfigControl);
-    $("#configSaveStatusDetail").on("keydown", handleConfigSaveStatusDetailKeydown);
 
     // Bind clicks on buttons/switches for resetting tooltips
     $(document).on(
@@ -1133,13 +1134,6 @@ function invalidCwTimingGroups(state = readCwTimingStateFromDom()) {
     };
 }
 
-function inactiveInvalidCwTimingGroup() {
-    const active = CwTimingState.activeGroup(selectedConfigMode());
-    const invalid = invalidCwTimingGroups();
-    const inactive = active === "dfcw" ? "conventional" : "dfcw";
-    return invalid[inactive] ? inactive : null;
-}
-
 function formatCwGapDuration(value) {
     if (!Number.isFinite(value)) return "Invalid duration";
     return `${Number(value.toFixed(6))} seconds`;
@@ -1171,6 +1165,13 @@ function syncCwTimingControls(options = {}) {
         const repairHeader = section ? section.querySelector(".cw-repair-header") : null;
         if (section) section.hidden = !isActive && !isRepair;
         if (repairHeader) repairHeader.hidden = !isRepair;
+        const repairAction = document.getElementById(`cw-repair-${group}`);
+        if (repairAction) {
+            repairAction.hidden = isActive || (!invalid[group] && !isRepair);
+            repairAction.setAttribute("aria-expanded", String(isRepair));
+            const label = group === "dfcw" ? "DFCW" : "QRSS/FSKCW";
+            repairAction.textContent = `Review ${invalid[group] ? "invalid " : ""}preserved ${label} spacing`;
+        }
         cwTimingFieldIds(group).forEach((id) => {
             const editable = isRepair || (isActive && spacing === "Advanced");
             $(`#${id}`).prop("disabled", !editable);
@@ -1221,8 +1222,6 @@ function handleCwSpacingChange(event) {
 function revealCwTimingRepair(group) {
     cwRepairRevealed[group] = true;
     syncCwTimingControls();
-    const action = document.querySelector("#configSaveStatusDetail button[aria-controls]");
-    if (action) action.setAttribute("aria-expanded", "true");
     const firstInvalid = cwTimingFieldIds(group)
         .map((id) => document.getElementById(id))
         .find((field) => field && CwTimingState.positiveFinite(field.value) === null);
@@ -1235,11 +1234,7 @@ function handleCwRepairClose(event) {
     if (invalid[group]) return;
     cwRepairRevealed[group] = false;
     syncCwTimingControls();
-    const action = document.querySelector("#configSaveStatusDetail button");
-    if (action) {
-        action.setAttribute("aria-expanded", "false");
-        action.focus();
-    }
+    document.querySelector('input[name="cw_spacing"]:checked')?.focus();
 }
 
 function synchronizeCwTimingAfterPopulation() {
@@ -1342,10 +1337,6 @@ function updateCwMessageLengthEstimate() {
         const plan = picoCwMessagePlan(String($("#qrss_message").val() || ""),mode,currentCwMessageTiming(mode));
         display.textContent = plan.ok ? `Calculated Message Length: ${formatPicoDuration(plan.duration)} · ${count} / 32 characters · ${plan.events} / ${WtpUi.maximumJobEvents || 512} events · finite-job limit ${formatPicoDuration(picoDurationLimitNs())}` : `Calculated Message Length: ${plan.reason}`;
     }
-    const messageHint = document.getElementById("qrss-message-hint");
-    if (messageHint) messageHint.textContent = typeof WtpUi !== "undefined" && WtpUi.selected()
-        ? "Pico: up to 32 characters including spaces. Duration and event limits also apply; the message is never split or truncated."
-        : "Enter the exact CW message to send. This field cannot be empty.";
     updateCwDurationPolicyLatch();
 
     return estimate;
@@ -1458,21 +1449,28 @@ function updateCwDurationPolicyLatch(options = {}) {
     const shouldLatch = constraint.applicable && constraint.overLimit;
     const wasLatched = cwDurationPolicyLatched;
     cwDurationPolicyLatched = shouldLatch;
+    const messageHint = document.getElementById("qrss-message-hint");
+    if (messageHint) {
+        const help = typeof WtpUi !== "undefined" && WtpUi.selected()
+            ? "Pico: up to 32 characters including spaces. Duration and event limits also apply; the message is never split or truncated."
+            : "Enter the exact CW message to send. This field cannot be empty.";
+        const text = shouldLatch ? `${help} ${cwDurationPolicyDetail(constraint)}` : help;
+        if (messageHint.textContent !== text) messageHint.textContent = text;
+    }
 
     if (cwDurationPolicyLatched) {
         if (configAutosaveTimer) {
             clearTimeout(configAutosaveTimer);
             configAutosaveTimer = null;
         }
-        setConfigSaveStatus(
+        setConfigValidationStatus(
             "error",
-            "Save failed",
-            cwDurationPolicyDetail(constraint)
+            "Save failed"
         );
     } else if (wasLatched) {
         lastFailedConfigPayload = "";
         lastFailedConfigMessage = "";
-        setConfigSaveStatus("saving", "Saving...", "");
+        setConfigValidationStatus("saving", "Saving...");
     }
 
     if (options.markDirty && cwDurationPolicyLatched) {
@@ -3677,163 +3675,6 @@ function openSetupDetailsDialog(detail) {
     });
 }
 
-function describeControlLabel(control) {
-    if (!control) {
-        return "the highlighted field";
-    }
-
-    const controlId = typeof control.id === "string" ? control.id.trim() : "";
-    if (controlId) {
-        const selectorId =
-            typeof CSS !== "undefined" && typeof CSS.escape === "function"
-                ? CSS.escape(controlId)
-                : controlId;
-        const label = document.querySelector(`label[for="${selectorId}"]`);
-        if (label) {
-            const text = label.textContent.replace(/\s+/g, " ").trim().replace(/:\s*$/, "");
-            if (text) {
-                return text;
-            }
-        }
-    }
-
-    const ariaLabel = String(control.getAttribute("aria-label") || "").trim();
-    if (ariaLabel) {
-        return ariaLabel.replace(/:\s*$/, "");
-    }
-
-    return "the highlighted field";
-}
-
-function describeControlSection(control) {
-    if (!control || typeof control.closest !== "function") {
-        return "";
-    }
-
-    const fieldset = control.closest("fieldset");
-    if (!fieldset) {
-        return "";
-    }
-
-    const legend = fieldset.querySelector("legend");
-    if (!legend) {
-        return "";
-    }
-
-    return legend.textContent.replace(/\s+/g, " ").trim();
-}
-
-function describeControlTab(control) {
-    if (!control || typeof control.closest !== "function") {
-        return "";
-    }
-
-    const tabPane = control.closest('[role="tabpanel"]');
-    if (!tabPane) {
-        return "";
-    }
-
-    const labelledBy = String(tabPane.getAttribute("aria-labelledby") || "").trim();
-    if (!labelledBy) {
-        return "";
-    }
-
-    const tabButton = document.getElementById(labelledBy);
-    if (!tabButton) {
-        return "";
-    }
-
-    return tabButton.textContent.replace(/\s+/g, " ").trim();
-}
-
-function firstInvalidConfigControl() {
-    const candidates = document.querySelectorAll(
-        '#wsprform input, #wsprform select, #wsprform textarea, #wsprform button.pin-dropdown-btn'
-    );
-
-    let firstHiddenInvalid = null;
-
-    for (const control of candidates) {
-        if (control.disabled) {
-            continue;
-        }
-
-        const ariaInvalid = control.getAttribute("aria-invalid") === "true";
-        const nativeInvalid =
-            typeof control.checkValidity === "function" && !control.checkValidity();
-
-        if (ariaInvalid || nativeInvalid) {
-            const isVisible =
-                control.offsetParent !== null || control.getClientRects().length > 0;
-            if (isVisible) {
-                return control;
-            }
-
-            if (!firstHiddenInvalid) {
-                firstHiddenInvalid = control;
-            }
-        }
-    }
-
-    return firstHiddenInvalid;
-}
-
-function invalidAutosaveDetailMessage() {
-    const invalidControl = firstInvalidConfigControl();
-    if (!invalidControl) {
-        return "Fix the highlighted fields before autosave can continue.";
-    }
-
-    const label = describeControlLabel(invalidControl);
-    const section = describeControlSection(invalidControl);
-    const tab = describeControlTab(invalidControl);
-    const validationMessage =
-        String(
-            invalidControl.dataset.validationMessage ||
-            (typeof invalidControl.validationMessage === "string"
-                ? invalidControl.validationMessage
-                : "")
-        ).trim();
-    let location = label;
-    if (section) {
-        location += ` in ${section}`;
-    }
-    if (tab) {
-        location += ` on ${tab}`;
-    }
-
-    if (validationMessage) {
-        return `Fix ${location}: ${validationMessage}`;
-    }
-
-    return `Fix ${location} before autosave can continue.`;
-}
-
-function revealControlTab(control) {
-    if (!control || typeof control.closest !== "function") {
-        return null;
-    }
-
-    const tabPane = control.closest('[role="tabpanel"]');
-    if (!tabPane) {
-        return null;
-    }
-
-    const tabList = document.getElementById("configTabs");
-    const paneSelector = tabPane.id ? `#${tabPane.id}` : "";
-    if (!tabList || !paneSelector || typeof bootstrap === "undefined" || !bootstrap.Tab) {
-        return null;
-    }
-
-    const trigger = findTabTriggerBySelector(tabList, paneSelector);
-    if (!trigger) {
-        return null;
-    }
-
-    bootstrap.Tab.getOrCreateInstance(trigger).show();
-    return trigger;
-}
-
 function focusInvalidConfigControl(control) {
     if (!control) {
         return;
@@ -3847,41 +3688,6 @@ function focusInvalidConfigControl(control) {
             control.scrollIntoView({ block: "center", behavior: "smooth" });
         }
     });
-}
-
-function navigateToFirstInvalidConfigControl() {
-    const invalidControl = firstInvalidConfigControl();
-    if (!invalidControl) {
-        return;
-    }
-
-    const targetPane = invalidControl.closest('[role="tabpanel"]');
-    const paneNeedsReveal =
-        !!targetPane &&
-        (!targetPane.classList.contains("active") || !targetPane.classList.contains("show"));
-    const trigger = revealControlTab(invalidControl);
-
-    if (paneNeedsReveal && trigger) {
-        $(trigger).one("shown.bs.tab", () => {
-            focusInvalidConfigControl(invalidControl);
-        });
-        return;
-    }
-
-    focusInvalidConfigControl(invalidControl);
-}
-
-function handleConfigSaveStatusDetailKeydown(event) {
-    if (!event) {
-        return;
-    }
-
-    if (event.key !== "Enter" && event.key !== " ") {
-        return;
-    }
-
-    event.preventDefault();
-    navigateToFirstInvalidConfigControl();
 }
 
 function validatePage(options = {}) {
@@ -4861,15 +4667,6 @@ function setConfigSaveStatus(state, message = "", detail = "", options = {}) {
             detailNode.appendChild(actionButton);
         } else {
             detailNode.textContent = detail;
-            const isActionable = state === "invalid" && !!detail && !!firstInvalidConfigControl();
-            detailNode.tabIndex = isActionable ? 0 : -1;
-            if (isActionable) {
-                detailNode.setAttribute("role", "button");
-                detailNode.setAttribute(
-                    "aria-label",
-                    `${detail} Activate to jump to the invalid field.`
-                );
-            }
         }
     }
 
@@ -4904,15 +4701,17 @@ function stationIdentityIsInvalid() {
 }
 
 function setInvalidIdentitySaveStatus(message) {
-    setConfigSaveStatus(
-        "warning",
-        message,
-        "The station identity remains local and is not valid for transmission. Fix Call Sign and Grid locator before transmitting.",
-        {
-            detailActionLabel: "Review station identity",
-            onDetailAction: navigateToFirstInvalidConfigControl,
-        }
-    );
+    setConfigValidationStatus("warning", message);
+}
+
+function setConfigValidationStatus(state, message) {
+    const status = document.getElementById("configSaveStatus");
+    const detail = document.getElementById("configSaveStatusDetail");
+    // Local validation must not dismiss a request failure that still needs recovery.
+    if (detail && !detail.hidden && ["error", "load-error"].includes(status?.dataset.state)) {
+        return;
+    }
+    setConfigSaveStatus(state, message);
 }
 
 function suspendConfigAutosave(suspended) {
@@ -5051,28 +4850,7 @@ function flushAutosave() {
     }
 
     if (!validatePage({ allowInvalidStationIdentity: true })) {
-        const inactiveGroup = inactiveInvalidCwTimingGroup();
-        if (inactiveGroup) {
-            const label = inactiveGroup === "dfcw" ? "DFCW spacing" : "QRSS/FSKCW spacing";
-            setConfigSaveStatus(
-                "invalid",
-                "Invalid - not saved",
-                `${label} contains an invalid preserved value.`,
-                {
-                    detailActionLabel: `Review ${label}`,
-                    detailActionControls: inactiveGroup === "dfcw"
-                        ? "cw_dfcw_gap_section"
-                        : "cw_conventional_gap_section",
-                    onDetailAction: () => revealCwTimingRepair(inactiveGroup),
-                }
-            );
-            return;
-        }
-        setConfigSaveStatus(
-            "invalid",
-            "Invalid - not saved",
-            invalidAutosaveDetailMessage()
-        );
+        setConfigValidationStatus("invalid", "Invalid - not saved");
         return;
     }
 
@@ -5086,7 +4864,9 @@ function flushAutosave() {
         lastFailedConfigPayload = "";
         lastFailedConfigMessage = "";
         if (invalidStationIdentity) {
-            setInvalidIdentitySaveStatus("Identity change not saved");
+            // The persisted payload is already confirmed; any earlier rejected
+            // unrelated draft has been reverted. Only the identity draft remains.
+            setConfigSaveStatus("warning", "Identity change not saved");
         } else {
             setConfigSaveStatus("saved", "Saved", "");
         }

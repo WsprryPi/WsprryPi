@@ -359,6 +359,10 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                         </div>
 
                                         <div id="cw_dot_duration_control"></div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button id="cw-repair-conventional" type="button" class="btn btn-link btn-sm p-0 cw-repair-open" data-group="conventional" aria-controls="cw_conventional_gap_section" aria-expanded="false" hidden>Review invalid preserved QRSS/FSKCW spacing</button>
+                                            <button id="cw-repair-dfcw" type="button" class="btn btn-link btn-sm p-0 cw-repair-open" data-group="dfcw" aria-controls="cw_dfcw_gap_section" aria-expanded="false" hidden>Review invalid preserved DFCW spacing</button>
+                                        </div>
                                         <div id="cw_conventional_gap_section" class="cw-gap-section" aria-labelledby="cw-conventional-gap-title">
                                             <div class="cw-repair-header" hidden>
                                                 <div>

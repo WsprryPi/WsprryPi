@@ -152,6 +152,7 @@ async function browserTest() {
     // Keep this focused on the real CW controls and their validation. Other
     // Setup panels are orthogonal and may be empty when the PHP fixture runs
     // without a controller backend.
+    const productionValidatePage = validatePage;
     validatePage = () => {
         const mode = selectedConfigMode();
         let valid = validateCwMessage() &&
@@ -210,7 +211,9 @@ async function browserTest() {
         ok(field("qrss_message").classList.contains("is-invalid"), "Message must have is-invalid");
         equal(field("qrss_message").getAttribute("aria-invalid"), "true", "Message aria-invalid");
         equal(field("configSaveStatus").textContent, "Save failed", "inline short status");
-        includes(field("configSaveStatusDetail").textContent, "calculated", "inline detail must explain duration");
+        ok(field("configSaveStatusDetail").hidden, "duration must not open the top validation box");
+        includes(field("qrss-message-hint").textContent, "calculated", "local Message hint must explain duration");
+        includes(field("qrss-message-hint").textContent, "repeat interval", "local hint must name repeat interval");
     };
 
     // Pico limits are independent of the repeat interval and preserve the draft.
@@ -326,6 +329,7 @@ async function browserTest() {
     equal(field("qrss_message").validationMessage, "CW message is required.", "empty validation must survive");
     ok(field("qrss_message").classList.contains("is-invalid"), "empty Message remains invalid");
     equal(patches.length, 0, "empty Message must not PATCH");
+    ok(field("configSaveStatusDetail").hidden, "ordinary validation must not open the top box");
 
     reset();
     field("dot_length").value = "61";
@@ -520,13 +524,36 @@ async function browserTest() {
     // setting is persisted with explicit partial-save feedback.
     reset();
     const focusedValidatePage = validatePage;
-    validatePage = (options = {}) => options.allowInvalidStationIdentity === true;
+    validatePage = (options = {}) => {
+        let valid = true;
+        for (const id of ["callsign", "gridsquare"]) {
+            setIdentityValidity(field(id));
+            const fieldValid = field(id).checkValidity();
+            setFieldValidationState(field(id), fieldValid);
+            valid = valid && fieldValid;
+        }
+        return options.allowInvalidStationIdentity === true || valid;
+    };
     field("wspr_mode").checked = true;
     field("qrss_mode").checked = false;
     field("callsign").value = "NXXX";
     field("gridsquare").value = "ZZ99";
-    persistedStationIdentity = { callsign: "NXXX", gridsquare: "ZZ99" };
-    lastSavedConfigPayload = JSON.stringify(buildConfigPayload());
+    syncConfigModeSections();
+    syncConfigAutosaveBaseline();
+    ok(field("configSaveStatusDetail").hidden, "initial placeholder identity must not open a box");
+    const paneTop = field("radio-pane").getBoundingClientRect().top;
+    setValue("callsign", ""); clock.tick(1000);
+    for (const grid of ["", "E", "EM", "EM1"]) {
+        setValue("gridsquare", grid); clock.tick(1000);
+        ok(field("configSaveStatusDetail").hidden, "incomplete identity must stay quiet after debounce");
+        ok(Math.abs(field("radio-pane").getBoundingClientRect().top - paneTop) <= 0.5,
+            "routine identity edits must not move the pane");
+    }
+    equal(patches.length, 0, "invalid identity edits alone must not PATCH");
+    setConfigSaveStatus("error", "Save failed", "An earlier unrelated draft was rejected.");
+    setValue("gridsquare", "EM1"); clock.tick(1000);
+    equal(field("configSaveStatus").textContent, "Identity change not saved", "a confirmed saved payload retires an obsolete rejection");
+    ok(field("configSaveStatusDetail").hidden, "an obsolete rejection must not linger over the remaining identity draft");
     setValue("callsign", "BAD CALL");
     field("use_led").checked = !field("use_led").checked;
     field("use_led").dispatchEvent(new Event("change", { bubbles: true }));
@@ -541,12 +568,13 @@ async function browserTest() {
         "PATCH must include the unrelated LED change"
     );
     equal(field("configSaveStatus").textContent, "Other changes saved", "partial-save status");
-    includes(
-        field("configSaveStatusDetail").textContent,
-        "not valid for transmission",
-        "partial-save detail must preserve the transmission safety boundary"
-    );
+    ok(field("configSaveStatusDetail").hidden, "partial-save identity warning must not open the validation box");
     ok(hasUnsavedLocalConfigChanges(), "invalid identity draft must remain visibly unsaved");
+    setValue("callsign", "AA0NT"); setValue("gridsquare", "EM18"); clock.tick(1000);
+    equal(patches.length, 2, "corrected identity must save once");
+    equal(JSON.parse(patches[1].options.data).WSPR["Call Sign"], "AA0NT", "corrected callsign is saved");
+    equal(JSON.parse(patches[1].options.data).WSPR["Grid Square"], "EM18", "corrected locator is saved");
+    ok(field("configSaveStatusDetail").hidden, "corrected identity must not open a box");
     validatePage = focusedValidatePage;
 
     // 15: a transient controller failure pauses autosave without an 800 ms
@@ -573,6 +601,15 @@ async function browserTest() {
     clock.tick(8000);
     equal(patches.length, 1, "paused autosave must not poll with PATCH requests");
     equal(statusTransitions.length, pausedTransitionCount, "paused autosave must not repeat live status announcements");
+
+    setValue("dot_length", "61"); clock.tick(1000);
+    equal(field("configSaveStatus").textContent, "Save paused", "local duration error must preserve connection failure status");
+    ok(!field("configSaveStatusDetail").hidden, "local duration error must preserve connection failure details");
+    includes(field("qrss-message-hint").textContent, "repeat interval", "duration still has local guidance while disconnected");
+    setValue("dot_length", "1"); clock.tick(1000);
+    equal(field("configSaveStatus").textContent, "Save paused", "duration correction must not claim a disconnected save is running");
+    setInvalidIdentitySaveStatus("Identity change not saved");
+    equal(field("configSaveStatus").textContent, "Save paused", "identity validation must preserve request failure details");
 
     setValue("qrss_message", "EE");
     clock.tick(8000);
@@ -601,19 +638,97 @@ async function browserTest() {
     clock.tick(800);
     equal(patches.length, 1, "the next edit after already-applied recovery must save normally");
 
+    // Preserved inactive spacing is repaired locally without switching modes.
+    for (const [mode, group, fieldId] of [["QRSS", "dfcw", "dfcw_inter_word_gap"], ["DFCW", "conventional", "cw_inter_word_gap"]]) {
+        reset(mode);
+        syncConfigModeSections();
+        cwRepairRevealed.conventional = cwRepairRevealed.dfcw = false;
+        field(fieldId).value = "0";
+        syncCwTimingControls();
+        const action = field(`cw-repair-${group}`);
+        ok(!action.hidden, "inactive invalid spacing must expose a local repair action");
+        ok(field(action.getAttribute("aria-controls")).hidden, "inactive spacing starts collapsed");
+        action.click();
+        await new Promise(requestAnimationFrame);
+        equal(action.getAttribute("aria-expanded"), "true", "repair disclosure must expand");
+        ok(!field(fieldId).disabled, "repair field must be editable");
+        equal(document.activeElement.id, fieldId, "repair must focus the invalid field");
+        equal(selectedConfigMode(), mode, "repair must not change mode");
+        field(fieldId).value = "3";
+        syncCwTimingControls();
+        ok(!action.textContent.includes("invalid"), "repaired spacing must not still be labeled invalid");
+        document.querySelector(`.cw-repair-close[data-group="${group}"]`).click();
+        ok(field(action.getAttribute("aria-controls")).hidden, "repaired inactive group must close");
+        equal(document.activeElement.name, "cw_spacing", "close returns focus to spacing controls");
+        equal(field(fieldId).value, "3", "repair retains the entered value");
+        ok(field("configSaveStatusDetail").hidden, "repair must not open the top box");
+    }
+
+    // WSPR frequency validation keeps its existing save gate and field state.
+    reset();
+    validatePage = validateFrequencies;
+    setValue("frequencies", "not-a-frequency"); clock.tick(800);
+    equal(patches.length, 0, "invalid frequency must not PATCH");
+    ok(field("frequencies").classList.contains("is-invalid"), "invalid frequency stays marked");
+    ok(field("configSaveStatusDetail").hidden, "invalid frequency must not open the top box");
+    setValue("frequencies", "14097100"); clock.tick(800);
+    equal(patches.length, 1, "corrected frequency must save");
+    validatePage = focusedValidatePage;
+
+    reset();
+    const platform = window.WSPRRYPI_PLATFORM;
+    window.WSPRRYPI_PLATFORM = {...platform, rp1GpioOperatorVisible:true};
+    populateRp1GpioDrive(99);
+    validatePage = validateRp1GpioDrive;
+    scheduleAutosave(); clock.tick(800);
+    equal(patches.length, 0, "unsupported drive value must not PATCH");
+    ok(field("rp1_gpio_drive_ma").classList.contains("is-invalid"), "drive value stays marked");
+    ok(!field("rp1-gpio-drive-error").hidden, "drive error remains beside its control");
+    ok(field("configSaveStatusDetail").hidden, "hardware validation must not open the top box");
+    populateRp1GpioDrive(2); scheduleAutosave(); clock.tick(800);
+    equal(patches.length, 1, "corrected drive value must save");
+    window.WSPRRYPI_PLATFORM = platform;
+    validatePage = focusedValidatePage;
+
     // Paired-plan refusal must offer the original multiline diagnostics without losing the draft.
     reset(); syncConfigAutosaveBaseline(); patchMode = "pending";
     setValue("qrss_message", "T"); clock.tick(800);
     pendingPatch.reject({status: 400, responseJSON: {plan_status: "PairedTransmissionUnavailable", message: "first reason\nsecond reason"}}, "error");
     includes(field("configSaveStatus").textContent, "Paired planning requires", "paired refusal stays concise");
     const more = field("configSaveStatusDetail").querySelector("button");
-    equal(more.textContent, "More", "paired refusal exposes details"); more.click();
+    equal(more.textContent, "More", "paired refusal exposes details");
+    const selectedTab = document.querySelector('#configTabs .active').id;
+    more.click();
+    equal(document.querySelector('#configTabs .active').id, selectedTab, "More must not navigate to an unrelated invalid field");
     equal(dialogs.at(-1).preserveLineBreaks, true, "paired refusal requests multiline rendering");
     includes(dialogs.at(-1).message, "first reason\nsecond reason", "original backend diagnostic survives");
     equal(field("qrss_message").value, "T", "paired refusal preserves the draft");
 
+    // Real full-page validation must not change externally disabled timing controls
+    // or rewrite an unchanged timing live region on every unrelated edit.
+    reset(); syncConfigModeSections();
+    cwSpeedSelectionOverride = "Advanced"; syncCwTimingControls();
+    field("dot_length").disabled = true;
+    const changes = new MutationObserver(() => {});
+    changes.observe(field("cw-mode-timing-explanation"), {childList:true});
+    productionValidatePage();
+    equal(field("dot_length").disabled, true, "validation must preserve externally disabled timing controls");
+    equal(changes.takeRecords().length, 0, "unrelated validation must not rewrite timing live announcements");
+    changes.disconnect();
+
+    // A restored draft or load error keeps its explanation while local values
+    // remain invalid; correcting and actually saving can replace it normally.
+    for (const [state, label] of [["error", "Local draft restored"], ["load-error", "Load failed"]]) {
+        reset();
+        setConfigSaveStatus(state, label, "Review the retained local draft.");
+        setValue("qrss_message", ""); clock.tick(1000);
+        equal(field("configSaveStatus").textContent, label, "local invalidity must retain the recovery status");
+        equal(field("configSaveStatusDetail").textContent, "Review the retained local draft.", "local invalidity must retain recovery details");
+        equal(patches.length, 0, "invalid retained draft must not save");
+    }
+
     return {
-        scenarios: 17,
+        scenarios: 24,
         assertions: "passed",
         finalPatchCount: patches.length,
         finalDialogCount: dialogs.length,
@@ -665,10 +780,10 @@ async function main() {
             throw new Error(detail || result.exceptionDetails.text || "Browser test failed");
         }
         assert.deepEqual(result.result.value, {
-            scenarios: 17,
+            scenarios: 24,
             assertions: "passed",
-            finalPatchCount: 1,
-            finalDialogCount: 1,
+            finalPatchCount: 0,
+            finalDialogCount: 0,
         });
 
         for (const viewport of [
@@ -688,10 +803,7 @@ async function main() {
                         ["saved", "Saved", "", {}],
                         ["saving", "Saving...", "", {}],
                         ["error", "Save paused", "The controller could not be reached for this save. Changes stay local until retry.", {}],
-                        ["warning", "Identity change not saved", "The station identity remains local and is not valid for transmission. Fix Call Sign and Grid locator before transmitting.", {
-                            detailActionLabel: "Review station identity",
-                            onDetailAction: () => {},
-                        }],
+                        ["warning", "Identity change not saved", "", {}],
                     ];
                     return states.map(([state, message, detail, options]) => {
                         setConfigSaveStatus(state, message, detail, options);
@@ -728,7 +840,7 @@ async function main() {
                 `${viewport.name} Setup tabs must not move across save states: ${JSON.stringify(metrics)}`
             );
             metrics.forEach((metric) => {
-                const hasDetail = metric.state === "error" || metric.state === "warning";
+                const hasDetail = metric.state === "error";
                 assert.equal(metric.detailInTabContent, true, `${viewport.name} detail belongs above the active pane`);
                 assert.equal(metric.detailHidden, !hasDetail, `${viewport.name} only detailed feedback takes space`);
                 assert.equal(metric.horizontalOverflow, false, `${viewport.name} Setup must fit the viewport`);
@@ -742,8 +854,8 @@ async function main() {
                     assert.equal(metric.detailHeight, 0, `${viewport.name} empty detail must use no height`);
                 }
             });
-            assert.equal(metrics.find(({ state }) => state === "warning").hasReviewAction, true,
-                `${viewport.name} recovery action must remain available`);
+            assert.equal(metrics.find(({ state }) => state === "warning").hasReviewAction, false,
+                `${viewport.name} identity must not have a redundant review action`);
             if (viewport.name === "desktop") {
                 assert.ok(metrics[0].headerActionsTop < metrics[0].hintBottom,
                     `desktop controls should share the header row: ${JSON.stringify(metrics[0])}`);
@@ -801,6 +913,49 @@ async function main() {
                 const bounds = await client.send("Runtime.evaluate",{expression:`(() => { const b=document.getElementById("qrss_message_set").getBoundingClientRect();return {x:Math.max(0,b.x),y:Math.max(0,b.y+scrollY),width:b.width,height:b.height,scale:1};})()`,returnByValue:true});
                 const detail = await client.send("Page.captureScreenshot",{format:"png",captureBeyondViewport:true,clip:bounds.result.value});
                 fs.writeFileSync(path.join(process.env.WSPRRYPI_UI_CAPTURE_DIR,viewport.name+"-pi-message-detail.png"),Buffer.from(detail.data,"base64"));
+            }
+        }
+        // Review the changed presentation in both themes at desktop and phone sizes.
+        if (process.env.WSPRRYPI_UI_CAPTURE_DIR) {
+            for (const width of [1280, 375]) for (const theme of ["light", "dark"]) {
+                await client.send("Emulation.setDeviceMetricsOverride", {width, height:900, deviceScaleFactor:1, mobile:width<768});
+                for (const state of ["identity", "duration", "spacing"]) {
+                    const prepared = await client.evaluate(`(() => {
+                        document.documentElement.setAttribute('data-bs-theme', ${JSON.stringify(theme)});
+                        configAutosaveSuspended = true;
+                        window.WtpUi = {...window.WtpUi, selected:()=>false};
+                        applyConfigModeSelection(${JSON.stringify(state === "identity" ? "WSPR" : "QRSS")});
+                        const field = id => document.getElementById(id);
+                        field('dot_length').value = ${state === "duration" ? "61" : "1"};
+                        field('tx_repeat_every').value = '1'; field('qrss_message').value = 'E';
+                        field('dfcw_inter_word_gap').value = ${JSON.stringify(state === "spacing" ? "0" : "3")};
+                        cwRepairRevealed.dfcw = false;
+                        syncCwTimingControls(); updateCwMessageLengthEstimate(); validateCwMessage();
+                        if (${JSON.stringify(state)} === 'identity') {
+                            field('callsign').value = ''; field('gridsquare').value = 'E';
+                            for (const id of ['callsign', 'gridsquare']) {
+                                setIdentityValidity(field(id)); setFieldValidationState(field(id), field(id).checkValidity());
+                            }
+                            setInvalidIdentitySaveStatus('Identity change not saved');
+                        } else if (${JSON.stringify(state)} === 'spacing') setConfigSaveStatus('invalid','Invalid - not saved');
+                        const target = ${JSON.stringify(state === "identity" ? "main-content" : state === "duration" ? "qrss_message_set" : "qrss_control")};
+                        field(target).scrollIntoView();
+                        return {hidden:field('configSaveStatusDetail').hidden, overflow:document.documentElement.scrollWidth>innerWidth};
+                    })()`);
+                    assert.equal(prepared.hidden, true, `${state}: routine box stays hidden`);
+                    assert.equal(prepared.overflow, false, `${state}: viewport fits`);
+                    await client.settleRendering();
+                    const clip = await client.evaluate(`(() => {
+                        const state = ${JSON.stringify(state)};
+                        const node = document.getElementById(state === 'duration' ? 'qrss_message_set' : state === 'spacing' ? 'cw-repair-dfcw' : 'main-content');
+                        const b = node.getBoundingClientRect();
+                        return state === 'identity' ? {x:0,y:0,width:innerWidth,height:900,scale:1}
+                            : state === 'duration' ? {x:b.x,y:b.y+scrollY,width:b.width,height:b.height,scale:1}
+                            : {x:0,y:Math.max(0,b.y+scrollY-100),width:innerWidth,height:600,scale:1};
+                    })()`);
+                    const shot = await client.send("Page.captureScreenshot", {format:"png", captureBeyondViewport:true, clip});
+                    fs.writeFileSync(path.join(process.env.WSPRRYPI_UI_CAPTURE_DIR, `${width}-${theme}-${state}.png`), Buffer.from(shot.data,"base64"));
+                }
             }
         }
         console.log("cw_duration_latch_integration_test passed");

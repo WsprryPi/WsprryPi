@@ -140,7 +140,9 @@ async function main() {
         await evaluate(`document.getElementById('fleet-refresh').click()`);
         await waitFor(async()=>await evaluate(`document.getElementById('fleet-device').options.length===2`),'catalog loaded');
         assert.equal(await evaluate(`document.getElementById('configPageTitle').textContent`),'Fleet');
-        assert.match(await evaluate(`document.getElementById('configSaveStatusHint').textContent`),/own save buttons/);
+        const fleetHint = await evaluate(`document.getElementById('configSaveStatusHint').textContent`);
+        assert.match(fleetHint,/Fleet changes use Save buttons\./);
+        assert.match(fleetHint,/This Pi's Use Pico and connection settings autosave\./);
         await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));`);
         assert.equal(await evaluate('configAutosaveDirty'),false,'Selecting a profile must not queue host autosave');
         await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value='Unsaved name';document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));`);
@@ -270,6 +272,18 @@ async function main() {
         async function capture(section, element) {
             for(const viewport of viewports){
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
+                await evaluate('document.fonts.ready');
+                if (viewport.name === 'desktop') {
+                    const hint = await evaluate(`(() => {
+                        const node=document.getElementById('configSaveStatusHint');
+                        if (!node || !document.getElementById('fleet-tab')?.classList.contains('active')) return null;
+                        return {height:node.getBoundingClientRect().height,lineHeight:parseFloat(getComputedStyle(node).lineHeight),whiteSpace:getComputedStyle(node).whiteSpace};
+                    })()`);
+                    if (hint) {
+                        assert.ok(hint.height <= hint.lineHeight + 0.5, 'Fleet guidance must fit one line at the desktop fixture width');
+                        assert.equal(hint.whiteSpace, 'normal', 'Fleet guidance must retain natural wrapping');
+                    }
+                }
                 // Full-page CDP screenshots otherwise paint fixed chrome in
                 // the middle of the document. Anchor that chrome to document
                 // edges only for capture; no product styles are changed.
