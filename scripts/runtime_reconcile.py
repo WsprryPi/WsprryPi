@@ -61,6 +61,12 @@ class Linux:
     def __init__(self):
         self.runner = installer.Runner(False)
 
+    def inspect_service_command(self):
+        companion.inspect_service_command()
+
+    def backend(self):
+        return companion.configured_backend(companion.trusted(companion.CONFIG)[0])
+
     def bootstrap_capable(self):
         companion.inspect_service()
         require(b'WSPRRYPI_RP1_REBOOT_IDLE' in companion.trusted(companion.BINARY)[0],
@@ -201,6 +207,8 @@ def restore_installation(system):
     This is an installer action, never a general startup default. The public
     provider owns the overlay, module and idle application transaction.
     """
+    if system.backend() != 'rp1-gpclk':
+        return 'configured backend does not require an RP1 route'
     with system.lock(wait=True):
         config = system.configuration()
         if config['backend'] != 'rp1-gpclk':
@@ -280,7 +288,13 @@ def journal_of(value):
 
 def prepare(system):
     """Keep the application available and idle while provider state is unavailable."""
+    system.inspect_service_command()
+    if system.backend() != 'rp1-gpclk':
+        system.environment(False)
+        return
     system.bootstrap_capable()
+    # Configuration errors must not be mistaken for unavailable provider state.
+    system.configuration()
     try:
         prepare_environment(system)
     except (OSError, ValueError, KeyError, TypeError, installer.ContractError) as error:
@@ -292,8 +306,11 @@ def prepare(system):
 
 def prepare_environment(system):
     """Set only the startup idle environment; inspection does not retire records."""
+    if system.backend() != 'rp1-gpclk':
+        system.environment(False)
+        return
     record = system.ownership()
-    if record is None or system.configuration()['backend'] != 'rp1-gpclk':
+    if record is None:
         system.environment(False)
         return
     # Never query the socket here: this runs while the provider may be
@@ -323,10 +340,14 @@ def selected_history(plan, route):
 
 
 def reconcile(system):
+    if system.backend() != 'rp1-gpclk':
+        return 'not-applicable'
     with system.lock():
-        record = system.ownership()
         config = system.configuration()
-        if record is None or config['backend'] != 'rp1-gpclk':
+        if config['backend'] != 'rp1-gpclk':
+            return 'not-applicable'
+        record = system.ownership()
+        if record is None:
             return 'not-applicable'
         boot = system.boot()
         checkpoint = system.checkpoint()
@@ -423,6 +444,9 @@ def main():
     elif sys.argv[1] == 'install':
         print(restore_installation(system))
     else:
+        if system.backend() != 'rp1-gpclk':
+            print('not-applicable')
+            return
         # Type=simple starts before application config loading; wait only for
         # the existing idle startup override to take effect, never edit policy.
         for attempt in range(40):
@@ -442,6 +466,6 @@ if __name__ == '__main__':
             print('RP1 reconciliation already in progress')
         else:
             sys.exit('RP1 installation route restoration timed out waiting for reconciliation')
-    except (OSError, ValueError, KeyError, TypeError, installer.ContractError,
-            subprocess.SubprocessError) as error:
+    except (OSError, ValueError, KeyError, TypeError, companion.configparser.Error,
+            installer.ContractError, subprocess.SubprocessError) as error:
         sys.exit('RP1 startup recovery refused: '+str(error))

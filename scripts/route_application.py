@@ -40,7 +40,7 @@ def trusted(path):
         os.close(fd)
 
 
-def configuration(data, require_runtime_backend=False):
+def parse_configuration(data):
     parser = configparser.ConfigParser(interpolation=None, strict=True)
     parser.optionxform = str
     # IniFile appends another section header when persisting newly added keys.
@@ -63,6 +63,22 @@ def configuration(data, require_runtime_backend=False):
     parser.read_string('\n'.join(normalized))
     if parser.defaults():
         raise ValueError('inherited configuration is not supported')
+    return parser
+
+
+def configured_backend(data):
+    """Classify persisted startup intent without imposing route constraints."""
+    parser = parse_configuration(data)
+    if not parser.has_section('Operation'):
+        raise ValueError('missing Operation section')
+    backend = parser.get('Operation', 'Transmit Backend', fallback='gpio').strip().lower() or 'gpio'
+    if backend not in ('gpio', 'rp1-gpclk', 'si5351', 'wtp'):
+        raise ValueError('installed configuration selects an unsupported transmit backend')
+    return backend
+
+
+def configuration(data, require_runtime_backend=False):
+    parser = parse_configuration(data)
     backend = parser.get('Operation', 'Transmit Backend').lower()
     if backend not in ('gpio', 'rp1-gpclk', 'si5351'):
         raise ValueError('installed configuration selects an unsupported transmit backend')
@@ -155,7 +171,7 @@ def validate_service_arguments(arguments):
             raise ValueError('ambiguous installed confirmation argument')
 
 
-def inspect_service():
+def inspect_service_command():
     output = subprocess.check_output(['/usr/bin/systemctl', 'show', 'wsprrypi.service',
         '--property=ExecStart', '--value'], text=True, timeout=10)
     # systemd's fixed argv[] representation; reject alternate configs, command
@@ -164,6 +180,10 @@ def inspect_service():
     if not match:
         raise ValueError('service is missing, masked, or uses an unsupported command; preserve it and repair installation')
     validate_service_arguments(match[1])
+
+
+def inspect_service():
+    inspect_service_command()
     binary, _ = trusted(BINARY)
     if b'WSPRRYPI_ROUTE_RESTORE_IDLE' not in binary:
         raise ValueError('installed application lacks idle restoration support')
