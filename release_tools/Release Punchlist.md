@@ -69,6 +69,21 @@ operator-documentation, UI, packaging, and applicable runtime checks, and
 complete [#412](https://github.com/WsprryPi/WsprryPi/issues/412) at its proper
 publication boundary. Beta acceptance does not establish final stable readiness.
 
+- ▧ **Remove Pico prerelease setup guidance before stable publication.** Owner:
+  documentation/release maintainer. Complete the
+  [Pico documentation cleanup gate](https://github.com/WsprryPi/WsprryPi-Docs/blob/devel/TODO.md#high-priority)
+  before publishing the final stable release and its manual. Review
+  `docs/Install/pico.md`, the active Pico connection and USB-update sections in
+  `docs/User_Interface/Setup/Transmitter/index.md`, and directly linked current
+  setup references in WsprryPi-Docs. Remove beta/RC version-pairing guidance,
+  raw candidate hashes, and prerelease-only image-selection workarounds from
+  those active instructions. Replace them with the verified supported stable
+  firmware selection and actual stable installation links. Close this gate only
+  after checking the stable image/channel and installation destinations and
+  reviewing the stable-rendered pages and links for stale prerelease setup
+  guidance. Preserve historical release/install records, exact artifact
+  provenance, compatibility safeguards, and required recovery procedures.
+
 ## RP1 dependency order
 
 For future changes, preserve the provider/consumer sequence: prepare the exact
