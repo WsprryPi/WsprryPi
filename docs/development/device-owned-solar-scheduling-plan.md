@@ -2,6 +2,12 @@
 
 Status: implementation plan, not implemented or qualified. Updated 2026-11-15.
 
+Feature tracking: [WsprryPi #473 — Shared device setup and device-owned solar
+scheduling](https://github.com/WsprryPi/WsprryPi/issues/473). This document is the
+authoritative implementation plan and execution prompt; the issue tracks its
+ordered slices and delivery evidence. Keep both references synchronized. Neither
+the issue nor this plan authorizes beginning implementation.
+
 ## Objective and authority
 
 Provide shared Setup controls for local Pis, remote Pis, and Picos. Each target
