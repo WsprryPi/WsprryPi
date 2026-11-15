@@ -213,7 +213,13 @@ recovery material and immutable installer snapshots.
 
 The package creates private root-owned backup/control/cache directories,
 `dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
-per-device lock directory restored by tmpfiles at boot. Permissions apply to
+per-device lock directory restored by tmpfiles at boot. Installation adds the
+ordinary user identified by `SUDO_USER` to `dialout`, preserving existing group
+memberships. Uninstallation leaves that membership in place. Existing shells
+retain their original groups. Log out and back in, or run `newgrp dialout` to
+open a shell with `dialout` access immediately; run `id -nG` in that shell to
+check, and `exit` to return to the original shell. A plain child shell does not
+refresh group membership. Permissions apply to
 new USB enumeration after rules reload; reconnect a cable when necessary.
 Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The main Pi installer supplies Python, libusb and the matching prebuilt picotool package without installing a Pico SDK or compiling picotool. The imported Fleet entry never downloads or removes tools, and deploying the USB adapter does not change unrelated backend settings. The separate [standalone bootstrap](https://wsprrypico.readthedocs.io/en/devel/install.html#run-directly-with-curl) can offer an official picotool download and cleanup. When using it on a WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host) so only one process uses the selected USB connection.
 

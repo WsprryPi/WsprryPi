@@ -155,6 +155,7 @@ logD() { :; }
 udevadm() { printf invoked >"$SENTINEL"; }
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 DRY_RUN=false
+SUDO_USER=fixture-user
 if pico_usb_runtime_provision install "$REPOSITORY"; then exit 99; fi
 [[ ! -e "$SENTINEL" ]]
 '''],text=True,capture_output=True,timeout=30,env={**os.environ,
@@ -174,6 +175,8 @@ source "$INSTALL_SCRIPT"
 source "$RUNTIME_SCRIPT"
 FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
 DRY_RUN=true
+SUDO_USER=fixture-user
+usermod() { printf invoked >"$TMPDIR/unexpected-usermod"; }
 pico_usb_runtime_provision install "$REPOSITORY"
 '''],text=True,capture_output=True,timeout=30,env={**os.environ,
                 'INSTALL_SCRIPT':str(SCRIPTS/'install.sh'),
@@ -181,7 +184,79 @@ pico_usb_runtime_provision install "$REPOSITORY"
                 'REPOSITORY':str(root),'TMPDIR':str(root)})
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('Complete: (dry) Deploy identified shared Pico USB installer.',result.stdout)
+            self.assertIn('Complete: (dry) Add invoking user to Pico USB access group.',result.stdout)
+            self.assertNotIn('your user has been added',result.stdout)
             self.assertEqual(list(root.iterdir()),[])
+
+    def test_install_adds_invoking_user_and_uninstall_preserves_membership(self):
+        for action in ('install','uninstall'):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as name:
+                root=Path(name)
+                (root/'scripts').mkdir()
+                (root/'scripts/pico_usb_deploy.py').write_text('print("deployment fixture")\n')
+                result=subprocess.run(['bash','-c',r'''
+source "$INSTALL_SCRIPT"
+source "$RUNTIME_SCRIPT"
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+DRY_RUN=false
+SUDO_USER=george
+logI() { printf '%s\n' "$1"; }
+usermod() { printf '%s\n' "$@" >>"$TMPDIR/membership"; }
+udevadm() { printf reloaded >"$TMPDIR/reload"; }
+pico_usb_runtime_provision "$ACTION" "$REPOSITORY"
+'''],text=True,capture_output=True,timeout=30,env={**os.environ,
+                    'INSTALL_SCRIPT':str(SCRIPTS/'install.sh'),
+                    'RUNTIME_SCRIPT':str(SCRIPTS/'pico_usb_runtime_install.sh'),
+                    'REPOSITORY':str(root),'TMPDIR':str(root),'ACTION':action})
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertTrue((root/'reload').exists())
+                if action == 'install':
+                    self.assertIn('your user has been added to that group',result.stdout)
+                    self.assertEqual((root/'membership').read_text().splitlines(),
+                                     ['-aG','dialout','--','george'])
+                else:
+                    self.assertNotIn('your user has been added',result.stdout)
+                    self.assertFalse((root/'membership').exists())
+
+    def test_membership_failure_fails_install_and_does_not_reload_rules(self):
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name)
+            (root/'scripts').mkdir()
+            (root/'scripts/pico_usb_deploy.py').write_text('print("deployment fixture")\n')
+            result=subprocess.run(['bash','-c',r'''
+source "$INSTALL_SCRIPT"
+source "$RUNTIME_SCRIPT"
+FGGLD= RESET= FGGRN= FGRED= MOVE_UP= CLEAR_LINE=
+DRY_RUN=false
+SUDO_USER=george
+usermod() { return 17; }
+udevadm() { printf reloaded >"$TMPDIR/reload"; }
+pico_usb_runtime_provision install "$REPOSITORY"
+'''],text=True,capture_output=True,timeout=30,env={**os.environ,
+                'INSTALL_SCRIPT':str(SCRIPTS/'install.sh'),
+                'RUNTIME_SCRIPT':str(SCRIPTS/'pico_usb_runtime_install.sh'),
+                'REPOSITORY':str(root),'TMPDIR':str(root)})
+            self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('Failed: Add invoking user to Pico USB access group.',result.stdout)
+            self.assertNotIn('your user has been added',result.stdout)
+            self.assertFalse((root/'reload').exists())
+
+    def test_install_without_ordinary_invoking_user_refuses_before_deployment(self):
+        for user in ('','root'):
+            with self.subTest(user=user), tempfile.TemporaryDirectory() as name:
+                root=Path(name)
+                result=subprocess.run(['bash','-c',r'''
+source "$RUNTIME_SCRIPT"
+logE() { printf '%s\n' "$1" >&2; }
+exec_command() { printf unexpected >"$TMPDIR/executed"; }
+DRY_RUN=false
+pico_usb_runtime_provision install "$REPOSITORY"
+'''],text=True,capture_output=True,timeout=30,env={**os.environ,
+                    'RUNTIME_SCRIPT':str(SCRIPTS/'pico_usb_runtime_install.sh'),
+                    'REPOSITORY':str(root),'TMPDIR':str(root),'SUDO_USER':user})
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('ordinary user who invoked sudo',result.stderr)
+                self.assertEqual(list(root.iterdir()),[])
 
 
 if __name__=='__main__':unittest.main()
