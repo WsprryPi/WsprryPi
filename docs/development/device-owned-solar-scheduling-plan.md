@@ -8,6 +8,9 @@ authoritative implementation plan and execution prompt; the issue tracks its
 ordered slices and delivery evidence. Keep both references synchronized. Neither
 the issue nor this plan authorizes beginning implementation.
 
+See the [brief phase list and individual execution prompts](issue-473-phases.md).
+The prompts expand each slice; this plan remains authoritative.
+
 ## Objective and authority
 
 Provide shared Setup controls for local Pis, remote Pis, and Picos. Each target
