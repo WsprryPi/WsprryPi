@@ -7,6 +7,7 @@
 #define RUNTIME_CONFIG_BRIDGE_HPP
 
 #include "config_types.hpp"
+#include "solar_configuration.hpp"
 
 #include <memory>
 #include <string>
@@ -34,5 +35,9 @@ void commit_runtime_config_candidate(const RuntimeConfigCandidate &candidate);
 void config_to_json();
 void persist_runtime_transmit_disabled();
 TestTonePlanningConfigSnapshot current_test_tone_planning_config_snapshot();
+
+// Owner-backed immutable ordinary+solar snapshot; no output/admission effects.
+void set_native_solar_snapshot_provider(std::function<wsprrypi::NativeSolarSnapshot()>);
+wsprrypi::NativeSolarSnapshot current_native_solar_snapshot();
 
 #endif // RUNTIME_CONFIG_BRIDGE_HPP

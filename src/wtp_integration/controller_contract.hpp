@@ -24,3 +24,5 @@ std::string canonical_pi_management_json(const nlohmann::json &);
 PicoHttpResponse controller_target_error(unsigned status,std::string_view code);
 PicoHttpResponse normalize_controller_error(const PicoHttpResponse &);
 }
+
+namespace wsprrypi { bool valid_pi_scheduling_shape(const nlohmann::json &); }

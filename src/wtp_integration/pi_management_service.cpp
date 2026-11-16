@@ -3,6 +3,8 @@
 #include "controller_contract.hpp"
 #include "control_contract.hpp"
 #include "config_handler.hpp"
+#include "config_handler_deserialization.hpp"
+#include "solar_configuration.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
 #include <openssl/rand.h>
@@ -68,8 +70,8 @@ Json PiLocalManagementService::capabilities(const PiManagementObservation &state
         auto capability=Json::parse(pi_resource_descriptor(resource));
         const bool config=std::string_view(resource)=="pi-config",stop=std::string_view(resource)=="stop";
         const bool cancellable=stop&&!state.authority.stop_reserved&&state.reserve_stop&&state.release_stop&&state.cancel_reserved_stop;
-        capability.update({{"resource",resource},{"read",!stop},{"write",(config&&writable(state))||cancellable},
-            {"activation",config?"next_occurrence":cancellable?"immediate":"unsupported"},{"maximum_bytes",stop&&!cancellable?0:32768}});
+        capability.update({{"resource",resource},{"read",!stop},{"write",((config||std::string_view(resource)=="pi-scheduling")&&writable(state))||cancellable},
+            {"activation",config?"next_occurrence":std::string_view(resource)=="pi-scheduling"?"stored_only":cancellable?"immediate":"unsupported"},{"maximum_bytes",stop&&!cancellable?0:32768}});
         if(!valid_pi_resource_capability(capability))throw std::logic_error("Pi descriptor mismatch");
         result.push_back(std::move(capability));
     }
@@ -164,7 +166,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         }
         if(!writable(*state))return refuse(409,"authority_pending");
         const auto &candidate=body["candidate"];
-        if(candidate["scheduling"]!=saved["scheduling"])return refuse(409,"unsupported_resource");
+        if(candidate["scheduling"]["enabled"]!=saved["scheduling"]["enabled"]||candidate["scheduling"]["solar"]["enabled"]!=false)return refuse(409,"unsupported_resource");
         for(const auto *key:{"Web Port","Socket Port"})
             if(candidate["configuration"]["Operation"][key]!=saved["configuration"]["Operation"][key])return refuse(409,"read_only_field");
         for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})
@@ -181,6 +183,10 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         try{
             patch_config_with_persistence_coordinator(candidate["configuration"],legacy.second,
                 [&](const auto &internal,const auto &persist){
+                    ArgParserConfig policy_config=config;
+                    config_handler_deserialization::deserialize_json_to_runtime_config(internal,policy_config);
+                    if(config.simulated_backend_override)policy_config.transmit_backend=TransmitBackendKind::SIMULATED;
+                    (void)parse_solar_configuration(candidate["scheduling"],policy_config,&saved["scheduling"],true);
                     auto prospective=saved;
                     prospective["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
                     prospective["scheduling"]=candidate["scheduling"];

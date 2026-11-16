@@ -3,6 +3,8 @@
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
+#include "solar_configuration.hpp"
+#include "version.hpp"
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/pi_management_service.hpp"
 #include "wtp_integration/controller_contract.hpp"
@@ -212,6 +214,100 @@ int main(){
   check(retired_reply.status==409&&Json::parse(retired_reply.body)["error"]["code"]=="connection_changed"&&
       bytes(ini)==retained_ini&&store.settings()==retained_saved,"An earlier edit context cannot revive an evicted operation");
   check(call("operations/00000000000000000000000000000100").status==200,"Latest retained receipt remains recoverable after context retirement");
+  // Stored-only drafts use the same actual authority and atomic transaction.
+  const auto solar_context=Json::parse(call("context").body);
+  bool stored_only=false;
+  for(const auto &cap:solar_context["capabilities"])if(cap["resource"]=="pi-scheduling")
+      stored_only=cap["write"]==true&&cap["activation"]=="stored_only";
+  check(stored_only,"Solar capability explicitly advertises storage without activation");
+  auto draft=store.settings()["scheduling"];
+  draft["solar"]["location"]["locator"]="EM18AA12";
+  draft["solar"]["morning"]["enabled"]=true;
+  draft["solar"]["morning"]["lower_mdeg"]=-7001;
+  draft["solar"]["day"]["allow"]=false;
+  draft["solar"]["night"]["cw_base_hz"]="14097000.000000001";
+  draft["solar"]["evening"]["wspr_override"]={{"Frequency","20m 0 30m"},{"Frequency Profile","existing_common"},{"Band Preferences",Json::object()}};
+  unsigned draft_id=4096;
+  const auto save_draft=[&](const Json &candidate){
+      const auto ctx=Json::parse(call("context").body),saved=Json::parse(call("settings").body);
+      std::ostringstream id;id<<std::setfill('0')<<std::setw(32)<<std::hex<<++draft_id;
+      Json command{{"contract","Wsprry-Control/1"},{"schema","target-save"},{"binding",ctx["binding"]},
+          {"capability_revision",ctx["capability_revision"]},{"operation_id",id.str()},
+          {"expected_revision",saved["revision"]},{"candidate",saved["saved"]}};
+      command["candidate"]["scheduling"]=candidate;
+      return call("settings","PUT",command,"\""+saved["revision"].get<std::string>()+"\"");
+  };
+  const auto draft_saved=save_draft(draft);
+  if(draft_saved.status!=200)std::cerr<<draft_saved.status<<" "<<draft_saved.body<<"\n";
+  check(draft_saved.status==200,"Valid disabled solar draft saved through production service");
+  check(store.settings()["scheduling"]==draft&&!config.transmit,"Exact stored draft cannot activate output");
+  auto retained_metadata=draft;retained_metadata["solar"]["evening"]["wspr_override"]["Frequency"]="20m@5H 0 30m";
+  const auto typed=parse_solar_configuration(retained_metadata,config);
+  check(typed.locator=="EM18AA12"&&!typed.solar_enabled&&!typed.day.allow&&
+      typed.night.cw_base_nhz==14097000000000001ULL&&typed.evening.wspr_override->entries.size()==3&&
+      typed.evening.wspr_override->entries.front().selector_gpio==5,
+      "Typed copy preserves precision, skips, metadata and full period policy");
+  const auto refuse_draft=[&](Json candidate){
+      const auto disk=bytes(ini);const auto settings=store.settings();
+      check(save_draft(candidate).status!=200&&bytes(ini)==disk&&store.settings()==settings,
+          "Invalid disabled draft refused before any transaction or output");
+  };
+  auto bad_draft=draft;bad_draft["solar"]["enabled"]=true;refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["enabled"]=!draft["enabled"].get<bool>();refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["location"]["locator"]="EM18aa";refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["morning"]["upper_mdeg"]=-7001;refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["morning"]["enabled"]=1;refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["day"]["extra"]=false;refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["night"]["cw_base_hz"]="18446744074";refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["night"]["cw_base_hz"]="14097000.0";refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["evening"]["wspr_override"]["Frequency"]="20m INVALID 30m";refuse_draft(bad_draft);
+  bad_draft=draft;bad_draft["solar"]["evening"]["wspr_override"]["Frequency"]="200MHz";refuse_draft(bad_draft);
+  if(transmit_backend_is_compiled(TransmitBackendKind::GPIO)){
+      auto gpio=config;gpio.transmit_backend=TransmitBackendKind::GPIO;gpio.ppm=0;
+      gpio.allow_unqualified_frequency=gpio.allow_non_amateur_frequency=true;
+      set_raspberry_pi_generation_override_for_test(1);
+      check(get_raspberry_pi_generation()==1,"Typed processor fixture reaches the legacy planner without hardware");
+      const std::array<std::uint64_t,1> boundary{99999995605468750ULL};
+      const bool accepts=solar_backend_frequencies(gpio,ModeType::QRSS,boundary);
+      clear_raspberry_pi_generation_override_for_test();
+      check(!accepts,"BCM2835 intrinsic correction is composed with additional PPM exactly as production before divider validation");
+  }
+  if(transmit_backend_is_compiled(TransmitBackendKind::RP1_GPCLK)){
+      auto rp1=config;rp1.transmit_backend=TransmitBackendKind::RP1_GPCLK;rp1.ppm=0;
+      const std::array<std::uint64_t,2> cw_tones{14097000000000000ULL,14097002000000000ULL};
+      check(solar_backend_frequencies(rp1,ModeType::FSKCW,cw_tones),"RP1 pure production planner validates the complete CW frequency table");
+      SolarModeIntent wspr;wspr.wspr.entries={{"20m",14095600,-1,false,true}};
+      check(evaluate_solar_policy({},wspr,{}, {},[&](auto mode,auto tones){return solar_backend_frequencies(rp1,mode,tones);}).outcome==SolarOutcome::Allowed,
+          "RP1 WSPR frequencies use the production numerical planner and dither count");
+      rp1.allow_unqualified_frequency=rp1.allow_non_amateur_frequency=true;
+      const std::array<std::uint64_t,1> edge{100000000000000000ULL};
+      check(!solar_backend_frequencies(rp1,ModeType::QRSS,edge),"RP1 refuses a base whose compatibility table exceeds the direct-output bound");
+  }
+  if(transmit_backend_is_compiled(TransmitBackendKind::SI5351)){
+      auto si=config;si.transmit_backend=TransmitBackendKind::SI5351;
+      const std::array<std::uint64_t,2> cw_tones{14097000000000000ULL,14097002000000000ULL};
+      check(solar_backend_frequencies(si,ModeType::FSKCW,cw_tones),"Compiled Si5351 validates both tones with its real pure planner");
+      si.allow_unqualified_frequency=si.allow_non_amateur_frequency=true;
+      const std::array<std::uint64_t,1> impossible{201000000000000000ULL};
+      check(!solar_backend_frequencies(si,ModeType::QRSS,impossible),"Si5351 envelope refuses an impossible new override");
+  }
+  auto different_peer=config;different_peer.transmit_backend=TransmitBackendKind::WTP;
+  different_peer.wtp.hostname="unobserved.invalid";
+  const std::array<std::uint64_t,1> proposed_tone{14097000000000000ULL};
+  check(!solar_backend_frequencies(different_peer,ModeType::QRSS,proposed_tone),
+      "Changed WTP endpoint cannot borrow a previous peer's capabilities or negotiate during validation");
+  // Retention is lexical, not a new grant to use an unavailable frequency.
+  auto retained_unsupported=draft;retained_unsupported["solar"]["night"]["cw_base_hz"]="200000000";
+  check(parse_solar_configuration(retained_unsupported,config,&retained_unsupported,true).night.cw_base_nhz==200000000000000000ULL,
+      "Unchanged well-formed unsupported override can be retained for repair");
+  bool unsupported_refused=false;
+  try{(void)parse_solar_configuration(retained_unsupported,config,&draft,true);}catch(...){unsupported_refused=true;}
+  check(unsupported_refused,"The same unsupported value cannot be newly saved");
+  // An ordinary INI save joins the same owner and must retain all draft fields.
+  patch_all_from_web({{"CW",{{"Message","SOLAR RETAINED"}}}});
+  check(store.settings()["scheduling"]==draft,"Legacy INI writer retains the complete solar document");
+  PiManagedStore reloaded_solar(ini,self,catalog.pi_management_anchor(self,{}));reloaded_solar.recover();
+  check(reloaded_solar.settings()["scheduling"]==draft,"Cold recovery retains exact disabled draft");
   // A trusted legacy writer can already own a candidate near the storage
   // limit. The adapter must bound the complete readback envelope as well.
   auto large_internal=jConfig;large_internal["CW"]["Message"]="";

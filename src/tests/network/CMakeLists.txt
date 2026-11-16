@@ -200,3 +200,9 @@ add_executable(wtp_fixture_clock_test fixture_clock_test.cpp)
 target_include_directories(wtp_fixture_clock_test PRIVATE "${PICO_SOURCE}/src")
 target_link_libraries(wtp_fixture_clock_test PRIVATE pico_consumer_fixture)
 target_compile_options(wtp_fixture_clock_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+# Phase-4 Pi geometry versus the actual caller-selected Pico implementation.
+add_executable(pi_solar_geometry_pair ../solar_geometry_pair_test.cpp ../../solar_geometry.cpp)
+target_include_directories(pi_solar_geometry_pair PRIVATE ../.. "${PICO_SOURCE}/src")
+target_link_libraries(pi_solar_geometry_pair PRIVATE pico_consumer_fixture)
+target_compile_options(pi_solar_geometry_pair PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)

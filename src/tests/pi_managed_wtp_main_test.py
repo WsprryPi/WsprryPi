@@ -60,7 +60,9 @@ def main():
                     json.dumps({"contract": "Wsprry-Control/1", "schema": "controller-browser-session"}), auth, with_headers=True)
                 assert status == 200
                 auth.update({"Cookie": session["Set-Cookie"].split(";")[0], "X-WsprryPi-CSRF": session["X-WsprryPi-CSRF"], "If-Match": headers["ETag"]})
-                candidate = saved["saved"];candidate["configuration"]["CW"]["Message"] = "OFFLINE PEER EDIT"
+                candidate = saved["saved"];candidate["scheduling"]["solar"]["location"]["locator"] = "EM18AA12"
+                candidate["scheduling"]["solar"]["morning"].update({"enabled": True, "lower_mdeg": -7001, "upper_mdeg": 8002})
+                candidate["configuration"]["CW"]["Message"] = "OFFLINE PEER EDIT"
                 command = json.dumps({"contract": "Wsprry-Control/1", "schema": "target-save", "binding": context["binding"],
                     "capability_revision": context["capability_revision"], "operation_id": "8" * 32, "expected_revision": saved["revision"], "candidate": candidate})
                 status, receipt = request(port, "PUT", base + "settings", command, auth)
@@ -68,6 +70,17 @@ def main():
                 assert request(port, "PUT", base + "settings", command, auth) == (200, receipt)
                 status, body = request(port, "GET", base + "settings");assert status == 200
                 assert json.loads(body)["saved"]["configuration"]["CW"]["Message"] == "OFFLINE PEER EDIT"
+                snapshot = json.loads(body)
+                assert snapshot["saved"]["scheduling"] == candidate["scheduling"]
+                for cap in context["capabilities"]:
+                    if cap["resource"] == "pi-scheduling":assert cap["activation"] == "stored_only" and cap["write"]
+                before = ini.read_bytes()
+                status, body, headers = request(port, "GET", base + "settings", with_headers=True)
+                auth["If-Match"] = headers["ETag"]
+                bad = json.loads(command);bad["expected_revision"] = json.loads(body)["revision"];bad["operation_id"] = "9" * 32
+                bad["candidate"]["scheduling"]["solar"]["enabled"] = True
+                assert request(port, "PUT", base + "settings", json.dumps(bad), auth)[0] == 409
+                assert ini.read_bytes() == before
                 status, body = request(port, "POST", "/api/wtp/recover", json.dumps({"operation": "reconcile"}), auth)
                 assert status == 409 and json.loads(body)["ok"] is False, body
                 assert request(port, "GET", "/api/control/v1/host/readiness")[0] == 200

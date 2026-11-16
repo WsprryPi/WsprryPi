@@ -12724,6 +12724,111 @@
         "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "action": "erase_history"
       }
+    },
+    {
+      "name": "Pi stored-only solar draft",
+      "family": "target-context",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-scheduling",
+            "schema_id": "urn:wsprry:control:1:pi-scheduling",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": true,
+            "activation": "stored_only",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "name": "Unknown activation remains refused",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-scheduling",
+            "schema_id": "urn:wsprry:control:1:pi-scheduling",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": true,
+            "activation": "stored_later",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "name": "Stored-only is Pi scheduling only",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": true,
+            "activation": "stored_only",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
     }
   ],
   "recovery_cases": [

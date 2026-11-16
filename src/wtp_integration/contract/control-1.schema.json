@@ -12613,7 +12613,8 @@
             "immediate",
             "next_occurrence",
             "restart",
-            "unsupported"
+            "unsupported",
+            "stored_only"
           ]
         },
         "maximum_bytes": {
@@ -12682,6 +12683,34 @@
               "const": "urn:wsprry:control:1:stop"
             }
           }
+        }
+      ],
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "activation": {
+                  "enum": [
+                    "immediate",
+                    "next_occurrence",
+                    "restart",
+                    "unsupported"
+                  ]
+                }
+              }
+            },
+            {
+              "properties": {
+                "activation": {
+                  "const": "stored_only"
+                },
+                "resource": {
+                  "const": "pi-scheduling"
+                }
+              }
+            }
+          ]
         }
       ]
     },

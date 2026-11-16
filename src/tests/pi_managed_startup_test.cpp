@@ -3,6 +3,7 @@
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
+#include "runtime_config_bridge.hpp"
 #include "wtp_pi_control.hpp"
 #include "wtp_integration/pi_managed_startup.hpp"
 #include "wtp_integration/pi_configuration_recovery.hpp"
@@ -57,6 +58,10 @@ int main(int argc,char **argv){
         check(load_json(ini,&error,nullptr)&&owner.store().settings()["configuration_generation"]==initial_generation,
             "Saved draft refresh observes the published file without another transaction");
         const auto initial_draft=owner.draft();
+        const auto solar_copy=current_native_solar_snapshot();
+        check(!solar_copy.policy.solar_enabled&&solar_copy.generation>0&&
+            solar_copy.revision==owner.store().settings()["revision"].get<std::string>()&&solar_copy.policy.locator=="EM18",
+            "Owner exposes typed immutable solar/ordinary generation snapshot");
         check(initial_draft&&initial_draft->source["WSPR"]["Call Sign"]=="AA0NT"&&owner.configuration_validated(),
             "Read-only saved draft is captured by the owning parser independently of native readiness");
         const auto profiles=owner.catalog().snapshot(config.wtp).first;
@@ -92,6 +97,10 @@ int main(int argc,char **argv){
             "Managed save does not truncate or replace the predictable hardlink");
         check(!unlink((ini+".tmp").c_str()),"Remove temporary hardlink fixture");
         const auto saved=owner.store().settings();
+        check(current_native_solar_snapshot().generation>solar_copy.generation&&
+            current_native_solar_snapshot().ordinary.frequencies==config.frequencies,
+            "Ordinary save propagates owner generation and current copy");
+
         check(reservations==3&&saved["configuration"]["CW"]["Message"]=="STARTUP OWNER","Legacy writer uses the admitted complete transaction owner");
         check(load_json(ini,&error,nullptr)&&owner.store().settings()==saved&&reservations==3,"Own monitor reload is observation, not another write");
         permit=false;const auto before=bytes(ini);

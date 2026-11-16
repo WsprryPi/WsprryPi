@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_store.hpp"
+#include "solar_configuration.hpp"
 #include "pi_managed_records.hpp"
 #include "controller_contract.hpp"
 #include "config_handler_serialization.hpp"
@@ -55,6 +56,7 @@ void PiManagedStore::load(){
     }
     settings_=parse_pi_managed_settings_record(observations_.at("settings").bytes,self_,
         PiManagementJournal::digest(observations_.at("ini").bytes));
+    validate_stored_solar(settings_["scheduling"]);
     operations_=parse_pi_operations_record(observations_.at("operations").bytes,self_);
     initialized_=true;
 }
@@ -234,6 +236,8 @@ void PiManagedStore::persist_recovery(const Json &internal,const std::function<v
 }
 void PiManagedStore::publish(const Json &candidate,const std::string &ini,const std::function<void()> &writer,const std::optional<Operation> &operation){
     require(valid_pi_candidate_shape(candidate));
+    validate_stored_solar(candidate.at("scheduling"));
+    if(initialized_)require(candidate.at("scheduling").at("enabled")==settings_.at("scheduling").at("enabled"));
     const auto saved=pi_managed_settings_record(self_,initialized_?next(settings_["configuration_generation"]):"1",candidate,PiManagementJournal::digest(ini));
     auto receipts=initialized_?operations_["receipts"]:Json::array();
     if(operation){

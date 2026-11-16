@@ -147,6 +147,11 @@ bool valid_pi_candidate_shape(const nlohmann::json &value) {
         return match(value,definitions.at("pi-candidate"),definitions,0);
     }catch(...){return false;}
 }
+bool valid_pi_scheduling_shape(const Json &value) {
+    try{static const auto definitions=Json::parse(controller_document_definitions());
+        return match(value,definitions.at("pi-scheduling"),definitions,0);
+    }catch(...){return false;}
+}
 bool valid_pico_network_observation(const nlohmann::json &value) {
     try {
         if(!value.is_object()||value.value("contract",Json(nullptr))!="Wsprry-Control/1")return false;

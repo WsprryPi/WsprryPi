@@ -24,9 +24,10 @@ separate authorization to execute and successful prerequisite gates.
    controls into target-aware tabs.
    [Phase 3 prompt](issue-473/03-shared-setup.md) ·
    [Phase-3 implementation and validation](issue-473/phase-3-progress.md)
-4. ▧ **Build Pi solar policy:** Implement solar calculations and the complete
+4. ✅ **Build Pi solar policy:** Implement solar calculations and the complete
    configuration lifecycle, preserving existing behavior when disabled.
-   [Phase 4 prompt](issue-473/04-solar-policy.md)
+   [Phase 4 prompt](issue-473/04-solar-policy.md) ·
+   [Phase-4 implementation and validation](issue-473/phase-4-progress.md)
 5. ▧ **Prevent competing authorities:** Add safeguards and explicit migration
    from controller-owned schedules before allowing new schedule enables.
    [Phase 5 prompt](issue-473/05-authority-transition.md)

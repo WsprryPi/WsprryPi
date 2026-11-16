@@ -6,6 +6,8 @@
 #include "wtp_settings_json.hpp"
 #include "pi_managed_records.hpp"
 #include "scheduling.hpp"
+#include "runtime_config_bridge.hpp"
+#include <charconv>
 #include <stdexcept>
 #include <filesystem>
 #include <atomic>
@@ -78,6 +80,7 @@ PiManagedStartup::~PiManagedStartup(){
     iniFile.set_file_reader({});
     iniFile.set_file_writer({});
     set_config_persistence_owner({},{},{});
+    set_native_solar_snapshot_provider({});
     // Teardown/failure is never permission to revert to an unguarded output
     // lane. A new explicitly prepared owner or process restart replaces this.
     set_wtp_pi_management_readiness([]{return false;});
@@ -147,6 +150,15 @@ void PiManagedStartup::prepare(){
     // Recover committed images before the component or application reads INI.
     state->store.recover();
     state->phase=State::Phase::Bootstrapping;
+    set_native_solar_snapshot_provider([state]{
+        require(state->validated&&(state->phase==State::Phase::Bootstrapping||state->phase==State::Phase::Ready));
+        const auto saved=state->store.settings();NativeSolarSnapshot result;
+        result.ordinary=config;result.policy=parse_solar_configuration(saved.at("scheduling"),result.ordinary);
+        const auto text=saved.at("configuration_generation").get<std::string>();
+        const auto parsed=std::from_chars(text.data(),text.data()+text.size(),result.generation);
+        require(parsed.ec==std::errc{}&&parsed.ptr==text.data()+text.size()&&result.generation>0);
+        result.revision=saved.at("revision").get<std::string>();return result;
+    });
 }
 void PiManagedStartup::activate(ConfigurationGate gate){
     std::lock_guard lock(config_update_mutex());

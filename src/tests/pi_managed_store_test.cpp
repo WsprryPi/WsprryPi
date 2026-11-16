@@ -7,6 +7,7 @@
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/pi_managed_store.hpp"
 #include "wtp_integration/pi_managed_records.hpp"
+#include "wtp_integration/controller_contract.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -57,6 +58,7 @@ int main(int argc,char **argv){
   request["binding"]["device_id"]=self;request["expected_revision"]=legacy["revision"];
   request["candidate"]={{"configuration",legacy["configuration"]},{"scheduling",legacy["scheduling"]}};
   request["candidate"]["configuration"]["CW"]["Message"]="MANAGED";
+  request["candidate"]["scheduling"]["solar"]["morning"]["lower_mdeg"]=-7101;
   const PiManagedStore::Operation operation{self,"1","/api/control/v1/targets/"+self+"/settings",request};
   check(!store.replay(operation),"New operation has no receipt");
   patch_config_with_persistence_coordinator({{"CW",{{"Message","MANAGED"}}}},get_public_config_snapshot().second,
@@ -264,6 +266,16 @@ int main(int argc,char **argv){
               "Successful first initialization retires retained rollback proof exactly once");
       }
   }
+  // Protected-file recovery also rejects a structurally current future policy.
+  const auto future=root+"/future.ini";put(future,original_ini);
+  WtpCatalog future_catalog(future+".wtp-devices.json");
+  PiManagedStore future_store(future,self,future_catalog.pi_management_anchor(self,{}));future_store.recover();future_store.initialize(jConfig);
+  auto future_candidate=future_store.settings();future_candidate["scheduling"]["solar"]["enabled"]=true;
+  const auto future_record=pi_managed_settings_record(self,"2",{{"configuration",future_candidate["configuration"]},
+      {"scheduling",future_candidate["scheduling"]}},PiManagementJournal::digest(bytes(future)));
+  put(future+".managed-settings.json",canonical_pi_management_json(future_record));
+  PiManagedStore cold_future(future,self,future_catalog.pi_management_anchor(self,{}));refuses([&]{cold_future.recover();});
+  check(!cold_future.initialized()&&bytes(future)==original_ini,"File activation refuses before parser, repair or output admission");
   check(!config.transmit,"No output admitted");
   std::cout<<"PASS: explicit Pi store initialization, legacy/native transaction parity, revision ABA, exact replay, authorization isolation, held uncertainty, restart recovery, and external replacement/deletion refusal without output\n";
  }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}
