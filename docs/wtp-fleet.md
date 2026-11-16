@@ -58,8 +58,13 @@ HTTP port is hidden for USB Pico assignments; network profiles retain the field
 for Pi takeover reconciliation. Hiding it preserves the assignment document
 format and the existing port value.
 
-Choose a saved Pico and select **Manage settings** to open its independent
-editor. Managing a Pico does not select the controller's output backend or
+Choose a saved Pico with **Device** beside the Setup tabs. Fleet’s **Manage
+settings** opens this same independent context. Signal Setup holds station and
+existing combined settings; Transmitter holds independent hardware resources;
+Device I/O holds connections, logging, and the complete RF-engine/pin/GPS plan.
+The selector sits outside the host form and never selects an output backend.
+Leaving an unsaved local draft pauses autosave; returning requires explicit
+**Save retained local draft** before saving resumes. Managing a Pico does not select the controller's output backend or
 change execution claims and accepted jobs. It is available in the explicit
 controller-only role. Each editor retains its own draft and captured transport;
 profile replacement retires its read authority, including replacement back to

@@ -6,7 +6,7 @@ const {schedules,changes} = require('../data/wtp-management.js');
 (async()=>{
   const {stationHint}=require('../data/wtp-management.js');
   const fs=require('node:fs'),path=require('node:path');
-  const view=fs.readFileSync(path.join(__dirname,'../data/views/wtp-controls.php'),'utf8');
+  const view=fs.readFileSync(path.join(__dirname,'../data/views/pico-target-settings.php'),'utf8');
   assert(view.includes(stationHint(null)));
   assert(!stationHint(null).includes('Type 1 station writes only'));
   assert.match(stationHint('application'),/automatically selects WSPR Type 1, 2 or 3/);

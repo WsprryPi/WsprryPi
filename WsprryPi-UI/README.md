@@ -209,3 +209,34 @@ child exit, partial discovery, missing pages, cancellation, occupied PHP ports,
 and cleanup denial. Each case has a separate 30-second deadlock watchdog.
 Software fixture results do not qualify hardware, installed services, physical
 USB, or RF output.
+
+## Shared Setup production browser fixtures
+
+`setup-targets.js` selects an editing context independently of `WtpUi` output
+selection. Native fields must finish loading before they are writable. Retained
+local drafts require explicit resume; Pico forms remain outside native autosave.
+`pico-target-editors.js` keeps scoped DOM drafts and captured target handles.
+
+Build `build/bin/shared_setup_main_fixture` from `src` with explicitly selected
+`BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=`. This actual-main fixture accepts only
+an offline WTP output and two exact authenticated loopback Pico software peers;
+it refuses physical backends and fails if any output transport write occurs.
+The Pico source and pinned Mbed TLS dependency for the network fixture must be
+selected explicitly as in the parent non-hardware workflow.
+
+With that actual Pico network build and the controller fixture available, run
+from this directory (substitute absolute fixture/build paths):
+
+```sh
+WSPRRYPI_SHARED_SETUP_MAIN_FIXTURE=/absolute/shared_setup_main_fixture \
+node tests/pico_controller_http_pair_test.js /absolute/pico-network-build \
+  /absolute/pico_controller_pair_fixture --browser --shared-browser
+```
+
+This exercises real controller HTTP, CSRF, crypto, producers, and journals,
+including two-target and local/Pico isolation, delayed/uncertain replies, a held
+initial native read, explicit native resume, visible shared panes, armed software
+work, and changed-boot recovery. The peer restart uses volatile fixture storage;
+it qualifies client fencing, not physical reboot persistence. Optional
+`WSPRRYPI_SHARED_SETUP_SCREENSHOTS` and `WSPRRYPI_EDITOR_SCREENSHOTS` select
+screenshot directories. These fixtures never qualify physical USB, GPIO, or RF.

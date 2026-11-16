@@ -5,14 +5,16 @@ and `--backend wtp`. The parent application owns the complete-job scheduler,
 worker, Linux USB CDC, Plain LAN or authenticated TLS network adapter and explicit recovery lifecycle.
 See [network configuration and credentials](wtp-network.md) and
 [shared browser API](wtp-browser-api.md) for authenticated network management. The web interface
-exposes Pico connections/settings in Setup → Fleet. Physical USB, target
+exposes output connections in Setup → Fleet and selected Pico settings through
+the shared Setup tabs. Physical USB, target
 lifecycle, timing and RF qualification require their own acceptance evidence.
 
 ## Selection and configuration
 
-Open **Setup → Fleet** for device discovery, connection settings, member
-management and independent output schedules. The tab is available on each page
-load without a console command or visibility preference. Browsing it does not
+Open **Setup → Fleet** for discovery and output connections. Select a Pico with
+**Device** beside the tabs for Signal Setup, Transmitter, and Device I/O member
+management. Fleet retains independent output schedules. Setup is available on
+each page load without a console command or visibility preference. Browsing does not
 save configuration, select a backend or enable output.
 
 **Use Pico** is the separate, persisted backend selection. Device and schedule

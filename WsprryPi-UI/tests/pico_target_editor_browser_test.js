@@ -35,19 +35,32 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
   const run=expression=>client.evaluate(expression);
   const navigate=async()=>{await client.send('Page.navigate',{url:origin+'/index.php?page=config'});await waitFor(()=>run("!!window.ControllerMode?.ready && !!window.PicoTargetEditors && !!window.WtpManagementEditor && !document.getElementById('fleet-device').disabled"),'target editor ready',20000);};
   const manage=async id=>{
-   await run(`document.getElementById('fleet-device').value='known:${profiles[id]}';document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-manage').click();`);
+   await run(`document.getElementById('setup-device').focus();document.getElementById('setup-device').value='known:${profiles[id]}';document.getElementById('setup-device').dispatchEvent(new Event('change',{bubbles:true}));`);
    await waitFor(()=>run(`document.getElementById('pico-target-identity').textContent.includes('${id.repeat(32)}') && document.getElementById('wtp-remote-load') && !document.getElementById('wtp-remote-load').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'`),'bound '+id+' editor',30000);
-   assert.equal(await run("document.activeElement.id"),'pico-target-heading','Explicit Manage brings keyboard focus to the editor');
+   assert.equal(await run("document.activeElement.id"),'setup-device','Device selection preserves keyboard focus');
   };
-  const load=async()=>{await run("document.getElementById('wtp-remote-load').click()");await waitFor(()=>run("!document.getElementById('wtp-remote-save').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'"),'saved target settings',30000);};
+  const load=async()=>{await run("document.getElementById('wtp-combined-settings').open=true;document.getElementById('wtp-remote-load').click()");await waitFor(()=>run("!document.getElementById('wtp-remote-save').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'"),'saved target settings',30000);};
   const draft=async value=>run(`document.getElementById('wtp-remote-callsign').value='${value}';document.getElementById('wtp-remote-callsign').dispatchEvent(new Event('input',{bubbles:true}));`);
   await navigate();await manage('a');await load();await draft('K1ABC');
+  assert.equal(await run("document.getElementById('setup-device').closest('form,[role=tablist]')"),null);
+  assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('form')"),null);
+  assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('[role=tabpanel]').id"),'setup-pico-signal');
+  assert.equal(await run("document.getElementById('wtp-member-rf').closest('[role=tabpanel]').id"),'setup-pico-io');
+  assert.equal(await run("document.getElementById('gpio-drive-select').closest('[role=tabpanel]').id"),'setup-pico-transmitter');
+  assert.equal(await run("document.getElementById('pi-hardware-tab').textContent.trim()"),'Device I/O');
+  assert.equal(await run("document.getElementById('fleet-pane').contains(document.getElementById('wtp-management'))"),false);
+  assert.equal(await run("document.querySelectorAll('#configTabs [role=tab]').length"),4,'No future Scheduling placeholder');
+
   assert.equal(await run("WtpUi.selected()"),false);
   assert.equal(await run("document.getElementById('wtp_use').disabled"),true);
   await manage('b');await load();assert.notEqual(await run("document.getElementById('wtp-remote-callsign').value"),'K1ABC');await draft('K2ABC');
   await manage('a');assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K1ABC');await load();
   assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K1ABC','Fresh read preserves A draft');
   delay=true;held=false;await run("document.getElementById('wtp-remote-save').click()");await waitFor(()=>held,'accepted A reply held',30000);
+  await manage('b');await load();assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K2ABC');
+  await run(`document.getElementById('setup-device').value='known:${profiles.a}';document.getElementById('setup-device').dispatchEvent(new Event('change',{bubbles:true}));`);
+  assert.equal(await run("document.getElementById('wtp-management')"),null,'A pending target cannot display the previously selected B editor');
+  assert.equal(await run("document.getElementById('pico-target-identity').textContent.includes('"+'a'.repeat(32)+"')"),true);
   await manage('b');await load();assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K2ABC');
   delay=false;release();await waitFor(()=>run("PicoTargetEditors.operations().some(item=>item.device==='"+'a'.repeat(32)+"'&&item.state==='committed')"),'old-target receipt tracked');
   assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K2ABC','Late A reply must not replace B draft');
@@ -73,7 +86,7 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
   await draft('K5ABC');
   await run("document.getElementById('wtp-remote-password').value='do-not-display-retained-password';document.getElementById('wtp-remote-password').dispatchEvent(new Event('input',{bubbles:true}))");
   for(const name of ['A temporarily renamed','Pico a']) {
-   await run(`document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value=${JSON.stringify(name)};document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-save').click();`);
+   await run(`bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();document.getElementById('fleet-device').value='known:${profiles.a}';document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value=${JSON.stringify(name)};document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-save').click();`);
    await waitFor(()=>run("document.getElementById('fleet-editor').hidden && !document.getElementById('fleet-manage').disabled && document.getElementById('wtp-management').inert"),'profile replacement retires editor',30000);
    assert.equal(await run("document.getElementById('wtp-remote-callsign').value"),'K5ABC','Retired draft stays intact');
   }
@@ -90,7 +103,7 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
    assert(await run('document.documentElement.scrollWidth<=innerWidth'),'Retained drafts fit their viewport');
    const image=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,`retained-${theme}-${width}.png`),Buffer.from(image.data,'base64'));
   }
-  assert(!requests.some(item=>item.path==='/api/control/v1/host/devices/use'||item.path==='/api/control/v1/host/config'&&item.method!=='GET'),'Managing must not select/save a host backend');
+  assert(!requests.some(item=>item.path==='/api/control/v1/host/devices/use'||['/api/control/v1/host/config','/config','/control/stop'].includes(item.path)&&item.method!=='GET'),'Managing must not select/save a host backend');
   assert(!requests.some(item=>item.path.startsWith('/api/control/v1/member/')&&item.path!=='/api/control/v1/member/firmware'),'Production UI must not call retired selected-member settings');
   console.log('PASS: real browser and two actual Pico services, no output backend, per-target drafts, accepted late reply isolation, fresh-browser durable recovery, explicit review, profile ABA fencing, and responsive themes');
  }catch(error){failure=error;if(client)try{console.error(await client.evaluate("({message:document.getElementById('pico-target-feedback')?.textContent,recovery:document.getElementById('pico-target-recovery-state')?.textContent,connection:document.getElementById('wtp-management-connection-feedback')?.textContent})"));}catch(_){} }

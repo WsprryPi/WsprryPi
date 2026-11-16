@@ -2,7 +2,7 @@
 (function(root) {
     "use strict";
     if (!root.document) return;
-    let maintenance = true, observed = false, localPending = false, timer = null, closed = false, polling = false;
+    let maintenance = true, observed = false, localPending = false, timer = null, closed = false, polling = false, setupLock;
     const held = new Map();
     const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle"]);
     function allowed(control) {
@@ -42,6 +42,7 @@
             root.syncMachinePowerControls?.();
             root.ControllerMode?.render?.();
         }
+        if (setupLock !== active) {setupLock = active;root.SetupTargets?.render?.();}
     }
     async function poll() {
         if (polling || closed) return;

@@ -107,7 +107,7 @@ async function main() {
         assert.equal(mutations.length,0);
         await capture("operation");
         console.log("PASS: production controller Setup/Operations, Fleet availability, local-action refusal, retained entries, and responsive themes");
-    } catch(error) {failure = error;}
+    } catch(error) {failure = error;if(client)try{console.error(await client.evaluate("({ready:window.ControllerMode?.ready,active:window.ControllerMode?.active,safety:window.PicoFirmwareSafety?.locked,setup:!!window.SetupTargets,fleet:document.getElementById('fleet-tab')?.outerHTML,pane:document.getElementById('fleet-pane')?.className,opacity:document.getElementById('fleet-pane')&&getComputedStyle(document.getElementById('fleet-pane')).opacity,text:document.body.innerText.slice(0,500),form:document.getElementById('fleet-pane')?.closest('form')?.id})"));}catch(_){} }
     finally {
         for (const socket of sockets) socket.destroy();
         const outcomes = await Promise.allSettled([

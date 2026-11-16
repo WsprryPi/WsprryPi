@@ -6,7 +6,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
 ?>
 
             <div class="card-header pb-0">
-                <?php require __DIR__ . '/local-wtp-control.php'; ?>
+                <div id="setup-local-output"><?php require __DIR__ . '/local-wtp-control.php'; ?></div>
                 <div class="config-header-bar mb-2">
                     <div class="config-header-context">
                         <div class="config-header-copy">
@@ -28,11 +28,13 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                         </div>
                     </div>
 
-                    <div class="config-header-actions">
+                    <div class="config-header-actions" aria-label="Controller time and power">
+                        <p class="form-text mb-0">Controller time and power</p>
                         <?php require_once __DIR__ . '/../clock_and_reboot.php'; ?>
                     </div>
                 </div>
 
+                <div class="setup-tabs-row">
                 <ul class="nav nav-tabs card-header-tabs" id="configTabs" role="tablist" aria-label="Setup sections" data-persist-tab-state="true" data-persist-tab-state-scope="reload" data-persist-tab-query-param="setup_tab">
                     <li class="nav-item" role="presentation">
                         <button
@@ -70,7 +72,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             role="tab"
                             aria-controls="pi-hardware-pane"
                             aria-selected="false">
-                            Pi I/O
+                            Device I/O
                         </button>
                     </li>
                     <li class="nav-item" id="fleet-tab-item" role="presentation">
@@ -87,6 +89,20 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                         </button>
                     </li>
                 </ul>
+                    <div class="setup-device-control">
+                        <label class="form-label" for="setup-device">Device</label>
+                        <select class="form-select" id="setup-device" aria-describedby="setup-device-detail setup-device-state" disabled>
+                            <option value="local">This Pi · local settings</option>
+                        </select>
+                    </div>
+                </div>
+                <p id="setup-device-detail" class="form-text text-break mt-3 mb-1">Reading available devices…</p>
+                <p id="setup-device-state" class="form-text mb-2" role="status" aria-live="polite"></p>
+                <button id="setup-device-reconnect" class="btn btn-outline-primary mb-3" type="button" hidden>Reconnect selected device</button>
+                <div id="setup-local-draft" class="mb-3" hidden>
+                    <p class="form-text">Your local Pi draft was retained. Selecting this Pi does not save it.</p>
+                    <button id="setup-local-resume" class="btn btn-outline-primary" type="button">Save retained local draft</button>
+                </div>
             </div>
 
             <div class="card-body">
@@ -1263,6 +1279,12 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                 </div>
                             </fieldset>
                         </div>
+                    </div>
+                </form>
+                <div id="setup-pico-workspace" data-independent-wtp hidden>
+                    <?php require __DIR__ . '/pico-target-settings.php'; ?>
+                </div>
+                <div class="tab-content config-tabs-content" id="setup-fleet-content">
                         <div
                             class="tab-pane fade"
                             id="fleet-pane"
@@ -1275,9 +1297,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             </div>
                             <?php require __DIR__ . '/wtp-controls.php'; ?>
                         </div>
-                    </div>
-
-                </form>
+                </div>
 
                 <div
                     class="modal fade"

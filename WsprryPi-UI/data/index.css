@@ -1394,3 +1394,25 @@ legend {
     color: var(--bs-body-bg);
     background-color: var(--bs-primary-text-emphasis);
 }
+
+/* Shared Setup context remains separate from tab and local-form submission. */
+.setup-tabs-row {display:flex;align-items:end;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+.setup-device-control {flex:0 1 24rem;min-width:12rem;max-width:100%;margin-bottom:.5rem;}
+.setup-device-control .form-label {margin-bottom:.25rem;}
+.setup-device-control .form-select {width:100%;max-width:100%;}
+#setup-pico-workspace {padding:0;min-width:0;}
+#setup-pico-workspace .tab-pane {padding-top:1rem;}
+.setup-pico-observations {margin-block:1rem 1.5rem;}
+#setup-pico-workspace button + button {margin-left:.35rem;}
+@media (max-width: 767.98px) {
+    .setup-device-control {order:2;flex-basis:100%;min-width:0;}
+    .setup-tabs-row > #configTabs {flex-basis:100%;}
+}
+
+.config-header-actions > .form-text {order:-2;flex-basis:100%;text-align:end;}
+@media (max-width: 767.98px) {
+    .setup-tabs-row > #configTabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;width:100%;}
+    .setup-tabs-row > #configTabs .nav-item {min-width:0;}
+    .setup-tabs-row > #configTabs .nav-link {width:100%;padding-inline:.5rem;}
+    .config-header-actions > .form-text {text-align:start;}
+}

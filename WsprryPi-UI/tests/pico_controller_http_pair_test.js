@@ -13,7 +13,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  try{
   const credentials=path.join(build,'credentials-v3');
   for(const id of ['a','b']){const dir=path.join(temporary,id);fs.mkdirSync(dir,{mode:0o700});for(const file of ['client-ca.crt','client.crt','client.key']){fs.copyFileSync(path.join(build,id==='a'?'credentials-v3':'credentials-second-v3',file),path.join(dir,file));fs.chmodSync(path.join(dir,file),0o600);}}
-  a=spawn(path.join(build,'pico_tls_server'),['0','a','settings','18443'],{stdio:['pipe','pipe','inherit']});const lineA=lines(a);assert.match(await lineA(),/^READY 18443/);
+  a=spawn(path.join(build,'pico_tls_server'),['0','a','settings','18443'],{stdio:['pipe','pipe','inherit']});let lineA=lines(a);assert.match(await lineA(),/^READY 18443/);
   b=spawn(path.join(build,'pico_tls_server'),['1','b','settings','18444','second'],{stdio:['pipe','pipe','inherit']});const lineB=lines(b);assert.match(await lineB(),/^READY 18444/);
   const dump=async(child,line)=>{child.stdin.write('DUMP\n');return JSON.parse((await line()).replace(/^DUMP /,''));};
   const beforeA=await dump(a,lineA),beforeB=await dump(b,lineB);
@@ -144,6 +144,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    afterA=await dump(a,lineA);afterB=await dump(b,lineB);
    for(const id of ['a','b']){const reopened=await call(target(id)+'management','GET',undefined,{'X-WsprryPi-Profile-ID':profiles[id]});assert.equal(reopened.status,200);headers[id]['X-WsprryPi-Target-Context']=reopened.context;}
   }
+  if(process.argv.includes('--shared-browser')) {await require('./shared_setup_browser_test.js')({credentials:temporary,dumpA:()=>dump(a,lineA),dumpB:()=>dump(b,lineB),activeA:async()=>{a.stdin.write('ACTIVE_JOB\n');assert.equal(await lineA(),'ACK');},jobA:async()=>{a.stdin.write('JOB_STATE\n');return await lineA();},endA:async()=>{a.stdin.write('END_ACTIVE_JOB\n');assert.equal(await lineA(),'ACK');},rebootA:async()=>{const old=a;const ended=new Promise(resolve=>old.once('exit',resolve));old.kill('SIGTERM');await ended;a=spawn(path.join(build,'pico_tls_server'),['7','a','settings','18443'],{stdio:['pipe','pipe','inherit']});lineA=lines(a);assert.match(await lineA(),/^READY 18443/);}});afterA=await dump(a,lineA);afterB=await dump(b,lineB);}
   const badContext=await call(target('a')+'configuration','GET',undefined,headers.b);assert.equal(badContext.status,409);
   const catalog=await call('/api/control/v1/host/devices');assert.equal((await call('/api/control/v1/host/devices','POST',{operation:'rename',id:profiles.a,name:'Renamed A'},{'If-Match':catalog.etag})).status,200);
   assert.equal((await call(target('a')+'configuration','GET',undefined,headers.a)).status,409);

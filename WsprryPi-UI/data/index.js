@@ -745,6 +745,8 @@ function bindIndexActions() {
     });
     $("#frequency_profile").on("change", refreshBandPreferenceRows);
 
+    $("[data-wtp-key], #wtp_use").on("input change", function () {scheduleAutosave();});
+
     // Bind any text/number/select control changes
     $(document).on(
         "input change",
@@ -811,6 +813,7 @@ function failStopRequest(message) {
 }
 
 function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return null;
     const $transmit = $("#transmit");
     const updateCheckboxOnSuccess = options.updateCheckboxOnSuccess === true;
     const syncAutosaveBaselineOnSuccess =
@@ -931,6 +934,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
 }
 
 function patchTransmitControl() {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return;
     if (window.ControllerMode?.active) return;
     if (isUpdatingTransmitFromBackend) return;
 
@@ -954,6 +958,7 @@ function patchTransmitControl() {
 }
 
 function stopTransmission(options = {}) {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return false;
     if (window.ControllerMode?.active) return false;
     const $stop = $("#stop_transmit");
     if ($stop.prop("disabled")) {
@@ -1611,6 +1616,7 @@ function shouldSuppressDisabledModeSwitchReloadFailure(message) {
 }
 
 function persistDisabledModeChange(targetMode, previousMode = currentConfigModeSelection) {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return null;
     const normalizedTargetMode = ["WSPR", "QRSS", "FSKCW", "DFCW"].includes(targetMode)
         ? targetMode
         : previousMode;
@@ -4807,6 +4813,7 @@ function resumeConfigAutosaveAfterControllerRecovery() {
 }
 
 function scheduleAutosave() {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return;
     if (window.ControllerMode?.active) return;
     if (configAutosaveSuspended) {
         return;
@@ -4834,6 +4841,7 @@ function scheduleAutosave() {
 }
 
 function flushAutosave() {
+    if (window.SetupTargets && !window.SetupTargets.localWritable) return;
     if (window.ControllerMode?.active) return;
     if (configAutosaveSuspended) {
         return;

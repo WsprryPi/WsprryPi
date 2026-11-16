@@ -94,7 +94,7 @@
             saved.management.setAvailability(saved.handle.state.connected,true);
             saved.usb.setAvailability(saved.handle.state.carrier === 'usb_physical');saved.udp.setAvailability(saved.handle.state.connected);
             node('pico-target-feedback').textContent = 'Connected to this Pico. Its retained draft is restored; read current saved settings before another change.';
-            recovery(saved);ledger();retained();
+            recovery(saved);ledger();retained();notify();
         }
         function response(result) {
             const headers = new Headers(result.response.headers);
@@ -145,10 +145,49 @@
                 if (error.code === 'request_unconfirmed' && error.operation)
                     hold(entry,{device:handle.device,operation:error.operation,resource,read:host.WsprryControl.controllerRecoveryRead(resource)});
                 throw error;
-            } finally {--entry.pending;ledger();recovery(entry);}
+            } finally {--entry.pending;ledger();recovery(entry);notify();}
+        }
+        function notify() { host.SetupTargets?.editorChanged?.(); }
+        function organize(panel) {
+            if (panel.dataset.setupOrganized) return;
+            panel.dataset.setupOrganized = 'true';
+            const find = id => panel.querySelector('#' + host.CSS.escape(id));
+            const pane = (name,label,tab) => {
+                const section = host.document.createElement('section');
+                section.id = 'setup-pico-' + name;section.className = 'tab-pane fade';
+                section.setAttribute('role','tabpanel');section.setAttribute('aria-labelledby',tab);section.tabIndex = 0;
+                const title = host.document.createElement('h3');title.className = 'cw-control-section__title';title.textContent = label;
+                section.append(title);return section;
+            };
+            const signal = pane('signal','Signal Setup','radio-tab'), transmitter = pane('transmitter','Transmitter','transmitter-hardware-tab'), io = pane('io','Device I/O','pi-hardware-tab');
+            const common = host.document.createElement('div');common.className = 'setup-pico-observations';
+            const member = find('wtp-member-heading').closest('section');
+            const heading = find('wtp-member-heading'),intro = heading.nextElementSibling;
+            heading.textContent = 'Saved and active resources';heading.classList.add('d-inline','mb-0');
+            const observations = host.document.createElement('details'), summary = host.document.createElement('summary');
+            observations.className = 'mt-2';summary.append(heading);observations.append(summary,intro,member.querySelector('dl'));
+            common.append(find('wtp-member-load'),find('wtp-member-feedback'),observations);
+            const station = member.querySelector('h5');station.id = 'setup-pico-station-heading';member.setAttribute('aria-labelledby',station.id);
+            const hardware = find('wtp-hardware-settings');
+            transmitter.append(find('wtp-si5351-controls'),find('amplifier-timing-settings'),find('filter-selector-controls'),find('gpio-drive-form'));
+            const hint = host.document.createElement('p');hint.className = 'form-text';
+            hint.textContent = 'The RF engine and pin assignments are validated and saved together in Device I/O. These independent RF controls keep their own save and activation actions.';
+            const jump = host.document.createElement('button');jump.type = 'button';jump.className = 'btn btn-outline-secondary mb-3';jump.textContent = 'Edit RF engine and pins';
+            jump.addEventListener('click',() => {host.bootstrap.Tab.getOrCreateInstance(node('pi-hardware-tab')).show();node('pi-hardware-tab').focus();});
+            transmitter.prepend(hint,jump);
+            io.append(hardware,find('wtp-usb-settings'),find('member-udp-logging-controls').closest('details'),find('wtp-management-carrier').closest('.row'));
+            const network = host.document.createElement('section');network.className = 'mt-4';
+            const networkTitle = host.document.createElement('h4');networkTitle.className = 'cw-control-section__title';networkTitle.textContent = 'Wi-Fi radio';
+            const feedback = find('wtp-network-feedback'),explanation = feedback.nextElementSibling;
+            network.append(networkTitle,find('wtp-network-load'),find('wtp-network-disable'),feedback,explanation);io.append(network);
+            signal.append(member,find('wtp-combined-settings'));
+            const unavailable = host.document.createElement('p');unavailable.className = 'form-text';unavailable.textContent = 'Pi CW profiles are unavailable on this Pico. Its existing standalone controls below retain their own scheduling and save semantics.';signal.prepend(unavailable);
+            const panes = host.document.createElement('div');panes.className = 'tab-content';panes.append(signal,transmitter,io);
+            panel.append(common,panes);
         }
         function mount(profile, handle, key) {
             const panel = template.content.firstElementChild.cloneNode(true);
+            organize(panel);
             const entry = {profile,signature:fingerprint(profile),panel,handle,key,pending:0,epoch:0,paused:false,hold:null,observed:null,recovering:false};
             const scoped = new Proxy(host.document,{get(document,property) {
                 if (property === 'getElementById') return id => id === panel.id ? panel : panel.querySelector('#' + host.CSS.escape(id));
@@ -184,13 +223,13 @@
             }
             profile = structuredClone(profile);Object.freeze(profile.settings);Object.freeze(profile);
             const working = Array.from(entries.values()).find(entry => entry.profile.settings['Device ID'] === profile.settings['Device ID'] && busy(entry));
-            if (working) {node('pico-target-feedback').textContent = 'A request is still finishing on this Pico. Its result is tracked here; wait before reopening its editor.';return;}
             const epoch = ++selection;
             if (active) {active.paused = true;++active.epoch;active.restoreObserver?.disconnect();active.restoreObserver = null;active.handle.retire();active.panel.remove();}
             active = null;
             retained();
             node('pico-target-panel').replaceChildren();node('pico-target-recovery').hidden = true;
             node('pico-target-identity').textContent = `${profile.name} · ${profile.settings.Transport} · device ${profile.settings['Device ID']}`;
+            if (working) {node('pico-target-feedback').textContent = 'A request is still finishing on this Pico. Its result is tracked here; wait before reconnecting its editor.';notify();return;}
             node('pico-target-feedback').textContent = 'Checking this Pico. The transmitter backend and accepted jobs remain unchanged.';
             let handle;
             try {
@@ -219,10 +258,11 @@
                 entry.management.setAvailability(handle.state.connected,true);
                 entry.usb.setAvailability(handle.state.connected && handle.state.carrier === 'usb_physical');
                 entry.udp.setAvailability(handle.state.connected);
-                recovery(entry);ledger();retained();
+                recovery(entry);ledger();retained();notify();
             } catch (error) {
                 handle?.retire();
                 if (epoch === selection) node('pico-target-feedback').textContent = error.message || 'Pico management is unavailable. Saved drafts are retained.';
+                notify();
             }
         }
         async function readRecovery() {
@@ -287,7 +327,8 @@
             if (current && fingerprint(current) === active.signature) return;
             active.paused = true;++active.epoch;active.handle.retire();active.panel.inert = true;
             recovery(active);
-            node('pico-target-feedback').textContent = 'This saved profile changed or was removed. Its draft is retained separately. Choose the intended saved Pico and Manage settings again.';
+            node('pico-target-feedback').textContent = 'This saved profile changed or was removed. Its draft is retained separately. Choose the intended saved Pico with Device again.';
+            notify();
         }
         function init() {
             template = node('pico-target-template');if (!template) return;
@@ -295,7 +336,17 @@
             node('pico-target-review-recovery').addEventListener('click',reviewRecovery);
             host.addEventListener('pagehide',() => {++selection;for (const entry of entries.values()) {entry.paused = true;++entry.epoch;entry.handle.retire();}});
         }
-        return Object.freeze({init,select,catalogChanged,operations:() => client.operations()});
+        function leave() {
+            ++selection;
+            if (active) {active.paused = true;++active.epoch;active.restoreObserver?.disconnect();active.restoreObserver = null;active.handle.retire();active.panel.remove();}
+            active = null;node('pico-target-panel')?.replaceChildren();
+            if (node('pico-target-recovery')) node('pico-target-recovery').hidden = true;
+            retained();ledger();notify();
+        }
+        return Object.freeze({init,select,leave,catalogChanged,operations:() => client.operations(),
+            retainedProfiles:() => Array.from(new Map(Array.from(entries.values()).map(entry => [entry.profile.id,entry.profile])).values()),
+            get state() {return active ? {device:active.profile.settings['Device ID'],profile:active.profile.id,connected:!!active.handle?.state.connected,
+                pending:active.pending,paused:active.paused,unconfirmed:!!active.hold,generation:active.generation} : null;}});
     }
     if (typeof module !== 'undefined' && module.exports) module.exports = {create};
     if (!root.document) return;

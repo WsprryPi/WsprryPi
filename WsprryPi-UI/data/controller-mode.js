@@ -34,7 +34,7 @@
         if (node("operationLocalView")) {node("operationLocalView").hidden = true;node("operationLocalView").inert = true;}
         for (const id of ["radio-tab", "transmitter-hardware-tab", "pi-hardware-tab"]) {
             const tab = node(id);
-            if (tab) {tab.disabled = true;tab.setAttribute("aria-disabled", "true");}
+            if (tab && !root.SetupTargets?.managingPico) {tab.disabled = true;tab.setAttribute("aria-disabled", "true");}
         }
         for (const id of ["transmit", "stop_transmit", "rebootButton", "shutdownButton"]) {
             const control = node(id);
@@ -52,6 +52,7 @@
         const saved = node("configSaveStatus");
         if (saved) {saved.textContent = "";saved.removeAttribute("data-state");}
         if (node("configSaveStatusDetail")) node("configSaveStatusDetail").hidden = true;
+        root.SetupTargets?.render?.();
         if (!initialized && node("fleet-tab")) {
             initialized = true;
             root.bootstrap.Tab.getOrCreateInstance(node("fleet-tab")).show();

@@ -1981,6 +1981,9 @@ function populateConfig(callback = null) {
                 // Band GPIO.<band>.Active High and per-frequency via
                 // @GPIO[H|L] metadata, not as a single GPIO-wide setting.
 
+                // A selected remote editor cannot consume or overwrite the
+                // local draft retained when its autosave timer was suspended.
+                if (isConfigView() && window.SetupTargets?.retainingLocalDraft) return;
                 // If we are on the config page
                 if (isConfigView()) {
                     if (typeof suspendConfigAutosave === "function") {
@@ -2141,6 +2144,7 @@ function populateConfig(callback = null) {
                     if (typeof restorePersistedConfigDraft === "function") {
                         restorePersistedConfigDraft();
                     }
+                    window.SetupTargets?.localLoaded?.();
                     if (typeof suspendConfigAutosave === "function") {
                         suspendConfigAutosave(false);
                     }

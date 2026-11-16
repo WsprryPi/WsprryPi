@@ -577,9 +577,10 @@
                 invalidateEditors();
                 feedback.textContent = data.carrier === "usb_physical" || body?.action === "usb_physical"
                     ? "USB management selected. Load saved Pico settings before editing. Wi-Fi and a network password are not required."
-                    : consumerConnected
+                    : consumerConnected && data.carrier?.startsWith("consumer_")
                     ? "Consumer management authenticated for this Pico and boot. Load saved Pico settings before editing. The login password has been cleared."
                     : explicitDisconnected ? "Management disconnected. Only this client's consumer session was closed. Your settings draft is preserved."
+                        : consumerConnected ? "Engineering HTTPS authenticated for this Pico and boot. Load saved Pico settings before editing."
                         : "Engineering HTTPS selected. Load saved Pico settings before editing.";
             } else if (resource === "network") {
                 networkRevision = etag;

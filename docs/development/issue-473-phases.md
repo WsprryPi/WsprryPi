@@ -20,9 +20,10 @@ separate authorization to execute and successful prerequisite gates.
    management unavailable under the approved security deferral.
    [Phase 2 prompt](issue-473/02-target-management.md) ·
    [Phase-2 acceptance and deferred-security boundary](issue-473/phase-2-progress.md)
-3. ▧ **Unify Setup controls:** Add the shared Device selector and move existing
+3. ✅ **Unify Setup controls:** Add the shared Device selector and move existing
    controls into target-aware tabs.
-   [Phase 3 prompt](issue-473/03-shared-setup.md)
+   [Phase 3 prompt](issue-473/03-shared-setup.md) ·
+   [Phase-3 implementation and validation](issue-473/phase-3-progress.md)
 4. ▧ **Build Pi solar policy:** Implement solar calculations and the complete
    configuration lifecycle, preserving existing behavior when disabled.
    [Phase 4 prompt](issue-473/04-solar-policy.md)

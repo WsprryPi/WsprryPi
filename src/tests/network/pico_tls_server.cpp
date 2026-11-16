@@ -130,6 +130,32 @@ int main(int argc, char **argv) {
       else if (input == "DISABLE_FAIL") { engine.can_disable=false; std::cout << "ACK" << std::endl; }
       else if (input == "STOP") { (void)scheduler.command("STOP"); std::cout << "ACK" << std::endl; }
       else if (input.starts_with("CONFIG ")) { std::cout << scheduler.command(input) << std::flush; }
+      else if (input == "ACTIVE_JOB") {
+        unsigned sequence=0;
+        const auto invoke=[&](const std::string &operation,wsprrypico::wtp::RequestBody body) {
+          wsprrypico::wtp::Request request;request.principal="shared-setup-software-fixture";
+          request.session_id=std::string(32,'d');request.request_id=std::string(31,'0')+std::to_string(++sequence);
+          request.operation=operation;request.body=std::move(body);request.payload_digest[0]=sequence;
+          return service.handle(request).ok;
+        };
+        wsprrypico::wtp::Job job{std::string(32,'e'),"rf-events/1","tone",1'000'000'000,{},false};
+        const bool events=job.events.push_back({0,job.total_duration_ns,true,7'040'000'000'000'000ULL});
+        const bool ready=events && invoke("HELLO",wsprrypico::wtp::HelloBody{{"WTP/1"}}) &&
+            invoke("CLAIM",wsprrypico::wtp::ClaimBody{std::string(32,'d'),60000}) && invoke("LOAD",std::move(job)) &&
+            invoke("ARM",wsprrypico::wtp::ArmBody{std::string(32,'e'),clock.snapshot().utc_now_ns+30'000'000'000ULL,1'000'000'000ULL});
+        std::cout << (ready ? "ACK" : "FAILED") << std::endl;
+      }
+      else if (input == "END_ACTIVE_JOB") {
+        wsprrypico::wtp::Request request;request.principal="shared-setup-software-fixture";
+        request.session_id=std::string(32,'d');request.request_id=std::string(32,'9');
+        request.operation="ABORT";request.body=wsprrypico::wtp::AbortBody{std::string(32,'e')};request.payload_digest[0]=99;
+        std::cout << (service.handle(request).ok ? "ACK" : "FAILED") << std::endl;
+      }
+      else if (input == "JOB_STATE") {
+        const auto current=service.status();
+        std::cout << "JOB " << static_cast<int>(current.state) << ' ' << current.owner_id.value_or("none")
+                  << ' ' << current.job_id.value_or("none") << ' ' << engine.prepares << ' ' << engine.disables << std::endl;
+      }
       else if (input == "DUMP") {
         wsprrypico::standalone::Store reload{flash};
         const bool healthy = reload.load();

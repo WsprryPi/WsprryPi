@@ -298,6 +298,7 @@
         byId("fleet-remove").disabled = fleetBusy || !profile;
         if (byId("fleet-manage")) byId("fleet-manage").disabled = fleetBusy || !profile || profile.legacy_unverified;
         root.PicoTargetEditors?.catalogChanged(fleetCatalog.profiles);
+        root.SetupTargets?.catalogChanged(fleetCatalog.profiles,[...(fleetDiscovery?.candidates || []),...(fleetDiscovery?.usb?.candidates || [])]);
         if (byId("fleet-uncertainty-default")) byId("fleet-uncertainty-default").disabled = fleetBusy;
         byId("fleet-device-detail").textContent = profile
             ? `${fleetCatalog.active_id === profile.id ? "Active host endpoint. " : "Saved profile. "}${profile.method === "dns_sd" ? "DNS-SD hint; identity must be checked again before use. " : "Manual endpoint. "}${profile.legacy_unverified ? "Confirm the full device ID before use. " : ""}Expected ID: ${profile.settings?.["Device ID"] || "unverified"}. Endpoint: ${profile.settings?.Transport === "usb" ? profile.settings?.Endpoint : `${profile.settings?.Hostname}:${profile.settings?.["TCP Port"]}`}.${candidate?.state === "online" && (candidate.target !== profile.settings?.Hostname || candidate.port !== profile.settings?.["TCP Port"]) ? ` Nearby SRV is now ${candidate.target}:${candidate.port}; edit and verify this profile before use.` : ""} Selecting does not connect or save.`
@@ -525,6 +526,7 @@
                 ? root.ControllerMode?.active ? "Fleet changes use Save buttons. This controller has no local transmitter settings."
                     : "Fleet changes use Save buttons. This Pi's Use Pico and connection settings autosave."
                 : originalHint;
+            root.SetupTargets?.render?.();
         };
         byId("configTabs")?.addEventListener("shown.bs.tab", updateHeader);
         updateHeader();
@@ -532,10 +534,9 @@
         byId("fleet-manage")?.addEventListener("click", () => {
             const profile = fleetSelection()?.profile;
             if (profile && !profile.legacy_unverified) {
-                void root.PicoTargetEditors?.select(profile);
-                const heading = byId("pico-target-heading");
-                heading?.focus?.({preventScroll:true});
-                heading?.scrollIntoView?.({block:"center",behavior:"instant"});
+                if (!root.SetupTargets) {fleetFeedback("Shared Setup is unavailable. Reload the page before managing settings.");return;}
+                byId("setup-device").focus({preventScroll:true});
+                void root.SetupTargets.selectProfile(profile);
             }
         });
         byId("fleet-device").addEventListener("change", event => { fleetChoice = event.target.value; fleetRender(); });
@@ -563,6 +564,10 @@
         byId("fleet-editor").addEventListener("input", () => { fleetObservedId = ""; });
     }
     root.WtpUi = { selected, read, validate, populate, refreshControls: render,
+        get catalogReady() {return !!fleetCatalog;},
+        get savedProfiles() {return structuredClone(fleetCatalog?.profiles || []);},
+        get nearbyDevices() {return structuredClone([...(fleetDiscovery?.candidates || []),...(fleetDiscovery?.usb?.candidates || [])]);},
+        explore(value) {fleetChoice = value;fleetRender();},
         get maximumJobDurationNs() {
             const value = snapshot?.capabilities?.max_job_duration_ns;
             const ns = typeof value === "string" && /^\d+$/.test(value) ? BigInt(value) : 0n;
