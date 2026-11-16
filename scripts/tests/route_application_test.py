@@ -20,6 +20,23 @@ class Tests(unittest.TestCase):
         self.data = (SOURCE/'config/wsprrypi.ini').read_bytes().replace(
             b'Transmit Backend = gpio', b'Transmit Backend = rp1-gpclk')
 
+    def test_backend_classification_is_independent_of_route_fields(self):
+        for value, expected in [('gpio', 'gpio'), (' Si5351 ', 'si5351'),
+                                ('WTP', 'wtp'), ('RP1-GPCLK', 'rp1-gpclk'), ('', 'gpio')]:
+            with self.subTest(value=value):
+                raw = ('[Operation]\nTransmit Backend = '+value+'\n').encode()
+                self.assertEqual(app.configured_backend(raw), expected)
+        self.assertEqual(app.configured_backend(b'[Operation]\n'), 'gpio')
+        for raw in (b'[Other]\n', b'[Operation]\nTransmit Backend = unknown\n',
+                    b'[Operation]\nTransmit Backend = simulated\n',
+                    b'[DEFAULT]\nTransmit Backend = gpio\n[Operation]\n',
+                    b'[Operation]\nTransmit Backend = gpio\n[Operation]\nTransmit Backend = si5351\n'):
+            with self.subTest(raw=raw), self.assertRaises((ValueError, app.configparser.Error)):
+                app.configured_backend(raw)
+        # The public restoration parser keeps its existing closed validation.
+        with self.assertRaises(ValueError):
+            app.configuration(self.data.replace(b'rp1-gpclk', b'wtp'))
+
     def test_explicit_route_selects_runtime_backend_pin_and_inhibits_transmit(self):
         for backend in (b'gpio', b'si5351'):
             for policy in (b'Never', b'Follow', b'Always'):

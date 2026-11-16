@@ -3,6 +3,7 @@
 """Offline startup orchestration tests; fake public provider, no system effects."""
 import contextlib
 import copy
+import io
 import json
 from pathlib import Path
 import sys
@@ -43,6 +44,8 @@ class System:
         self.active = None
         self.interrupt = None
 
+    def inspect_service_command(self): pass
+    def backend(self): return self.config["backend"]
     def bootstrap_capable(self): pass
     def lock(self, wait=False): return contextlib.nullcontext()
     def ownership(self): return copy.deepcopy(self.record)
@@ -629,6 +632,94 @@ class Tests(unittest.TestCase):
         with patch.object(system, 'bootstrap_capable', side_effect=ValueError('old binary')):
             with self.assertRaises(ValueError): recovery.prepare(system)
         self.assertIsNone(system.env)
+
+    def test_non_rp1_entry_points_ignore_all_provider_state(self):
+        for backend in ('gpio', 'si5351', 'wtp'):
+            system = System(); system.config['backend'] = backend; system.env = True
+            system.config['transmit'] = True
+            system.saved = {'phase': 'pending'}
+            before = copy.deepcopy(system.config)
+            with self.subTest(backend=backend), contextlib.ExitStack() as stack:
+                for name in ('bootstrap_capable', 'ownership', 'checkpoint',
+                             'activation_journal', 'configuration', 'lock', 'call'):
+                    stack.enter_context(patch.object(system, name,
+                        side_effect=AssertionError('non-RP1 called '+name)))
+                recovery.prepare(system)
+                self.assertFalse(system.env)
+                self.assertEqual(recovery.reconcile(system), 'not-applicable')
+                self.assertIn('does not require', recovery.restore_installation(system))
+                self.assertEqual(system.config, before)
+                self.assertEqual(system.saved, {'phase': 'pending'})
+                with patch.object(recovery, 'Linux', return_value=system), \
+                     patch.object(recovery.os, 'geteuid', return_value=0), \
+                     patch.object(recovery.sys, 'argv', ['runtime_reconcile.py', 'reconcile']), \
+                     patch.object(recovery.time, 'sleep', side_effect=AssertionError('non-RP1 wait')), \
+                     patch('sys.stdout', new_callable=io.StringIO) as output:
+                    recovery.main()
+                    self.assertEqual(output.getvalue().strip(), 'not-applicable')
+
+    def test_real_preparation_markers_are_required_only_for_rp1(self):
+        service = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini ; ignore_errors=no ; }'
+        for backend in ('gpio', 'si5351', 'wtp', 'rp1-gpclk'):
+            for binary in (b'old binary', b'WSPRRYPI_ROUTE_RESTORE_IDLE',
+                           b'WSPRRYPI_RP1_REBOOT_IDLE',
+                           b'WSPRRYPI_ROUTE_RESTORE_IDLE WSPRRYPI_RP1_REBOOT_IDLE'):
+                with self.subTest(backend=backend, binary=binary), tempfile.TemporaryDirectory() as raw:
+                    root = Path(raw); env = root/'startup.env'; env.write_bytes(b'WSPRRYPI_RP1_REBOOT_IDLE=1\n')
+                    config = (Path(__file__).resolve().parents[2]/'config/wsprrypi.ini').read_bytes().replace(
+                        b'Transmit Backend = gpio', b'Transmit Backend = '+backend.encode())
+                    def trusted(path):
+                        if path == recovery.companion.CONFIG: return config, None
+                        if path == recovery.companion.BINARY: return binary, None
+                        return path.read_bytes(), path.stat()
+                    system = recovery.Linux()
+                    with patch.object(recovery.companion, 'trusted', side_effect=trusted), \
+                         patch.object(recovery.companion.subprocess, 'check_output', return_value=service), \
+                         patch.object(recovery, 'ENVIRONMENT', env), \
+                         patch.object(recovery.installer, 'secure_record_parent'), \
+                         patch.object(system, 'ownership', side_effect=AssertionError('provider touched') if backend != 'rp1-gpclk' else None, return_value=None):
+                        before = config
+                        if backend == 'rp1-gpclk' and not all(marker in binary for marker in
+                                (b'WSPRRYPI_ROUTE_RESTORE_IDLE', b'WSPRRYPI_RP1_REBOOT_IDLE')):
+                            with self.assertRaises((ValueError, recovery.installer.ContractError)):
+                                recovery.prepare(system)
+                            self.assertEqual(env.read_bytes(), b'WSPRRYPI_RP1_REBOOT_IDLE=1\n')
+                        else:
+                            recovery.prepare(system)
+                            self.assertEqual(env.read_bytes(), b'')
+                        self.assertEqual(config, before)
+
+    def test_preparation_refuses_unknown_or_untrusted_input_before_environment(self):
+        system = System()
+        for name, error in (('inspect_service_command', ValueError('unsupported command')),
+                            ('backend', ValueError('unknown backend')),
+                            ('backend', recovery.companion.configparser.DuplicateOptionError('Operation', 'Transmit Backend')),
+                            ('backend', OSError('untrusted config'))):
+            with self.subTest(name=name, error=error), \
+                 patch.object(system, name, side_effect=error), \
+                 patch.object(system, 'ownership', side_effect=AssertionError('ownership read')):
+                with self.assertRaises(type(error)):
+                    recovery.prepare(system)
+                self.assertIsNone(system.env)
+
+    def test_preparation_preserves_unsafe_environment_and_its_target(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw); target = root/'operator-file'; target.write_bytes(b'preserve')
+            env = root/'startup.env'; env.symlink_to(target)
+            def trusted(path):
+                if path == env:
+                    raise ValueError('untrusted startup environment')
+                return b'', None
+            system = recovery.Linux()
+            with patch.object(system, 'inspect_service_command'), \
+                 patch.object(system, 'backend', return_value='gpio'), \
+                 patch.object(recovery, 'ENVIRONMENT', env), \
+                 patch.object(recovery.installer, 'secure_record_parent'), \
+                 patch.object(recovery.companion, 'trusted', side_effect=trusted):
+                with self.assertRaisesRegex(ValueError, 'untrusted startup environment'):
+                    recovery.prepare(system)
+            self.assertTrue(env.is_symlink())
+            self.assertEqual(target.read_bytes(), b'preserve')
 
     def test_duplicate_or_malformed_checkpoint_is_rejected(self):
         with self.assertRaises(recovery.installer.ContractError): recovery.strict_json('{"a":1,"a":2}')

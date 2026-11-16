@@ -37,6 +37,7 @@ python3 -B "${SCRIPT_DIR}/installer_output_test.py"
 python3 -B "${SCRIPT_DIR}/picotool_install_test.py"
 python3 -B "${SCRIPT_DIR}/picotool_build_test.py"
 python3 "${SCRIPT_DIR}/service_install_recovery_test.py"
+python3 -B "${SCRIPT_DIR}/startup_recovery_pair_test.py"
 "${SCRIPT_DIR}/build_resource_preflight_test.sh"
 
 if ! awk '

@@ -51,7 +51,12 @@ application-owned installer support, `wsprrypi-rp1-reconcile.service`, and the
 exact interrupted-installation retries. `remove` removes only that recorded
 inventory; neither operation starts a service or selects a route.
 
-Normal reboot recovery requires a provider supporting current post-reboot
+Startup recovery applies only when the saved transmit backend is `rp1-gpclk`.
+Other backends, including Si5351 and WTP, do not require RP1 restoration support
+in the application executable or depend on provider recovery records. Their
+startup clears the dedicated RP1 idle override without changing saved settings.
+
+Normal RP1 reboot recovery requires a provider supporting current post-reboot
 activation plans and an application binary with the separate reboot-idle flag.
 A provider-only update does not supply this orchestration. See the
 [runtime workflow](runtime-route-workflow.md) for route and idle policy. Provider
@@ -60,6 +65,10 @@ installation workflow; historical session values in installation provenance do
 not assert current-boot ownership.
 
 ## Selection
+
+Automatic provider installation on supported Pi 5/CM5 systems is independent of
+the selected transmit backend. Selecting Si5351 or WTP leaves the RP1 provider
+available for later use. An explicit `false` still omits provider installation.
 
 `INSTALL_RP1_GPCLK_DKMS` accepts exactly:
 

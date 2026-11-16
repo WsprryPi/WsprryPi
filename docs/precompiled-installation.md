@@ -66,7 +66,12 @@ and build-resource checks, even with a precompiled application.
 The executable is staged before service interruption and published by an
 atomic rename. If a subsequent installer step fails, the installer attempts to
 restore the prior executable and service state. This is executable recovery,
-not a rollback of package or configuration changes.
+not a rollback of package or configuration changes. Supporting files, including
+the startup hook, remain at the installed version. The hook accepts a restored
+non-RP1 application without requiring RP1 restoration support; RP1 operation
+still requires that support. Recovery does not establish that an older executable
+can read all configuration changes made during the attempted installation.
+The installer reports failure even when executable recovery succeeds.
 
 An upgrade preserves current settings, including WTP connection settings,
 WSPR frequency preferences and band-selector assignments. Retired `GPIO.Use NTP`
