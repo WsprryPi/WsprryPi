@@ -212,7 +212,8 @@
         if (!current.size) {
             list.replaceChildren();
             const empty = root.document.createElement("p");empty.className = "form-text";empty.dataset.empty = "";
-            empty.textContent = "No remote schedules assigned. This Pi's local schedule remains available.";list.append(empty);
+            empty.textContent = root.ControllerMode?.active ? "No remote schedules assigned. Choose a saved output to assign a schedule."
+                : "No remote schedules assigned. This Pi's local schedule remains available.";list.append(empty);
         }
         const removals = data.removals || [];
         if (removals.length && !busy) message(`${removals.length} assignment${removals.length === 1 ? " was" : "s were"} removed after local takeover. Reassign only when the target is available again.`);
@@ -460,9 +461,17 @@
     }
     function setVisible(value) {
         visible = value === true;
+        if (root.ControllerMode?.active && byId("fleet-schedules-description"))
+            byId("fleet-schedules-description").textContent = "Assign a schedule to each remote output. This controller has no local transmitter schedule.";
         for (const id of ["fleet-schedules", "fleet-listener"]) {
             const panel = byId(id);
             if (!panel) continue;
+            if (id === "fleet-listener" && root.ControllerMode?.active) {
+                panel.hidden = true;
+                panel.inert = true;
+                panel.querySelectorAll("input,select,button").forEach(control => {control.disabled = true;});
+                continue;
+            }
             panel.inert = !visible;
             panel.querySelectorAll("input,select,button").forEach(control => {control.disabled = !visible || busy || (id === "fleet-listener" && listenerBusy);});
         }

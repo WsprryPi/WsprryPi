@@ -23,6 +23,7 @@ def main():
         original = args.source / 'engineering/protocol/control-1.schema.json'
         contents = original.read_bytes()
         for name, relative in [('control-policy.json', 'engineering/protocol/control-policy.json'),
+                               ('network-diagnostics.schema.json', 'engineering/protocol/network-diagnostics.schema.json'),
                                ('check_control_policy.py', 'scripts/check_control_policy.py')]:
             source = (args.source / relative).read_bytes()
             if args.check:
@@ -31,6 +32,12 @@ def main():
             else:
                 DEST.mkdir(parents=True, exist_ok=True)
                 (DEST / name).write_bytes(source)
+        vectors=(args.source/'engineering/protocol/control-controller-vectors.json').read_bytes()
+        if args.check:
+            if (DEST/'control-controller-vectors.json').read_bytes()!=vectors:
+                raise ValueError('Controller vectors differ from selected Pico source')
+        else:
+            (DEST/'control-controller-vectors.json').write_bytes(vectors)
         DEST.mkdir(parents=True, exist_ok=True)
         if not args.check:
             spec_path.write_bytes(contents)
@@ -43,7 +50,7 @@ def main():
             (ROOT/'WsprryPi-UI/data/gray-line.js').write_bytes((args.source/'src/network/web/gray-line.js').read_bytes())
             revision = subprocess.check_output(['git','-C',str(args.source),'rev-parse','HEAD'],text=True).strip()
             dirty = bool(subprocess.check_output(['git','-C',str(args.source),'status','--porcelain'],text=True))
-            (DEST / 'PROVENANCE.json').write_text(json.dumps({'repository':'https://github.com/WsprryPi/WsprryPico','source_base_revision':revision,'source_uncommitted':dirty,'upstream':'engineering/protocol/control-1.schema.json','sha256':hashlib.sha256(contents).hexdigest(),'javascript_sha256':hashlib.sha256(javascript).hexdigest(),'si5351_javascript_sha256':hashlib.sha256(si5351).hexdigest(),'gps_javascript_sha256':hashlib.sha256(gps).hexdigest(),'gray_line_javascript_sha256':hashlib.sha256((ROOT/'WsprryPi-UI/data/gray-line.js').read_bytes()).hexdigest(),'policy_sha256':hashlib.sha256((DEST/'control-policy.json').read_bytes()).hexdigest(),'policy_checker_sha256':hashlib.sha256((DEST/'check_control_policy.py').read_bytes()).hexdigest()},indent=2)+'\n')
+            (DEST / 'PROVENANCE.json').write_text(json.dumps({'repository':'https://github.com/WsprryPi/WsprryPico','source_base_revision':revision,'source_uncommitted':dirty,'upstream':'engineering/protocol/control-1.schema.json','sha256':hashlib.sha256(contents).hexdigest(),'javascript_sha256':hashlib.sha256(javascript).hexdigest(),'si5351_javascript_sha256':hashlib.sha256(si5351).hexdigest(),'gps_javascript_sha256':hashlib.sha256(gps).hexdigest(),'gray_line_javascript_sha256':hashlib.sha256((ROOT/'WsprryPi-UI/data/gray-line.js').read_bytes()).hexdigest(),'controller_vectors_sha256':hashlib.sha256(vectors).hexdigest(),'network_diagnostics_sha256':hashlib.sha256((DEST/'network-diagnostics.schema.json').read_bytes()).hexdigest(),'policy_sha256':hashlib.sha256((DEST/'control-policy.json').read_bytes()).hexdigest(),'policy_checker_sha256':hashlib.sha256((DEST/'check_control_policy.py').read_bytes()).hexdigest()},indent=2)+'\n')
         elif spec_path.read_bytes() != contents:
             raise ValueError('Vendored Control/1 differs from selected Pico source')
         if args.check and (ROOT / 'WsprryPi-UI/data/control-contract.js').read_bytes() != (args.source / 'src/network/web/control-contract.js').read_bytes():
@@ -67,7 +74,9 @@ def main():
         raise ValueError('Shared GPS control provenance mismatch')
     if provenance.get('gray_line_javascript_sha256') != hashlib.sha256((ROOT/'WsprryPi-UI/data/gray-line.js').read_bytes()).hexdigest():
         raise ValueError('Shared gray-line control provenance mismatch')
-    for name, key in [('control-policy.json', 'policy_sha256'), ('check_control_policy.py', 'policy_checker_sha256')]:
+    if provenance.get('controller_vectors_sha256') != hashlib.sha256((DEST/'control-controller-vectors.json').read_bytes()).hexdigest():
+        raise ValueError('Controller vector provenance mismatch')
+    for name, key in [('control-policy.json', 'policy_sha256'), ('check_control_policy.py', 'policy_checker_sha256'), ('network-diagnostics.schema.json', 'network_diagnostics_sha256')]:
         if provenance.get(key) != hashlib.sha256((DEST / name).read_bytes()).hexdigest():
             raise ValueError('Vendored lifecycle guard provenance mismatch: ' + name)
     module_spec = importlib.util.spec_from_file_location('control_lifecycle', DEST / 'check_control_policy.py')
@@ -110,6 +119,24 @@ def main():
         header += '  return "{}";\n}\n'
     capshape=json.dumps(spec['$defs']['capabilities'],separators=(',',':'))
     header += 'inline std::string_view control_capabilities_shape() { return R\"CTRL('+capshape+')CTRL\"; }\n'
+    adapter=spec['controller_adapter']
+    diagnostics=json.loads((DEST/'network-diagnostics.schema.json').read_text())
+    header += 'inline std::string_view network_diagnostics_shape() { return R"CTRL('+json.dumps(diagnostics,separators=(',',':'))+')CTRL"; }\n'
+    header += 'inline std::string_view controller_adapter_contract() { return R"CTRL('+json.dumps(adapter,separators=(',',':'))+')CTRL"; }\n'
+    definitions={name:spec['$defs'][name] for name in adapter['definitions']}
+    header += 'inline std::string_view controller_document_definitions() { return R"CTRL('+json.dumps(definitions,separators=(',',':'))+')CTRL"; }\n'
+    header += 'inline std::string_view pi_resource_descriptor(std::string_view resource) {\n'
+    for resource,descriptor in lifecycle.pi_resource_descriptors(spec).items():
+        header += '  if(resource=='+json.dumps(resource)+') return R"CTRL('+json.dumps(descriptor,separators=(',',':'))+')CTRL";\n'
+    header += '  return {};\n}\n'
+    header += 'inline bool controller_pico_route(std::string_view resource,std::string_view method) {\n'
+    for method,names in adapter['pico_routes'].items():
+        header += '  if(method=='+json.dumps(method)+') return '+' || '.join('resource=='+json.dumps(name) for name in names)+';\n'
+    header += '  return false;\n}\n'
+    header += 'inline std::string_view controller_pico_recovery_read(std::string_view resource) {\n'
+    for resource,read in adapter['reconciliation_reads'].items():
+        header += '  if(resource=='+json.dumps(resource)+') return '+json.dumps(read)+';\n'
+    header += '  return {};\n}\n'
     header += '}\n'
     generated = ROOT/'src/wtp_integration/control_contract.hpp'
     if args.check:

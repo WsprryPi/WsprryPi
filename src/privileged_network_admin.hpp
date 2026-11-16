@@ -18,6 +18,10 @@ struct PrivilegedNetworkAdminPaths {
 
 using PrivilegedNetworkCommandRunner =
     std::function<bool(const std::vector<std::string> &)>;
+struct PrivilegedNetworkIniIO {
+    std::function<std::optional<std::string>(const std::string &)> read;
+    std::function<bool(const std::string &,const std::string &,const std::string &)> write;
+};
 
 [[nodiscard]] std::optional<std::string> read_text_file(
     const std::string &path);
@@ -34,7 +38,8 @@ class PrivilegedNetworkAdmin {
 public:
     explicit PrivilegedNetworkAdmin(
         PrivilegedNetworkAdminPaths paths,
-        PrivilegedNetworkCommandRunner runner = run_privileged_network_command);
+        PrivilegedNetworkCommandRunner runner = run_privileged_network_command,
+        PrivilegedNetworkIniIO ini_io = {});
 
     [[nodiscard]] PrivilegedNetworkTransactionSnapshot status();
     [[nodiscard]] PrivilegedNetworkTransactionResult apply(
@@ -43,8 +48,11 @@ public:
 private:
     [[nodiscard]] PrivilegedNetworkTransactionSnapshot snapshot() const;
     [[nodiscard]] bool validate_apache_candidate(const std::string &policy) const;
+    std::optional<std::string> read_application_ini() const;
+    bool write_application_ini(const std::string &);
 
     PrivilegedNetworkAdminPaths paths_;
     PrivilegedNetworkCommandRunner runner_;
+    PrivilegedNetworkIniIO ini_io_;
     mutable std::mutex mutex_;
 };

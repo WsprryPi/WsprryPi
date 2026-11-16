@@ -8,6 +8,13 @@ User constraints recorded 2026-11-15: no certificate/file/fingerprint workflow,
 keys generated and stored on devices, automatic credential lifecycle, ownership
 replacement through ordinary UI, and no change to existing WTP contracts.
 
+Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS
+and controller-to-remote-Pi management are deferred to the
+[end-of-phase-6 security milestone](deferred-pi-security.md). These approved
+design contracts remain unchanged; phase 2 no longer claims their implementation.
+Existing WTP/Pico TLS and the requirement for an automatic certificate-free
+operator workflow remain unchanged.
+
 ## Operator workflow
 
 1. Open the intended target Pi's own UI and choose **Pair a controller**. The

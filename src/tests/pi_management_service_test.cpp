@@ -1,0 +1,229 @@
+// SPDX-License-Identifier: MIT
+#include "arg_parser.hpp"
+#include "config_handler.hpp"
+#include "config_handler_serialization.hpp"
+#include "scheduling.hpp"
+#include "wtp_integration/catalog.hpp"
+#include "wtp_integration/pi_management_service.hpp"
+#include "wtp_integration/controller_contract.hpp"
+#include "WTP-Server/include/wtp_server/inhibited_rf_engine.hpp"
+#include "WTP-Server/include/wtp_server/sha256.hpp"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <span>
+#include <iomanip>
+#include <sstream>
+#include <thread>
+#include <future>
+#include <chrono>
+#include <sys/stat.h>
+#include <unistd.h>
+using namespace wsprrypi;
+using namespace wsprrypico::wtp;
+using Json=nlohmann::json;
+namespace {
+void check(bool value,const char *message){if(!value)throw std::runtime_error(message);}
+std::string bytes(const std::string &path){std::ifstream input(path,std::ios::binary);return {(std::istreambuf_iterator<char>(input)),{}};}
+class TestClock final:public Clock {public:ClockSnapshot snapshot() const override{return {ClockState::Synchronized,1000000000000ULL,10000000000ULL,1000,0,LeapState::Normal,std::nullopt};}};
+class TestIdentity final:public IdentitySource {public:std::string boot=std::string(32,'1');std::string new_boot_id() override{return boot;}};
+Request request(const char *operation,RequestBody body,char id){
+    const std::string text(1,id);const auto digest=sha256(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t *>(text.data()),text.size()));
+    return {"WTP/1",std::string(32,'7'),std::string(32,id),"local-network",operation,digest,std::move(body)};
+}
+}
+int main(){
+ try{
+  char pattern[]="/tmp/pi-management-service-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary,"Private fixture directory");const std::string root=temporary;
+  struct Remove{std::string root;~Remove(){std::filesystem::remove_all(root);}} remove{root};
+  const auto ini=root+"/settings.ini";const std::string self(32,'a');
+  init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
+  config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
+  config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";resolve_backend_specific_config(config);config_to_json();
+  {std::ofstream output(ini);output<<"; local Pi fixture\n[Security]\nPrivileged Network Safety = enforced\n";}
+  check(!chmod(ini.c_str(),0600),"Private INI");iniFile.set_filename(ini);iniFile.set_raw_passthrough_keys({{"Security","Privileged Network Safety"}});json_to_ini();
+  patch_all_from_web({{"WSPR",{{"Grid Square","EM18"},{"Call Sign","AA0NT"}}}});
+  WtpCatalog catalog(ini+".wtp-devices.json");PiManagedStore store(ini,self,catalog.pi_management_anchor(self,{}));store.recover();store.initialize(jConfig);
+  set_config_persistence_owner([&](const auto &internal,const auto &persist){store.persist(internal,persist);},
+      [&](const auto &internal){store.validate_snapshot(internal);},[&](const auto &internal,const auto &image){store.persist_stock(internal,image);});
+  iniFile.set_file_writer([&](const std::string &path,const std::string &image){check(path==ini,"Fixed owning INI publication");store.write_committed_ini(image);});
+  struct Clear{~Clear(){iniFile.set_file_writer({});set_config_persistence_owner({},{},{});}} clear;
+  TestClock clock;TestIdentity identity;InhibitedRfEngine engine;JobService jobs(clock,engine,identity);WtpPiAuthority authority(jobs,false);
+  bool available=true,race_claim=false,race_stop=false,fail_cancel=false;unsigned cancellations=0;std::string stopping_id;
+  bool wrong_identity=false;
+  try{PiLocalManagementService wrong(store,std::string(32,'b'),"Other Pi",[]()->std::optional<PiManagementObservation>{return {};});}
+  catch(const std::invalid_argument &){wrong_identity=true;}
+  check(wrong_identity,"A service cannot advertise an identity different from its durable store");
+  const auto claim=[&]{check(authority.handle(request("HELLO",HelloBody{{"WTP/1"}},'a')).ok,"Fixture inspection");
+      check(authority.handle(request("CLAIM",ClaimBody{std::string(32,'2'),10000},'b')).ok,"Fixture remote claim");};
+  PiLocalManagementService service(store,self,"This Pi",[&]()->std::optional<PiManagementObservation>{
+      if(!available)return {};
+      auto observed=authority.management_snapshot(self);
+      return PiManagementObservation{self,std::move(observed.first),std::move(observed.second),[&]{if(race_claim){race_claim=false;claim();}return authority.begin_configuration();},[&]{authority.end_configuration();},
+          [&](const WtpPiAuthority::ObservedOutput &expected){
+              if(race_stop){race_stop=false;check(authority.begin_test_tone(),"Racing output admission");}
+              return authority.reserve_observed_stop(self,identity.boot,expected);
+          },[&]{authority.release_observed_stop();},[&]{
+              ++cancellations;
+              check(store.receipt(self,"1",stopping_id).has_value(),"Cancellation dispatch follows durable acceptance");
+              if(fail_cancel)throw std::runtime_error("Fixture cancellation dispatch failed");
+              check(authority.local_stop(),"Existing Stop cancels fixture authority");authority.end_local_work(true);
+              config.transmit=false;config_to_json();
+          }};
+  });
+  const auto path="/api/control/v1/targets/"+self+"/";
+  const auto call=[&](const std::string &resource,const std::string &method="GET",Json body=Json(),const std::string &revision=std::string{},bool authenticated=true,bool origin=true){
+      return service.handle({method,path+resource,body.is_null()?std::string{}:body.dump(),revision,method!="GET"&&origin},authenticated);
+  };
+  const auto original=bytes(ini);const auto original_saved=store.settings();const auto output_before=authority.snapshot();
+  const auto busy=[&](auto &mutex){
+      std::promise<void> acquired;auto ready=acquired.get_future();
+      std::thread holder([&]{std::lock_guard lock(mutex);acquired.set_value();std::this_thread::sleep_for(std::chrono::milliseconds(200));});
+      ready.wait();const auto result=call("settings");holder.join();
+      check(result.status==409&&Json::parse(result.body)["error"]["code"]=="capacity"&&
+          bytes(ini)==original&&store.settings()==original_saved,
+          "Busy lifecycle/configuration owner refuses without waiting to negotiate or mutating state");
+  };
+  busy(test_tone_lifecycle_mutex());busy(config_update_mutex());
+  check(call("context","GET",nullptr,{},false).status==403,"Unauthenticated local gateway refusal");
+  const auto context_reply=call("context");check(context_reply.status==200,"Current context");const auto context=Json::parse(context_reply.body);
+  check(valid_controller_document(context,"target-context")&&context["target"]["device_id"]==self,"Closed self context");
+  for(const auto &cap:context["capabilities"])check(valid_pi_resource_capability(cap),"Recognized policy-bound descriptor");
+  const auto snapshot_reply=call("settings");check(snapshot_reply.status==200,"Current settings");const auto snapshot=Json::parse(snapshot_reply.body);
+  check(valid_controller_document(snapshot,"target-settings")&&snapshot_reply.etag=="\""+snapshot["revision"].get<std::string>()+"\"","Exact settings ETag");
+  const auto status=call("status");
+  check(status.status==200&&Json::parse(status.body)["authority_state"]=="unclassified"&&
+      bytes(ini)==original&&store.settings()==original_saved&&authority.snapshot().remote==output_before.remote,
+      "Reads preserve settings/output ownership and do not invent completed legacy-authority inventory");
+  Json save{{"contract","Wsprry-Control/1"},{"schema","target-save"},{"binding",context["binding"]},{"capability_revision",context["capability_revision"]},
+      {"operation_id",std::string(32,'c')},{"expected_revision",snapshot["revision"]},{"candidate",snapshot["saved"]}};
+  save["candidate"]["configuration"]["CW"]["Message"]="SERVICE SAVE";
+  const auto revision=snapshot_reply.etag;
+  check(call("settings","PUT",save,revision,true,false).status==403,"Origin/intent refusal");
+  check(call("settings","PUT",save).status==428,"Strong revision required");
+  const auto negative=[&](Json value){check(call("settings","PUT",value,revision).status!=200,"Malformed/stale request refused");check(bytes(ini)==original&&store.settings()==original_saved,"Refusal before persistence");};
+  auto invalid=save;invalid["extra"]=true;negative(invalid);
+  invalid=save;invalid["binding"]["device_id"]=std::string(32,'b');negative(invalid);
+  invalid=save;invalid["binding"]["boot_id"]=std::string(32,'b');negative(invalid);
+  invalid=save;invalid["binding"]["connection_generation"]="0";negative(invalid);
+  invalid=save;invalid["capability_revision"]=std::string(64,'b');negative(invalid);
+  invalid=save;invalid["candidate"]["configuration"]["Operation"]["Web Port"]=31419;negative(invalid);
+  invalid=save;invalid["candidate"]["configuration"]["WTP"]["TLS Client Key"]="/never-open-this-key";negative(invalid);
+  invalid=save;invalid["candidate"]["configuration"]["CW"]["Fade Shape"]="invalid";negative(invalid);
+  invalid=save;invalid["candidate"]["scheduling"]["enabled"]=false;negative(invalid);
+  invalid=save;invalid["candidate"]["configuration"]["CW"]["Message"]="";
+  invalid["candidate"]["configuration"]["CW"]["Message"]=std::string(32768-invalid.dump().size(),'A');
+  check(invalid.dump().size()==32768,"Maximum-sized complete request fixture");
+  negative(invalid);
+  check(call("settings","PUT",invalid,revision).status==400,"An unreadable complete candidate is rejected before persistence");
+  check(call("enable","POST",save,revision).status==404&&call("stop","POST",save,revision).status==400,"Unimplemented activation and malformed Stop cannot gain authority");
+  const auto committed=call("settings","PUT",save,revision);check(committed.status==200,"Validated service save");
+  const auto receipt=Json::parse(committed.body);check(receipt["state"]=="committed"&&receipt["binding"]==context["binding"]&&store.settings()["configuration"]["CW"]["Message"]=="SERVICE SAVE","Durable receipt and saved configuration");
+  const auto after=bytes(ini);check(call("settings","PUT",save,revision).body==committed.body&&bytes(ini)==after,"Exact replay does not repeat a write");
+  invalid=save;invalid["candidate"]["configuration"]["CW"]["Message"]="REUSED";
+  check(call("settings","PUT",invalid,revision).status==409&&bytes(ini)==after,"Request-ID reuse refusal");
+  check(call("operations/"+save["operation_id"].get<std::string>()).body==committed.body,"Lost-reply lookup returns exact receipt");
+  check(call("operations/"+std::string(32,'f')).status==404,"Absent receipt remains explicitly unknown");
+  const auto fresh_context=Json::parse(call("context").body),fresh_settings=Json::parse(call("settings").body);
+  save["operation_id"]=std::string(32,'d');save["expected_revision"]=fresh_settings["revision"];save["binding"]=fresh_context["binding"];
+  save["capability_revision"]=fresh_context["capability_revision"];save["candidate"]=fresh_settings["saved"];
+  save["candidate"]["configuration"]["CW"]["Message"]="SHOULD NOT SAVE";
+  race_claim=true;
+  check(call("settings","PUT",save,"\""+save["expected_revision"].get<std::string>()+"\"").status==409&&bytes(ini)==after&&authority.snapshot().remote.owner_id==std::string(32,'2'),"A racing claim wins without a hidden takeover or persistence");
+  check(call("settings").status==200&&authority.snapshot().remote.owner_id==std::string(32,'2'),"Management read preserves another owner's claim");
+  check(authority.local_stop(),"Retire fixture remote owner");identity.boot=std::string(32,'3');check(authority.recover_remote_output(),"New native boot fixture");
+  check(call("settings","PUT",save,"\""+save["expected_revision"].get<std::string>()+"\"").status==409&&bytes(ini)==after,"New native boot retires earlier edit binding");
+  auto stop_context=Json::parse(call("context").body),stop_settings=Json::parse(call("settings").body);
+  const auto stop_request=[&](char id){return Json{{"contract","Wsprry-Control/1"},{"schema","target-stop"},
+      {"binding",stop_context["binding"]},{"capability_revision",stop_context["capability_revision"]},
+      {"operation_id",std::string(32,id)},{"expected_revision",stop_settings["revision"]},{"observed_output",stop_settings["observed_output"]}};};
+  auto stop=stop_request('8');const auto stop_before=bytes(ini);const auto stop_record=store.settings();
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"",false).status==403&&
+      call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"",true,false).status==403,
+      "Bound Stop requires gateway authentication and CSRF before mutation");
+  race_stop=true;
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"").status==409&&
+      bytes(ini)==stop_before&&store.settings()==stop_record&&cancellations==0,
+      "A racing replacement output refuses before persistence and cancellation");
+  authority.end_local_work(true);
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"").status==409&&cancellations==0,
+      "Output ABA requires a new observation even when idle again");
+  check(authority.begin_test_tone(),"Fixture current output for bound cancellation");
+  stop_settings=Json::parse(call("settings").body);stop=stop_request('9');stopping_id=stop["operation_id"];
+  const auto stopped=call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"");
+  check(stopped.status==200&&Json::parse(stopped.body)["state"]=="committed"&&cancellations==1&&
+      store.settings()["scheduling"]==stop_record["scheduling"]&&store.settings()["configuration"]["Operation"]["Transmit"]==false,
+      "Bound cancellation acceptance is durable and preserves scheduler enablement");
+  check(authority.begin_test_tone(),"A later explicit output fixture");
+  const auto later=authority.observed_output(self);const auto stopped_bytes=bytes(ini);
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"").body==stopped.body&&
+      cancellations==1&&authority.observed_output(self)==later&&bytes(ini)==stopped_bytes,
+      "Lost-reply replay cannot cancel a later unobserved output or save again");
+  auto reused=stop;reused["observed_output"]=Json::parse(call("settings").body)["observed_output"];
+  check(call("stop","POST",reused,"\""+stop["expected_revision"].get<std::string>()+"\"").status==409&&cancellations==1,
+      "Stop operation IDs cannot be rebound to a later output");
+  stop_settings=Json::parse(call("settings").body);stop=stop_request('0');stopping_id=stop["operation_id"];fail_cancel=true;
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"").status==200&&cancellations==2&&
+      !authority.begin_scheduled_work()&&!authority.begin_test_tone()&&!authority.reserve_reconfiguration(),
+      "Cancellation dispatch failure preserves its durable acceptance and native admission fence");
+  const auto held_status=Json::parse(call("status").body),held_context=Json::parse(call("context").body);
+  check(held_status["transmit_effective"]==false&&Json::parse(call("settings").body)["pending_application"]=="held",
+      "A retained cancellation fence reports held application and no effective transmit permission");
+  for(const auto &cap:held_context["capabilities"])check(cap["write"]==false,"A retained cancellation fence cannot advertise another writable operation");
+  authority.release_observed_stop();authority.end_local_work(true);
+  fail_cancel=false;claim();
+  stop_context=Json::parse(call("context").body);stop_settings=Json::parse(call("settings").body);
+  stop=stop_request('6');stopping_id=stop["operation_id"];
+  const auto remote_stop=call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"");
+  check(remote_stop.status==200,"Remote-owner Stop acceptance");
+  check(cancellations==3&&!authority.snapshot().remote.owner_id,"Remote-owner cancellation dispatch");
+  check(Json::parse(call("context").body)["capability_revision"]!=stop_context["capability_revision"],"Remote-owner Stop changes writable capabilities");
+  check(call("stop","POST",stop,"\""+stop["expected_revision"].get<std::string>()+"\"").body==remote_stop.body&&cancellations==3,
+      "Stop's own remote-owner transition can change capabilities without losing its exact accepted replay");
+  PiManagedStore cold(ini,self,catalog.pi_management_anchor(self,{}));cold.recover();
+  check(cold.receipt(self,"1",stopping_id).has_value()&&cold.settings()==store.settings(),"Accepted Stop survives cold storage recovery");
+  const auto final_bytes=bytes(ini);available=false;check(call("context").status==503&&bytes(ini)==final_bytes,"Unavailable output authority is never replaced with a fabricated idle target");
+  check(call("operations/"+std::string(32,'c')).body==committed.body,"Authoritative receipt lookup survives an unavailable/replaced output");
+  available=true;
+  // Exercise actual bounded receipt publication, rather than only the pure
+  // retention helper. An evicted ID must never become a fresh write under an
+  // earlier browser context, even when its candidate happens to be unchanged.
+  Json before_eviction,evicted_request;
+  for(unsigned index=1;index<=257;++index){
+      const auto current_context=Json::parse(call("context").body);
+      const auto current_settings=Json::parse(call("settings").body);
+      std::ostringstream id;id<<std::setfill('0')<<std::setw(32)<<std::hex<<index;
+      Json retained{{"contract","Wsprry-Control/1"},{"schema","target-save"},
+          {"binding",current_context["binding"]},{"capability_revision",current_context["capability_revision"]},
+          {"operation_id",id.str()},{"expected_revision",current_settings["revision"]},{"candidate",current_settings["saved"]}};
+      const auto result=call("settings","PUT",retained,"\""+current_settings["revision"].get<std::string>()+"\"");
+      check(result.status==200,"Bounded history publication through the production transaction owner");
+      if(index==1)evicted_request=retained;
+      if(index==257)before_eviction=current_context;
+  }
+  const auto retired_context=Json::parse(call("context").body);
+  check(store.context_epoch()==6&&retired_context["binding"]["connection_generation"]!=before_eviction["binding"]["connection_generation"],
+      "Actual terminal eviction retires the previous edit context");
+  const auto retained_ini=bytes(ini);
+  const auto retained_saved=store.settings();
+  check(call("operations/"+std::string(32,'c')).status==404,"Evicted receipt lookup remains unknown");
+  check(call("operations/"+evicted_request["operation_id"].get<std::string>()).status==404,"Second terminal eviction removes its receipt");
+  const auto retired_reply=call("settings","PUT",evicted_request,"\""+evicted_request["expected_revision"].get<std::string>()+"\"");
+  check(retired_reply.status==409&&Json::parse(retired_reply.body)["error"]["code"]=="connection_changed"&&
+      bytes(ini)==retained_ini&&store.settings()==retained_saved,"An earlier edit context cannot revive an evicted operation");
+  check(call("operations/00000000000000000000000000000100").status==200,"Latest retained receipt remains recoverable after context retirement");
+  // A trusted legacy writer can already own a candidate near the storage
+  // limit. The adapter must bound the complete readback envelope as well.
+  auto large_internal=jConfig;large_internal["CW"]["Message"]="";
+  const Json large_candidate{{"configuration",config_handler_serialization::saved_configuration_from_internal_json(large_internal)},
+      {"scheduling",store.settings()["scheduling"]}};
+  large_internal["CW"]["Message"]=std::string(32768-canonical_pi_management_json(large_candidate).size(),'A');
+  const auto large_ini=serialize_config_ini_projection_for_management(large_internal);
+  store.persist(large_internal,[&]{std::ofstream output(ini,std::ios::binary);output<<large_ini;output.close();check(bool(output),"Legacy after-image write");});
+  const auto bounded=call("settings");
+  check(bounded.status==503&&bounded.body.size()<32768&&Json::parse(bounded.body)["error"]["code"]=="payload_too_large",
+      "An oversized legacy readback becomes a bounded typed refusal, never an oversized success");
+  check(!config.transmit,"No transmission requested");
+  std::cout<<"PASS: Pi local context/settings/status, policy-bound capabilities, semantic/read-only/binding refusals, actual configuration/WAL writes, exact replay/lookup, and racing-claim preservation without output\n";
+ }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}
+}

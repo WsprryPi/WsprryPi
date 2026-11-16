@@ -27,6 +27,9 @@
  */
 
 #include "web_server.hpp"
+#include "privileged_network_managed_ini.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
 
 #include "web_server_routes.hpp"
 
@@ -108,6 +111,12 @@ void WebServer::setCORSHeaders(httplib::Response &res)
  * @param port The TCP port to bind the server to.
  * @throws std::invalid_argument If the port is outside the allowed range.
  */
+void WebServer::bind_loopback_for_test() {
+    std::lock_guard lock(mtx);
+    if(running)throw std::logic_error("Cannot replace a running listener binding");
+    loopback_fixture_=true;
+}
+
 void WebServer::start(int port)
 {
     // Validate port range for non-root processes.
@@ -128,6 +137,15 @@ void WebServer::start(int port)
         {
             svr = std::make_unique<httplib::Server>();
         }
+        if (controller_only_mode()) {
+            // Match the shared browser adapter's complete-request body bound.
+            svr->set_payload_max_length(32768);
+            svr->set_read_timeout(5, 0);
+            svr->set_write_timeout(5, 0);
+        }
+        if(wsprrypi::pi_managed_host_selected()){
+            svr->set_read_timeout(5,0);svr->set_write_timeout(5,0);
+        }
         if (!supportBundleJobManager_)
         {
             supportBundleJobManager_ = SupportBundleRuntime::create_production();
@@ -135,7 +153,7 @@ void WebServer::start(int port)
         if (!privilegedNetworkAdmin_)
         {
             privilegedNetworkAdmin_ = std::make_unique<PrivilegedNetworkAdmin>(
-                PrivilegedNetworkAdminPaths{config.ini_filename});
+                PrivilegedNetworkAdminPaths{config.ini_filename},run_privileged_network_command,managed_network_ini_io());
         }
         if (!rp1GpclkRouteService_)
         {
@@ -176,8 +194,7 @@ void WebServer::start(int port)
         cvStarted.notify_one();  // Notify after all routes are ready.
     }
 
-    // Accept connections from any network interface.
-    svr->listen("0.0.0.0", port_);
+    svr->listen(loopback_fixture_?"127.0.0.1":"0.0.0.0", port_);
 
     // Reset running flag once the server stops.
     {

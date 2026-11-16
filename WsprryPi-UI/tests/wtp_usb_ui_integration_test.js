@@ -30,7 +30,7 @@ async function main() {
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url}, 60000);
         const evaluate=async expression=>{const result=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
-        await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.WtpUi && !!window.WtpUsbSettings'),"USB scripts");
+        await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.WtpUi && !!window.WtpUsbSettingsEditor'),"USB scripts");
         await evaluate(`(() => {
             configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
             backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
@@ -60,14 +60,22 @@ async function main() {
                     path.endsWith('/host/discovery')?{available:false,candidates:[],reason:'USB workflow'}:{};
                 return {ok:true,status:200,headers:header,json:async()=>value?.schema?{contract:'Wsprry-Control/1',...value}:value};
             };
+            // Explicit reusable-component fixture; production target routing is
+            // exercised separately by the independent controller pair.
+            document.getElementById('pico-target-panel').append(document.getElementById('pico-target-template').content.cloneNode(true));
+            WtpManagementEditor.mount(window);WtpUsbSettingsEditor.mount(window);
             WtpUi.populate({Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'PICO123','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'a'.repeat(32),'Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false});
             WtpUi.select(true);bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();
 
+            WtpManagement.setAvailability(true,true);WtpUsbSettings.setAvailability(true);
             document.getElementById('wtp-management').open=true;
         })()`);
         await waitFor(async()=>await evaluate("document.getElementById('wtp-status-heading').textContent==='workbench-pico.local'"),"common name");
         await evaluate("document.getElementById('wtp-usb-load').click()");
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-feedback').textContent.includes('No saved Wi-Fi')"),"USB no-network state");
+        // The standalone fixture owns availability; production uses its captured target handle.
+        await evaluate("WtpManagement.setAvailability(true,true)");
+        await waitFor(async()=>await evaluate("!document.getElementById('wtp-usb-progress-load').disabled"),"station progress ready after connection read");
         await evaluate("document.getElementById('wtp-usb-progress-load').click()");
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-progress-state').textContent.includes('station incomplete')"),"partial saved progress");
         await evaluate("document.getElementById('wtp-usb-logging-read').click()");

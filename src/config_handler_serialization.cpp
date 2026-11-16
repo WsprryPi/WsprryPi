@@ -154,6 +154,30 @@ void serialize_runtime_config_to_json(
     }
 }
 
+nlohmann::json saved_configuration_from_internal_json(const nlohmann::json &source)
+{
+    nlohmann::json public_json;
+    public_json["WTP"] = source.value("WTP", wtp_settings_json(WtpSettings{}));
+    public_json["WTP Server"] =
+        source.value("WTP Server", wtp_server_settings_json(WtpServerSettings{}));
+    public_json["Operation"] = source.at("Operation");
+    public_json["GPIO"] = source.at("GPIO");
+    public_json["Calibration"] = source.at("Calibration");
+    public_json["Si5351"] = source.at("Si5351");
+    public_json["WSPR"] = {
+        {"Call Sign", source.at("WSPR").at("Call Sign")},
+        {"Grid Square", source.at("WSPR").at("Grid Square")},
+        {"TX Power", source.at("WSPR").at("TX Power")},
+        {"Frequency", source.at("WSPR").at("Frequency")},
+        {"Frequency Profile", source.at("WSPR").at("Frequency Profile")},
+        {"Band Preferences", source.at("WSPR").at("Band Preferences")},
+        {"Planner Preference", source.at("WSPR").at("Planner Preference")},
+        {"Use Random Offset", source.at("WSPR").at("Use Random Offset")}};
+    public_json["CW"] = source.at("CW");
+    public_json["Band GPIO"] = source.at("Band GPIO");
+    return public_json;
+}
+
 nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
 {
     std::string gpio_support_error;
@@ -213,25 +237,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
         }
     }
 
-    nlohmann::json public_json;
-    public_json["WTP"] = source.value("WTP", wtp_settings_json(WtpSettings{}));
-    public_json["WTP Server"] =
-        source.value("WTP Server", wtp_server_settings_json(WtpServerSettings{}));
-    public_json["Operation"] = source.at("Operation");
-    public_json["GPIO"] = source.at("GPIO");
-    public_json["Calibration"] = source.at("Calibration");
-    public_json["Si5351"] = source.at("Si5351");
-    public_json["WSPR"] = {
-        {"Call Sign", source.at("WSPR").at("Call Sign")},
-        {"Grid Square", source.at("WSPR").at("Grid Square")},
-        {"TX Power", source.at("WSPR").at("TX Power")},
-        {"Frequency", source.at("WSPR").at("Frequency")},
-        {"Frequency Profile", source.at("WSPR").at("Frequency Profile")},
-        {"Band Preferences", source.at("WSPR").at("Band Preferences")},
-        {"Planner Preference", source.at("WSPR").at("Planner Preference")},
-        {"Use Random Offset", source.at("WSPR").at("Use Random Offset")}};
-    public_json["CW"] = source.at("CW");
-    public_json["Band GPIO"] = source.at("Band GPIO");
+    nlohmann::json public_json = saved_configuration_from_internal_json(source);
     const auto i2c_inventory = i2c_bus_inventory::discover();
     auto i2c_buses = nlohmann::json::array();
     const auto adapter_inventory = linux_i2c_identity::discover();

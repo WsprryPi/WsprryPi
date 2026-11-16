@@ -1,4 +1,5 @@
 #include "privileged_network_policy.hpp"
+#include "wtp_integration/control_contract.hpp"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -90,6 +91,27 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/control/v1/")) {
+        if((path=="/api/control/v1/host/readiness"&&method=="GET")||
+            (path=="/api/control/v1/host/configuration-recovery"&&(method=="GET"||method=="PUT"||method=="POST")))
+            return PrivilegedOperationClass::protected_operation;
+        if((path=="/api/control/v1/targets"&&method=="GET")||
+            (path=="/api/control/v1/host/management-session"&&method=="POST"))return PrivilegedOperationClass::protected_operation;
+        constexpr std::string_view targets="/api/control/v1/targets/";
+        if(path.starts_with(targets)) {
+            auto relative=path.substr(targets.size());
+            if(relative.size()<34||relative[32]!='/'||relative.substr(0,32).find_first_not_of("0123456789abcdef")!=std::string_view::npos)
+                return PrivilegedOperationClass::reject;
+            relative.remove_prefix(33);
+            if((method=="GET"&&(relative=="context"||relative=="settings"||relative=="status"))||
+                (method=="PUT"&&relative=="settings")||(method=="POST"&&relative=="stop"))
+                return PrivilegedOperationClass::protected_operation;
+            if(relative.starts_with("pico/")&&wsprrypi::controller_pico_route(relative.substr(5),method))
+                return PrivilegedOperationClass::protected_operation;
+            if(method=="GET"&&relative.starts_with("operations/")&&relative.size()==43&&
+                relative.substr(11).find_first_not_of("0123456789abcdef")==std::string_view::npos)
+                return PrivilegedOperationClass::protected_operation;
+            return PrivilegedOperationClass::reject;
+        }
         if(path=="/api/control/v1/host/udp-logging/installation" && method=="GET")return PrivilegedOperationClass::protected_operation;
         if (((path == "/api/control/v1/member/udp-logging/test/capabilities" || path == "/api/control/v1/host/udp-logging/test/capabilities") && method == "GET") ||
             ((path == "/api/control/v1/member/udp-logging/test" || path == "/api/control/v1/host/udp-logging/test") && method == "POST"))

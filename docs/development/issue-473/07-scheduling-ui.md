@@ -4,12 +4,16 @@ Execute only phase 7 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues
 when separately authorized. Read the [execution rules](execution-rules.md), the full
 [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions.
 Require phases 1–6 gates for intended sources, including production target-local
-fencing and actual device-owned recurrence. Use Impeccable before any UI edits.
+fencing, actual device-owned recurrence, and the completed
+[deferred Pi security milestone](deferred-pi-security.md). Do not start this phase
+with pairing or authenticated remote Pi management still deferred. Use Impeccable
+before any UI edits.
 
 ## Objective and inspection
 
 Add shared scheduling controls through the phase 3 target context and phase 2
-management adapters, backed by phase 6 runtime. Inspect `WsprryPi-UI/DESIGN.md`,
+local/Pico management adapters and the completed deferred remote Pi adapter,
+backed by phase 6 runtime. Inspect `WsprryPi-UI/DESIGN.md`,
 Setup templates, target drafts, existing gray-line/GPS controls, configuration API,
 status consumers, and the complete configuration/admission lifecycle. Preserve the
 incumbent operational visual language and use production interfaces in reviews.

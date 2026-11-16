@@ -931,6 +931,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled, options = {}) {
 }
 
 function patchTransmitControl() {
+    if (window.ControllerMode?.active) return;
     if (isUpdatingTransmitFromBackend) return;
 
     const enabled = $("#transmit").is(":checked");
@@ -953,6 +954,7 @@ function patchTransmitControl() {
 }
 
 function stopTransmission(options = {}) {
+    if (window.ControllerMode?.active) return false;
     const $stop = $("#stop_transmit");
     if ($stop.prop("disabled")) {
         return false;
@@ -2104,6 +2106,7 @@ function syncTransmitAvailabilityUi() {
     if (!transmitField) {
         return;
     }
+    if (window.ControllerMode?.active) {transmitField.disabled = true;return;}
 
     const unavailableMessage = currentTransmitUnavailableMessage();
     const formattedMessage = unavailableMessage
@@ -4804,6 +4807,7 @@ function resumeConfigAutosaveAfterControllerRecovery() {
 }
 
 function scheduleAutosave() {
+    if (window.ControllerMode?.active) return;
     if (configAutosaveSuspended) {
         return;
     }
@@ -4830,6 +4834,7 @@ function scheduleAutosave() {
 }
 
 function flushAutosave() {
+    if (window.ControllerMode?.active) return;
     if (configAutosaveSuspended) {
         return;
     }

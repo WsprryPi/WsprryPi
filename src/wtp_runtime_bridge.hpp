@@ -9,6 +9,7 @@
 #include "wtp_integration/consumer_radio.hpp"
 #include "json.hpp"
 #include <optional>
+#include <memory>
 std::string wtp_runtime_selection_error(const std::optional<WtpSettings> &);
 void wtp_runtime_prepare_skip();
 void select_wtp_runtime(const std::optional<WtpSettings> &);
@@ -50,3 +51,14 @@ void set_wtp_runtime_for_test(WtpSettings, wsprrypi::WtpScheduleClock &,
 // Runtime admission, carrier selection and dispatch remain production code.
 void set_wtp_management_transports_for_test(wsprrypi::PicoManagementExchange engineering,
     wsprrypi::ConsumerRadioClient::Transport consumer = {});
+namespace wsprrypi {
+struct WtpTargetRuntime;
+namespace testing {
+// Before application threads/selection only. Isolated production-main tests
+// supply a software transport for every validated WTP setting; no product
+// CLI, environment, INI, or HTTP field can install this factory.
+using WtpRuntimeFactory=std::function<std::shared_ptr<WtpTargetRuntime>(WtpSettings,
+    std::function<bool()>,std::shared_ptr<void>)>;
+void set_wtp_runtime_factory(WtpRuntimeFactory);
+}
+}

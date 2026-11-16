@@ -7,9 +7,12 @@ Require the phase 1 gate before implementation; report missing approvals explici
 
 ## Objective and inspection
 
-Implement bounded, authenticated management adapters for local Pi, remote Pi, and
-existing Pico resources, with explicit controller-only operation. Management context
-must be independent of the controller's output backend, active claims, and jobs.
+Implement bounded, protected local Pi and existing authenticated Pico management
+adapters, with explicit controller-only operation. Under the approved
+[sequencing amendment](deferred-pi-security.md), new Pi pairing/TLS and the
+controller-to-remote-Pi adapter/lifecycle move to the mandatory end-of-phase-6
+security milestone. Preserve their approved design; keep those paths unavailable.
+Management context must be independent of the controller's output backend, active claims, and jobs.
 
 Trace `src/wtp_integration/{browser_api,configuration,fleet_runtime,fleet_store,
 fleet_schedule}.*`, `src/wtp_pi_control.*`, `src/wtp_runtime_bridge.cpp`, startup
@@ -19,9 +22,10 @@ application and reusable component boundary; follow the shared approval rules.
 
 ## Required work
 
-1. Implement the phase 1 approved service and adapter contracts end to end.
-   Target remote reads/writes at that Pi's service. Never translate remote edits
-   into host configuration saves or treat execution credentials as management
+1. Implement the phase 1 approved local Pi and existing Pico service/adapter
+   contracts end to end. Defer the remote Pi security/adapter requirements to the
+   named milestone. Eventual remote reads/writes must reach that Pi's service.
+   Never translate remote edits into host configuration saves or treat execution credentials as management
    permission. Apply approved provisioning, authorization, secret storage/redaction,
    browser origin/CSRF, proxy address/redirect limits, and resource/time bounds.
 2. Bind every operation to verified stable identity, authorized enrollment,
@@ -53,7 +57,9 @@ application and reusable component boundary; follow the shared approval rules.
 ## Tests and acceptance gate
 
 Exercise production management paths with zero local outputs and at least two
-independent targets, including local/remote configuration isolation. Test failed
+independent targets, including local/Pico configuration isolation and direct refusal of unavailable
+remote Pi routes without host persistence. Remote Pi authentication, enrollment,
+transfer, renewal, and lifecycle tests move to the named security gate. Test failed
 authentication, credential redaction, malformed documents/descriptors, stale identity,
 boot/profile/revision, capability loss, reconnect, bounded retry/timeouts, lost
 replies, concurrent writes, and refusal before persistence. Show that selecting or
@@ -71,8 +77,11 @@ changes, plus focused management, startup, and configuration regressions. Update
 engineering/security and applicable controller/remote-management operator guidance
 concomitantly, following sibling authority and build rules.
 
-The gate requires production-path local/remote management evidence, a functioning
-explicit no-local-output controller, and both paired suites where applicable.
+The amended gate requires production-path local Pi/existing Pico management
+evidence, refusal of unavailable remote Pi routes before host mutation, a
+functioning explicit no-local-output controller, and both paired suites where
+applicable. New Pi pairing/TLS and dependent remote-management implementation,
+tests, and docs remain explicit obligations of the named security milestone.
 Do not add Fleet recurrence dispatch, solar runtime, new schedule enablement, or
 shared Setup layout in this phase. End with the shared report and review loop;
 stop before phase 3.

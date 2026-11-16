@@ -15,11 +15,11 @@ PicoHttpResponse error(unsigned status, const char *code) {
   return {status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
 }
 }
-nlohmann::json strict_browser_json(const std::string &body) {
+nlohmann::json strict_browser_json(const std::string &body, unsigned maximum_depth) {
   if (body.size() > 32768) throw std::runtime_error("body_too_large");
   std::vector<std::set<std::string>> objects;
   return nlohmann::json::parse(body, [&](int depth, nlohmann::json::parse_event_t event, nlohmann::json &value) {
-    if (depth > 32) throw std::runtime_error("nesting_limit");
+    if (depth < 0 || static_cast<unsigned>(depth) > maximum_depth) throw std::runtime_error("nesting_limit");
     if (event == nlohmann::json::parse_event_t::object_start) objects.emplace_back();
     if (event == nlohmann::json::parse_event_t::object_end) objects.pop_back();
     if (event == nlohmann::json::parse_event_t::key && !objects.back().insert(value.get<std::string>()).second)
@@ -54,6 +54,11 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &request) {
   } catch (...) { return error(502,"invalid_control_response"); }
   return result;
 }
+void WtpBrowserApi::retire_management_reads() {
+  std::lock_guard lock(management_mutex_);
+  usb_resource_reads_.clear();member_context_.clear();member_revision_.clear();member_selection_.clear();
+  legacy_read_required_=true;alias_reads_required_={"network"};legacy_selection_.clear();alias_selections_.clear();
+}
 PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
   if (r.body.size() > 32768) return error(413, "body_too_large");
   if (r.method != "GET" && !r.mutation_context) return error(403, "origin_or_content_type");
@@ -69,16 +74,9 @@ PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
     return {200, nlohmann::json{{"scope", "wsprrypi-host/1"},
         {"host_logging", {{"contract","Wsprry-Control/1"},{"schema","host-usb-logging/1"},{"path","/api/control/v1/host/logging"},{"maximum_sources",8}}},
         {"wtp", host.value("capabilities", nlohmann::json(nullptr))},
-        {"features", {{"member_configuration", true}, {"network", true},
-                      {"jobs", true}, {"member_resources",true}, {"softap", false}, {"ble", false}}},
-        {"member_resources", {{"scope","pico-member"},{"application","/api/control/v1/member/application"},
-          {"station","/api/control/v1/member/station"},{"hardware","/api/control/v1/member/hardware"},
-          {"pins","/api/control/v1/member/pins"},{"preview","/api/control/v1/member/pins/validate"},
-          {"remote_support","authenticated_resource_discovery_required"}}},
+        {"features", {{"jobs", true}, {"softap", false}, {"ble", false}}},
         {"job_operations", {"ABORT"}}, {"job_submission", "host-application"},
-        {"management_scope", "pico-standalone"},
-        {"management_carriers", {{"scope", "wsprrypi-host/1"}, {"built_in", {"engineering_mtls", "consumer_station", "consumer_ap", "usb_physical"}},
-          {"selection", "/api/control/v1/member/management"}, {"remote_capabilities", "authenticated_read_required"}}}, {"active_job_connections", false},
+        {"active_job_connections", false},
         {"max_body_bytes", 32768}}.dump(), {}};
   }
   if (r.path == "/api/control/v1/member/management" && (r.method == "GET" || r.method == "POST")) {

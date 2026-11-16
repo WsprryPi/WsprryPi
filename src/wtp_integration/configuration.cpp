@@ -387,6 +387,19 @@ void success(const PicoHttpResponse &r) {
   throw Rejected{r.status >= 400 && r.status <= 599 ? r.status : 502U, "remote_configuration_rejected"};
 }
 } // namespace
+bool pico_management_capabilities_valid(const nlohmann::json &document,const std::string &carrier) {
+  try {
+    if (!document.is_object() || !document.contains("contract") || document["contract"]!="Wsprry-Control/1") return false;
+    auto caps=document;caps.erase("contract");
+    if (!capabilities_shape(caps) || !caps.contains("management_carriers") ||
+        !valid_management_descriptor(caps["management_carriers"],carrier) ||
+        !caps.contains("application_resources")) return false;
+    for (const auto name : {"application_resources","configuration_updates","saved_progress",
+         "gpio_drive","amplifier_timing","filter_selector","si5351","gps","gray_line","field_access"})
+      if (caps.contains(name) && !supported_descriptor(caps[name],name)) return false;
+    return true;
+  } catch (...) {return false;}
+}
 PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &method,
     const std::string &body, const std::string &revision,

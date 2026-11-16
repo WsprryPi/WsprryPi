@@ -736,7 +736,7 @@ PicoHttpResponse
 consumer_http_request(PlainTcpStream &stream, TlsStream::Clock clock,
                       const std::string &host, const std::string &path,
                       const std::string &method, const std::string &body,
-                      const std::string &media) {
+                      const std::string &media, std::optional<std::uint64_t> operation_deadline) {
   const auto identity = canonical_network_identity(host);
   if (!identity || *identity != host || host.find(':') != std::string::npos ||
       (method != "GET" && method != "POST") || body.size() > 32768 ||
@@ -751,7 +751,7 @@ consumer_http_request(PlainTcpStream &stream, TlsStream::Clock clock,
     PlainTcpStream &stream;
     ~Close() { stream.close(); }
   } close{stream};
-  const auto deadline = clock() + 8000;
+  const auto deadline = std::min(clock() + 8000, operation_deadline.value_or(UINT64_MAX));
   while (stream.opening() && clock() < deadline) {
     stream.poll_open();
     std::this_thread::sleep_for(std::chrono::milliseconds(2));

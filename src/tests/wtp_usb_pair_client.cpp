@@ -86,6 +86,7 @@ int main(int argc,char **argv) {
         return pico_resource_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
       if(resource=="member/udp-logging"||resource=="member/udp-logging/capabilities"||resource=="member/udp-logging/test"||resource=="member/udp-logging/test/capabilities")return pico_udp_logging_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision);
       if(resource.starts_with("member/progress"))return pico_progress_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision,"usb_physical");
+      if(resource=="member/wifi"||resource=="member/hostname"||resource=="member/logging"||resource=="member/restart"||resource=="member/ap")return pico_usb_settings_request(exchange,client.device(),client.boot(),resource.substr(7),method,body,revision);
       return exchange(resource=="member/wifi"?"/api/usb/v1/wifi":resource=="member/hostname"?"/api/control/v1/hostname":resource=="member/ap"?"/api/usb/v1/ap":resource=="member/restart"?"/api/control/v1/restart":resource,method,body,revision);
     },[](auto){return PicoHttpResponse{409,"{}",{}};});
   std::string line;

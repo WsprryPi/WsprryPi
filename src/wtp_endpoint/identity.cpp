@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <string_view>
 #include <unistd.h>
+#include <algorithm>
+#include <ctime>
 
 namespace wsprrypi {
 namespace {
@@ -24,7 +26,32 @@ std::string hex16(std::span<const std::uint8_t> bytes) {
     }
     return result;
 }
+std::string derived_id(std::string_view domain,std::string_view seed) {
+    const std::string input=std::string(domain)+std::string(seed);
+    const auto digest=wsprrypico::wtp::sha256(std::span<const std::uint8_t>(
+        reinterpret_cast<const std::uint8_t*>(input.data()),input.size()));
+    return hex16(digest);
+}
 } // namespace
+
+std::string wtp_pi_macos_device_id(const std::array<std::uint8_t,16>& host_uuid) {
+    if(std::all_of(host_uuid.begin(),host_uuid.end(),[](auto byte){return byte==0;})||
+       std::all_of(host_uuid.begin(),host_uuid.end(),[](auto byte){return byte==255;}))
+        throw std::runtime_error("Mac host identity is unavailable");
+    return derived_id("wsprrypi-wtp-macos-device-v1:",hex16(host_uuid));
+}
+
+std::string wtp_pi_device_id() {
+#ifdef __APPLE__
+    std::array<std::uint8_t,16> host_uuid{};
+    const timespec timeout{2,0}; // Zero would mean an unbounded OS wait.
+    if(::gethostuuid(host_uuid.data(),&timeout)!=0)
+        throw std::runtime_error("Mac host identity is unavailable");
+    return wtp_pi_macos_device_id(host_uuid);
+#else
+    return wtp_pi_device_id("/etc/machine-id");
+#endif
+}
 
 std::string wtp_pi_device_id(const std::string& machine_id_path) {
     std::ifstream file(machine_id_path);
@@ -34,11 +61,7 @@ std::string wtp_pi_device_id(const std::string& machine_id_path) {
     for (char c : machine_id)
         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
             throw std::runtime_error("Machine ID is not canonical lowercase hex");
-    constexpr std::string_view domain = "wsprrypi-wtp-device-v1:";
-    const std::string input = std::string(domain) + machine_id;
-    const auto digest = wsprrypico::wtp::sha256(std::span<const std::uint8_t>(
-        reinterpret_cast<const std::uint8_t*>(input.data()), input.size()));
-    return hex16(digest);
+    return derived_id("wsprrypi-wtp-device-v1:",machine_id);
 }
 
 std::string WtpPiBootIdentity::new_boot_id() {

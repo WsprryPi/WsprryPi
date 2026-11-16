@@ -6,6 +6,7 @@
 #include "web_server_routes.hpp"
 
 #include "config_handler.hpp"
+#include "controller_runtime.hpp"
 #include "httplib.hpp"
 #include "json.hpp"
 #include "version.hpp"
@@ -130,7 +131,7 @@ void register_version(
             const std::string version =
                 get_raw_version_string()
                 + " on a "
-                + get_pi_model()
+                + (controller_only_mode() ? "controller host" : get_pi_model())
                 + ", "
                 + get_os_version_name()
                 + (sizeof(void *) == 8 ? " 64-bit" : " 32-bit")

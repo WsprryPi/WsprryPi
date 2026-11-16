@@ -5,6 +5,16 @@ when separately authorized. Read the [execution rules](execution-rules.md), the 
 [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 handover,
 ownership, storage, security, and recovery decisions. Require phases 1–4 gates.
 
+## Deferred Pi security boundary
+
+Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
+acceptance covers local Pi and existing Pico management. Implement independently
+eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
+associated migration remain unavailable until the end-of-phase-6 security gate.
+Carry their acceptance obligations into that gate; do not substitute unsecured
+transport, fabricated capability, or host writes for remote target operations.
+Existing security and target-local authority checks remain enforced.
+
 ## Objective and inspection
 
 Implement target-local authority fencing before exposing new schedule enablement.

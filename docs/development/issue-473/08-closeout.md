@@ -6,6 +6,11 @@ when separately authorized. Read the [execution rules](execution-rules.md), the 
 acceptance evidence for phases 1–7. Reinspect actual sources, repository authority,
 branches, dirty changes, and companion availability before relying on prior results.
 
+The [deferred Pi security milestone](deferred-pi-security.md) must already have
+passed at the end of phase 6. Verify its actual provider, automatic lifecycle,
+remote editor/migration integration, current-source tests, and documentation;
+phase-2 completion under the narrowed gate is not remote-security evidence.
+
 ## Objective and scope
 
 Finish cross-repository documentation and validate the integrated candidates against

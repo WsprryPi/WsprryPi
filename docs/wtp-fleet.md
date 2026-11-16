@@ -6,7 +6,7 @@ or saving field drafts.
 
 The compatibility route keeps one selected endpoint in the existing `[WTP]`
 INI section and runtime configuration. Independent output assignments, described
-below, use separate target contexts and do not replace that selection. A separate version 1 catalog at
+below, use separate target contexts and do not replace that selection. A separate catalog at
 `<active-INI-path>.wtp-devices.json` stores up to 64 named profiles with random
 local IDs, a manual or DNS-SD connection method, a complete endpoint/settings
 snapshot, expected full WTP device ID, and host paths to TLS files. The private
@@ -17,6 +17,21 @@ profile without changing them. A legacy Plain LAN endpoint with no expected
 ID is retained as `legacy_unverified` and cannot be selected again from the
 catalog until its full identity is supplied. Other valid legacy INI/JSON
 settings keep their current behavior.
+
+The public catalog remains version 1. Private storage uses checksummed version 2
+with server-owned profile generations and management-history epochs. Reading a
+valid private version 1 file preserves its bytes; the next explicit catalog
+mutation writes the current private format. Profile generations change on edits,
+including renaming a profile back to its earlier name.
+
+Independent Pico management records reside in the private directory
+`<active-INI-path>.management`. The catalog anchors their history epochs, so a
+backup or restore must keep the catalog and management records coherent. Missing,
+replaced, or corrupt anchored history inhibits controller startup or management
+writes. Removing a saved profile never discards its unresolved operations.
+Terminal, reviewed orphan history can be retired during startup or an explicit
+catalog mutation; a settings read does not perform that cleanup. These records
+contain redacted operation results, not native login passwords or key contents.
 
 The catalog API derives `active_id` by exact comparison with current `[WTP]`.
 If an operator removes or edits the matching profile, `[WTP]` remains active
@@ -43,14 +58,32 @@ HTTP port is hidden for USB Pico assignments; network profiles retain the field
 for Pi takeover reconciliation. Hiding it preserves the assignment document
 format and the existing port value.
 
-Under **Pico standalone settings and Wi-Fi**, management prerequisites appear
-before the editors. Read saved station progress, save valid station fields, and
+Choose a saved Pico and select **Manage settings** to open its independent
+editor. Managing a Pico does not select the controller's output backend or
+change execution claims and accepted jobs. It is available in the explicit
+controller-only role. Each editor retains its own draft and captured transport;
+profile replacement retires its read authority, including replacement back to
+the original values. Accepted old-target operations remain in the request list.
+**Retained drafts** exposes inactive entries for read-only review, including
+replaced profiles. It does not restore old authority, copy a password into a new
+editor, or send a management request.
+
+Read saved station progress, save valid station fields, and
 apply saved progress separately. **Complete station save** is an alternative
 that saves all three station fields together after reading member resources.
 **RF output, GPS, and pins** groups the hardware plan and places validation and
 saving after its pin, GPS, and optional Si5351 controls. Amplifier timing, filter
 selectors, and GPIO drive retain their own actions. Controls depend on the
 selected Pico's supported capabilities and current readback.
+
+Settings requests use `/api/control/v1/targets/{device_id}/pico/{resource}`
+with the server-issued context and saved profile binding. The public
+selected-backend `/member/*` settings routes and `/network` alias are retired;
+the explicit `/member/firmware` workflow remains separate. Native Pico methods
+and payloads are preserved. An uncertain write holds the editor until durable
+receipt lookup, mapped native readback, and explicit review. No mutation is
+automatically repeated. A new browser discovers a durable earlier hold before
+dispatching another settings change. These adapter routes do not alter WTP.
 
 **Standalone schedules and combined settings** contains the combined editor.
 **Save schedules only** changes recurrence; **Save combined settings** can also

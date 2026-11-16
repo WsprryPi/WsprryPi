@@ -8,11 +8,13 @@
 #include "configuration.hpp"
 #include "output_lease.hpp"
 #include "usb_management.hpp"
+#include "pico_usb_management_channel.hpp"
 #include "../pico_usb_installer_state.hpp"
 #include <cstdlib>
 #include <memory>
 namespace wsprrypi {
 struct WtpTargetRuntime {
+  const std::string output_selection_id{wtp_random_identity()};
   WtpSettings settings;
   std::shared_ptr<void> output_lease;
   mutable std::mutex output_lease_mutex;
@@ -43,20 +45,23 @@ struct WtpTargetRuntime {
             static_cast<unsigned>(settings.tcp_port)};
   }
   std::unique_ptr<wsprrypi::WtpApplication> app;
+  std::shared_ptr<WtpDispatchPermit> output_management_permit{std::make_shared<WtpDispatchPermit>()};
   // Management selection is volatile and independent of the WTP transport.
   std::string management_carrier, management_host;
   std::string management_selection_id{wtp_random_identity()};
   std::unique_ptr<wsprrypi::ConsumerRadioClient> consumer_management;
   wsprrypi::PlainTcpStream management_tcp{[this] { return clock.now_ms(); }};
-  UsbCdcStream management_usb{system};
-  std::unique_ptr<UsbManagementClient> usb_management;
+  std::shared_ptr<PicoUsbManagementChannel> usb_channel{pico_usb_management_channel(settings)};
+  UsbCdcStream &management_usb{usb_channel->stream};
+  std::unique_ptr<UsbManagementClient> &usb_management{usb_channel->client};
   // The scheduler admission worker and periodic/UI callers share one lifecycle.
   // Nested ensure/name helpers retain this authority through the full exchange.
-  mutable std::recursive_mutex usb_connection_mutex;
-  std::function<std::unique_ptr<UsbManagementClient>()> usb_management_for_test;
+  std::recursive_mutex &usb_connection_mutex{usb_channel->mutex};
+  std::function<std::unique_ptr<UsbManagementClient>()> &usb_management_for_test{usb_channel->factory_for_test};
   std::function<HostUtcObservation()> usb_utc_observer{qualified_host_utc};
   std::optional<std::uint64_t> last_usb_time_ms;
-  std::atomic_bool usb_cancelled{false};
+  std::shared_ptr<std::atomic_bool> usb_cancellation{std::make_shared<std::atomic_bool>(false)};
+  std::atomic_bool &usb_cancelled{*usb_cancellation};
   std::string learned_usb_device, learned_usb_boot;
   mutable std::mutex usb_observation_mutex;
   nlohmann::json usb_observation, usb_name;
@@ -77,6 +82,7 @@ struct WtpTargetRuntime {
   // No network fallback and no unchecked tty probing.
   bool ensure_usb_management() {
     std::lock_guard connection(usb_connection_mutex);
+    usb_channel->cancellation = usb_cancellation;
     if (settings.transport != "usb") return usb_unavailable();
     if (pico_usb_update_blocked(settings.usb_serial) && !verified_update_reconnect) return usb_unavailable();
     if (!usb_management_for_test) {
@@ -93,31 +99,14 @@ struct WtpTargetRuntime {
     }
     try {
       usb_unavailable();
-      if (usb_management_for_test) usb_management=usb_management_for_test();
-      else {
-      management_usb.close();
-      PicoCdcSelection selection{settings.path,settings.usb_serial,
-        static_cast<std::uint16_t>(settings.vendor_id),static_cast<std::uint16_t>(settings.product_id)};
-      auto paired = paired_linux_cdc(selection,PicoCdcRole::Management);
-      if (!management_usb.begin_open(paired,clock.now_ms())) return usb_unavailable();
-      while (management_usb.state() == CdcState::Resetting) {
-        if (usb_cancelled) { management_usb.close(); return usb_unavailable(); }
-        management_usb.poll_open(clock.now_ms());
-        if (management_usb.state() == CdcState::Resetting) clock.wait_ms(5);
-      }
-      if (management_usb.state() != CdcState::Ready) return usb_unavailable();
-      usb_management = std::make_unique<UsbManagementClient>(management_usb,
-        [this]{return clock.now_ms();},[this](unsigned ms){clock.wait_ms(ms);},[this]{return usb_cancelled.load();});
-      }
-      if (!usb_management) return usb_unavailable();
       const auto identity = app->status().identity;
       std::string expected;
       { std::lock_guard lock(usb_observation_mutex);
         expected = !learned_usb_device.empty() ? learned_usb_device :
             identity ? identity->device_id : settings.device_id;
       }
-      if (!usb_management->hello(expected)) {
-        if (usb_management->observation().value("diagnostic","")=="usb_identity_mismatch") reject_usb_binding();
+      if (!usb_channel->ensure(expected, verified_update_reconnect)) {
+        if (usb_management && usb_management->observation().value("diagnostic","")=="usb_identity_mismatch") reject_usb_binding();
         return usb_unavailable();
       }
       if (identity && identity->boot_id != usb_management->boot()) { reject_usb_binding(); usb_management->close(); return usb_unavailable(); }
@@ -207,7 +196,8 @@ struct WtpTargetRuntime {
     // and destroy the worker before automatic member destruction reaches them.
     usb_cancelled=true;
     if (app) { (void)app->stop(); app.reset(); }
-    if (usb_management) usb_management->close();
+    // A settings context may still own the shared physical management channel.
+    // Its last owner closes it; execution teardown never retires another editor.
   }
   bool credentials_current() const {
     return settings.transport != "network" ||
@@ -278,6 +268,7 @@ struct WtpTargetRuntime {
           if (!identity || !reserve_output(identity->device_id)) return false;
           return !admission || admission();
         });
+    app->set_dispatch_permit(output_management_permit);
   }
   WtpTargetRuntime(WtpSettings s, wsprrypi::WtpScheduleClock &c,
                 wsprrypi::wtp::ByteStream &b,
@@ -286,7 +277,9 @@ struct WtpTargetRuntime {
       : settings(std::move(s)), clock(c),
         app(std::make_unique<wsprrypi::WtpApplication>(
             c, b, settings, std::move(options), std::move(reopen),
-            [this, admission=std::move(admission)]{refresh_usb_time(true);return usb_identity_admitted() && (!admission || admission());})) {
+            [this, admission=std::move(admission)]{refresh_usb_time(true);return usb_identity_admitted() && (!admission || admission());})),
+        usb_channel(std::make_shared<PicoUsbManagementChannel>(settings)) {
+    app->set_dispatch_permit(output_management_permit);
     if (settings.transport == "network")
       credentials = std::make_shared<wsprrypi::TlsCredentials>(network_selection());
   }

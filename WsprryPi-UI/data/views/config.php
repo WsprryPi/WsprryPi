@@ -90,6 +90,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
             </div>
 
             <div class="card-body">
+                <?php require __DIR__ . '/configuration-recovery.php'; ?>
 
                 <form id="wsprform" class="needs-validation config-setup-form" novalidate>
                     <div class="tab-content config-tabs-content" id="configTabsContent">

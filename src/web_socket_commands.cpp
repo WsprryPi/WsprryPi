@@ -36,6 +36,8 @@
 #endif
 #include "band_lookup.hpp"
 #include "config_handler.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
 #include "json.hpp"
 #include "logging.hpp"
 #include "scheduling.hpp"
@@ -207,6 +209,28 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
         // Extract "command" (defaults to empty string if missing), lowercase it
         std::string cmd = j.value("command", "");
         std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
+
+        if(wsprrypi::pi_managed_host_held())
+        {
+            reply["command"]=cmd;reply["status"]="error";reply["error"]="authority_pending";
+            sendJSON(reply);return;
+        }
+        if (controller_only_mode())
+        {
+            reply["command"] = cmd;
+            if (cmd == "get_tx_state") {
+                reply.update(controller_only_status());
+                reply["tx_state"] = "disabled";
+                reply["runtime_mode"] = "controller-only";
+                reply["transmit_backend"] = nullptr;
+            } else {
+                reply["status"] = "error";
+                reply["error"] = "controller_only";
+                reply["message"] = "This process has no local transmitter. The requested operation is unavailable.";
+            }
+            sendJSON(reply);
+            return;
+        }
 
         if (cmd == "tone_start" || cmd == "tone_end" || cmd == "stop")
         {

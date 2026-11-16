@@ -109,7 +109,7 @@
     const byId = id => root.document.getElementById(id);
     let saved = { ...defaults }, snapshot = null, busy = false, timer = null, initialized = false, closed = false, statusReadFailed = false, hostRevision = "", cancelling = false;
     let browserSession = "";
-    const selected = () => byId("wtp_use")?.checked === true;
+    const selected = () => !root.ControllerMode?.active && byId("wtp_use")?.checked === true;
     function read() {
         const result = { ...saved };
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => {
@@ -125,6 +125,25 @@
     }
     function render() {
         if (!byId("wtp-controls")) return;
+        if (root.ControllerMode?.active) {
+            for (const child of byId("wtp-controls").children) {
+                if (!child.matches("#wtp-heading, .fleet-catalog, #fleet-schedules, #pico-target-settings, #pico-target-template")) {
+                    child.hidden = true;
+                    child.inert = true;
+                }
+            }
+            root.FleetSchedules?.setVisible(root.ControllerMode.ready);
+            byId("wtp_use").disabled = true;
+            byId("wtp-settings").inert = true;
+            byId("wtp-settings").hidden = true;
+            const selectedStatus = byId("wtp-status-heading")?.closest(".wtp-status");
+            if (selectedStatus) selectedStatus.hidden = true;
+            root.document.querySelectorAll("[data-wtp-key]").forEach(field => {field.disabled = true;});
+            byId("wtp-recover").disabled = true;
+            if (byId("wtp-cancel")) byId("wtp-cancel").disabled = true;
+            fleetRender();
+            return;
+        }
         root.FleetSchedules?.setVisible(true);
         byId("wtp_use").disabled = false;
         root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !selected(); });
@@ -146,8 +165,6 @@
         if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
             ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. ${n.security === "plain_lan" ? "Plain LAN; clients on this network can control the Pico." : `Expected identity: ${n.expected_identity || "unconfirmed"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}.`} Resolved address: ${n.resolved_address || "unresolved"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
             : "Network connection is unconfirmed.";
-        root.WtpManagement?.setAvailability(selected() && (transport === "network" || transport === "usb") && snapshot?.selected === true && (snapshot.ready === true || snapshot.management_available === true) && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns,
-            selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns && !snapshot.uncertain && !snapshot.safety_fault);
         if (byId("wtp-status-heading")) byId("wtp-status-heading").textContent = snapshot?.common_name ? snapshot.common_name + (snapshot.common_name_confirmed ? "" : " (last confirmed)") : "Pico status";
         if (byId("wtp-connection-method")) byId("wtp-connection-method").textContent = transport === "usb"
             ? `USB${snapshot?.common_name ? " · configured hostname" : " · hostname unconfirmed"}${snapshot?.name_pending_restart ? " · name pending restart" : ""}`
@@ -161,8 +178,6 @@
         }
         root.WtpFirmware?.setAvailability(selected() && transport === "usb" && (snapshot?.selected === true || statusReadFailed),
             JSON.stringify([read()["USB Serial"], read().Endpoint, read()["Device ID"]]), snapshot?.firmware_selection_id || "", read()["USB Serial"]);
-        root.WsprryMemberUdp?.setAvailability(selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
-        root.WtpUsbSettings?.setAvailability(selected() && transport === "usb" && snapshot?.management_available === true);
         const state = summarize(snapshot);
         for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;
         if (byId("wtp-cancel")) byId("wtp-cancel").disabled = cancelling || !selected() || snapshot?.selected !== true || !snapshot?.job_id || !(snapshot.owns || snapshot.phase === "waiting");
@@ -171,6 +186,7 @@
         else if (typeof root.syncTransmitAvailabilityUi === "function") root.syncTransmitAvailabilityUi();
     }
     async function request(recover = false) {
+        if (root.ControllerMode?.active) {render();return;}
         if (busy || closed) return;
         busy = true;
         clearTimeout(timer);
@@ -277,9 +293,11 @@
         byId("fleet-use").hidden = !profile;
         byId("fleet-edit").hidden = !profile;
         byId("fleet-remove").hidden = !profile;
-        byId("fleet-use").disabled = fleetBusy || !profile || profile.legacy_unverified;
+        byId("fleet-use").disabled = root.ControllerMode?.active || fleetBusy || !profile || profile.legacy_unverified;
         byId("fleet-edit").disabled = fleetBusy || !profile;
         byId("fleet-remove").disabled = fleetBusy || !profile;
+        if (byId("fleet-manage")) byId("fleet-manage").disabled = fleetBusy || !profile || profile.legacy_unverified;
+        root.PicoTargetEditors?.catalogChanged(fleetCatalog.profiles);
         if (byId("fleet-uncertainty-default")) byId("fleet-uncertainty-default").disabled = fleetBusy;
         byId("fleet-device-detail").textContent = profile
             ? `${fleetCatalog.active_id === profile.id ? "Active host endpoint. " : "Saved profile. "}${profile.method === "dns_sd" ? "DNS-SD hint; identity must be checked again before use. " : "Manual endpoint. "}${profile.legacy_unverified ? "Confirm the full device ID before use. " : ""}Expected ID: ${profile.settings?.["Device ID"] || "unverified"}. Endpoint: ${profile.settings?.Transport === "usb" ? profile.settings?.Endpoint : `${profile.settings?.Hostname}:${profile.settings?.["TCP Port"]}`}.${candidate?.state === "online" && (candidate.target !== profile.settings?.Hostname || candidate.port !== profile.settings?.["TCP Port"]) ? ` Nearby SRV is now ${candidate.target}:${candidate.port}; edit and verify this profile before use.` : ""} Selecting does not connect or save.`
@@ -385,6 +403,10 @@
         if (fleetUsbId) void fleetIdentify();
     }
     async function fleetMutation(body, feedback) {
+        if (root.ControllerMode?.active && !root.ControllerMode.ready) {
+            fleetFeedback("Controller management is unavailable. Read current controller status before saving.");
+            return;
+        }
         fleetBusy = true; fleetRender();
         try {
             const response = await root.fetch(fleetUrl("devices"), {method:"POST", cache:"no-store",
@@ -453,9 +475,12 @@
             {operation:"edit", id:profile.id, name, settings, consent_plain:byId("fleet-plain-consent").checked} :
             {operation:"add", name, method, discovery_id:method === "dns_sd" ? discoveryId : "", settings,
              consent_plain:byId("fleet-plain-consent").checked};
-        await fleetMutation(body, "Device profile saved. Use this device to apply it to the host.");
+        await fleetMutation(body, root.ControllerMode?.active
+            ? "Device profile saved. Assign it a schedule in Fleet to use it as a remote output."
+            : "Device profile saved. Use this device to apply it to the host.");
     }
     async function fleetUse() {
+        if (root.ControllerMode?.active) return;
         const profile = fleetSelection()?.profile;
         if (!profile || fleetBusy) return;
         if (typeof root.hasUnsavedLocalConfigChanges === "function" && root.hasUnsavedLocalConfigChanges()) {
@@ -497,12 +522,22 @@
             const fleet = byId("fleet-tab")?.classList.contains("active");
             if (title) title.textContent = fleet ? "Fleet" : "Signal setup";
             if (saveHint) saveHint.textContent = fleet
-                ? "Fleet changes use Save buttons. This Pi's Use Pico and connection settings autosave."
+                ? root.ControllerMode?.active ? "Fleet changes use Save buttons. This controller has no local transmitter settings."
+                    : "Fleet changes use Save buttons. This Pi's Use Pico and connection settings autosave."
                 : originalHint;
         };
         byId("configTabs")?.addEventListener("shown.bs.tab", updateHeader);
         updateHeader();
         byId("fleet-refresh").addEventListener("click", fleetLoad);
+        byId("fleet-manage")?.addEventListener("click", () => {
+            const profile = fleetSelection()?.profile;
+            if (profile && !profile.legacy_unverified) {
+                void root.PicoTargetEditors?.select(profile);
+                const heading = byId("pico-target-heading");
+                heading?.focus?.({preventScroll:true});
+                heading?.scrollIntoView?.({block:"center",behavior:"instant"});
+            }
+        });
         byId("fleet-device").addEventListener("change", event => { fleetChoice = event.target.value; fleetRender(); });
         byId("fleet-add").addEventListener("click", () => fleetEditorOpen(false));
         byId("fleet-edit").addEventListener("click", () => fleetEditorOpen(true));

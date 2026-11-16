@@ -21,6 +21,7 @@ public:
   WtpBrowserApi(Status status, Management management, Cancel cancel)
       : status_(std::move(status)), management_(std::move(management)), cancel_(std::move(cancel)) {}
   PicoHttpResponse handle(const BrowserRequest &);
+  void retire_management_reads();
 private:
   PicoHttpResponse handle_control(const BrowserRequest &);
   Status status_;
@@ -39,5 +40,5 @@ private:
   // a delayed browser retry to affect later work. Process restart resets scope.
   std::map<std::string, Replay> replays_;
 };
-nlohmann::json strict_browser_json(const std::string &);
+nlohmann::json strict_browser_json(const std::string &, unsigned maximum_depth = 32);
 } // namespace wsprrypi

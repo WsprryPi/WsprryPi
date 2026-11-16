@@ -71,7 +71,7 @@ PicoHttpResponse wtp_json_http_exchange(wtp::ByteStream& stream, TlsStream::Cloc
 PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &selection,
     std::shared_ptr<TlsCredentials> credentials, TlsStream::Clock clock,
     const std::string &resource, const std::string &method,
-    const std::string &body, const std::string &revision) {
+    const std::string &body, const std::string &revision, std::optional<std::uint64_t> operation_deadline) {
   const auto error = [](unsigned status, const char *code) {
     return PicoHttpResponse{status, nlohmann::json{{"error", {{"code", code}}}}.dump(), {}};
   };
@@ -87,7 +87,7 @@ PicoHttpResponse pico_http_request(TlsStream &stream, const TlsSelection &select
   if (mutation && resource != "pins/validate" && revision.empty()) return error(428, "revision_required");
   if (!stream.begin_open(selection, std::move(credentials), "http/1.1")) return error(503, "network_unavailable");
   struct Close { TlsStream &stream; ~Close() { stream.close(); } } close{stream};
-  const auto deadline = clock() + 20000;
+  const auto deadline = std::min(clock() + 20000, operation_deadline.value_or(UINT64_MAX));
   while (stream.opening() && clock() < deadline) {
     stream.poll_open(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
   }

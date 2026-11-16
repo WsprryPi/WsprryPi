@@ -53,6 +53,7 @@ void commit_runtime_config_candidate(const RuntimeConfigCandidate &candidate)
 
 void persist_runtime_transmit_disabled()
 {
+    if(persist_owned_transmit_disabled())return;
     iniFile.set_bool_value("Operation", "Transmit", false);
     iniFile.commit_changes();
 }

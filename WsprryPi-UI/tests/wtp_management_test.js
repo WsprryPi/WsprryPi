@@ -27,6 +27,8 @@ const {schedules,changes} = require('../data/wtp-management.js');
   let fail=false, reboot=false;
   const b=browser(r=>fail ? response({error:{code:'revision_conflict'}},412) : response({...context(),reboot_required:reboot}));
   await b.click('wtp-remote-load');
+  assert.equal(b.networkReads.length,1,'Wi-Fi state loads automatically with the confirmed connection');
+  assert.match(b.element('wtp-network-feedback').textContent,/Wi-Fi: enabled/);
   assert.equal(b.element('wtp-remote-callsign').value,'AA0NT');
   await b.click('wtp-remote-save'); assert.equal(b.requests.length,1);
   b.element('wtp-remote-callsign').value='K1ABC';

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "wtp_runtime_bridge.hpp"
+#include "wtp_managed_output.hpp"
+#include "wtp_pi_control.hpp"
 #include "wtp_integration/configuration.hpp"
 #include "wtp_integration/control_contract.hpp"
 #include "wtp_integration/target_runtime.hpp"
@@ -20,11 +22,70 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <limits>
 namespace {
 using NativeRuntime = wsprrypi::WtpTargetRuntime;
 std::mutex operation_mutex, runtime_mutex;
 std::shared_ptr<NativeRuntime> runtime;
+wsprrypi::testing::WtpRuntimeFactory runtime_factory;
 std::atomic_bool firmware_operation_active{false};
+struct ManagedGate {std::string token;std::thread::id thread;};
+std::optional<ManagedGate> managed_gate;
+std::atomic_bool managed_stop_reserved{false};
+std::atomic_bool managed_output_exhausted{false};
+void require_management_admission(bool owner_allowed=false) {
+  if(managed_gate&&(!owner_allowed||managed_gate->thread!=std::this_thread::get_id()))
+    throw std::runtime_error("management_busy");
+}
+bool output_admitted() {return !managed_stop_reserved.load()&&!managed_output_exhausted.load()&&
+    wtp_pi_management_ready()&&wsprrypi::wtp_pi_external_output_admitted();}
+std::shared_ptr<NativeRuntime> make_runtime(const WtpSettings &settings,std::shared_ptr<void> lease={}){
+  return runtime_factory?runtime_factory(settings,output_admitted,std::move(lease)):
+      std::make_shared<NativeRuntime>(settings,output_admitted,std::move(lease));
+}
+struct ManagedStamp {
+  std::string selection,device,boot,accepted_job;
+  std::optional<std::string> owner,job;
+  bool output_active{},pending{},active{},skip{},unknown{};
+  bool operator==(const ManagedStamp &) const = default;
+};
+std::optional<ManagedStamp> managed_stamp;
+std::uint64_t managed_generation{1};
+wsprrypi::WtpManagedOutput managed_snapshot(const std::shared_ptr<NativeRuntime> &r) {
+  const auto status=r?r->app->status():wsprrypi::WtpRuntimeStatus{};
+  ManagedStamp stamp;
+  stamp.selection=r?r->output_selection_id:std::string{};
+  if(status.identity){stamp.device=status.identity->device_id;stamp.boot=status.identity->boot_id;}
+  // The retained unique job ID detects a complete host-job ABA between reads.
+  // Observation timestamps/revisions do not change output ownership and must
+  // not make an otherwise current Stop stale on every harmless status poll.
+  stamp.accepted_job=status.job_id;
+  if(status.remote){stamp.owner=status.remote->owner_id;stamp.job=status.remote->job_id;stamp.output_active=status.remote->output_active;}
+  stamp.pending=status.phase==wsprrypi::WtpSchedulePhase::Waiting||status.phase==wsprrypi::WtpSchedulePhase::Preparing||status.phase==wsprrypi::WtpSchedulePhase::Executing;
+  stamp.active=r&&r->app->active();stamp.skip=r&&r->app->skipping();
+  stamp.unknown=status.uncertain||status.safety_fault||status.recovery_required;
+  if(managed_stamp&&*managed_stamp!=stamp){
+    if(managed_generation==std::numeric_limits<std::uint64_t>::max()){
+      managed_output_exhausted=true;throw std::runtime_error("management_output_capacity");
+    }
+    ++managed_generation;
+  }
+  managed_stamp=stamp;
+  wsprrypi::WtpManagedOutput result;
+  result.output.generation=managed_generation;
+  if(status.identity)result.destination_id=status.identity->device_id;
+  if(status.remote){result.output.owner_id=status.remote->owner_id;result.output.job_id=status.remote->job_id;}
+  if((stamp.active||status.phase==wsprrypi::WtpSchedulePhase::Waiting||status.phase==wsprrypi::WtpSchedulePhase::Preparing||
+      status.phase==wsprrypi::WtpSchedulePhase::Executing)&&!status.job_id.empty()){
+    result.output.owner_id=status.owner_id;result.output.job_id=status.job_id;
+  }
+  result.unknown=status.uncertain||status.safety_fault||status.recovery_required||managed_output_exhausted;
+  result.stop_reserved=managed_stop_reserved;
+  result.cancellable=!status.remote||!status.remote->owner_id||*status.remote->owner_id==status.owner_id;
+  result.ready=r&&r->app->ready()&&!r->has_usb_binding_fault()&&!firmware_operation_active&&!managed_output_exhausted&&!managed_stop_reserved&&
+      !(r->settings.transport=="usb"&&wsprrypi::pico_usb_update_blocked(r->settings.usb_serial));
+  return result;
+}
 std::shared_ptr<NativeRuntime> get() {
   std::lock_guard lock(runtime_mutex);
   return runtime;
@@ -38,24 +99,69 @@ std::shared_ptr<NativeRuntime> require() {
   return r;
 }
 } // namespace
+void wsprrypi::testing::set_wtp_runtime_factory(WtpRuntimeFactory factory){
+  std::lock_guard operation(operation_mutex);
+  if(get()||managed_gate||runtime_factory)throw std::logic_error("WTP fixture factory requires an unselected runtime");
+  runtime_factory=std::move(factory);
+}
+std::optional<wsprrypi::WtpManagedOutput> wsprrypi::wtp_runtime_managed_output() {
+  std::unique_lock operation(operation_mutex,std::try_to_lock);
+  if(!operation.owns_lock())return {};
+  const auto selected=get();
+  auto result=managed_snapshot(selected);
+  const auto token=wtp_random_identity();
+  const auto release=[selected,token]{
+    std::lock_guard operation(operation_mutex);
+    if(!managed_gate||managed_gate->token!=token)return;
+    if(selected){std::lock_guard permit(selected->output_management_permit->mutex);selected->output_management_permit->allowed=true;}
+    managed_gate.reset();managed_stop_reserved=false;
+  };
+  if(!managed_gate&&!firmware_operation_active){
+    result.reserve_configuration=[selected,token]{
+      std::unique_lock operation(operation_mutex,std::try_to_lock);
+      if(!operation.owns_lock()||managed_gate||get()!=selected||firmware_operation_active)return false;
+      managed_gate=ManagedGate{token,std::this_thread::get_id()};return true;
+    };
+    result.release_configuration=release;
+  }
+  if(!managed_gate&&!firmware_operation_active&&result.cancellable){
+    result.reserve_stop=[selected,token](const wsprrypi::ManagedOutputObservation &expected){
+      std::unique_lock operation(operation_mutex,std::try_to_lock);
+      if(!operation.owns_lock()||managed_gate||get()!=selected||firmware_operation_active)return false;
+      std::unique_lock<std::mutex> permit;
+      if(selected){
+        permit=std::unique_lock(selected->output_management_permit->mutex,std::try_to_lock);
+        if(!permit.owns_lock()||!selected->output_management_permit->allowed)return false;
+      }
+      const auto current=managed_snapshot(selected);
+      if(!current.cancellable||current.output!=expected)return false;
+      if(selected)selected->output_management_permit->allowed=false;
+      managed_gate=ManagedGate{token,std::this_thread::get_id()};managed_stop_reserved=true;return true;
+    };
+    result.release_stop=release;
+  }
+  return result;
+}
 void set_wtp_runtime_for_test(WtpSettings settings,
                               wsprrypi::WtpScheduleClock &clock,
                               wsprrypi::wtp::ByteStream &stream,
                               wsprrypi::wtp::SessionOptions options,
                               std::function<bool()> reopen) {
   std::lock_guard operation(operation_mutex);
+  require_management_admission();
   std::lock_guard lock(runtime_mutex);
   if (runtime)
     throw std::logic_error("Test runtime must start unselected");
   runtime =
       std::make_shared<NativeRuntime>(std::move(settings), clock, stream,
-                                      std::move(options), std::move(reopen));
+                                      std::move(options), std::move(reopen),output_admitted);
 }
 std::string
 wtp_runtime_selection_error(const std::optional<WtpSettings> &settings) {
   std::lock_guard operation(operation_mutex);
   auto r = get();
   try {
+    require_management_admission(true);
     if (settings) validate_wtp_settings(*settings, true);
     if (settings && !settings->device_id.empty() &&
         (!r || r->settings.device_id != settings->device_id) &&
@@ -90,15 +196,19 @@ nlohmann::json wtp_runtime_safe_probe(const std::function<nlohmann::json()> &pro
 }
 bool wtp_runtime_switch_allowed() noexcept {
   std::lock_guard operation(operation_mutex);
+  if(managed_gate)return false;
   auto r = get();
   return !r || r->app->replaceable();
 }
 void wtp_runtime_prepare_skip() {
   std::lock_guard operation(operation_mutex);
+  require_management_admission();
+  if(!output_admitted())throw std::runtime_error("managed_host_not_ready");
   require()->app->prepare_skip();
 }
 void select_wtp_runtime(const std::optional<WtpSettings> &settings) {
   std::lock_guard operation(operation_mutex);
+  require_management_admission(true);
   std::lock_guard lock(runtime_mutex);
   if (runtime && settings && runtime->settings == *settings &&
       runtime->credentials_current())
@@ -110,7 +220,7 @@ void select_wtp_runtime(const std::optional<WtpSettings> &settings) {
       ? runtime->output_lease_snapshot() : std::shared_ptr<void>{};
   const bool management_requires_selection = runtime && !runtime->management_carrier.empty() &&
       runtime->management_carrier != "engineering_mtls";
-  runtime = settings ? std::make_shared<NativeRuntime>(*settings, std::function<bool()>{}, std::move(lease)) : nullptr;
+  runtime = settings ? make_runtime(*settings,std::move(lease)) : nullptr;
   if (runtime && management_requires_selection) runtime->management_carrier = "disconnected";
 }
 bool wtp_runtime_selected() noexcept { return static_cast<bool>(get()); }
@@ -124,6 +234,7 @@ bool wtp_runtime_ready() noexcept {
 }
 bool wtp_runtime_invalidate_for_reload() {
   std::lock_guard operation(operation_mutex);
+  if(managed_gate)return true;
   auto r = get();
   if (!r)
     return false;
@@ -172,6 +283,8 @@ wsprrypi::TransmissionMode wtp_runtime_mode() noexcept {
 }
 void wtp_runtime_prepare(wsprrypi::TransmissionRequest r) {
   std::lock_guard operation(operation_mutex);
+  require_management_admission();
+  if(!output_admitted())throw std::runtime_error("managed_host_not_ready");
   auto target = require();
   target->refresh_usb_time(true);
   target->app->prepare(std::move(r));
@@ -181,6 +294,8 @@ std::chrono::nanoseconds wtp_runtime_preparation_lead() {
 }
 void wtp_runtime_start() {
   std::lock_guard operation(operation_mutex);
+  require_management_admission();
+  if(!output_admitted())throw std::runtime_error("managed_host_not_ready");
   require()->app->start();
 }
 wsprrypi::CleanupResult wtp_runtime_stop() {
@@ -225,7 +340,8 @@ void wtp_runtime_poll_idle() {
   if (r) (void)r->app->poll_idle();
 }
 wsprrypi::CleanupResult wtp_runtime_recover() {
-  std::lock_guard operation(operation_mutex);
+  std::unique_lock operation(operation_mutex);
+  if(managed_gate)return {false,"Output management is reserved"};
   auto r = get();
   if (!r) return {false, "Pico is not selected"};
   if (r->settings.transport=="usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial))
@@ -234,6 +350,14 @@ wsprrypi::CleanupResult wtp_runtime_recover() {
   if (result.ok) {
     (void)r->reconcile_usb_binding();
     if (r->has_usb_binding_fault()) return {false,"USB device identity changed. Reconcile matching USB control channels before another job."};
+  }
+  if(result.ok){
+    const auto observed=managed_snapshot(r);
+    // Do not invert the native lifecycle -> outgoing operation lock order.
+    // The native callback rechecks this exact observation after unlocking.
+    operation.unlock();
+    if(wsprrypi::wtp_pi_reconcile_external_output(observed)==wsprrypi::WtpExternalReconcileResult::Held)
+      return {false,"Pico output was reconciled. The controller could not confirm its output permission. Read status, then retry Reconcile Pico."};
   }
   return result;
 }
@@ -320,6 +444,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
   }
   std::unique_lock selection_lock(operation_mutex,std::try_to_lock);
   if(!selection_lock.owns_lock()) return failure(409,"The selected Pico is busy; read firmware status again shortly.");
+  if(managed_gate)return failure(409,"Output management is reserved; finish the settings operation first.");
   const auto identity=r->app->status().identity;
   const std::string serial=r->settings.usb_serial, selection=r->management_selection_id;
   const auto public_status=[&] {
@@ -433,6 +558,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
         if(action!="recover") { expected["branch"]=branch; wsprrypi::pico_usb_save_hold(marker,expected,true); }
         if (r->usb_management) r->usb_management->close();
         r->management_usb.close(); r->usb_unavailable(); r->updater_lease.reset();
+        r->usb_channel->updater_lease.reset();
         if(action=="recover" && expected.value("verified",false)) result={{"ok",true},{"stage","complete"},{"serial",serial},{"source",expected.at("source")},{"version",expected.at("version")},{"target",expected.at("verified_target")}};
         else {
           auto args=base;
@@ -466,7 +592,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_firmware(const std::string &method, const
           // Keep the output reservation and maintenance hold while negotiating
           // a fresh session; publish it only after WTP and management agree.
           r->stream.close(); r->updater_lease.reset();
-          auto fresh=std::make_shared<NativeRuntime>(r->settings,std::function<bool()>{},r->output_lease_snapshot());
+          auto fresh=make_runtime(r->settings,r->output_lease_snapshot());
           if (fresh->output_lease_snapshot()) fresh->output_lease_device=expected.at("device_id");
           fresh->management_selection_id=selection;
           reconnected=fresh->verify_firmware_reconnection(expected.at("device_id"),
@@ -502,6 +628,7 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
     const std::string &expected_selection) {
   std::unique_lock operation(operation_mutex, std::try_to_lock);
   if (!operation.owns_lock()) return {409, R"({"error":{"code":"busy"}})", {}};
+  if(managed_gate)return {409,R"({"error":{"code":"busy"}})",{}};
   auto r = get();
   if (!r) return {409, R"({"error":{"code":"member_not_selected"}})", {}};
   if(method!="GET" && r->settings.transport=="usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial))
@@ -626,7 +753,8 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
         if (r->consumer_management) r->consumer_management->logout();
         r->consumer_management.reset(); r->management_host.clear();
         std::lock_guard connection(r->usb_connection_mutex);
-        if (r->usb_management) r->usb_management->close();
+        // This editor does not own the shared physical CDC exclusively. A
+        // separate target editor or execution-time observer may still use it.
         r->usb_unavailable();
         r->management_selection_id = wsprrypi::wtp_random_identity();
         r->management_carrier = action == "engineering_mtls" ? "engineering_mtls" : "disconnected";
@@ -649,11 +777,10 @@ wsprrypi::PicoHttpResponse wtp_runtime_management(const std::string &resource,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision,"usb_physical");
         else if (resource == "member/udp-logging" || resource == "member/udp-logging/capabilities" || resource == "member/udp-logging/test" || resource == "member/udp-logging/test/capabilities") response = wsprrypi::pico_udp_logging_request(exchange,
           r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision);
-        else if (resource == "member/logging") response = exchange("/api/control/v1/logging",method,body,revision);
-        else if (resource == "member/wifi") response = exchange("/api/usb/v1/wifi",method,body,revision);
-        else if (resource == "member/hostname") { response = exchange("/api/control/v1/hostname",method,body,revision); r->observe_usb_name(response); }
-        else if (resource == "member/ap") response = exchange("/api/usb/v1/ap",method,body,revision);
-        else if (resource == "member/restart") response = exchange("/api/control/v1/restart",method,body,revision);
+        else if (resource == "member/logging" || resource == "member/wifi" || resource == "member/hostname" || resource == "member/ap" || resource == "member/restart") {
+          response = wsprrypi::pico_usb_settings_request(exchange,r->usb_management->device(),r->usb_management->boot(),resource.substr(7),method,body,revision);
+          if(resource=="member/hostname")r->observe_usb_name(response);
+        }
         else response = exchange(resource,method,body,revision);
       },true)) return failure(409,"host_busy_or_output_unresolved");
       return response;

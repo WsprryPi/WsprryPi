@@ -8,6 +8,8 @@
 #include "httplib.hpp"
 #include "config_handler.hpp"
 #include "web_server_config_http.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "wtp_integration/controller_contract.hpp"
 
 #include <utility>
 
@@ -54,7 +56,18 @@ void register_config(
         [set_cors_headers](
             const httplib::Request &, httplib::Response &response)
         {
+            std::lock_guard lock(config_update_mutex());
+            // Admission may have observed a ready host before its saved
+            // history changed. Do not publish a stale ordinary snapshot or
+            // disclose a protected draft through this read-only handler.
+            if(wsprrypi::pi_managed_host_held()) {
+                response.status=503;
+                response.set_header("Cache-Control","no-store");
+                response.set_content(wsprrypi::controller_target_error(503,"authority_pending").body,"application/json");
+                return;
+            }
             auto [config, revision] = get_public_config_snapshot();
+            response.set_header("Cache-Control","no-store");
             response.set_header("ETag", revision);
             write_route_response(response, {200, config.dump(4), "application/json", false}, set_cors_headers);
         });

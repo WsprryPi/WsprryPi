@@ -6,6 +6,16 @@ when separately authorized. Read the [execution rules](execution-rules.md), the 
 Require phases 1–3 gates. Implement the evaluator and configuration, not recurrence
 admission, authority migration, or the Scheduling UI.
 
+## Deferred Pi security boundary
+
+Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
+acceptance covers local Pi and existing Pico management. Implement independently
+eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
+associated migration remain unavailable until the end-of-phase-6 security gate.
+Carry their acceptance obligations into that gate; do not substitute unsecured
+transport, fabricated capability, or host writes for remote target operations.
+Existing security and target-local authority checks remain enforced.
+
 ## Objective and inspection
 
 Build a pure Pi-owned policy evaluator with injected UTC, transmitter-site location,

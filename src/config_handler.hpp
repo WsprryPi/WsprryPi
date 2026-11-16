@@ -37,10 +37,12 @@
 #include "config_types.hpp"
 #include "ini_file.hpp"
 #include "json.hpp"
+#include "config_ini_draft.hpp"
 
 #include <stdexcept>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -369,6 +371,50 @@ enum class LocalEnableAction { Noninteractive, EndNow, FinishCurrent };
 std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision,
     LocalEnableAction action = LocalEnableAction::Noninteractive, bool confirmed = false,
     const std::string& observed_owner = {}, const std::string& observed_job = {});
+// Runs after the existing validation/revision guards, under their commit locks.
+// The parent transaction owner must durably reserve its decision, invoke the
+// supplied INI persistence function exactly once, and propagate uncertainty.
+using ConfigPersistenceCoordinator = std::function<void(
+    const nlohmann::json &, const std::function<void()> &)>;
+using ConfigSnapshotValidator = std::function<void(const nlohmann::json &)>;
+using ConfigStockCoordinator = std::function<void(const nlohmann::json &,const std::string &)>;
+using ConfigIniInputGuard = std::function<void(const std::string &)>;
+using ConfigPrivateCoordinator = std::function<void(const nlohmann::json &,
+    const std::string &,const std::string &)>;
+// Install all three before admitting writers. Unchanged monitor reloads validate a
+// snapshot without writing or advancing a revision. No UI can replace these.
+void set_config_persistence_owner(ConfigPersistenceCoordinator,ConfigSnapshotValidator,
+    ConfigStockCoordinator,ConfigIniDraftObserver = {},ConfigIniInputGuard = {},ConfigPrivateCoordinator = {});
+// Return false only when no managed owner applies. Managed reads never fall
+// through to an unsafe file reader, and managed private writes never fall
+// through to an unrelated rename. The private writer accepts only the existing
+// network-safety setting; all other saved bytes and configuration stay intact.
+bool read_owned_ini_snapshot(const std::string &path,std::optional<std::string> &bytes);
+bool persist_owned_network_safety_ini(const std::string &path,
+    const std::string &before,const std::string &after);
+// Existing operator Stop saves only the saved Transmit permission. Returns
+// false solely when no managed owner applies; a held owner never falls back
+// to a direct component write. Transient runtime settings are not saved.
+bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserved_owner = {});
+// Invoke before the component opens an owning INI path. A failed managed-state
+// recovery must not let the legacy parser follow a FIFO, symlink, or stale file.
+void validate_config_ini_input(const std::string &filename);
+// Private metadata guard for an owning-parser snapshot, never a browser path.
+bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &);
+// Validate a private stock preview through the owning INI/config parser, then
+// join the installed transaction owner. Does not publish runtime state or start
+// the file monitor. Repair/Reset uses this before its existing reload lifecycle.
+void persist_stock_configuration(bool preserve_compatible_values);
+// Recovery-only saved after-image, using the same non-live owning INI validator
+// as stock preview. The trusted caller restores private references first. No
+// backend construction, runtime publication, monitor, or output admission.
+void persist_recovery_configuration(const nlohmann::json &configuration,
+    const nlohmann::json &preserved_internal);
+// Pure prediction under the configuration commit lock. Rejects values that
+// cannot be represented by the existing INI format before reserving a save.
+std::string serialize_config_ini_projection_for_management(const nlohmann::json &);
+std::string patch_config_with_persistence_coordinator(const nlohmann::json &,
+    const std::string &expected_revision, const ConfigPersistenceCoordinator &);
 std::pair<nlohmann::json, std::string> get_public_config_snapshot();
 void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept;
 bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message = nullptr) noexcept;
@@ -379,7 +425,9 @@ bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message = nullp
  * Performs either a repair or full restore of the INI configuration using
  * stock defaults, then reloads the runtime configuration state.
  *
- * If repair is selected, only missing or invalid values are corrected.
+ * Repair preserves saved values for matching stock keys and restores stock-only
+ * keys. With the transaction owner installed, invalid resulting settings refuse
+ * publication through the owning semantic validator.
  * If restore is selected, the configuration is fully reset to stock.
  *
  * After updating the INI file, the configuration is reloaded by converting

@@ -39,6 +39,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace
 {
@@ -75,6 +76,28 @@ void IniFile::set_filename(const std::string &filename)
     load();
 }
 
+void IniFile::set_file_reader(FileReader reader)
+{
+    _fileReader = std::move(reader);
+}
+void IniFile::set_file_writer(FileWriter writer)
+{
+    _fileWriter = std::move(writer);
+}
+
+std::string IniFile::read_contents(const std::string &filename) const
+{
+    if (_fileReader) return _fileReader(filename);
+    std::ifstream file(filename);
+    if (!file.is_open())
+        throw std::runtime_error("Cannot open ini file " + filename + ".");
+    std::ostringstream bytes;
+    bytes << file.rdbuf();
+    if (file.bad() || bytes.bad())
+        throw std::runtime_error("Cannot read ini file " + filename + ".");
+    return bytes.str();
+}
+
 bool IniFile::load()
 {
     if (_filename.empty())
@@ -82,11 +105,13 @@ bool IniFile::load()
         throw std::runtime_error("Null value filename passed for load.");
     }
 
-    std::ifstream file(_filename);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Cannot open ini file " + _filename + ".");
-    }
+    std::istringstream file(read_contents(_filename));
+    load_stream(file);
+    return true;
+}
+
+void IniFile::load_stream(std::istream &file)
+{
 
     _data.clear();
     _lines.clear();
@@ -138,24 +163,13 @@ bool IniFile::load()
 
     _removedKeys.clear();
     _pendingChanges = false;
-    return true;
 }
 
-void IniFile::save()
+std::string IniFile::serialize_with_data(
+    const std::map<std::string,
+                   std::unordered_map<std::string, std::string>> &proposed_data) const
 {
-    if (_filename.empty())
-    {
-        throw std::runtime_error("Null value filename passed for save.");
-    }
-
-    const std::string temp_filename = _filename + ".tmp";
-    std::ofstream file(temp_filename, std::ios::trunc);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Cannot write temporary ini file " +
-                                 temp_filename + ".");
-    }
-
+    std::ostringstream file;
     std::string current_section;
     std::unordered_map<std::string, std::unordered_set<std::string>> written_keys;
     for (const auto &entry : _rawPassthroughKeys)
@@ -188,15 +202,16 @@ void IniFile::save()
                 file << _lines[i] << "\n";
                 continue;
             }
-            if (_removedKeys.count({current_section, key}) > 0)
+            const bool proposed = proposed_data.count(current_section) > 0 &&
+                proposed_data.at(current_section).count(key) > 0;
+            if (_removedKeys.count({current_section, key}) > 0 && !proposed)
             {
                 continue;
             }
-            if (!key.empty() && _data.count(current_section) > 0 &&
-                _data.at(current_section).count(key) > 0)
+            if (!key.empty() && proposed)
             {
                 file << key << " = "
-                     << _data.at(current_section).at(key) << "\n";
+                     << proposed_data.at(current_section).at(key) << "\n";
                 written_keys[current_section].insert(key);
             }
             else
@@ -211,7 +226,7 @@ void IniFile::save()
     }
 
     bool appended_entries = false;
-    for (const auto &section_pair : _data)
+    for (const auto &section_pair : proposed_data)
     {
         const std::string &section = section_pair.first;
         std::vector<std::string> missing_keys;
@@ -245,6 +260,31 @@ void IniFile::save()
         }
     }
 
+    if (!file)
+    {
+        throw std::runtime_error("Failed serializing INI data.");
+    }
+    return file.str();
+}
+
+void IniFile::save()
+{
+    if (_filename.empty())
+    {
+        throw std::runtime_error("Null value filename passed for save.");
+    }
+
+    const auto serialized = serialize_with_data(_data);
+    if(_fileWriter){_fileWriter(_filename,serialized);_pendingChanges=false;return;}
+    const std::string temp_filename = _filename + ".tmp";
+    std::ofstream file(temp_filename, std::ios::trunc);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Cannot write temporary ini file " +
+                                 temp_filename + ".");
+    }
+
+    file << serialized;
     file.close();
     if (!file)
     {
@@ -277,15 +317,62 @@ void IniFile::reset_to_stock(const std::string &semantic_version)
             "Null value filename passed for reset_to_stock.");
     }
 
-    const std::string stock_filename = _filename + ".stock";
-    const std::string temp_filename = _filename + ".tmp";
+    replace_from_stock(serialize_from_stock(semantic_version, false));
+    load();
+}
 
-    std::ifstream stock_file(stock_filename);
-    if (!stock_file.is_open())
+std::string IniFile::serialize_from_stock(const std::string &semantic_version,
+    bool preserve_compatible_values) const
+{
+    if (_filename.empty())
+        throw std::runtime_error("Null value filename passed for serialize_from_stock.");
+
+    IniFile preserved;
+    if (preserve_compatible_values)
     {
-        throw std::runtime_error("Cannot open stock ini file " +
-                                 stock_filename + ".");
+        std::istringstream live(read_contents(_filename));
+        preserved.load_stream(live);
+        if (live.bad())
+            throw std::runtime_error("Cannot read ini file " + _filename + ".");
     }
+    const std::string stock_filename = _filename + ".stock";
+    std::istringstream stock_file(read_contents(stock_filename));
+
+    std::ostringstream bytes;
+    std::string line;
+    while (std::getline(stock_file, line))
+        bytes << replace_all(line, "%SEMANTIC_VERSION%", semantic_version) << "\n";
+    if (stock_file.bad() || !bytes)
+        throw std::runtime_error("Cannot read stock ini file " + stock_filename + ".");
+    const auto reset = bytes.str();
+    if (!preserve_compatible_values) return reset;
+
+    IniFile stock;
+    stock._rawPassthroughKeys = _rawPassthroughKeys;
+    std::istringstream input(reset);
+    stock.load_stream(input);
+    bool merged = false;
+    for (const auto &[section, values] : preserved._data)
+    {
+        auto target = stock._data.find(section);
+        if (target == stock._data.end()) continue;
+        for (const auto &[key, value] : values)
+        {
+            auto saved = target->second.find(key);
+            if (saved != target->second.end() && saved->second != value)
+            {
+                saved->second = value;
+                merged = true;
+            }
+        }
+    }
+    return merged ? stock.serialize_with_data(stock._data) : reset;
+}
+
+void IniFile::replace_from_stock(const std::string &bytes)
+{
+    if(_fileWriter){_fileWriter(_filename,bytes);return;}
+    const std::string temp_filename = _filename + ".tmp";
 
     std::ofstream temp_file(temp_filename, std::ios::trunc);
     if (!temp_file.is_open())
@@ -294,14 +381,7 @@ void IniFile::reset_to_stock(const std::string &semantic_version)
                                  temp_filename + ".");
     }
 
-    std::string line;
-    while (std::getline(stock_file, line))
-    {
-        temp_file << replace_all(line,
-                                 "%SEMANTIC_VERSION%",
-                                 semantic_version)
-                  << "\n";
-    }
+    temp_file << bytes;
 
     temp_file.close();
     if (!temp_file)
@@ -317,8 +397,6 @@ void IniFile::reset_to_stock(const std::string &semantic_version)
         throw std::runtime_error("Cannot replace live ini file " +
                                  _filename + ".");
     }
-
-    load();
 }
 
 void IniFile::repair_from_stock(const std::string &semantic_version)
@@ -329,47 +407,8 @@ void IniFile::repair_from_stock(const std::string &semantic_version)
             "Null value filename passed for repair_from_stock.");
     }
 
+    replace_from_stock(serialize_from_stock(semantic_version, true));
     load();
-    const auto preserved_data = _data;
-
-    reset_to_stock(semantic_version);
-
-    bool merged_changes = false;
-
-    for (const auto &section_entry : preserved_data)
-    {
-        const std::string &section = section_entry.first;
-        auto stock_section = _data.find(section);
-        if (stock_section == _data.end())
-        {
-            continue;
-        }
-
-        for (const auto &key_entry : section_entry.second)
-        {
-            const std::string &key = key_entry.first;
-            const std::string &value = key_entry.second;
-            auto stock_key = stock_section->second.find(key);
-            if (stock_key == stock_section->second.end())
-            {
-                continue;
-            }
-
-            if (stock_key->second != value)
-            {
-                stock_key->second = value;
-                merged_changes = true;
-            }
-        }
-    }
-
-    if (merged_changes)
-    {
-        save();
-        load();
-    }
-
-    _pendingChanges = false;
 }
 
 std::string IniFile::get_value(const std::string &section,

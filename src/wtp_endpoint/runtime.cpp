@@ -11,6 +11,7 @@
 #include "wtp_endpoint/execution_context.hpp"
 #include "WTP-Server/include/wtp_server/inhibited_rf_engine.hpp"
 #include "wtp_pi_control.hpp"
+#include "wtp_managed_output.hpp"
 
 #include "json.hpp"
 #include "logging.hpp"
@@ -48,8 +49,11 @@
 #endif
 
 namespace wsprrypi {
+static WtpExternalReconcileResult reconcile_native_external_output(const WtpManagedOutput &);
 namespace {
+std::string fixture_private_state_path;
 std::string private_state_path() {
+    if(!fixture_private_state_path.empty())return fixture_private_state_path;
     const passwd* owner = getpwuid(geteuid());
     if (!owner || !owner->pw_dir || !*owner->pw_dir)
         throw std::runtime_error("WTP endpoint state home unavailable");
@@ -187,7 +191,7 @@ public:
             clock_, engine_ ? static_cast<wsprrypico::wtp::RfEngine&>(*engine_) :
                              static_cast<wsprrypico::wtp::RfEngine&>(unavailable_engine_),
             boot_identity_, caps);
-        authority_ = std::make_shared<WtpPiAuthority>(*service_, false, &journal_);
+        authority_ = std::make_shared<WtpPiAuthority>(*service_, false, &journal_,wtp_pi_management_ready);
         if (authority_->snapshot().revocation_unavailable)
             throw std::runtime_error("WTP takeover revocation journal unavailable");
         if (settings.transmit)
@@ -291,6 +295,7 @@ public:
     }
 
     std::shared_ptr<WtpPiAuthority> authority() const { return authority_; }
+    const std::string &device_id() const { return device_id_; }
     void withdraw() {
         std::lock_guard lock(state_mutex_);
         publisher_.stop();
@@ -366,7 +371,12 @@ bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) 
             },
             [candidate](bool off) { candidate->authority()->end_scheduled_work(off); },
             [candidate] { return candidate->authority()->begin_configuration(); },
-            [candidate] { candidate->authority()->end_configuration(); }});
+            [candidate] { candidate->authority()->end_configuration(); },
+            [candidate] {
+                const auto state=candidate->authority()->snapshot();
+                return !state.output_unknown&&!state.revocation_unavailable;
+            },
+            [](const WtpManagedOutput &expected){return reconcile_native_external_output(expected);}});
         std::lock_guard lock(runtime_mutex);
         runtime = std::move(candidate);
         runtime_start_error.clear();
@@ -377,6 +387,18 @@ bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) 
         if (error) *error = runtime_start_error;
         return false;
     }
+}
+
+void testing::set_wtp_pi_private_state_path(const std::string &path){
+    std::lock_guard lifecycle(lifecycle_mutex);
+    std::lock_guard lock(runtime_mutex);
+    if(runtime||pending_settings||path.empty()||path.front()!='/'||path.back()=='/'||path.find('\0')!=std::string::npos)
+        throw std::invalid_argument("Invalid isolated endpoint ledger path or runtime lifecycle");
+    const auto parent=path.substr(0,path.find_last_of('/'));
+    struct stat info{};
+    if(lstat(parent.c_str(),&info)!=0||!S_ISDIR(info.st_mode)||info.st_uid!=geteuid()||(info.st_mode&0077)!=0)
+        throw std::invalid_argument("Isolated endpoint ledger requires a private fixture parent");
+    fixture_private_state_path=path;
 }
 
 void poll_wtp_pi_endpoint() noexcept {
@@ -410,6 +432,7 @@ void activate_wtp_pi_endpoint() {
 
 void stop_wtp_pi_endpoint() noexcept {
     std::lock_guard lifecycle(lifecycle_mutex);
+    wtp_pi_management_stopping();
     clear_wtp_pi_control_hooks();
     std::shared_ptr<Runtime> current;
     { std::lock_guard lock(runtime_mutex); current.swap(runtime); }
@@ -462,11 +485,105 @@ void wtp_pi_configuration_committed(const ArgParserConfig& settings) {
     }
 }
 
+void wtp_pi_with_configuration(const std::function<void()>& action) {
+    if (!action) throw std::runtime_error("configuration_action_required");
+    std::shared_ptr<Runtime> current;
+    {
+        // Configuration callers already own their configuration lock. Never
+        // wait here behind a poll/reconfiguration path with the opposite lock
+        // order, and never release a reservation through a replacement runtime.
+        std::unique_lock lifecycle(lifecycle_mutex, std::try_to_lock);
+        if (!lifecycle.owns_lock()) throw std::runtime_error("management_busy");
+        { std::lock_guard lock(runtime_mutex); current = runtime; }
+        if (!current || pending_settings || !current->authority()->begin_configuration())
+            throw std::runtime_error("native_configuration_unavailable");
+    }
+    struct Release {
+        std::shared_ptr<Runtime> current;
+        ~Release() { current->authority()->end_configuration(); }
+    } release{current};
+    action();
+}
+
+std::optional<PiManagementObservation> wtp_pi_management_observation(){
+    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
+    if(!lifecycle.owns_lock())return {};
+    std::shared_ptr<Runtime> current;
+    {std::lock_guard lock(runtime_mutex);current=runtime;}
+    if(!current||pending_settings)return {};
+    const auto observed=current->authority()->management_snapshot(current->device_id());
+    auto result=PiManagementObservation{current->device_id(),observed.first,observed.second,
+        [current]{
+            std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
+            if(!lifecycle.owns_lock())return false;
+            {std::lock_guard lock(runtime_mutex);if(runtime!=current||pending_settings)return false;}
+            return current->authority()->begin_configuration();
+        },[current]{current->authority()->end_configuration();},
+        [current,boot=observed.first.remote.boot_id](const WtpPiAuthority::ObservedOutput &expected){
+            std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
+            if(!lifecycle.owns_lock())return false;
+            {std::lock_guard lock(runtime_mutex);if(runtime!=current||pending_settings)return false;}
+            return current->authority()->reserve_observed_stop(current->device_id(),boot,expected);
+        },[current]{current->authority()->release_observed_stop();},
+        [current]{
+            std::lock_guard lifecycle(lifecycle_mutex);
+            {std::lock_guard lock(runtime_mutex);if(runtime!=current||pending_settings)
+                throw std::runtime_error("native_stop_owner_changed");}
+            // Durable acceptance already saved Transmit=false. The existing
+            // cleanup path does not save again or change scheduling.enabled.
+            (void)stop_transmission_by_user_request(false);
+        }};
+    if(current->settings().transmit_backend!=TransmitBackendKind::WTP){
+        result.destination_id=current->device_id();return result;
+    }
+    const auto outgoing=wtp_runtime_managed_output();if(!outgoing)return {};
+    result.destination_id=outgoing->destination_id;result.output=outgoing->output;
+    result.authority.output_unknown=result.authority.output_unknown||outgoing->unknown;
+    result.authority.stop_reserved=result.authority.stop_reserved||outgoing->stop_reserved;
+    result.authority.effective_local_enable=result.authority.requested_local_enable&&outgoing->ready&&!outgoing->unknown;
+    const auto native_reserve=result.reserve_configuration;
+    const auto native_release=result.release_configuration;
+    if(outgoing->reserve_configuration&&outgoing->release_configuration){
+        result.reserve_configuration=[native_reserve,native_release,outgoing]{
+            if(!native_reserve())return false;
+            if(outgoing->reserve_configuration())return true;
+            native_release();return false;
+        };
+        result.release_configuration=[native_release,outgoing]{native_release();outgoing->release_configuration();};
+    }else {result.reserve_configuration={};result.release_configuration={};}
+    const auto native_stop=result.reserve_stop;
+    const auto release_stop=result.release_stop;
+    if(outgoing->reserve_stop&&outgoing->release_stop){
+        result.reserve_stop=[native_stop,release_stop,outgoing,native_output=observed.second](const auto &expected){
+            if(!native_stop(native_output))return false;
+            if(outgoing->reserve_stop(expected))return true;
+            release_stop();return false;
+        };
+        result.release_stop=[release_stop,outgoing]{release_stop();outgoing->release_stop();};
+    }else {result.reserve_stop={};result.release_stop={};result.cancel_reserved_stop={};}
+    return result;
+}
+
 bool wtp_pi_stop_remote_work() {
     std::lock_guard lifecycle(lifecycle_mutex);
     std::shared_ptr<Runtime> current;
     { std::lock_guard lock(runtime_mutex); current = runtime; }
     return !current || current->authority()->local_stop();
+}
+
+static WtpExternalReconcileResult reconcile_native_external_output(const WtpManagedOutput &expected){
+    std::shared_ptr<Runtime> current;
+    {std::lock_guard lock(runtime_mutex);current=runtime;}
+    if(!current)return WtpExternalReconcileResult::NotApplicable;
+    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
+    if(!lifecycle.owns_lock())return WtpExternalReconcileResult::Held;
+    {std::lock_guard lock(runtime_mutex);if(current!=runtime)return WtpExternalReconcileResult::Held;}
+    if(current->settings().transmit_backend!=TransmitBackendKind::WTP)return WtpExternalReconcileResult::NotApplicable;
+    if(pending_settings)return WtpExternalReconcileResult::Held;
+    const auto observed=wtp_runtime_managed_output();
+    if(!observed||observed->output!=expected.output||observed->destination_id!=expected.destination_id||
+        !observed->destination_id||!observed->ready||observed->unknown||observed->output.owner_id||observed->output.job_id)return WtpExternalReconcileResult::Held;
+    return current->authority()->recover_output(true)?WtpExternalReconcileResult::Confirmed:WtpExternalReconcileResult::Held;
 }
 
 bool wtp_pi_recover_remote_output() {

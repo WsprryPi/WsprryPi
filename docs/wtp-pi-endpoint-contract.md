@@ -174,6 +174,13 @@ an `ARM` reply, or a terminal label alone never proves output inactive. Local
 safety stop may use the protocol's local-abort provision, with the same terminal
 and output checks; remote ownership cannot prevent a local safety stop.
 
+Linux device identity retains the existing domain-separated machine-ID mapping.
+Mac identity uses the OS host UUID, queried with a two-second bound, under a
+separate `wsprrypi-wtp-macos-device-v1:` hash domain. No random or file-based
+fallback identity is created. Unavailable identity inhibits identity-dependent
+startup, and a changed OS identity does not transfer existing managed history.
+These endpoint labels do not authenticate a client or change WTP/1.
+
 The server SHALL preserve WTP/1 session/principal binding, request replay,
 resource idempotency, lease behavior, terminal retention, reconnect, and boot
 change semantics. A restart must not adopt or rearm an old job. Reuse of Pico's

@@ -3,12 +3,20 @@
 #include "WTP-Server/include/wtp_server/job_service.hpp"
 
 #include <string>
+#include <array>
+#include <cstdint>
 
 namespace wsprrypi {
 
-// The machine ID is domain-separated and truncated to WTP's 128-bit display
-// identity. It is an endpoint label, not authentication for Plain LAN.
-std::string wtp_pi_device_id(const std::string& machine_id_path = "/etc/machine-id");
+// OS-owned identity, domain-separated and truncated to WTP's 128-bit display
+// label, never authentication. Linux retains its existing machine-ID mapping;
+// macOS uses its host UUID with a distinct domain and a bounded OS query.
+std::string wtp_pi_device_id();
+// Explicit file source for existing Linux software fixtures. No CLI, INI,
+// environment, browser, or network request can select this source.
+std::string wtp_pi_device_id(const std::string& machine_id_path);
+// Pure Mac mapping used by the OS producer and cross-platform golden tests.
+std::string wtp_pi_macos_device_id(const std::array<std::uint8_t,16>& host_uuid);
 
 class WtpPiBootIdentity final : public wsprrypico::wtp::IdentitySource {
 public:

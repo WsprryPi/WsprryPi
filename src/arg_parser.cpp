@@ -28,6 +28,7 @@
 
 // Primary header for this source file
 #include "arg_parser.hpp"
+#include "pi_managed_host_runtime.hpp"
 #include "test_tone_frequency_plan.hpp"
 #include "arg_parser_internal.hpp"
 
@@ -2631,6 +2632,7 @@ bool parse_command_line(int argc, char *argv[])
 
             try
             {
+                validate_config_ini_input(config.ini_filename);
                 iniFile.set_raw_passthrough_keys(
                     {{"Security", "Privileged Network Safety"}});
                 iniFile.set_filename(config.ini_filename);
@@ -2708,6 +2710,7 @@ bool parse_command_line(int argc, char *argv[])
                 defer_startup_diagnostic(WARN, "NETWORK SAFETY OFF");
             }
 
+            if(const auto host=wsprrypi::pi_managed_host())host->restore_recovery_listener_ports();
             // Remove "-i <file>" from args
             args.erase(it, it + 2);
             break; // Exit loop after removing argument

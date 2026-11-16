@@ -1,6 +1,7 @@
 # Shared device setup and device-owned solar scheduling
 
-Status: implementation plan, not implemented or qualified. Updated 2026-11-15.
+Status: implementation plan; phase-specific implementation evidence is recorded
+in the phase list. Updated 2026-11-16.
 
 Feature tracking: [WsprryPi #473 — Shared device setup and device-owned solar
 scheduling](https://github.com/WsprryPi/WsprryPi/issues/473). This document is the
@@ -20,6 +21,18 @@ ownership replacement; no manual certificates. D07 automates known-authority
 retirement/reconciliation, leaves offline/unknown migrations pending, and preserves
 existing WTP claims when local Transmit is off. Management replacement and RF
 ownership remain independent. These decisions authorize no phase-2 implementation.
+
+## Approved sequencing amendment (2026-11-16)
+
+The user deferred new automatic Pi pairing/TLS and controller-to-remote-Pi
+management to the [mandatory security milestone](issue-473/deferred-pi-security.md)
+at the end of phase 6, before phase 7. Phase 2 is assessed on local Pi management,
+existing Pico management, controller-only operation, persistence/recovery, and
+readiness. Phases 3–6 may proceed only on independently eligible paths when
+separately authorized. Remote Pi editor/migration acceptance moves with that
+milestone; unfinished remote-Pi management stays unavailable. Existing WTP/Pico
+TLS and all approved eventual security/ownership contracts remain unchanged.
+This explicit amendment controls earlier phase-placement language in this plan.
 
 ## Objective and authority
 
@@ -233,9 +246,10 @@ invent unresolved semantics during later UI or scheduler implementation.
 
 ### 2. Target management and controller-only separation
 
-- Add bounded, identity-bound management adapters for local Pi, remote Pi, and
-  existing Pico resources. Remote Pi reads/writes reach services on that Pi;
-  background UI selection cannot mutate the host configuration.
+- Add bounded, identity-bound management adapters for local Pi and existing
+  Pico resources. Preserve the approved remote Pi service contracts, but defer
+  its controller adapter and new pairing/TLS to the mandatory security milestone.
+  Unavailable remote Pi targets cannot mutate the host configuration.
 - Decouple selecting/managing a Pico from choosing it as the host's WTP backend.
   Preserve active sessions, claims, and jobs across editing-context changes.
 - Make controller/UI operation explicit without local hardware initialization,
@@ -244,9 +258,11 @@ invent unresolved semantics during later UI or scheduler implementation.
 - Establish readiness and admission inhibition until target configuration and
   ownership state are loaded and validated at startup.
 
-Gate: production-path local/remote management tests pass, including a controller
-with zero local outputs and multiple independent targets; no recurrence dispatch
-is added to Fleet runtime.
+Gate: production-path local Pi and existing Pico management tests pass, including
+a controller with zero local outputs and multiple independent Pico targets.
+Direct requests for unavailable remote Pi management cannot write host settings
+or history. Both applicable paired suites pass; no recurrence dispatch is added
+to Fleet runtime. The deferred security milestone is not part of phase-2 completion.
 
 ### 3. Shared Setup context and existing-control migration
 
@@ -317,6 +333,11 @@ the interlock independently of the UI and current controller process.
 Gate: actual application paths pass accelerated and bounded real-time simulation
 for admission, pair refusal, shifts, rotation, skips, lifecycle failures, clock
 steps, restarts, disable/enable, cancellation, and no duplicate/catch-up work.
+
+Phase 6 also completes the [deferred Pi security milestone](issue-473/deferred-pi-security.md),
+including deferred remote editor/migration integration, before its acceptance
+gate can pass. Independent recurrence development can precede that work, but no
+remote Pi management becomes available before the full security gate.
 
 ### 7. Shared Scheduling tab and native remote operation
 

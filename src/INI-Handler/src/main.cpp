@@ -310,6 +310,60 @@ void test_writing(IniFile &config, const std::string &filename)
               << std::endl;
 }
 
+void test_serialization(IniFile &config)
+{
+    print_header("Testing pure proposed-data serialization.");
+    const auto filename = test_dir / "serialization.ini";
+    const std::string original = std::string("; preserved byte ") + char(0xff) +
+        "\r\n[Common]\r\nKey = first\r\nKey = last\r\nKeep = retained\r\nRemove = old\r\n"
+        "[Security]\r\n  Privileged Network Safety = enforced  \r\n[Tail]\r\nLast = unchanged\r\n";
+    { std::ofstream output(filename, std::ios::binary); output << original; }
+    config.set_filename(filename.string());
+    config.set_raw_passthrough_keys({{"Security", "Privileged Network Safety"}});
+    config.erase_value("Common", "Remove");
+    const auto current = config.getData();
+    const bool pending = config.hasPendingChanges();
+    auto proposed = current;
+    proposed["Common"]["Key"] = "proposed";
+    proposed["Common"]["Added"] = "new";
+    proposed["New section"]["New key"] = "new value";
+    proposed["Security"]["Privileged Network Safety"] = "disabled";
+    proposed["Tail"].erase("Last");
+    const auto predicted = config.serialize_with_data(proposed);
+    const auto read = [&]() {
+        std::ifstream input(filename, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    };
+    if (read() != original || config.getData() != current ||
+        config.hasPendingChanges() != pending || fs::exists(filename.string() + ".tmp"))
+        throw std::runtime_error("Serialization changed file, data, pending edits, or temporary files.");
+    const auto first = predicted.find("Key = proposed\n");
+    if (first == std::string::npos || predicted.find("Key = proposed\n", first + 1) == std::string::npos ||
+        predicted.find("Remove =") != std::string::npos || predicted.find("Last = unchanged\r\n") == std::string::npos ||
+        predicted.find("  Privileged Network Safety = enforced  \r\n") == std::string::npos ||
+        predicted.find(char(0xff)) == std::string::npos || predicted.find("[New section]\nNew key = new value\n") == std::string::npos)
+        throw std::runtime_error("Serialization lost layout, removals, additions, duplicates, bytes, or raw owner data.");
+    auto reintroduced = proposed;
+    reintroduced["Common"]["Remove"] = "reintroduced";
+    const auto restored_key = config.serialize_with_data(reintroduced);
+    if (restored_key.find("Remove = reintroduced\n") == std::string::npos ||
+        config.getData() != current || config.hasPendingChanges() != pending)
+        throw std::runtime_error("Proposed reintroduction changed pending erasure state.");
+    fs::remove(filename);
+    if (config.serialize_with_data(proposed) != predicted || fs::exists(filename))
+        throw std::runtime_error("Serialization performed I/O on a missing live file.");
+    { std::ofstream output(filename, std::ios::binary); output << original; }
+    config.setData(proposed);
+    config.save();
+    if (read() != predicted || config.hasPendingChanges())
+        throw std::runtime_error("Predicted bytes differ from the actual save.");
+    config.setData(reintroduced);
+    config.save();
+    if (read() != restored_key)
+        throw std::runtime_error("Reintroduced-key prediction differs from setData/save.");
+    config.set_raw_passthrough_keys({});
+}
+
 void test_key_erasure(IniFile &config, const std::string &filename)
 {
     print_header("Testing explicit key erasure.");
@@ -469,6 +523,74 @@ void test_reset_to_stock(IniFile &config, const std::string &filename)
     std::cout << "reset_to_stock() verification passed." << std::endl;
 }
 
+void test_stock_serialization(IniFile &config)
+{
+    print_header("Testing pure stock reset/repair serialization.");
+    const auto filename = test_dir / "stock-preview.ini";
+    const auto stockfile = fs::path(filename.string() + ".stock");
+    const auto write = [](const fs::path &path, const std::string &bytes) {
+        std::ofstream output(path, std::ios::binary); output << bytes;
+        if (!output) throw std::runtime_error("Stock preview fixture write failed.");
+    };
+    const auto read = [](const fs::path &path) {
+        std::ifstream input(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(input), {});
+    };
+    const std::string live = "[Section]\nKey = custom\nOther = off\nRetired = discarded\n[Retired]\nX = discarded\n";
+    const std::string stock = "; %SEMANTIC_VERSION% / %SEMANTIC_VERSION%\n[Section]\nKey = factory ; retained on reset\nOther = on\n";
+    const std::string reset = "; 1.2.3 / 1.2.3\n[Section]\nKey = factory ; retained on reset\nOther = on\n";
+    const std::string repaired = "; 1.2.3 / 1.2.3\n[Section]\nKey = custom\nOther = off\n";
+    write(filename, live);write(stockfile, stock);config.set_filename(filename.string());
+    config.set_string_value("Section", "Key", "unsaved");
+    config.erase_value("Section", "Other");
+    const auto memory = config.getData();
+    const auto pending = config.hasPendingChanges();
+    const auto ordinary = config.serialize_with_data(memory);
+    if (config.serialize_from_stock("1.2.3", false) != reset ||
+        config.serialize_from_stock("1.2.3", true) != repaired ||
+        config.getData() != memory || config.hasPendingChanges() != pending ||
+        config.serialize_with_data(memory) != ordinary || read(filename) != live ||
+        read(stockfile) != stock || fs::exists(filename.string() + ".tmp"))
+        throw std::runtime_error("Stock preview changed state or differs from exact legacy reset/repair bytes.");
+    config.repair_from_stock("1.2.3");
+    if (read(filename) != repaired || config.hasPendingChanges())
+        throw std::runtime_error("Repair differs from its exact preview.");
+    config.reset_to_stock("1.2.3");
+    if (read(filename) != reset || config.hasPendingChanges())
+        throw std::runtime_error("Reset differs from its exact preview.");
+    // Unchanged compatible values retain the original stock inline comments;
+    // raw owner fields retain stock bytes even when another field is merged.
+    if (config.serialize_from_stock("1.2.3", true) != reset)
+        throw std::runtime_error("No-op repair normalized stock layout.");
+    write(filename,live);config.set_filename(filename.string());
+    config.set_raw_passthrough_keys({{"Section","Key"}});
+    const std::string raw = "; 1.2.3 / 1.2.3\n[Section]\nKey = factory ; retained on reset\nOther = off\n";
+    if (config.serialize_from_stock("1.2.3",true) != raw)
+        throw std::runtime_error("Repair preview changed raw passthrough semantics.");
+    config.repair_from_stock("1.2.3");
+    if (read(filename) != raw) throw std::runtime_error("Raw repair differs from preview.");
+    config.set_raw_passthrough_keys({});
+    config.set_string_value("Section","Key","pending");
+    const auto before_error=config.getData();const auto pending_error=config.hasPendingChanges();
+    fs::remove(stockfile);
+    for (const bool repair : {false,true}) {
+        bool refused=false;
+        try { (void)config.serialize_from_stock("1.2.3",repair); }
+        catch (const std::runtime_error &) { refused=true; }
+        if (!refused || config.getData()!=before_error || config.hasPendingChanges()!=pending_error ||
+            read(filename)!=raw || fs::exists(filename.string()+".tmp"))
+            throw std::runtime_error("Failed stock preview changed live or pending state.");
+    }
+    write(stockfile,stock);fs::remove(filename);
+    if (config.serialize_from_stock("1.2.3",false)!=reset || fs::exists(filename))
+        throw std::runtime_error("Reset preview requires or creates a live file.");
+    bool refused=false;
+    try { (void)config.serialize_from_stock("1.2.3",true); }
+    catch (const std::runtime_error &) { refused=true; }
+    if (!refused || config.getData()!=before_error || config.hasPendingChanges()!=pending_error)
+        throw std::runtime_error("Repair preview of absent live file changed state.");
+}
+
 void test_repair_from_stock(IniFile &config, const std::string &filename)
 {
     print_header("Testing repair_from_stock().");
@@ -584,6 +706,85 @@ void test_repair_from_stock(IniFile &config, const std::string &filename)
     std::cout << "repair_from_stock() verification passed." << std::endl;
 }
 
+void test_file_reader(IniFile &config)
+{
+    const auto path=(test_dir/"virtual-reader.ini").string();
+    const std::string live="; retained\n[Section]\nKey = custom\nOther = off\n";
+    const std::string stock="; %SEMANTIC_VERSION%\n[Section]\nKey = factory\nOther = on\n";
+    bool fail=false;std::vector<std::string> reads;
+    struct Restore{IniFile &config;~Restore(){config.set_file_reader({});}} restore{config};
+    config.set_file_reader([&](const std::string &name){
+        reads.push_back(name);
+        if(fail)throw std::runtime_error("Reader refuses input");
+        if(name==path)return live;
+        if(name==path+".stock")return stock;
+        throw std::runtime_error("Unexpected reader path");
+    });
+    config.set_filename(path);
+    if(fs::exists(path)||config.get_value("Section","Key")!="custom")throw std::runtime_error("Reader must supply live bytes without reopening a file");
+    config.set_string_value("Section","Key","unsaved");config.erase_value("Section","Other");
+    const auto data=config.getData(),before_data=data;
+    const auto preview=config.serialize_with_data(data);
+    if(config.serialize_from_stock("reader-version",false)!="; reader-version\n[Section]\nKey = factory\nOther = on\n"||
+        config.serialize_from_stock("reader-version",true)!="; reader-version\n[Section]\nKey = custom\nOther = off\n")
+        throw std::runtime_error("Stock preview must use the same reader and existing merge/layout semantics");
+    if(config.getData()!=before_data||!config.hasPendingChanges()||config.serialize_with_data(config.getData())!=preview)
+        throw std::runtime_error("Reader previews must preserve pending data and removals");
+    fail=true;
+    for(const auto action:{0,1,2}){
+        bool refused=false;
+        try{if(action==0)config.load();else (void)config.serialize_from_stock("v",action==2);}catch(const std::runtime_error &){refused=true;}
+        if(!refused||config.getData()!=before_data||!config.hasPendingChanges()||config.serialize_with_data(config.getData())!=preview)
+            throw std::runtime_error("Reader failure must leave component state unchanged");
+    }
+    if(reads.size()<5)throw std::runtime_error("Expected live/stock reader coverage");
+    config.set_file_reader({});
+    bool ordinary_refused=false;try{config.load();}catch(const std::runtime_error &){ordinary_refused=true;}
+    if(!ordinary_refused)throw std::runtime_error("Clearing a reader must restore ordinary missing-file refusal");
+}
+
+void test_file_writer(IniFile &config)
+{
+    const auto path=(test_dir/"virtual-writer.ini").string();
+    const std::string stock="; %SEMANTIC_VERSION%\n[Section]\nKey = factory\n";
+    std::string live="; retained\n[Section]\nKey = saved\n";
+    bool fail=false;unsigned writes=0;
+    struct Restore{IniFile &config;~Restore(){config.set_file_writer({});config.set_file_reader({});}} restore{config};
+    config.set_file_reader([&](const std::string &name){
+        if(name==path)return live;
+        if(name==path+".stock")return stock;
+        throw std::runtime_error("Unexpected reader path");
+    });
+    config.set_file_writer([&](const std::string &name,const std::string &value){
+        if(name!=path)throw std::runtime_error("Unexpected writer path");
+        if(fail)throw std::runtime_error("Writer refuses publication");
+        ++writes;live=value;
+    });
+    config.set_filename(path);config.set_string_value("Section","Key","pending");
+    const auto pending=config.getData();const auto preview=config.serialize_with_data(pending);
+    fail=true;
+    for(const auto action:{0,1,2}){
+        bool refused=false;
+        try{if(action==0)config.save();else if(action==1)config.reset_to_stock("v");else config.repair_from_stock("v");}
+        catch(const std::runtime_error &){refused=true;}
+        if(!refused||writes||config.getData()!=pending||!config.hasPendingChanges()||config.serialize_with_data(config.getData())!=preview)
+            throw std::runtime_error("Writer refusal must preserve pending data and layout without default publication");
+    }
+    fail=false;config.commit_changes();
+    if(writes!=1||live!=preview||config.hasPendingChanges()||fs::exists(path)||fs::exists(path+".tmp"))
+        throw std::runtime_error("Writer must receive exact live bytes and bypass ordinary filesystem publication");
+    config.reset_to_stock("reset");
+    if(writes!=2||live!="; reset\n[Section]\nKey = factory\n"||config.get_value("Section","Key")!="factory")
+        throw std::runtime_error("Reset must publish through the writer then reload through the reader");
+    config.set_string_value("Section","Key","uncommitted");
+    config.repair_from_stock("repair");
+    if(writes!=3||live!="; repair\n[Section]\nKey = factory\n"||config.hasPendingChanges())
+        throw std::runtime_error("Repair must use saved values and the same publication policy");
+    config.set_file_writer({});config.set_string_value("Section","Key","ordinary");config.save();
+    if(writes!=3||!fs::exists(path)||config.hasPendingChanges())
+        throw std::runtime_error("Clearing a writer must restore ordinary publication");
+}
+
 template <typename TestFunc>
 void run_test(IniFile &config,
               const std::string &test_name,
@@ -604,6 +805,16 @@ int main()
         prepare_test_environment();
 
         auto &ini_file = IniFile::instance();
+        const std::map<std::string, std::unordered_map<std::string, std::string>> initial_data =
+            {{"Unloaded", {{"Key", "Value"}}}};
+        if (ini_file.serialize_with_data(initial_data) != "\n[Unloaded]\nKey = Value\n" ||
+            !ini_file.getData().empty() || ini_file.hasPendingChanges())
+            throw std::runtime_error("Pure serialization requires no configured filename or state change.");
+        bool stock_refused=false;
+        try { (void)ini_file.serialize_from_stock(kSemanticVersion,false); }
+        catch (const std::runtime_error &) { stock_refused=true; }
+        if (!stock_refused || !ini_file.getData().empty() || ini_file.hasPendingChanges())
+            throw std::runtime_error("Unconfigured stock preview must refuse without initializing state.");
         ini_file.set_filename(test_ini.string());
 
         run_test(ini_file,
@@ -611,6 +822,13 @@ int main()
                  [&]()
                  {
                      test_reading(ini_file, test_ini.string());
+                 });
+
+        run_test(ini_file,
+                 "test_serialization()",
+                 [&]()
+                 {
+                     test_serialization(ini_file);
                  });
 
         run_test(ini_file,
@@ -647,6 +865,12 @@ int main()
                  {
                      test_reset_to_stock(ini_file, test_ini.string());
                  });
+
+        run_test(ini_file, "test_stock_serialization()", [&]() {
+            test_stock_serialization(ini_file);
+        });
+        run_test(ini_file,"test_file_reader()",[&]{test_file_reader(ini_file);});
+        run_test(ini_file,"test_file_writer()",[&]{test_file_writer(ini_file);});
 
         run_test(ini_file,
                  "test_repair_from_stock()",

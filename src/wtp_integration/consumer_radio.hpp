@@ -65,7 +65,8 @@ PicoHttpResponse consumer_http_request(PlainTcpStream &, TlsStream::Clock,
                                        const std::string &path,
                                        const std::string &method,
                                        const std::string &body,
-                                       const std::string &media);
+                                       const std::string &media,
+                                       std::optional<std::uint64_t> operation_deadline = {});
 #ifdef WSPRRYPI_CONSUMER_CRYPTO_TEST
 void consumer_radio_fixed_vectors(const nlohmann::json &);
 #endif

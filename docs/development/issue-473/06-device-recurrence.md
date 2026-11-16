@@ -6,6 +6,16 @@ when separately authorized. Read the [execution rules](execution-rules.md), the 
 Require phases 1–5 gates, especially target-local authority fencing. Read
 `docs/simulated-backend.md` before designing application tests.
 
+## Deferred Pi security acceptance
+
+The user-approved [security milestone](deferred-pi-security.md) is a mandatory
+part of this phase's final gate, after independent recurrence development and
+before phase 7. Complete new automatic Pi pairing/TLS, authenticated remote Pi
+management, and deferred remote editor/authority integration and evidence.
+Qualify the provider first; no fallback or manual-credential substitute is
+authorized. Keep remote management unavailable until its applicable gates pass.
+This document is future execution scope, not authorization to begin phase 6 now.
+
 ## Objective and inspection
 
 Integrate phase 4 policy evaluation into the actual Pi WSPR and repeating

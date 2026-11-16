@@ -39,6 +39,19 @@ changes, deployment, or mutating sudo commands are authorized by any prompt here
 Reusable src components need the repository's separate scope approval before a
 parent-only task expands into them. Preserve component independence and attribution.
 
+## Approved deferred Pi security milestone
+
+The user approved the [sequencing amendment](deferred-pi-security.md) on
+2026-11-16. It narrows phase 2 to local Pi/existing Pico management and foundations;
+new Pi pairing/TLS, controller-to-remote-Pi management, and dependent remote
+editor/migration acceptance belong to the end-of-phase-6 security gate. Phases
+3–6 may proceed on independently eligible paths when separately authorized.
+Remote Pi management stays unavailable; no unauthenticated substitute is allowed.
+Phase 6 cannot complete and phase 7 cannot begin until that gate passes. Phase 8
+cannot waive it. All other predecessor, security, authority, documentation, and
+paired-integration gates remain binding. This changes sequencing, not the approved
+security contracts, existing WTP/Pico transports, or phase-execution authority.
+
 ## Shared implementation and validation requirements
 
 Each target owns its schedule; neither browser nor controller evaluates remote

@@ -13,6 +13,7 @@
             <p class="form-text" id="fleet-discovery-status" role="status"></p>
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary" id="fleet-use" disabled>Use this device</button>
+                <button type="button" class="btn btn-outline-primary" id="fleet-manage" disabled>Manage settings</button>
                 <button type="button" class="btn btn-outline-primary" id="fleet-add">Add device</button>
                 <button type="button" class="btn btn-outline-secondary" id="fleet-edit" disabled>Edit saved device</button>
                 <button type="button" class="btn btn-outline-danger" id="fleet-remove" disabled>Remove saved device</button>
@@ -248,9 +249,28 @@
                 </ol>
             </div>
         </details>
-        <details id="wtp-management" class="wtp-status mt-3" hidden>
+        <section id="pico-target-settings" data-independent-wtp class="mt-3" aria-labelledby="pico-target-heading">
+            <h4 id="pico-target-heading" class="cw-control-section__title" tabindex="-1">Pico settings</h4>
+            <p id="pico-target-identity" class="form-text text-break">Choose a saved Pico and select Manage settings. This does not select a transmitter backend.</p>
+            <p id="pico-target-feedback" class="form-text" role="status" aria-live="polite"></p>
+            <div id="pico-target-recovery" hidden>
+                <p id="pico-target-recovery-state" class="form-text" role="status" aria-live="polite"></p>
+                <button id="pico-target-read-recovery" type="button" class="btn btn-outline-primary">Read current settings</button>
+                <dl id="pico-target-recovery-observation" class="text-break mt-2"></dl>
+                <button id="pico-target-review-recovery" type="button" class="btn btn-outline-primary mt-2" disabled>I reviewed these settings</button>
+            </div>
+            <details class="mt-3"><summary>Earlier settings requests</summary><ul id="pico-target-operations" class="text-break"></ul></details>
+            <details id="pico-target-retained" class="mt-3" hidden>
+                <summary>Retained drafts</summary>
+                <p class="form-text">Entries from other editors remain available for review. They cannot save through an old connection. Password contents are not shown.</p>
+                <div id="pico-target-retained-list"></div>
+            </details>
+            <div id="pico-target-panel"></div>
+        </section>
+        <template id="pico-target-template">
+        <details id="wtp-management" class="wtp-status mt-3" open>
             <summary class="cw-control-section__title">Pico standalone settings and Wi-Fi</summary>
-            <p class="form-text">These settings belong to Pico's standalone scheduler, separate from WsprryPi's schedule. Management is available only while the host has no pending, owned or unresolved job. Saves preserve settings outside this form. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
+            <p class="form-text">These settings belong to the named Pico. Managing it does not change this controller's transmitter backend or take radio ownership. The Pico checks whether each change is allowed. Network or pin changes may require a Pico restart; each save reports the requirement.</p>
             <p id="wtp-management-availability" class="form-text mt-2" role="status" aria-live="polite" hidden></p>
             <details class="mb-4"><summary>UDP logging on this Pico</summary><div id="member-udp-logging-controls"></div></details>
             <section id="wtp-usb-settings" class="mb-4" aria-labelledby="wtp-usb-settings-heading" hidden>
@@ -499,13 +519,15 @@
             <div class="d-flex flex-wrap gap-2 mt-3">
                 <button type="button" class="btn btn-primary" id="wtp-remote-save" disabled>Save combined settings</button>
                 <button type="button" class="btn btn-outline-primary" id="wtp-schedules-save" disabled>Save schedules only</button>
-                <button type="button" class="btn btn-outline-primary" id="wtp-network-load">Read Pico Wi-Fi status</button>
+                <button type="button" class="btn btn-outline-primary" id="wtp-network-load">Refresh Wi-Fi status</button>
                 <button type="button" class="btn btn-outline-danger" id="wtp-network-disable" disabled>Disable Pico Wi-Fi</button>
             </div>
+            <p id="wtp-network-feedback" class="form-text mt-2" role="status" aria-live="polite">Wi-Fi status loads when the Pico connection is confirmed.</p>
             <p class="form-text mt-2">Disabling Wi-Fi disconnects network control. Re-enable it using the physical USB Console or a restart. This is a temporary switch, separate from saved standalone settings.</p>
             <p id="wtp-management-feedback" class="form-text" role="status" aria-live="polite"></p>
             </details>
 
         </details>
+        </template>
     </section>
 </div>

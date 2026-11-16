@@ -40,6 +40,11 @@ int main() {
     expect_http("GET", "/api/wtp", Classification::read_only);
     expect_http("GET", "/api/wtp/recover", Classification::reject);
     expect_http("PUT", "/api/wtp", Classification::reject);
+    expect_http("GET","/api/control/v1/host/readiness",Classification::protected_operation);
+    for(const auto *method:{"POST","PUT","DELETE"})expect_http(method,"/api/control/v1/host/readiness",Classification::reject);
+    for(const auto *method:{"GET","PUT","POST"})expect_http(method,"/api/control/v1/host/configuration-recovery",Classification::protected_operation);
+    expect_http("DELETE","/api/control/v1/host/configuration-recovery",Classification::reject);
+    expect_http("GET","/api/control/v1/host/configuration-recovery/other",Classification::reject);
     for (const auto* path : {"/api/control/v1/host/logging", "/api/control/v1/member/logging"}) {
         expect_http("GET", path, PrivilegedOperationClass::protected_operation);
         expect_http("PUT", path, PrivilegedOperationClass::protected_operation);

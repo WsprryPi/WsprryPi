@@ -52,7 +52,7 @@ async function main() {
         await client.send("Page.navigate", {url}, 60000);
         await client.send('Page.enable');
         const evaluate = expression => client.evaluate(expression);
-        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
+        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagementEditor'), 'WTP scripts');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
         await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
         assert.equal(await evaluate('new URL(location.href).searchParams.get("setup_tab")'), '#fleet-pane');
@@ -177,9 +177,14 @@ async function main() {
                 }
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
+            // Component visual harness: mount the current reusable editor with its
+            // mocked logical exchange; real target routing is covered by the pair.
+            document.getElementById('pico-target-panel').append(document.getElementById('pico-target-template').content.cloneNode(true));
+            WtpManagementEditor.mount(window);WtpUsbSettingsEditor.mount(window);
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
 
             window.WtpUi.select(true);
+            WtpManagement.setAvailability(true,true);
             document.getElementById('fleet-tab').click();
         })()`);
         await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
@@ -465,12 +470,16 @@ async function main() {
         await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'final settings readback');
         await evaluate(`document.getElementById('wtp-remote-password').value='unsaved-secret';`);
         for (const discovery of ['active', 'conflict', 'failed']) {
+            await evaluate(`(() => {for(let node=document.getElementById('wtp-network-feedback');node;node=node.parentElement)if(node.tagName==='DETAILS')node.open=true;})()`);
             await evaluate(`window.__discoveryState='${discovery}'; document.getElementById('wtp-network-load').click();`);
-            await waitFor(async () => await evaluate(`document.getElementById('wtp-management-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
+            await waitFor(async () => await evaluate(`document.getElementById('wtp-network-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
             assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'), 'unsaved-secret');
             for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-                await evaluate(`document.getElementById('wtp-management-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                await client.settleRendering();
+                await evaluate(`document.getElementById('wtp-network-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                await client.settleRendering();
+                await waitFor(async () => await evaluate(`(() => {const r=document.getElementById('wtp-network-feedback').getBoundingClientRect();return r.height>0&&r.top>=0&&r.bottom<=innerHeight;})()`), 'Wi-Fi feedback is visible in the viewport');
                 await capture(`${viewport.name}-discovery-${discovery}.png`, {format:'png'});
                 assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'discovery horizontal overflow');
             }
@@ -504,7 +513,7 @@ async function main() {
         assert.equal(await evaluate('document.getElementById("wtp-output").textContent'), 'Unknown');
         assert.equal(await evaluate('document.getElementById("wtp-recover").disabled'),true);
         await evaluate(`document.getElementById('wtp-status-heading').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-140);`);
-        assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),true);
+        assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),false,'A host WTP status failure does not retire an independent settings editor');
         await client.settleRendering();
         await capture('mobile-status-failure.png', {format:'png'});
         await evaluate('document.getElementById("transmitter-hardware-tab").click()');

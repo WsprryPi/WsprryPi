@@ -113,11 +113,11 @@ Json UsbManagementClient::exchange(const Json &request, std::uint64_t deadline) 
       !result.at("target").is_object()) throw std::runtime_error("invalid_usb_response");
   return result;
 }
-bool UsbManagementClient::hello(const std::string &expected_device) {
+bool UsbManagementClient::hello(const std::string &expected_device, unsigned timeout) {
   std::lock_guard lock(mutex_);
   try {
     connected_=false; target_=nullptr; session_.clear(); next_id_=1;
-    auto response=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","hello"}},now_()+2000);
+    auto response=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","hello"}},now_()+std::min(timeout,2000U));
     const auto &target=response.at("target");
     if (response.at("status")!=200 || response.at("delivery_required")!=false || target.size()!=3 ||
         target.value("scope","")!="member" || !identity(target.value("device_id","")) ||

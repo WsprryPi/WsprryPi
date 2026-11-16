@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Lee Bussy
 (function (root) {
     "use strict";
+    if (typeof module !== "undefined" && module.exports) module.exports = {mount};
     if (!root.document) return;
+    function mount(root) {
     const byId = id => root.document.getElementById(`wtp-usb-${id}`);
     const api = resource => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/member/" + resource;
     let available = false, busy = false, hostname = null, wifi = null, nameRevision = "", wifiRevision = "", dirty = false, uncertain = false, reviewRequired = false;
@@ -99,7 +101,7 @@
                 const payload = action === "name-save" ? {contract:'Wsprry-Control/1',schema:"hostname",target,hostname:byId("hostname").value || null}
                     : action === "wifi-save" ? {contract:'Wsprry-Control/1',schema:"wifi",target,wifi:{ssid:byId("ssid").value,password:byId("password").value || (wifi?.wifi ? null : ""),time_server:byId("time-server").value}}
                     : action === "wifi-remove" ? {contract:'Wsprry-Control/1',schema:"wifi",target,wifi:null}
-                    : action === "ap" ? {contract:'Wsprry-Control/1',schema:"ap-request",target} : {};
+                    : action === "ap" ? {contract:'Wsprry-Control/1',schema:"ap-request",target} : {contract:'Wsprry-Control/1'};
                 const revision = action.startsWith("wifi-") ? wifiRevision : nameRevision;
                 invalidate(); root.WtpManagement?.invalidate(); uncertain = true;
                 await exchange(action === "name-save" ? "hostname" : action.startsWith("wifi-") ? "wifi" : action,
@@ -127,4 +129,8 @@
         render();
     }
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init); else init();
+    return root.WtpUsbSettings;
+    }
+    root.WtpUsbSettingsEditor = Object.freeze({mount});
+    if (!root.PicoTargetEditors) mount(root);
 })(typeof window === "undefined" ? globalThis : window);

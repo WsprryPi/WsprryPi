@@ -1494,6 +1494,21 @@ websocket-lifecycle-test: $(BIN_DIR)/$(WEBSOCKET_LIFECYCLE_TEST_OUT)
 web-server-network-lifecycle-test: $(BIN_DIR)/$(WEB_SERVER_NETWORK_LIFECYCLE_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WEB_SERVER_NETWORK_LIFECYCLE_TEST_OUT)
 
+# Identity is injected only in the fixture launcher; every service and storage
+# operation is production code, with no output backend selected.
+$(OBJ_DIR_DEBUG)/tests/controller_only_fixture.o: tests/controller_only_fixture.cpp
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
+
+$(BIN_DIR)/controller_only_fixture: $(OBJ_DIR_DEBUG)/tests/controller_only_fixture.o $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+.PHONY: controller-only-test
+controller-only-test: $(BIN_DIR)/controller_only_fixture $(BIN_DIR)/$(TEST_OUT)
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_fixture
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/$(TEST_OUT) --production-main
+
 wspr-band-catalog-test: $(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
 
@@ -2057,6 +2072,155 @@ wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
 
 wtp-production-test: wtp-production-cpp-test wtp-ui-test
 
+.PHONY: wtp-managed-output-test
+$(BIN_DIR)/wtp_managed_output_test: tests/wtp_managed_output_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+wtp-managed-output-test: $(BIN_DIR)/wtp_managed_output_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/wtp_managed_output_test"
+
+.PHONY: pico-management-target-test
+$(BIN_DIR)/pico_management_target_test: tests/pico_management_target_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_management_pair_client: tests/pico_management_pair_client.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_management_usb_pair_client: tests/pico_management_usb_pair_client.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_controller_pair_fixture: tests/pico_controller_pair_fixture.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-target-test: $(BIN_DIR)/pico_management_target_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_management_target_test"
+
+.PHONY: pico-management-journal-test
+.PHONY: pico-management-history-test
+$(BIN_DIR)/pico_management_history_test: tests/pico_management_history_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-history-test: $(BIN_DIR)/pico_management_history_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_management_history_test"
+
+.PHONY: pico-usb-settings-test
+$(BIN_DIR)/pico_usb_settings_test: tests/pico_usb_settings_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-usb-settings-test: $(BIN_DIR)/pico_usb_settings_test
+	$(Q)"$(BIN_DIR)/pico_usb_settings_test"
+
+$(BIN_DIR)/pico_management_journal_test: tests/pico_management_journal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-journal-test: $(BIN_DIR)/pico_management_journal_test
+	$(Q)"$(BIN_DIR)/pico_management_journal_test"
+
+.PHONY: pico-target-controller-test
+$(BIN_DIR)/pico_target_controller_test: tests/pico_target_controller_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-target-controller-test: $(BIN_DIR)/pico_target_controller_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_target_controller_test"
+
+.PHONY: controller-contract-test
+.PHONY: pi-config-persistence-coordinator-test
+.PHONY: pi-management-anchor-test
+.PHONY: pi-management-journal-test
+.PHONY: pi-managed-store-test
+.PHONY: pi-management-service-test
+.PHONY: pi-managed-startup-test
+.PHONY: pi-managed-host-test
+.PHONY: pi-managed-host-runtime-test
+.PHONY: pi-private-network-persistence-test
+.PHONY: pi-managed-main-test
+.PHONY: pi-managed-wtp-main-test
+$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
+$(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture"
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --network-safety-off
+
+$(BIN_DIR)/pi_managed_wtp_main_fixture: tests/pi_managed_wtp_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+# Actual-main fixtures deliberately retain the production singleton boundary.
+# Serialize them even when the parent validation target uses parallel make.
+pi-managed-wtp-main-test: pi-managed-main-test $(BIN_DIR)/pi_managed_wtp_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_wtp_main_test.py --fixture "$(BIN_DIR)/pi_managed_wtp_main_fixture"
+
+$(BIN_DIR)/pi_private_network_persistence_test: tests/pi_private_network_persistence_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-private-network-persistence-test: $(BIN_DIR)/pi_private_network_persistence_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_private_network_persistence_test"
+
+$(BIN_DIR)/pi_managed_host_runtime_test: tests/pi_managed_host_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-host-runtime-test: $(BIN_DIR)/pi_managed_host_runtime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_host_runtime_test"
+
+$(BIN_DIR)/pi_managed_host_test: tests/pi_managed_host_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-host-test: $(BIN_DIR)/pi_managed_host_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_host_test"
+
+$(BIN_DIR)/pi_managed_startup_test: tests/pi_managed_startup_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-startup-test: $(BIN_DIR)/pi_managed_startup_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_startup_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_service_test: tests/pi_management_service_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-service-test: $(BIN_DIR)/pi_management_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_service_test"
+
+$(BIN_DIR)/pi_managed_store_test: tests/pi_managed_store_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-store-test: $(BIN_DIR)/pi_managed_store_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_store_test" wtp_integration/contract/control-controller-vectors.json
+
+.PHONY: pi-managed-records-test
+$(BIN_DIR)/pi_managed_records_test: tests/pi_managed_records_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-records-test: $(BIN_DIR)/pi_managed_records_test
+	$(Q)"$(BIN_DIR)/pi_managed_records_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_journal_test: tests/pi_management_journal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-journal-test: $(BIN_DIR)/pi_management_journal_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_journal_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_anchor_test: tests/pi_management_anchor_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-anchor-test: $(BIN_DIR)/pi_management_anchor_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_anchor_test"
+
+$(BIN_DIR)/pi_config_persistence_coordinator_test: tests/pi_config_persistence_coordinator_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-config-persistence-coordinator-test: $(BIN_DIR)/pi_config_persistence_coordinator_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_config_persistence_coordinator_test"
+
+$(BIN_DIR)/controller_contract_test: tests/controller_contract_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+controller-contract-test: $(BIN_DIR)/controller_contract_test
+	$(Q)"$(BIN_DIR)/controller_contract_test" wtp_integration/contract/control-controller-vectors.json
+	$(Q)node ../WsprryPi-UI/tests/controller_contract_test.js
+
 .PHONY: wtp-production-cpp-test wtp-api-cpp-test wtp-config-cpp-test wtp-ui-test wtp-management-ui-test
 wtp-ui-test:
 	$(Q)node ../WsprryPi-UI/tests/wtp_ui_test.js
@@ -2105,8 +2269,8 @@ wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
-		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_pi_control.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/pico_usb_management_channel.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
+		wtp_integration/configuration.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
@@ -2128,6 +2292,10 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_amplifier_timing_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_gpio_drive_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
+	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/pico_management_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+	$(Q)node ../WsprryPi-UI/tests/pico_management_transport_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_management_pair_client)"
+	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/pico_controller_pair_fixture BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+	$(Q)node ../WsprryPi-UI/tests/pico_controller_http_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_controller_pair_fixture)"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
@@ -2199,7 +2367,7 @@ wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client

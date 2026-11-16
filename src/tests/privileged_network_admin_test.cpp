@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <stdexcept>
 #include <vector>
 #include <unistd.h>
 
@@ -41,6 +42,11 @@ int main() {
     const auto policy = root / "policy.conf";
     write_file(ini, original);
     write_file(policy, "old-policy\n");
+
+    bool partial_refused=false;
+    try{PrivilegedNetworkAdmin partial({ini.string(),policy.string()},[](const auto &){return true;},{read_text_file,{}});}
+    catch(const std::invalid_argument &){partial_refused=true;}
+    assert(partial_refused);
 
     initialize_privileged_network_runtime("enforced");
     std::vector<std::vector<std::string>> calls;

@@ -16,7 +16,7 @@ public:
   using Clock = std::function<std::uint64_t()>;
   using Wait = std::function<void(unsigned)>;
   UsbManagementClient(wtp::ByteStream &, Clock, Wait, std::function<bool()> cancelled = {});
-  bool hello(const std::string &expected_device);
+  bool hello(const std::string &expected_device, unsigned timeout_ms = 2000);
   PicoHttpResponse request(const std::string &path, const std::string &method,
       const std::string &body = {}, const std::string &revision = {}, unsigned timeout_ms = 10000);
   bool synchronize(const std::function<HostUtcObservation()> & = qualified_host_utc);

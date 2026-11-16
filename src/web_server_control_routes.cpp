@@ -24,23 +24,64 @@
 #include <utility>
 #include <mutex>
 #include "web_server_config_http.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "wtp_endpoint/identity.hpp"
+#include "wtp_integration/pico_target_controller.hpp"
+#include "wtp_integration/controller_contract.hpp"
+#include "wtp_integration/management_browser_session.hpp"
+#include "privileged_network_runtime.hpp"
+#include <filesystem>
 
 namespace {
 std::optional<WtpSettings> selected_wtp() {
+    if (controller_only_mode()) return {};
     const auto [snapshot, revision] = get_public_config_snapshot();
     (void)revision;
     if (snapshot.at("Operation").value("Transmit Backend", "") != "wtp") return {};
     return parse_wtp_settings(snapshot.at("WTP"), true);
 }
 wsprrypi::WtpCatalog &catalog() {
+    // The main-owned host outlives every HTTP worker. Reuse its mutex and
+    // atomic anchor owner; a second catalog instance could lose concurrent
+    // management history updates even though both name the same file.
+    if(const auto host=wsprrypi::pi_managed_host())return host->catalog();
     static wsprrypi::WtpCatalog value(config.ini_filename + ".wtp-devices.json");
     return value;
+}
+struct TargetControllerSlot {
+    std::mutex mutex;
+    std::shared_ptr<wsprrypi::PicoTargetController> production,fixture;
+};
+TargetControllerSlot &target_controller_slot(){static TargetControllerSlot value;return value;}
+std::shared_ptr<wsprrypi::PicoTargetController> target_controller() {
+    auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);
+    if(slot.fixture)return slot.fixture;
+    if(!slot.production) {
+        const auto identity=controller_only_mode()?controller_only_status().at("device_id").get<std::string>():wsprrypi::wtp_pi_device_id();
+        slot.production=std::make_shared<wsprrypi::PicoTargetController>(catalog(),selected_wtp,
+            config.ini_filename+".management",identity);
+    }
+    return slot.production;
+}
+void catalog_management_changed() {
+    auto &slot=target_controller_slot();std::shared_ptr<wsprrypi::PicoTargetController> existing;
+    {std::lock_guard lock(slot.mutex);existing=slot.fixture?slot.fixture:slot.production;}
+    if(existing){existing->catalog_changed();return;}
+    // Ordinary catalog use does not initialize a management service or acquire
+    // native sessions. A previous process's history still needs safe retirement.
+    const auto directory=config.ini_filename+".management";
+    if(!std::filesystem::exists(std::filesystem::symlink_status(directory)))return;
+    const auto identity=controller_only_mode()?controller_only_status().at("device_id").get<std::string>():wsprrypi::wtp_pi_device_id();
+    wsprrypi::PicoManagementJournal recovery(directory,identity,identity,catalog().management_history_authority(selected_wtp()));
+    recovery.prune_retired();
 }
 std::uint64_t discovery_now() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
 }
 void require_probe_idle() {
+    if (controller_only_mode()) return;
     const auto [current, revision] = get_public_config_snapshot();
     (void)revision;
     const auto state = transmitter_state();
@@ -73,6 +114,9 @@ WtpSettings candidate_settings(const nlohmann::json &request, bool allow_blank_p
 }
 wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
     try {
+        std::unique_lock profile_lock(wsprrypi::pico_management_catalog_gate(),std::defer_lock);
+        if(request.method=="POST"&&request.path=="/api/control/v1/host/devices"&&!profile_lock.try_lock())
+            return {409,R"({"error":{"code":"management_busy"}})",{}};
         static std::mutex mutation_mutex;
         std::unique_lock mutation_lock(mutation_mutex, std::defer_lock);
         if (request.method == "POST" &&
@@ -132,6 +176,9 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             }
             auto [result, revision] = catalog().mutate(body,
                 request.get_header_value("If-Match"), active);
+            try {catalog_management_changed();}
+            catch(...){return {503,R"({"error":{"code":"management_history_unavailable"}})",{}};}
+            revision=catalog().snapshot(active).second;
             return {200, result.dump(), revision};
         }
         if (request.path == "/api/control/v1/host/devices/use" && request.method == "POST") {
@@ -198,12 +245,25 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
 }
 }
 
+void wsprrypi::testing::set_pico_target_controller(std::shared_ptr<PicoTargetController> controller) {
+    auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);slot.fixture=std::move(controller);
+}
+
 namespace web_server_routes
 {
+void retire_control_management(){
+    std::shared_ptr<wsprrypi::PicoTargetController> retiring;
+    {auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);retiring=std::move(slot.production);}
+}
 void register_control(
     httplib::Server &server,
     CorsHeaderSetter set_cors_headers)
 {
+    server.Get("/status", [](const httplib::Request &, httplib::Response &response) {
+        if (!controller_only_mode()) { response.status = 404; return; }
+        response.set_header("Cache-Control", "no-store");
+        response.set_content(controller_only_status().dump(), "application/json");
+    });
     wsprrypi::start_wtp_discovery();
     static wsprrypi::WtpBrowserApi api(
         [] { return nlohmann::json::parse(wtp_runtime_json()); },
@@ -218,15 +278,67 @@ void register_control(
         const auto browser_request = wsprrypi::wtp_browser_http_request(request);
         if (!browser_request) {
             response.status = 400;
-            response.set_content(R"({"error":{"code":"invalid_request"}})", "application/json");
+            const bool target=request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
+                request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/");
+            response.set_content(target?wsprrypi::controller_target_error(400,"invalid_shape").body:
+                R"({"error":{"code":"invalid_request"}})", "application/json");
             return;
         }
         const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
-        if (request.path == "/api/control/v1/member/firmware") {
+        if(request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")) {
+            static wsprrypi::ManagementBrowserSessions sessions;
+            const auto failure=[](unsigned status,const char *code){return wsprrypi::controller_target_error(status,code);};
+            std::size_t header_bytes=0;for(const auto &[name,value]:request.headers)header_bytes+=name.size()+value.size()+4;
+            if(active_privileged_network_mode()!=PrivilegedNetworkMode::enforced&&
+                !wsprrypi::pi_managed_host_protected_recovery_path(request.path))result=failure(403,"unauthorized");
+            else if(header_bytes>8192||request.path.size()>256)result=failure(431,"payload_too_large");
+            else if(!sessions.within_rate(request))result=failure(429,"rate_limited");
+            else if(request.path=="/api/control/v1/host/management-session") {
+                try {
+                    if(request.body.size()>256||!wsprrypi::valid_controller_document(wsprrypi::strict_browser_json(request.body),"controller-browser-session"))result=failure(400,"invalid_shape");
+                    else if(!sessions.establish(request,response))result=failure(403,"csrf_failed");
+                    else result={200,R"({"contract":"Wsprry-Control/1","schema":"controller-browser-session"})",{}};
+                }catch(...){result=failure(400,"invalid_json");}
+            } else if(request.method!="GET"&&!sessions.permits(request))result=failure(403,"csrf_failed");
+            else if(request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery")
+                result=wsprrypi::pi_managed_host_recovery(*browser_request,true);
+            else if(wsprrypi::pi_managed_host_target_path(request.path)){
+                if(!request.get_header_value("X-WsprryPi-Profile-ID").empty()||!request.get_header_value("X-WsprryPi-Target-Context").empty()||
+                    !request.get_header_value("X-WsprryPi-Operation-ID").empty())result=failure(400,"invalid_shape");
+                else if(const auto host=wsprrypi::pi_managed_host())result=host->management(*browser_request,true);
+                else result=failure(503,"storage_unavailable");
+            }
+            else try {
+                const auto reply=target_controller()->handle(*browser_request,request.get_header_value("X-WsprryPi-Profile-ID"),
+                    request.get_header_value("X-WsprryPi-Target-Context"),request.get_header_value("X-WsprryPi-Operation-ID"));
+                result=wsprrypi::normalize_controller_error(reply.response);
+                if(request.method=="GET"&&request.path=="/api/control/v1/targets"&&result.status==200){
+                    if(const auto host=wsprrypi::pi_managed_host()){
+                        auto targets=wsprrypi::strict_browser_json(result.body);
+                        if(!wsprrypi::valid_controller_document(targets,"targets"))throw std::runtime_error("invalid_targets");
+                        const auto local=host->target();
+                        for(const auto &target:targets["targets"])if(target["device_id"]==local["device_id"])
+                            throw std::runtime_error("duplicate_target_identity");
+                        targets["targets"].push_back(local);
+                        result=wsprrypi::valid_controller_document(targets,"targets")&&targets.dump().size()<=32768
+                            ?wsprrypi::PicoHttpResponse{200,targets.dump(),{}}:failure(429,"capacity");
+                    }
+                }
+                if(!reply.context.empty())response.set_header("X-WsprryPi-Target-Context",reply.context);
+                if(!reply.operation.empty())response.set_header("X-WsprryPi-Operation-ID",reply.operation);
+                if(!reply.location.empty())response.set_header("Location",reply.location);
+                if(!reply.readback_revision.empty())response.set_header("X-WsprryPi-Readback-Revision",reply.readback_revision);
+                if(!reply.recovery_resource.empty())response.set_header("X-WsprryPi-Recovery-Resource",reply.recovery_resource);
+            }catch(...){result=failure(503,"transport_unavailable");}
+        } else if (request.path == "/api/control/v1/member/firmware") {
             result = request.method == "GET" || context
                 ? wtp_runtime_firmware(request.method, request.body)
                 : wsprrypi::PicoHttpResponse{403, R"({"error":{"code":"origin_or_content_type"}})", {}};
+        } else if (request.path.starts_with("/api/control/v1/member/") || request.path == "/api/control/v1/network") {
+            // Settings use enrolled target contexts. Keep the explicit firmware
+            // lifecycle endpoint separate from settings and WTP execution.
+            result = wsprrypi::controller_target_error(404,"unsupported_resource");
         } else if(request.path=="/api/control/v1/host/udp-logging/installation") {
             result=request.method=="GET"?wsprrypi::udp_logging_installation():wsprrypi::PicoHttpResponse{405,R"({"error":{"code":"method_not_allowed"}})",{}};
         } else if (request.path == "/api/control/v1/host/udp-logging" || request.path == "/api/control/v1/udp-logging/capabilities" || request.path == "/api/control/v1/host/udp-logging/test" || request.path == "/api/control/v1/host/udp-logging/test/capabilities") {
@@ -320,6 +432,27 @@ void register_control(
         response.headers.erase("Access-Control-Allow-Origin");
         response.set_content(result.body, "application/json");
     };
+    const auto bounded_shared=[shared](const httplib::Request &request,httplib::Response &response,const httplib::ContentReader &reader){
+        auto bounded=request;bool oversized=false;
+        const auto started=std::chrono::steady_clock::now();
+        const bool read=reader([&](const char *data,std::size_t size){
+            if(size>32768-bounded.body.size()){oversized=true;return false;}
+            if(std::chrono::steady_clock::now()-started>std::chrono::seconds(24))return false;
+            bounded.body.append(data,size);return true;
+        });
+        if(!read){
+            oversized=oversized||response.status==413;
+            const auto result=wsprrypi::controller_target_error(oversized?413:400,oversized?"payload_too_large":"invalid_shape");
+            response.status=result.status;response.set_header("Cache-Control","no-store");
+            response.set_content(result.body,"application/json");return;
+        }
+        shared(bounded,response);
+    };
+    server.Put(R"(/api/control/v1/.*)",bounded_shared);
+    server.Post(R"(/api/control/v1/.*)",bounded_shared);
+    server.Delete(R"(/api/control/v1/.*)",bounded_shared);
+    // Keep bodyless requests on the same closed adapter; ContentReader handlers
+    // are selected only when the HTTP parser sees request content.
     server.Get(R"(/api/control/v1/.*)", shared);
     server.Put(R"(/api/control/v1/.*)", shared);
     server.Post(R"(/api/control/v1/.*)", shared);

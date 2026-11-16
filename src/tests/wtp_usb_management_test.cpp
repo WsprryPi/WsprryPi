@@ -174,6 +174,10 @@ int main() {
   CHECK(!strict.hello(""));
   Device stalled;stalled.drop=true;UsbManagementClient timeout(stalled,[&]{return now;},[&](unsigned n){now+=n;});
   const auto start=now;CHECK(!timeout.hello("") && now-start==2000 && stalled.closed);
+  Device short_wait;short_wait.drop=true;
+  UsbManagementClient remaining(short_wait,[&]{return now;},[&](unsigned n){now+=n;});
+  const auto short_start=now;
+  CHECK(!remaining.hello("",7) && now-short_start==7 && short_wait.closed);
   unsigned writes{};std::string selection="selection1";
   WtpBrowserApi api([]{return Json::object();},[&](auto resource,auto method,auto,auto,auto) {
     if(resource=="member/management")return PicoHttpResponse{200,Json{{"carrier","usb_physical"},{"selection_id",selection}}.dump(),{}};

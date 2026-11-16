@@ -1,15 +1,22 @@
 # Issue 473: phase 1 contracts and proposed decisions
 
 Status: ✅ phase-1 design-and-decision gate complete on 2026-11-15.
-All D01–D12 approved. No application behavior has been implemented; phase 2
-remains not started and separately authorized.
-Inspection date: 2026-11-15. No application implementation or qualification is
-claimed. Phase 2 is not authorized by this document or by decision approval.
+All D01–D12 approved. This record establishes design approval; see the
+[phase list](../issue-473-phases.md) for current implementation status.
+Baseline inspection date: 2026-11-15. This design record itself claims no
+application qualification and authorizes no later-phase execution.
 
 Read the [plan](../device-owned-solar-scheduling-plan.md),
 [phase prompt](01-contracts-and-decisions.md), and
 [execution rules](execution-rules.md). Recommendations below are proposals,
 including numeric limits, have the approval status recorded below.
+
+Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS
+and controller-to-remote-Pi management are deferred to the
+[end-of-phase-6 security milestone](deferred-pi-security.md). These approved
+design contracts remain unchanged; phase 2 no longer claims their implementation.
+Existing WTP/Pico TLS and the requirement for an automatic certificate-free
+operator workflow remain unchanged.
 
 ## Evidence and authority
 
@@ -101,7 +108,7 @@ it does not mean the approved decision is awaiting approval.
 | ID | Recommendation | Alternative and tradeoff | Phase owner | Approval |
 | --- | --- | --- | --- | --- |
 | D01 | Explicit target adapters and independent edit context; controller-only mode is an explicit startup choice with zero outputs | Reuse active WTP backend selection: fewer paths, but changes connection/ownership while browsing and violates the plan | 2–3 | Approved |
-| D02 | Automatic UI pairing, device-only keys, certificate-free management transport, automatic reconnect/renewal, and target-local Replace/Remove controller; see [pairing proposal](phase-1-pairing.md) | Manual provisioning is rejected by the user; if the automatic lifecycle cannot be delivered, omit new remote Pi management. Existing WTP remains unchanged | 2 | Approved: workflow/behavior |
+| D02 | Automatic UI pairing, device-only keys, certificate-free management transport, automatic reconnect/renewal, and target-local Replace/Remove controller; see [pairing proposal](phase-1-pairing.md) | Manual provisioning is rejected by the user; if the automatic lifecycle cannot be delivered, omit new remote Pi management. Existing WTP remains unchanged | 6: deferred security gate | Approved: workflow/behavior |
 | D03 | Closed current-control envelopes, full-candidate atomic Pi saves, revisions, durable operation IDs, mandatory authoritative readback after uncertainty | Loose patches or blind retries simplify clients but permit stale enables and duplicate actions | 2, 4, 7 | Approved |
 | D04 | Separate durable schedule enable, solar enable, Transmit, boot preference, and RF authority; disable drains an accepted complete occurrence | Reusing Transmit as scheduler enable changes ownership and stopping semantics | 4–6 | Approved |
 | D05 | Durable reservation before launch, at-most-once occurrence admission, per-list cursors, conservative skip after uncertain crash | Post-launch checkpointing risks repeats; exactly-once RF execution cannot be proved after a crash | 4, 6 | Approved |

@@ -31,6 +31,8 @@
 #define INI_FILE_HPP
 
 #include <map>
+#include <functional>
+#include <iosfwd>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -55,6 +57,20 @@ public:
      * @return Reference to the global IniFile instance.
      */
     static IniFile &instance();
+
+    // Optional caller-owned read policy for live and stock input. Return the
+    // complete bytes or throw before parsing. An empty callback restores the
+    // ordinary file reader. This changes no filename, data, layout, or pending
+    // edits. The caller serializes access and must not reenter/mutate this
+    // component from its reader; bounds and filesystem policy belong to it.
+    using FileReader = std::function<std::string(const std::string &)>;
+    void set_file_reader(FileReader);
+    // Optional caller-owned publication policy for live Save/Repair/Reset.
+    // Publish the exact complete bytes or throw; save clears pending edits
+    // only after success. The caller serializes access and must not reenter
+    // or mutate this component. Empty restores the ordinary writer.
+    using FileWriter = std::function<void(const std::string &,const std::string &)>;
+    void set_file_writer(FileWriter);
 
     /**
      * @brief Sets the INI filename and immediately loads it.
@@ -89,6 +105,18 @@ public:
      *         file cannot be written, or the atomic replacement fails.
      */
     void save();
+
+    /**
+     * @brief Serializes proposed data without changing memory or files.
+     *
+     * Predicts setData(proposed_data) followed by save() using the currently
+     * loaded layout, pending removals, and raw passthrough keys. Reintroducing
+     * a removed key has the same effect as setData(). No filename is required.
+     * The caller owns semantic validation and any size or durability policy.
+     */
+    std::string serialize_with_data(
+        const std::map<std::string,
+                       std::unordered_map<std::string, std::string>> &proposed_data) const;
 
     /**
      * @brief Configures section/key pairs that normal saves preserve verbatim.
@@ -250,6 +278,17 @@ public:
     void reset_to_stock(const std::string &semantic_version);
 
     /**
+     * @brief Previews the exact stock reset or repair without changing state.
+     * Reads `<filename>.stock`; repair also reads the current live file,
+     * ignoring unsaved edits just like repair_from_stock(). Preserves existing
+     * parsing, layout, version substitution, and raw passthrough semantics.
+     * Performs no writes and leaves all in-memory/pending state unchanged.
+     * Callers own semantic validation, bounds, and transaction durability.
+     */
+    std::string serialize_from_stock(const std::string &semantic_version,
+        bool preserve_compatible_values) const;
+
+    /**
      * @brief Repairs the live INI file using the stock template.
      *
      * The repair process loads the current live file, resets the file to the
@@ -289,6 +328,11 @@ public:
                                                    std::string>> &data);
 
 private:
+    std::string read_contents(const std::string &) const;
+    FileReader _fileReader;
+    FileWriter _fileWriter;
+    void load_stream(std::istream &);
+    void replace_from_stock(const std::string &bytes);
     /** @brief Default constructor for the singleton instance. */
     IniFile() = default;
 

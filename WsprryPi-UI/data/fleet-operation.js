@@ -34,7 +34,7 @@
         const selector = el("operationDevice"), data = state.data;
         if (data) {
             const names = new Map();for (const row of data.assignments) names.set(row.name, (names.get(row.name) || 0) + 1);
-            const options = [{id: "", label: "This Pi (controller)"}];
+            const options = [{id: "", label: root.ControllerMode?.active ? "Controller (no local output)" : "This Pi (controller)"}];
             for (const [id, output] of Object.entries(data.outputs)) {
                 const row = data.assignments.find(r => r.device_id === id);
                 const name = row?.name || output.retained_name || id;
@@ -46,15 +46,24 @@
                 selector.replaceChildren(...options.map(o => {const n = root.document.createElement("option");n.value = o.id;n.textContent = o.label;return n;}));
             }
             selector.value = selected?.key || "";
-            el("operationDeviceField").hidden = options.length === 1;
+            el("operationDeviceField").hidden = options.length === 1 && !root.ControllerMode?.active;
         }
         selector.disabled = frozen || state.busy;
         const remote = !!selected;
-        setHidden("operationLocalView", remote);el("operationLocalView").inert = remote;
-        setHidden("operationFleetView", !remote);root.document.body.classList.toggle("fleet-remote-selected", remote);
+        const noLocalOutput = root.ControllerMode?.active === true;
+        setHidden("operationLocalView", remote || noLocalOutput);el("operationLocalView").inert = remote || noLocalOutput;
+        setHidden("operationFleetView", !remote);root.document.body.classList.toggle("fleet-remote-selected", remote || noLocalOutput);
+        const controllerView = el("operationControllerView");
+        if (controllerView) {
+            controllerView.hidden = !noLocalOutput || remote;
+            text("operationControllerHeading", !state.valid ? "Fleet status unavailable"
+                : data && Object.keys(data.outputs).length ? "Select an assigned output" : "No assigned outputs");
+            text("operationControllerDetail", !state.valid ? "Read current Fleet status before choosing an output. This controller has no local transmitter."
+                : "This controller has no local transmitter. Choose an assigned output above or manage outputs in Fleet.");
+        }
         for (const label of root.document.querySelectorAll(".times-wrapper .time-label")) {
             const original = label.dataset.localLabel || label.textContent;label.dataset.localLabel = original;
-            label.textContent = remote ? "Controller " + original : original;
+            label.textContent = remote || noLocalOutput ? "Controller " + original : original;
         }
         if (!remote) {
             const backend = typeof selectedRuntimeTransmitBackend === "function" ? selectedRuntimeTransmitBackend() : "";
@@ -142,6 +151,7 @@
         root.FleetClient.subscribe(render);restoreReturnFocus();
         root.addEventListener("pageshow", restoreReturnFocus);
         el("operationDevice").addEventListener("change", choose);
+        el("operationControllerRefresh")?.addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
         el("operationFleetReturn").addEventListener("click", () => {el("operationDevice").value = "";choose();el("operationDevice").focus();});
         for (const [id, op] of [["Enable", "enable"], ["Pause", "pause"], ["Recover", "recover"]]) el("operationFleet" + id).addEventListener("click", () => action(op));
         el("operationFleetRefresh").addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
@@ -156,6 +166,6 @@
         el("operationFleetConfirmation").addEventListener("hidden.bs.modal", () => {const pending = confirmation;confirmation = null;pending?.resolve(pending.accepted);if (pending && !pending.accepted) {frozen = false;render();el("operationFleetPause").focus();}});
         root.document.addEventListener("visibilitychange", () => {if (root.document.hidden && confirmation) {confirmation.accepted = false;confirmation.modal.hide();}});
     }
-    root.FleetOperation = {remote: () => !!selected, model};
+    root.FleetOperation = {remote: () => !!selected, model, refresh: () => render()};
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init);else init();
 })(window);

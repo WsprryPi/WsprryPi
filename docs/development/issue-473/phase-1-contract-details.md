@@ -5,6 +5,13 @@ change, migration, or security qualification. This closes the encoding, field-se
 and handover details left implicit in the [decision document](phase-1-decisions.md)
 and [pairing workflow](phase-1-pairing.md). No phase-2 implementation is authorized.
 
+Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS
+and controller-to-remote-Pi management are deferred to the
+[end-of-phase-6 security milestone](deferred-pi-security.md). These approved
+design contracts remain unchanged; phase 2 no longer claims their implementation.
+Existing WTP/Pico TLS and the requirement for an automatic certificate-free
+operator workflow remain unchanged.
+
 ## Interpretation and version boundaries
 
 Closed object notation lists every required key; nullable fields are still

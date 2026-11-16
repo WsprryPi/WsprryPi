@@ -38,6 +38,8 @@ void register_config(
 void register_control(
     httplib::Server &server,
     CorsHeaderSetter set_cors_headers);
+// After HTTP handlers stop, before the process-owned catalog is destroyed.
+void retire_control_management();
 void register_privileged_admin(
     httplib::Server &server,
     PrivilegedNetworkAdmin &privileged_network_admin,

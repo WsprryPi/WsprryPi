@@ -3,8 +3,10 @@
 // WsprryPi-owned harness: selected Pico TLS server and common service.
 #include "network/pico/server.hpp"
 #include "network_support.hpp"
+#include "network_diagnostics_fixture.hpp"
 #include "standalone/progress.hpp"
 #include "network_credentials.hpp"
+#include "network_credentials_second.hpp"
 #include "pico/time.h"
 #include "fixture_clock.hpp"
 #include "time/mapping.hpp"
@@ -14,6 +16,11 @@
 #include <unistd.h>
 #include <thread>
 namespace {
+struct DiagnosticNetwork final : network_test::Network {
+  std::string status() const override {
+    return network_diagnostics_fixture(enabled,pending);
+  }
+};
 using Clock = network_test::FixtureClock;
 // Preserve the production dry-run engine's timing policy. Diagnose a host OS
 // scheduling miss instead of treating a later retry as evidence it never happened.
@@ -82,7 +89,7 @@ int main(int argc, char **argv) {
   ObservedEngine engine{clock};
   wsprrypico::wtp::JobService service{clock, engine, identities};
   wsprrypico::standalone::Scheduler scheduler{store, service};
-  network_test::Network network;
+  DiagnosticNetwork network;
   const std::string device(32, argc > 2 ? argv[2][0] : 'a');
   wsprrypico::network::BrowserApi api{service, store, scheduler, network, device, "phase11-host-test"};
   network_test::Flash udp_flash;
@@ -101,7 +108,15 @@ int main(int argc, char **argv) {
   api.management_availability({wsprrypico::network::ManagementProfile::Engineering,
       0, false, true, false, false, false});
   using namespace wsprrypico::network::credentials;
-  const wsprrypico::provisioning::CredentialMaterial material{device_id,hostname,port,certificate,key,ca};
+  const auto selected_port=argc>4?std::stoul(argv[4]):port;
+  if(selected_port<1024||selected_port>49151)return 2;
+  const bool second=argc>5&&std::string(argv[5])=="second";
+  const wsprrypico::provisioning::CredentialMaterial material=second?
+    wsprrypico::provisioning::CredentialMaterial{wsprrypico::network::credentials_second::device_id,
+        wsprrypico::network::credentials_second::hostname,static_cast<std::uint16_t>(selected_port),
+        wsprrypico::network::credentials_second::certificate,wsprrypico::network::credentials_second::key,
+        wsprrypico::network::credentials_second::ca}:
+    wsprrypico::provisioning::CredentialMaterial{device_id,hostname,static_cast<std::uint16_t>(selected_port),certificate,key,ca};
   wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test",material};
   if (!server.start()) { std::cerr << "TLS server initialization failed: " << server.last_error() << "\n"; return 1; }
   std::cout << "READY " << server.port() << std::endl;
@@ -111,6 +126,7 @@ int main(int argc, char **argv) {
       std::string input; std::getline(std::cin, input);
       if (input == "FAIL") { flash.fail = true; std::cout << "ACK" << std::endl; }
       else if (input == "RESUME") { flash.fail = false; std::cout << "ACK" << std::endl; }
+      else if (input == "RELOAD_STORE") { flash.fail = false; std::cout << (store.load() ? "ACK" : "FAILED") << std::endl; }
       else if (input == "DISABLE_FAIL") { engine.can_disable=false; std::cout << "ACK" << std::endl; }
       else if (input == "STOP") { (void)scheduler.command("STOP"); std::cout << "ACK" << std::endl; }
       else if (input.starts_with("CONFIG ")) { std::cout << scheduler.command(input) << std::flush; }

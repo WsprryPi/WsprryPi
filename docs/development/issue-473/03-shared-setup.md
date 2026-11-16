@@ -5,6 +5,16 @@ when separately authorized. Read the [execution rules](execution-rules.md), the 
 [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions.
 Require phases 1–2 acceptance evidence for the intended candidate sources.
 
+## Deferred Pi security boundary
+
+Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
+acceptance covers local Pi and existing Pico management. Implement independently
+eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
+associated migration remain unavailable until the end-of-phase-6 security gate.
+Carry their acceptance obligations into that gate; do not substitute unsecured
+transport, fabricated capability, or host writes for remote target operations.
+Existing security and target-local authority checks remain enforced.
+
 ## Objective and inspection
 
 Provide one target-aware Setup context for existing controls. Inspect the complete
@@ -32,9 +42,10 @@ existing operational design, typography, colors, and light/dark behavior.
    the old target; uncertain outcomes require authoritative readback before retry.
    Reconnection/reboot renegotiates before editing. Handle deletion, capability
    changes, and unsaved drafts without silent loss or cross-target application.
-4. Adapt existing Signal Setup, transmitter, and I/O controls to local and remote
-   adapters from phase 2. Keep units, precision, custom values, valid inactive
-   values, field validation, and actual persistence semantics. Never route remote
+4. Adapt existing Signal Setup, transmitter, and I/O controls to eligible local Pi
+   and existing Pico adapters from phase 2. Complete remote Pi migration through
+   the deferred security milestone before phase 7. Keep units, precision, custom
+   values, valid inactive values, field validation, and actual persistence semantics. Never route remote
    controls through local autosave. Clearly distinguish draft, saving, saved,
    pending activation/restart, conflict, invalid, disconnected, and read-only states.
 5. Rename Pi I/O to Device I/O and expose only supported writable capabilities.

@@ -8,7 +8,7 @@ const config = {enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm
   allow_unqualified_frequency:true,allow_non_amateur_frequency:true};
 const target = {scope:'member',device_id:'a'.repeat(32),boot_id:'1'.repeat(32)};
 function browser(exchange, producer = source) {
-  const fields = new Map(), requests = [];
+  const fields = new Map(), requests = [], networkReads = [];
   const element = id => {
     if (!fields.has(id)) fields.set(id, {value:'',checked:false,disabled:false,hidden:false,textContent:'',listeners:{},
       replaceChildren(...children){this.options=children;this.value=children[0]?.value || "";},dataset:{wtpResource:['wtp-member-callsign','wtp-member-locator','wtp-member-power'].includes(id)?'station':'hardware'}, setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
@@ -19,6 +19,10 @@ function browser(exchange, producer = source) {
     WtpUi:{read:()=>({Transport:'network'})}, crypto:require("node:crypto").webcrypto, AbortSignal, AbortController,setTimeout,clearTimeout,
     fetch:async (url, options) => {
       const request = {url,...options,body:options.body ? JSON.parse(options.body) : null};
+      if (url.endsWith('/network') && (!options.method || options.method === 'GET')) {
+        networkReads.push(request);
+        return response({enabled:true,requested_enabled:null,withdrawal_pending:false});
+      }
       if (!(url.endsWith('/member/management') && (!options.method || options.method === 'GET'))) requests.push(request);
       if (url.endsWith('/member/management') && (!options.method || options.method === 'GET'))
         return response(root.managementState || {carrier:'engineering_mtls',host:'',connected:false,selection_id:'f'.repeat(32),session:null});
@@ -26,7 +30,7 @@ function browser(exchange, producer = source) {
     }};
   root.window=root; vm.runInNewContext(producer,root);
   root.WtpManagement.setAvailability(true);
-  return {root,fields,requests,element,click:async id=>{ await new Promise(resolve=>setImmediate(resolve)); return element(id).listeners.click(); }};
+  return {root,fields,requests,networkReads,element,click:async id=>{ await new Promise(resolve=>setImmediate(resolve)); return element(id).listeners.click(); }};
 }
 const response = (body, status=200, etag='"r1"') => ({ok:status===200,status,headers:{get:()=>etag},json:async()=>({...body,contract:"Wsprry-Control/1"})});
 const context = (c=config) => ({schema:'pico-settings',target,config:structuredClone(c),update_strategy:'merge',reboot_required:false});

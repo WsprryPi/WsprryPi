@@ -15,11 +15,22 @@
 #include "system_clock_frequency_estimate.hpp"
 #include "wspr_transmit.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "application_simulation_fixture.hpp"
 
 #include <iomanip>
 #include <sched.h>
 #include <sstream>
 #include <string>
+#include <optional>
+
+namespace {
+std::optional<WsprTransmitter::SimulatedRuntimeConfig> application_simulation_fixture;
+}
+void wsprrypi::testing::set_application_simulation_fixture(const WsprTransmitter::SimulatedRuntimeConfig &options){
+    if(application_simulation_fixture||wsprTransmitter.hasSelectedBackend()||wtp_runtime_selected())
+        throw std::logic_error("Simulation fixture must precede application runtime selection");
+    application_simulation_fixture=options;
+}
 
 void apply_runtime_config_side_effects()
 {
@@ -50,7 +61,9 @@ void apply_runtime_config_side_effects()
         if (!wtp_runtime_ready()) (void)wtp_runtime_inspect();
     } else {
         select_wtp_runtime(std::nullopt);
-        wsprTransmitter.selectBackend(backend_kind, si5351_config);
+        if(backend_kind==wsprrypi::BackendKind::SIMULATED&&application_simulation_fixture)
+            wsprTransmitter.selectBackend(backend_kind,si5351_config,*application_simulation_fixture);
+        else wsprTransmitter.selectBackend(backend_kind, si5351_config);
     }
     if (config.transmit_backend != TransmitBackendKind::WTP)
         wsprTransmitter.setTransmitNow(backend_kind == wsprrypi::BackendKind::SIMULATED);

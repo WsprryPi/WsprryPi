@@ -67,6 +67,7 @@ void print_usage(const std::string &message, int exit_code)
     std::cerr << "\nUsage:\n"
               << "  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]\n"
               << "  (sudo) wsprrypi -i /path/to/wsprrypi.ini\n"
+              << "  wsprrypi --controller-only -i /path/to/controller.ini [listener/logging options]\n"
               << "  (sudo) wsprrypi --test-tone BAND_OR_RF_FREQ [backend/options]\n"
               << "  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]\n"
               << "  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC\n"

@@ -63,6 +63,8 @@ namespace wsprrypi { class Rp1GpclkRouteService; }
 class WebServer
 {
 public:
+    // Typed fixture isolation only; no CLI/INI/browser control exposes this.
+    void bind_loopback_for_test();
     /**
      * @brief Constructs a WebServer instance.
      *
@@ -114,6 +116,7 @@ private:
     friend class WebServerNetworkLifecycleTest;
 
     int port_;                         ///< Port on which the server listens.
+    bool loopback_fixture_{};
     // Declared before svr so route captures are destroyed before the manager.
     std::unique_ptr<SupportBundleJobManager> supportBundleJobManager_;
     std::unique_ptr<PrivilegedNetworkAdmin> privilegedNetworkAdmin_;

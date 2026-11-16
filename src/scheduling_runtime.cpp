@@ -5,6 +5,9 @@
 
 #include "scheduling.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "pi_recovery_runtime.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/usb_logging.hpp"
@@ -32,6 +35,7 @@
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
+#include <exception>
 #include <cstring>
 #include <iomanip>
 #include <mutex>
@@ -631,6 +635,16 @@ void stop_runtime_components_for_test() noexcept
  */
 bool wspr_loop()
 {
+    if (controller_only_mode()) return controller_only_loop();
+    wsprrypi::PiRecoveryRuntime recovery;
+    if(!recovery.await_configuration())return exiting_wspr.load(std::memory_order_acquire);
+    // The saved source has passed owning validation before any selector,
+    // backend, or ancillary worker starts. Unwind every native worker before
+    // main releases the persistence/readiness owner on an exception.
+    struct NativeUnwind {
+        int exceptions=std::uncaught_exceptions();
+        ~NativeUnwind(){if(std::uncaught_exceptions()>exceptions)stop_runtime_components_for_process_exit();}
+    } native_unwind;
     transmission_runtime_failed.store(false, std::memory_order_release);
     const bool any_selector_gpio_configured =
         has_configured_selector_gpios(config);
@@ -677,7 +691,8 @@ bool wspr_loop()
     // automatic-transmit path can run.  This latch is process-lifetime by
     // design: ordinary reloads and toggles cannot clear a hardware-safety
     // failure; Pico retains its separate explicit reconciliation boundary.
-    if (!run_startup_quiesce_gate(config))
+    const bool startup_quiesced=run_startup_quiesce_gate(config);
+    if (!startup_quiesced)
     {
         if (config.transmit_backend == TransmitBackendKind::WTP)
             llog.logS(ERROR, "Pico startup is not ready; inspect endpoint status and explicitly reconcile before scheduling.");
@@ -701,10 +716,12 @@ bool wspr_loop()
         }
     }
 
+    bool endpoint_ready=false;
     if (config.use_ini && !startup_quiesce_inhibited_state())
     {
         std::string endpoint_error;
-        if (!wsprrypi::start_wtp_pi_endpoint(config, &endpoint_error))
+        endpoint_ready=wsprrypi::start_wtp_pi_endpoint(config, &endpoint_error);
+        if (!endpoint_ready)
             llog.logS(ERROR, "WTP Pi endpoint unavailable: ", endpoint_error);
     }
 
@@ -714,6 +731,17 @@ bool wspr_loop()
         try { wsprrypi::start_usb_logging(config.ini_filename); }
         catch (const std::exception&) { llog.logS(ERROR, "USB log collector unavailable; review its saved settings."); }
     }
+    if(const auto host=wsprrypi::pi_managed_host()){
+        // WTP peer readiness is separate from the verified host/storage owner.
+        // An offline peer keeps its existing explicit reconciliation path and
+        // cannot dispatch: its application and managed-state gate still refuse.
+        // Physical startup inhibition remains a process-lifetime hold.
+        if((startup_quiesced||config.transmit_backend==TransmitBackendKind::WTP)&&
+            !startup_quiesce_inhibited_state()&&endpoint_ready){
+            wsprrypi::wtp_pi_with_configuration([&]{host->activate(wsprrypi::wtp_pi_with_configuration);});
+        }else host->hold_output();
+    }
+    recovery.finish_native_startup();
     const bool start_web = web_server_start_enabled(config);
     const bool start_websocket = websocket_server_start_enabled(config);
     const int startup_web_port = config.web_port;
@@ -724,7 +752,7 @@ bool wspr_loop()
     {
         llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
     }
-    else if (start_web)
+    else if (start_web&&!recovery.owns_http())
     {
         try
         {
@@ -760,7 +788,7 @@ bool wspr_loop()
         llog.logS(DEBUG, "Skipping web server.");
     }
 
-    if (start_websocket)
+    if (start_websocket&&!recovery.owns_websocket())
     {
         if (!socketServer.start(
                 startup_socket_port,

@@ -9,6 +9,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 VENDOR = ROOT / 'src/wtp_integration/contract'
 FILES = {
+    'engineering/protocol/network-diagnostics.schema.json': VENDOR / 'network-diagnostics.schema.json',
+    'engineering/protocol/control-controller-vectors.json': VENDOR / 'control-controller-vectors.json',
     'engineering/protocol/control-1.schema.json': VENDOR / 'control-1.schema.json',
     'engineering/protocol/control-policy.json': VENDOR / 'control-policy.json',
     'scripts/check_control_policy.py': VENDOR / 'check_control_policy.py',
@@ -37,6 +39,7 @@ with tempfile.TemporaryDirectory() as directory:
         assert ('differs from selected Pico source' in result.stderr or
                 'Shared Si5351 controls differ from selected Pico source' in result.stderr or
                 'Shared GPS controls differ from selected Pico source' in result.stderr or
-                'Shared gray-line controls differ from selected Pico source' in result.stderr), result.stderr
+                'Shared gray-line controls differ from selected Pico source' in result.stderr or
+                'Controller vectors differ from selected Pico source' in result.stderr), result.stderr
         destination.write_bytes(original)
 print('PASS selected-source schema, lifecycle, checker, browser registry, Si5351, GPS and gray-line control parity')

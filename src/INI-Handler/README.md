@@ -38,6 +38,21 @@ This ensures deterministic behavior, safe updates, and reliable recovery.
 - Stock-based repair and reset
 - Minimal dependencies (C++20)
 
+### Caller-owned input policy
+
+`set_file_reader(FileReader)` optionally supplies complete file bytes for live
+loads and stock Reset/Repair previews. The reader receives the component's
+internally selected filename and must return bytes or throw; it must be read-only
+and must not reenter or mutate the component. The caller serializes access and
+owns input bounds, permissions, file-type checks, and filesystem policy.
+`set_file_reader({})` restores ordinary file reads. Installing or clearing a
+reader changes no loaded data, layout, pending edits, or filename.
+
+All inputs use the existing parser, layout preservation, stock merge, and version
+substitution. Reader failure before parsing preserves loaded data and pending
+edits. As before, `set_filename()` selects its filename before attempting a load.
+The reader adds no application-specific or platform dependency to this component.
+
 ---
 
 ## File Layout (WsprryPi)
@@ -62,8 +77,10 @@ This ensures deterministic behavior, safe updates, and reliable recovery.
 | `set_int_value(section, key, value)` | Set integer value |
 | `commit_changes()` | Persist pending changes |
 | `save()` | Write changes (atomic) |
+| `serialize_with_data(data)` | Preview proposed INI serialization without changing state or files |
+| `serialize_from_stock(version, preserve)` | Preview exact stock Reset (`false`) or Repair (`true`) bytes without changing state or files |
 | `reset_to_stock()` | Replace live config with stock |
-| `repair_from_stock()` | Rebuild from stock and merge valid values |
+| `repair_from_stock()` | Rebuild from stock and merge values for matching keys |
 
 ---
 
@@ -90,22 +107,52 @@ Throw `std::runtime_error` if:
 
 ### save() (Atomic)
 
-Writes safely using:
+The default writer uses:
 
 ```text
 write → .tmp
 rename → live file
 ```
 
-Prevents partial writes or corruption.
+Rename prevents readers from observing a partial replacement. The default
+predictable temporary name requires a trusted directory and temporary path;
+it is not a no-follow or crash-durable publication policy.
+
+`set_file_writer(FileWriter)` optionally supplies a reusable publication callback
+receiving the configured filename and complete serialized bytes. Save, Reset,
+and Repair use it without opening the default temporary file. A successful Save
+clears pending changes; a throwing callback preserves pending edits and layout.
+Reset and Repair reload through the configured reader after successful
+publication. A callback that fails after publishing must arrange its own recovery.
+The caller owns authorization, bounds, atomic replacement, filesystem safety,
+and durability. Calls must be serialized and callbacks must not reenter the
+component. Passing an empty callback restores the default writer.
+
+`serialize_with_data(data)` uses the same layout and serialization rules as
+`setData(data)` followed by `save()`. It preserves comments, raw passthrough
+fields, pending removals, and existing key placement; proposed reintroduced keys
+follow `setData()` behavior. It does not change the filename, parsed data,
+pending edits, or files, and it needs no configured filename. Callers own
+semantic validation, size limits, and transaction recovery. Rename provides
+atomic replacement; callers requiring crash durability must also synchronize
+the file and parent directory.
 
 ---
 
 ### repair_from_stock()
 
+`serialize_from_stock(version, true)` previews Repair using values freshly read
+from the live file, not unsaved edits. `false` previews Reset and does not require
+the live file to exist. Both read the stock template and preserve existing
+version substitution, compatible-key, formatting, and raw passthrough rules.
+They leave the filename, parsed data, pending edits/removals, live file, and stock
+file unchanged, including on failure. Reset and Repair use the same preview
+implementation before their atomic replacement. Semantic validation, input size
+bounds, and crash-durable multi-record coordination belong to the caller.
+
 - Rebuilds config using stock structure
-- Merges valid user values
-- Drops unknown or invalid entries
+- Merges existing values for keys present in the stock schema
+- Drops keys and sections absent from stock; callers validate value semantics
 - Writes atomically
 
 ---

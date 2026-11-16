@@ -402,6 +402,7 @@ function syncTransmitAvailabilityUi() {
     if (!transmitField) {
         return;
     }
+    if (window.ControllerMode?.active) {transmitField.disabled = true;return;}
 
     const unavailableMessage = currentTransmitUnavailableMessage();
     const useGpioUnavailableModal = isGpioUnsupportedReason(unavailableMessage);
@@ -505,6 +506,7 @@ function requestTransmitEnabledChange(enabled, previousEnabled) {
 }
 
 function patchTransmitControl() {
+    if (window.ControllerMode?.active) return;
     if (window.FleetOperation?.remote()) return;
     if (isUpdatingTransmitFromBackend) {
         return;
@@ -515,6 +517,7 @@ function patchTransmitControl() {
 }
 
 function patchRebootBehaviorControl() {
+    if (window.ControllerMode?.active) return;
     if (window.FleetOperation?.remote()) return;
     if (isUpdatingRebootBehaviorFromBackend) {
         return;
@@ -579,6 +582,7 @@ function patchRebootBehaviorControl() {
 }
 
 function stopTransmission(options = {}) {
+    if (window.ControllerMode?.active) return false;
     if (window.FleetOperation?.remote()) return;
     const $stop = $("#stop_transmit");
     if ($stop.prop("disabled")) {

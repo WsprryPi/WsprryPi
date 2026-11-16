@@ -297,6 +297,13 @@ function ajaxWithEndpointFallback(endpoint, options = {}) {
                     rejectDeferred(this, [jqXHR, textStatus, errorThrown]);
                     return;
                 }
+                if (endpoint === SETTINGS_ENDPOINT && jqXHR.status === 409 &&
+                    typeof jqXHR.responseJSON?.contract === 'string' && jqXHR.responseJSON.contract.startsWith('Wsprry-Control/')) {
+                    // Protected recovery is an authoritative host reply, not a
+                    // proxy outage. Never replace it with a direct-port peer
+                    // or an older settings view, including unknown versions.
+                    rejectDeferred(this,[jqXHR,textStatus,errorThrown]);return;
+                }
 
                 if (!useFallback) {
                     const reason = jqXHR && typeof jqXHR.status === "number" && jqXHR.status > 0
@@ -1640,6 +1647,7 @@ function populateConfig(callback = null) {
 
     getJsonWithEndpointFallback(SETTINGS_ENDPOINT)
         .done(function (configJson, textStatus, xhr) {
+            if (window.ConfigurationRecovery?.normalResponse()) return;
             window.WtpUi?.setHostRevision(xhr?.getResponseHeader?.("ETag"));
             try {
                 if (!configJson || typeof configJson !== "object") {
@@ -2199,6 +2207,24 @@ function populateConfig(callback = null) {
             }
         })
         .fail(function (jqXHR, textStatus, errorThrown) {
+            if (jqXHR.status === 409 && window.ConfigurationRecovery?.accept(jqXHR.responseJSON)) {
+                backendCurrentlyConnected = true;
+                backendConnectedOnce = true;
+                clearPendingPopulateConfigRetry();clearConfigLoadFailureState();syncConnectionAlert();pageLoaded();
+                if (typeof callback === 'function') callback();
+                return;
+            }
+            if (jqXHR.status === 409 && window.ControllerMode?.accept(jqXHR.responseJSON?.controller)) {
+                backendCurrentlyConnected = true;
+                backendConnectedOnce = true;
+                clearPendingPopulateConfigRetry();
+                clearConfigLoadFailureState();
+                syncConnectionAlert();
+                window.ControllerMode.render();
+                pageLoaded();
+                if (typeof callback === "function") callback();
+                return;
+            }
             if (isConfigView() &&
                 typeof suspendConfigAutosave === "function") {
                 suspendConfigAutosave(false);
@@ -3955,6 +3981,14 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
             msg = JSON.parse(ev.data);
         } catch (err) {
             debugConsole("warn", "WebSocket ⚠️ invalid JSON:", err);
+            return;
+        }
+
+        if (window.ControllerMode?.accept(msg)) {
+            backendCurrentlyConnected = true;
+            backendConnectedOnce = true;
+            setConnectionState("connected");
+            syncConnectionAlert();
             return;
         }
 
@@ -7608,7 +7642,7 @@ function updateMachinePowerCapabilities(value) {
     syncMachinePowerControls();
 }
 function syncMachinePowerControls(message = "") {
-    const busy = pendingSystemAction !== null || window.PicoFirmwareSafety?.locked === true;
+    const busy = pendingSystemAction !== null || window.PicoFirmwareSafety?.locked === true || window.ControllerMode?.active === true;
     for (const [id, key] of [["rebootButton", "reboot"], ["shutdownButton", "power_off"]]) {
         const button = document.getElementById(id);
         if (button) {
@@ -7618,7 +7652,8 @@ function syncMachinePowerControls(message = "") {
     }
     const hint = document.getElementById("machine-power-status");
     if (hint) {
-        hint.textContent = message || (machinePowerCapabilities.reboot && machinePowerCapabilities.power_off
+        hint.textContent = window.ControllerMode?.active ? "Machine power controls are unavailable in controller-only mode."
+            : message || (machinePowerCapabilities.reboot && machinePowerCapabilities.power_off
             ? "" : machinePowerCapabilitiesKnown ? "Machine reboot and power-off are unavailable on this host." : "Machine power controls are unavailable until host support is confirmed.");
         hint.hidden = !hint.textContent;
     }
