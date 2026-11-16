@@ -10,6 +10,18 @@ import time
 from controller_only_test import free_port, request
 
 
+def read_managed(port, path, with_headers=False):
+    deadline = time.monotonic() + 5
+    while True:
+        result = request(port, "GET", path, with_headers=with_headers)
+        if result[0] == 200:
+            return result
+        value = json.loads(result[1])
+        assert result[0] in (409, 429) and value.get("schema") == "target-error" and value.get("error", {}).get("code") in ("capacity", "rate_limited"), result[:2]
+        assert time.monotonic() < deadline, result[:2]
+        time.sleep(0.1)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", required=True)
@@ -49,9 +61,9 @@ def main():
                 status, body = request(port, "GET", "/api/control/v1/targets");assert status == 200
                 self_id = json.loads(body)["targets"][0]["device_id"]
                 base = f"/api/control/v1/targets/{self_id}/"
-                status, body = request(port, "GET", base + "context");assert status == 200;context = json.loads(body)
-                status, body, headers = request(port, "GET", base + "settings", with_headers=True);assert status == 200;saved = json.loads(body)
-                status, body = request(port, "GET", base + "status");assert status == 200
+                status, body = read_managed(port, base + "context");assert status == 200;context = json.loads(body)
+                status, body, headers = read_managed(port, base + "settings", with_headers=True);assert status == 200;saved = json.loads(body)
+                status, body = read_managed(port, base + "status");assert status == 200
                 observed = json.loads(body)
                 assert observed["destination_id"] is None and observed["transmit_effective"] is False and observed["phase"] == "unknown"
                 status, body = request(port, "GET", "/api/wtp");assert status == 200 and json.loads(body)["ready"] is False
@@ -68,14 +80,14 @@ def main():
                 status, receipt = request(port, "PUT", base + "settings", command, auth)
                 assert status == 200 and json.loads(receipt)["state"] == "committed", receipt
                 assert request(port, "PUT", base + "settings", command, auth) == (200, receipt)
-                status, body = request(port, "GET", base + "settings");assert status == 200
+                status, body = read_managed(port, base + "settings");assert status == 200
                 assert json.loads(body)["saved"]["configuration"]["CW"]["Message"] == "OFFLINE PEER EDIT"
                 snapshot = json.loads(body)
                 assert snapshot["saved"]["scheduling"] == candidate["scheduling"]
                 for cap in context["capabilities"]:
                     if cap["resource"] == "pi-scheduling":assert cap["activation"] == "stored_only" and cap["write"]
                 before = ini.read_bytes()
-                status, body, headers = request(port, "GET", base + "settings", with_headers=True)
+                status, body, headers = read_managed(port, base + "settings", with_headers=True)
                 auth["If-Match"] = headers["ETag"]
                 bad = json.loads(command);bad["expected_revision"] = json.loads(body)["revision"];bad["operation_id"] = "9" * 32
                 bad["candidate"]["scheduling"]["solar"]["enabled"] = True

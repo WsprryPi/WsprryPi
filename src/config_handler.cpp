@@ -1805,6 +1805,14 @@ void init_config_json()
     init_config_json_impl(jConfig);
 }
 
+nlohmann::json initial_configuration_draft()
+{
+    std::lock_guard update_lock(config_update_mutex());
+    nlohmann::json draft;
+    init_config_json_impl(draft);
+    return draft;
+}
+
 bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &draft)
 {
     std::lock_guard lock(config_update_mutex());

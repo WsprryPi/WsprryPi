@@ -16,6 +16,7 @@
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_pi_control.hpp"
+#include "recurrence_admission.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -49,6 +50,12 @@ bool set_config(bool force)
         ini_reload_pending.store(true, std::memory_order_release);
         return true;
     }
+    // Migration never uses ordinary configuration or a restarted scheduler to
+    // reopen a retired recurring assignment. Manual tone admission is separate.
+    const auto recurrence=wsprrypi::legacy_recurrence_admission();
+    if (recurrence!=wsprrypi::LegacyRecurrenceAdmission::Open &&
+        !(recurrence==wsprrypi::LegacyRecurrenceAdmission::DrainAcceptedPair &&
+          active_wspr_plan_in_progress && !force && !ini_reload_pending.load())) return true;
 
     // Exit if we are shutting down
     if (exiting_wspr.load())

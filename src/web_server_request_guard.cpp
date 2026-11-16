@@ -74,7 +74,7 @@ void register_request_guard(
                         {"controller", controller_only_status()}}.dump(), "application/json");
                     return httplib::Server::HandlerResponse::Handled;
                 }
-                const bool management=request.path=="/api/control/v1/host/management-session"||
+                const bool management=request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||
                     request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
                     request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")||
                     (request.path=="/config"&&wsprrypi::pi_managed_host_held());
@@ -171,7 +171,7 @@ void register_request_guard(
             }
             response.status = 403;
             response.headers.erase("Access-Control-Allow-Origin");
-            if(request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
+            if(request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
                 request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/"))
                 response.set_content(wsprrypi::controller_target_error(403,"unauthorized").body,"application/json");
             else response.set_content("Forbidden", "text/plain");

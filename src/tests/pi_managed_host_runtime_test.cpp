@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_host_runtime.hpp"
 #include "arg_parser.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "config_handler.hpp"
 #include "controller_runtime.hpp"
 #include "scheduling.hpp"
@@ -28,6 +29,7 @@ namespace {
 void check(bool value,const char *message){if(!value)throw std::runtime_error(message);}
 template<class F>void refuses(F action){bool refused=false;try{action();}catch(...){refused=true;}check(refused,"Expected protected runtime refusal");}
 void fixture(const std::string &ini){
+    testing::set_wtp_pi_private_state_path(ini+".ledger");
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
     config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";

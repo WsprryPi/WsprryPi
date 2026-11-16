@@ -278,7 +278,7 @@ void register_control(
         const auto browser_request = wsprrypi::wtp_browser_http_request(request);
         if (!browser_request) {
             response.status = 400;
-            const bool target=request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
+            const bool target=request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
                 request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/");
             response.set_content(target?wsprrypi::controller_target_error(400,"invalid_shape").body:
                 R"({"error":{"code":"invalid_request"}})", "application/json");
@@ -286,7 +286,7 @@ void register_control(
         }
         const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
-        if(request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")) {
+        if(request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")) {
             static wsprrypi::ManagementBrowserSessions sessions;
             const auto failure=[](unsigned status,const char *code){return wsprrypi::controller_target_error(status,code);};
             std::size_t header_bytes=0;for(const auto &[name,value]:request.headers)header_bytes+=name.size()+value.size()+4;
@@ -301,6 +301,8 @@ void register_control(
                     else result={200,R"({"contract":"Wsprry-Control/1","schema":"controller-browser-session"})",{}};
                 }catch(...){result=failure(400,"invalid_json");}
             } else if(request.method!="GET"&&!sessions.permits(request))result=failure(403,"csrf_failed");
+            else if(request.path=="/api/control/v1/host/retirements")
+                result=wsprrypi::wtp_fleet_api(request.method,request.body,request.get_header_value("If-Match"),"retirements");
             else if(request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery")
                 result=wsprrypi::pi_managed_host_recovery(*browser_request,true);
             else if(wsprrypi::pi_managed_host_target_path(request.path)){

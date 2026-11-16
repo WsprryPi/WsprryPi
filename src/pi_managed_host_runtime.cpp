@@ -41,6 +41,7 @@ std::shared_ptr<PiManagedHost> prepare_pi_managed_host(const std::string &ini){
     }catch(...){return {};}
 }
 std::shared_ptr<PiManagedHost> pi_managed_host(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.host.lock();}
+void poll_pi_managed_migration() noexcept {try{if(const auto host=pi_managed_host())host->advance_migration();}catch(...){}}
 bool pi_managed_host_selected(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.selected;}
 bool pi_managed_host_protected_recovery_path(std::string_view path){
     return pi_managed_host_selected()&&(path=="/api/control/v1/host/readiness"||

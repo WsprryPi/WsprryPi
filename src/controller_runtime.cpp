@@ -126,9 +126,9 @@ bool controller_http_allowed(std::string_view method, std::string_view path) {
     if(path=="/api/control/v1/host/management-session")return method=="POST";
     if (method == "GET" && (path == "/api/control/v1/host/devices" ||
         path == "/api/control/v1/host/discovery" || path == "/api/control/v1/host/fleet" ||
-        path == "/api/control/v1/host/fleet/operations" || path == "/api/control/v1/host/fleet/actions")) return true;
+        path == "/api/control/v1/host/retirements" || path == "/api/control/v1/host/fleet/operations" || path == "/api/control/v1/host/fleet/actions")) return true;
     return method == "POST" && (path == "/api/control/v1/host/devices" ||
-        path == "/api/control/v1/host/discovery/identify" || path == "/api/control/v1/host/fleet");
+        path == "/api/control/v1/host/discovery/identify" || path == "/api/control/v1/host/retirements" || path == "/api/control/v1/host/management-session" || path == "/api/control/v1/host/fleet");
 }
 
 bool controller_only_loop(const std::string &fixture_identity) {

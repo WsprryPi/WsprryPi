@@ -3,6 +3,8 @@
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
+#include "scheduling_internal.hpp"
+#include "recurrence_admission.hpp"
 #include "solar_configuration.hpp"
 #include "version.hpp"
 #include "wtp_integration/catalog.hpp"
@@ -51,7 +53,7 @@ int main(){
   iniFile.set_file_writer([&](const std::string &path,const std::string &image){check(path==ini,"Fixed owning INI publication");store.write_committed_ini(image);});
   struct Clear{~Clear(){iniFile.set_file_writer({});set_config_persistence_owner({},{},{});}} clear;
   TestClock clock;TestIdentity identity;InhibitedRfEngine engine;JobService jobs(clock,engine,identity);WtpPiAuthority authority(jobs,false);
-  bool available=true,race_claim=false,race_stop=false,fail_cancel=false;unsigned cancellations=0;std::string stopping_id;
+  bool available=true,race_claim=false,race_stop=false,fail_cancel=false;unsigned cancellations=0;std::string stopping_id,management_boot;
   bool wrong_identity=false;
   try{PiLocalManagementService wrong(store,std::string(32,'b'),"Other Pi",[]()->std::optional<PiManagementObservation>{return {};});}
   catch(const std::invalid_argument &){wrong_identity=true;}
@@ -61,6 +63,7 @@ int main(){
   PiLocalManagementService service(store,self,"This Pi",[&]()->std::optional<PiManagementObservation>{
       if(!available)return {};
       auto observed=authority.management_snapshot(self);
+      if(!management_boot.empty())observed.first.remote.boot_id=management_boot;
       return PiManagementObservation{self,std::move(observed.first),std::move(observed.second),[&]{if(race_claim){race_claim=false;claim();}return authority.begin_configuration();},[&]{authority.end_configuration();},
           [&](const WtpPiAuthority::ObservedOutput &expected){
               if(race_stop){race_stop=false;check(authority.begin_test_tone(),"Racing output admission");}
@@ -94,7 +97,7 @@ int main(){
   const auto snapshot_reply=call("settings");check(snapshot_reply.status==200,"Current settings");const auto snapshot=Json::parse(snapshot_reply.body);
   check(valid_controller_document(snapshot,"target-settings")&&snapshot_reply.etag=="\""+snapshot["revision"].get<std::string>()+"\"","Exact settings ETag");
   const auto status=call("status");
-  check(status.status==200&&Json::parse(status.body)["authority_state"]=="unclassified"&&
+  check(status.status==200&&Json::parse(status.body)["authority_state"]=="legacy"&&
       bytes(ini)==original&&store.settings()==original_saved&&authority.snapshot().remote==output_before.remote,
       "Reads preserve settings/output ownership and do not invent completed legacy-authority inventory");
   Json save{{"contract","Wsprry-Control/1"},{"schema","target-save"},{"binding",context["binding"]},{"capability_revision",context["capability_revision"]},
@@ -308,6 +311,61 @@ int main(){
   check(store.settings()["scheduling"]==draft,"Legacy INI writer retains the complete solar document");
   PiManagedStore reloaded_solar(ini,self,catalog.pi_management_anchor(self,{}));reloaded_solar.recover();
   check(reloaded_solar.settings()["scheduling"]==draft,"Cold recovery retains exact disabled draft");
+  // Retire the existing self-owned recurrence through the production API.
+  // A manual output must finish before handover; retirement never stops it.
+  auto migration_context=Json::parse(call("context").body),migration_settings=Json::parse(call("settings").body);
+  const auto migration_state=Json::parse(call("migration").body);
+  check(valid_controller_document(migration_state,"target-migration-read")&&migration_state["controllers"].size()==1&&
+      migration_state["controllers"][0]["controller_id"]==self,"Target-owned local inventory is returned without browser-supplied proof");
+  Json migrate{{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",migration_context["binding"]},
+      {"capability_revision",migration_context["capability_revision"]},{"operation_id",std::string(32,'4')},
+      {"expected_revision",migration_settings["revision"]},{"expected_authority_generation",migration_state["authority_generation"]},
+      {"controllers",migration_state["controllers"]}};
+  const auto migration_etag="\""+migrate["expected_revision"].get<std::string>()+"\"";
+  const auto pre_migration=bytes(ini);
+  auto omitted=migrate;omitted["controllers"]=Json::array();
+  check(call("migration","POST",omitted,migration_etag).status==409&&bytes(ini)==pre_migration,"Caller omission cannot replace authoritative inventory");
+  check(authority.begin_test_tone(),"Independent manual output fixture");
+  check(call("migration","POST",migrate,migration_etag).status==409&&authority.snapshot().local_work_active&&bytes(ini)==pre_migration,
+      "Active manual output blocks handover without cancellation or writes");
+  authority.end_local_work(true);
+  migration_context=Json::parse(call("context").body);migrate["capability_revision"]=migration_context["capability_revision"];
+  const auto migrated=call("migration","POST",migrate,migration_etag);
+  check(migrated.status==200&&store.settings()["scheduling"]["enabled"]==false&&store.recurrence_authority()["state"]=="staged"&&
+      store.recurrence_authority()["retirements"].size()==1,"Local retirement, disabled settings, frozen rollback and receipt commit together");
+  check(call("migration","POST",migrate,migration_etag).body==migrated.body,"Lost migration reply replays without another retirement");
+  PiManagedStore migrated_cold(ini,self,catalog.pi_management_anchor(self,{}));migrated_cold.recover();
+  check(migrated_cold.recurrence_authority()==store.recurrence_authority(),"Target reboot retains the local tombstone");
+  const auto rollback_context=Json::parse(call("context").body),rollback_settings=Json::parse(call("settings").body),rollback_state=Json::parse(call("migration").body);
+  Json rollback{{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",rollback_context["binding"]},
+      {"capability_revision",rollback_context["capability_revision"]},{"operation_id",std::string(32,'5')},
+      {"expected_revision",rollback_settings["revision"]},{"expected_authority_generation",rollback_state["authority_generation"]},
+      {"resume_controller_id",self},{"resume_assignment_id",rollback_state["controllers"][0]["assignment_id"]}};
+  const auto rolled=call("migration/rollback","POST",rollback,"\""+rollback["expected_revision"].get<std::string>()+"\"");
+  check(rolled.status==200&&store.settings()["scheduling"]==draft&&store.recurrence_authority()["state"]=="rollback"&&
+      store.recurrence_authority()["retirements"].size()==1,"Explicit rollback restores the selected prior assignment without erasing retirement evidence");
+  // The lifecycle marker represents an already accepted WSPR plan, including
+  // its inter-frame interval. No transmitter is constructed in this fixture.
+  active_wspr_plan_in_progress=true;
+  migration_context=Json::parse(call("context").body);migration_settings=Json::parse(call("settings").body);
+  auto draining=migrate;draining["binding"]=migration_context["binding"];draining["capability_revision"]=migration_context["capability_revision"];
+  draining["expected_revision"]=migration_settings["revision"];draining["expected_authority_generation"]=store.recurrence_authority()["generation"];
+  draining["controllers"]=store.recurrence_authority()["controllers"];draining["operation_id"]="123456789abcdef0123456789abcdef0";
+  const auto drain_ini=bytes(ini);const auto accepted=call("migration","POST",draining,"\""+draining["expected_revision"].get<std::string>()+"\"");
+  check(accepted.status==202&&Json::parse(accepted.body)["state"]=="pending"&&store.recurrence_authority()["state"]=="retiring"&&
+      store.recurrence_authority()["jobs"].size()==1&&bytes(ini)==drain_ini,"Accepted pair is durably recorded and fenced without rewriting INI or cancelling work");
+  service.advance_migration();
+  check(store.migration_pending()&&bytes(ini)==drain_ini,"Inter-frame idle cannot falsely complete the accepted pair");
+  reset_active_wspr_plan_state();management_boot=std::string(32,'f');
+  service.advance_migration();
+  check(store.migration_pending(),"A different boot cannot automatically claim the earlier work completed");
+  auto reconcile=draining;const auto reconciliation_context=Json::parse(call("context").body);
+  reconcile["binding"]=reconciliation_context["binding"];reconcile["capability_revision"]=reconciliation_context["capability_revision"];
+  reconcile["expected_revision"]=store.settings()["revision"];reconcile["expected_authority_generation"]=store.recurrence_authority()["generation"];
+  reconcile["operation_id"]="123456789abcdef0123456789abcdef1";
+  const auto reconciled=call("migration","POST",reconcile,"\""+reconcile["expected_revision"].get<std::string>()+"\"");
+  check(reconciled.status==200&&!store.migration_pending()&&store.settings()["scheduling"]["enabled"]==false&&bytes(ini)==drain_ini&&
+      store.receipt(self,"1",draining["operation_id"])->at("state")=="committed","Explicit current-boot reconciliation completes retained intent and its earlier receipt atomically");
   // A trusted legacy writer can already own a candidate near the storage
   // limit. The adapter must bound the complete readback envelope as well.
   auto large_internal=jConfig;large_internal["CW"]["Message"]="";

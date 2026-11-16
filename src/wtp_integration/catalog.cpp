@@ -373,8 +373,16 @@ PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
     if(!identity(history)||!commit)throw std::invalid_argument("Pi management history transaction required");
     std::lock_guard lock(mutex_);std::string before;auto value=load(active,&before);const auto existing=epoch(value);
     if(existing&&*existing!=history)throw std::runtime_error("Pi management history changed");
-    std::string after=before;
-    if(!existing){value["pi_management_history"]={{"device_id",self},{"history_id",history}};after=catalog_storage_bytes(value);}
+    bool changed=false;
+    if(!existing){value["pi_management_history"]={{"device_id",self},{"history_id",history}};changed=true;}
+    // The pre-parser authority boundary can precede validation of an existing
+    // local WTP selection. Its owner supplies active only for that first
+    // validated initialization, never for later reads or ordinary saves.
+    if(active&&value["profiles"].empty()){
+      WtpCatalogProfile legacy{local_id(),"Current WTP device","manual","",*active,active->device_id.empty()};
+      legacy.generation=next_generation(value);value["profiles"].push_back(serialize(legacy));changed=true;
+    }
+    const std::string after=changed?catalog_storage_bytes(value):before;
     commit(before,after);
     struct stat published{};
     if(::lstat(path_.c_str(),&published))throw std::runtime_error("Pi management catalog disappeared during commit");

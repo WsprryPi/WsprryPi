@@ -28,9 +28,10 @@ separate authorization to execute and successful prerequisite gates.
    configuration lifecycle, preserving existing behavior when disabled.
    [Phase 4 prompt](issue-473/04-solar-policy.md) ·
    [Phase-4 implementation and validation](issue-473/phase-4-progress.md)
-5. ▧ **Prevent competing authorities:** Add safeguards and explicit migration
+5. ✅ **Prevent competing authorities:** Add safeguards and explicit migration
    from controller-owned schedules before allowing new schedule enables.
-   [Phase 5 prompt](issue-473/05-authority-transition.md)
+   [Phase 5 prompt](issue-473/05-authority-transition.md) ·
+   [Phase-5 implementation and validation](issue-473/phase-5-progress.md)
 6. ▧ **Integrate device-owned recurrence:** Apply solar policies to Pi scheduling,
    including ownership, enablement, restart handling, and status. Complete the
    [deferred Pi pairing/TLS and remote-management gate](issue-473/deferred-pi-security.md)

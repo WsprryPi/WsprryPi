@@ -1,10 +1,10 @@
 <?php // SPDX-License-Identifier: MIT ?>
 <section id="fleet-schedules" class="mb-4" aria-labelledby="fleet-schedules-heading" data-independent-wtp>
     <h4 id="fleet-schedules-heading" class="cw-control-section__title">Output schedules</h4>
-    <p id="fleet-schedules-description" class="form-text">Assign a schedule to each remote output. This Pi keeps its own schedule and Enable setting.</p>
+    <p id="fleet-schedules-description" class="form-text">Manage existing remote-output schedules. Adding schedules is unavailable because target-owned scheduling is required. This Pi keeps its own schedule and Enable setting.</p>
     <p id="fleet-schedule-capacity" class="form-text" role="status" aria-live="polite">Load schedules to check available capacity.</p>
     <div class="d-flex flex-wrap gap-2 mb-2">
-        <button type="button" id="fleet-schedule-new" class="btn btn-primary">Assign a schedule</button>
+        <button type="button" id="fleet-schedule-new" class="btn btn-primary" disabled aria-describedby="fleet-schedules-description">Assign a schedule</button>
         <button type="button" id="fleet-schedule-refresh" class="btn btn-outline-secondary">Refresh schedules</button>
     </div>
     <p id="fleet-schedule-feedback" class="form-text" role="status" aria-live="polite"></p>
@@ -81,6 +81,24 @@
                 <button type="button" class="btn btn-outline-secondary" id="fleet-schedule-editor-review">Review current state</button>
             <button type="button" id="fleet-schedule-cancel" class="btn btn-outline-secondary">Cancel</button>
         </div>
+        <section id="controllerRetirement" class="mt-4" aria-labelledby="controllerRetirementHeading" hidden>
+            <h5 id="controllerRetirementHeading" class="cw-control-section__title">Retire this controller’s schedule</h5>
+            <p class="form-text">Stop this controller from starting further occurrences. Accepted work finishes first. This does not set up a replacement schedule.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" id="controllerRetirementReview" class="btn btn-outline-warning">Review retirement</button>
+                <button type="button" id="controllerRetirementRefresh" class="btn btn-outline-secondary">Check saved result</button>
+            </div>
+            <div id="controllerRetirementConfirmation" class="mt-3" hidden>
+                <p id="controllerRetirementSummary" class="text-break"></p>
+                <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="controllerRetirementConsent" form="wtp-independent">
+                    <label class="form-check-label" for="controllerRetirementConsent">Keep this controller from starting new occurrences of this saved schedule. Accepted or unknown work must be reconciled before retirement is confirmed.</label>
+                </div>
+                <button type="button" id="controllerRetirementConfirm" class="btn btn-warning" disabled>Retire this controller’s schedule</button>
+                <button type="button" id="controllerRetirementCancel" class="btn btn-outline-secondary">Cancel review</button>
+            </div>
+            <p id="controllerRetirementFeedback" class="form-text mt-2" role="status" aria-live="polite"></p>
+        </section>
         <p id="fleet-schedule-editor-feedback" class="form-text mt-2" role="status" aria-live="polite"></p>
     </div>
 <div id="fleet-draft-choice" class="alert alert-secondary" hidden role="group" aria-label="Unsaved schedule entries">

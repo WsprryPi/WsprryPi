@@ -331,10 +331,17 @@ retirement_generation:Generation,receipt_digest:Digest}` rows. jobs is at most 3
 staged_revision is Digest or null. clean_proof is null or
 `{installation_id:ID,kind:never_initialized,attestation_id:ID}`. Bounded full
 records and their WAL are private/synced; capacity holds, never evicts uncertainty.
-The target-local initialization owner records clean proof only after explicit
-trusted local UI confirmation of a never-used output and safe target state.
-An upgraded/wiped target with unknown history cannot use that confirmation to
-bypass retirement; it stays unclassified. No browser catalog can create proof.
+P5-03 amends the meaning of clean proof: it records an installation that has
+accepted no work since its target-owned authority record was established, not
+hardware that has never been used. The owner establishes that boundary before
+admission, generates identifiers locally, and requires explicit protected local
+setup on Maintenance before staging validated settings disabled. The wire/storage
+version remains 1. Updates and ordinary configuration resets preserve history;
+missing or damaged established history requires recovery. Existing prior-authority
+evidence still requires retirement. A completely erased device cannot prove
+previous-controller retirement, and unchanged Plain-LAN WTP permits fresh external
+claims under its existing rules. No browser catalog can create proof, and no
+operator manages keys, certificates, or proof files.
 
 The target's own legacy local recurrence is represented by a ControllerRow
 with controller_id=self ID and a target-generated persistent assignment ID;

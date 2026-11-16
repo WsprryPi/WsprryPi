@@ -119,9 +119,13 @@ bool WtpTransmitBackend::transact(wtp::Operation op, wtp::RequestBody body,
     if(dispatch && dispatch_permit_) {
       permit=std::unique_lock(dispatch_permit_->mutex);
       if(!dispatch_permit_->allowed) return fail("Output dispatch authority was revoked");
+      if(dispatch_permit_->retiring && !(op==wtp::Operation::Arm &&
+          dispatch_permit_->loaded_job && std::get<wtp::ArmRequest>(body).job_id==*dispatch_permit_->loaded_job))
+        return fail("Recurring assignment is retiring");
     }
     if (!session_.request(op, std::move(body), clock_.now_ms()))
       return fail(session_.diagnostic());
+    if(dispatch_permit_ && op==wtp::Operation::Load)dispatch_permit_->loaded_job=prepared_->job.job_id;
   }
   observed();
   if (!settle(end, cancellable))

@@ -1416,3 +1416,6 @@ legend {
     .setup-tabs-row > #configTabs .nav-link {width:100%;padding-inline:.5rem;}
     .config-header-actions > .form-text {text-align:start;}
 }
+
+/* Keep retirement consent readable within the existing Fleet editor. */
+.fleet-editor #controllerRetirement .form-check { max-inline-size: 75ch; }

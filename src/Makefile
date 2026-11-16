@@ -1399,7 +1399,7 @@ semantics-test:
 	$(Q)$(MAKE) --no-print-directory semantics-test-full \
 		BACKENDS=$(DEFAULT_BACKENDS) ANCILLARY_GPIO=1
 
-semantics-test-full: solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-full: recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running runtime semantics tests."
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running cleanup lifecycle tests."
@@ -1427,7 +1427,7 @@ semantics-test-portable:
 	$(Q)$(MAKE) --no-print-directory semantics-test-portable-profile \
 		BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-semantics-test-portable-profile: solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-portable-profile: recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running portable UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
 	$(Q)echo "Running portable GPIO band fail-closed policy tests."
@@ -1505,9 +1505,9 @@ $(BIN_DIR)/controller_only_fixture: $(OBJ_DIR_DEBUG)/tests/controller_only_fixtu
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
 .PHONY: controller-only-test
-controller-only-test: $(BIN_DIR)/controller_only_fixture $(BIN_DIR)/$(TEST_OUT)
+controller-only-test: $(BIN_DIR)/controller_only_fixture $(BIN_DIR)/controller_only_production_fixture
 	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_fixture
-	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/$(TEST_OUT) --production-main
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_production_fixture --production-main --private-state
 
 wspr-band-catalog-test: $(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
@@ -2138,12 +2138,16 @@ pico-target-controller-test: $(BIN_DIR)/pico_target_controller_test
 $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
+$(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 $(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture"
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --network-safety-off
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --initialization
 
 $(BIN_DIR)/shared_setup_main_fixture: tests/shared_setup_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -2501,3 +2505,10 @@ solar-geometry-pair-test:
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" --target pi_solar_geometry_pair -j4
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pi_solar_geometry_pair"
+
+.PHONY: recurrence-authority-record-test
+$(BIN_DIR)/recurrence_authority_record_test: tests/recurrence_authority_record_test.cpp recurrence_authority.cpp recurrence_authority.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. tests/recurrence_authority_record_test.cpp recurrence_authority.cpp -o $@
+recurrence-authority-record-test: $(BIN_DIR)/recurrence_authority_record_test
+	$(Q)$(BIN_DIR)/recurrence_authority_record_test

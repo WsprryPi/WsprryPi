@@ -1,4 +1,5 @@
 #include "wtp_integration/fleet_store.hpp"
+#include "wtp_integration/controller_retirement.hpp"
 #include "wtp_integration/fleet_limits.hpp"
 #include "wtp_integration/fleet_schedule.hpp"
 #include "wtp_integration/output_lease.hpp"
@@ -16,6 +17,7 @@
 #include <stdexcept>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <atomic>
 #include <thread>
 #include <condition_variable>
@@ -155,21 +157,105 @@ void unbound_takeover_observation(const std::string& ini,const std::string& self
     check(journal.snapshot().at("contexts").empty(),"unbound HTTP observation cannot create retirement authority");
 }
 void failed_manager_replacement(const std::string& ini,const std::string& self) {
-    start_wtp_fleet(ini,self);struct Stop {~Stop(){stop_wtp_fleet();}} stop;
+    start_wtp_fleet_private_storage_for_test(ini,self,ini+".controller-retirements");struct Stop {~Stop(){stop_wtp_fleet();}} stop;
     const auto previous=Json::parse(wtp_fleet_api("GET","","").body).at("controller_incarnation");
     const auto broken=ini+".broken";
     {std::ofstream file(broken+".wtp-assignments.json");file<<"{broken";}
     check(chmod((broken+".wtp-assignments.json").c_str(),0600)==0,"private corrupt assignment fixture");
-    start_wtp_fleet(broken,self);
+    start_wtp_fleet_private_storage_for_test(broken,self,broken+".controller-retirements");
     const auto failed=wtp_fleet_api("GET","","");
     check(failed.status==503,"failed replacement cannot masquerade as a healthy stopped manager");
     const auto error=Json::parse(failed.body).at("error");
     check(error.at("code")=="fleet_unavailable" && !error.at("message").get<std::string>().empty(),"failed replacement exposes its bounded startup cause");
-    start_wtp_fleet(ini,self);
+    start_wtp_fleet_private_storage_for_test(ini,self,ini+".controller-retirements");
     const auto fresh=wtp_fleet_api("GET","","");
     check(fresh.status==200 && Json::parse(fresh.body).at("controller_incarnation")!=previous,"corrected configuration establishes a fresh working manager");
 }
+void controller_retirement_records() {
+    char pattern[]="/tmp/wsprrypi-retirement-records-XXXXXX";const auto directory=mkdtemp(pattern);check(directory,"private retirement fixture");
+    const std::string root(directory),self(32,'f'),incarnation(32,'e'),device(32,'a');
+    struct Cleanup{std::string root;~Cleanup(){std::filesystem::remove_all(root);}}cleanup{root};
+    auto rows=Json::array({assignment('a')});const auto source=root+"/existing-assignments";
+    Json intent;
+    {
+        ControllerRetirementBook book(root+"/book",source,self,rows);
+        const auto before=book.read(incarnation,rows);check(book.permits(device),"legacy permission established before retirement");
+        const auto row=before.at("assignments").at(0);
+        auto changed=rows;changed[0]["name"]="Changed saved assignment";
+        check(book.read(incarnation,changed).at("revision")!=before.at("revision"),"Strong retirement revision covers current assignment content");
+        check(book.read(std::string(32,'8'),rows).at("revision")!=before.at("revision"),"Strong retirement revision covers process incarnation");
+        auto flags=rows;flags[0]["enabled"]=false;flags[0]["in_flight"]=true;
+        check(book.read(incarnation,flags)==before,"Private execution flags cannot change an unchanged public representation");
+        intent={{"contract","Wsprry-Control/1"},{"schema","controller-retirement"},{"controller_id",self},{"controller_incarnation",incarnation},
+            {"operation_id",std::string(32,'1')},{"transition_id",std::string(32,'2')},{"target_id",device},
+            {"assignment_id",row.at("assignment_id")},{"expected_assignment_revision",row.at("assignment_revision")},{"expected_retirement_generation",before.at("generation")}};
+        auto stale=intent;stale["controller_incarnation"]=std::string(32,'3');rejects([&]{book.retire(stale,before.at("revision"),incarnation,rows);},"stale incarnation refuses before fence");
+        check(book.permits(device),"refused review preserves previous permission");
+        const auto receipt=book.retire(intent,before.at("revision"),incarnation,rows);
+        check(receipt.at("state")=="retiring"&&!book.permits(device)&&book.pending(device),"accepted intent durably fences before proof");
+        check(book.replay(intent,before.at("revision"))==std::optional<Json>(receipt),"Read-only replay does not need a retained assignment row");
+        check(book.retire(intent,before.at("revision"),std::string(32,'4'),Json::array())==receipt,"exact replay survives new incarnation with its original revision");
+        rejects([&]{book.retire(intent,std::string(64,'0'),incarnation,rows);},"replay cannot change its strong request revision");
+        auto reused=intent;reused["transition_id"]=std::string(32,'5');rejects([&]{book.retire(reused,before.at("revision"),incarnation,rows);},"operation ID reuse rejects");
+    }
+    {
+        ControllerRetirementBook restored(root+"/book",source,self,rows);
+        check(!restored.permits(device)&&restored.pending(device),"restored enabled assignment cannot reopen retired generation");
+        rejects([&]{restored.confirm_idle(device,nullptr);},"unknown completion cannot grant retirement");
+        restored.confirm_idle(device,{{"device_id",device},{"boot_id",std::string(32,'1')},{"owner_id",nullptr},{"job_id",nullptr},{"output_active",false},{"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}});check(!restored.pending(device)&&!restored.permits(device),"positive idle proof keeps permanent tombstone");
+    }
+    ControllerRetirementBook restarted(root+"/book",source,self,rows);check(!restarted.permits(device),"retirement survives restart");
+    rejects([&]{ControllerRetirementBook alternate(root+"/book",root+"/other-assignments",self,rows);},"alternate assignment source cannot reinterpret global book");
+    for(const auto point:{RetirementWritePoint::Prepared,RetirementWritePoint::Committed,RetirementWritePoint::Published}) {
+        const auto directory=root+"/crash-"+std::to_string(static_cast<unsigned>(point));
+        ControllerRetirementBook initial(directory,source,self,rows);const auto before=initial.read(incarnation,rows);
+        auto request=intent;request["assignment_id"]=before.at("assignments").at(0).at("assignment_id");request["expected_assignment_revision"]=before.at("assignments").at(0).at("assignment_revision");request["expected_retirement_generation"]=before.at("generation");
+        const auto child=fork();check(child>=0,"Fork retirement crash fixture");
+        if(!child){try{ControllerRetirementBook interrupted(directory,source,self,rows,[&](RetirementWritePoint stage){if(stage==point)_exit(77);});
+            interrupted.retire(request,before.at("revision"),incarnation,rows);_exit(78);}catch(...){_exit(79);}}
+        int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==77,"Crash at the intended durable retirement boundary");
+        ControllerRetirementBook recovered(directory,source,self,rows);
+        check(recovered.permits(device)==(point==RetirementWritePoint::Prepared),"Only an uncommitted intent can recover the old permission");
+        check(recovered.pending(device)==(point!=RetirementWritePoint::Prepared),"Committed fence survives cold recovery before or after image publication");
+        const auto reply=recovered.retire(request,before.at("revision"),point==RetirementWritePoint::Prepared?incarnation:std::string(32,'7'),rows);
+        check(reply.at("operation_id")==request.at("operation_id")&&reply.at("state")=="retiring","Cold recovery retains original intent and replay identity");
+        check(!recovered.permits(device),"Recovery cannot admit a new occurrence after the retained fence");
+    }
+    for(const auto point:{RetirementWritePoint::EstablishmentPrepared,RetirementWritePoint::EstablishmentCommitted,RetirementWritePoint::EstablishmentPublished}) {
+        const auto directory=root+"/initialize-crash-"+std::to_string(static_cast<unsigned>(point));
+        const auto child=fork();check(child>=0,"Fork controller establishment crash fixture");
+        if(!child){try{ControllerRetirementBook interrupted(directory,source,self,rows,[&](RetirementWritePoint stage){if(stage==point)_exit(77);});_exit(78);}catch(...){_exit(79);}}
+        int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==77,"Crash at intended establishment boundary");
+        std::ifstream image(directory+"/authority.json");Json before;image>>before;
+        ControllerRetirementBook recovered(directory,source,self,rows);
+        check(recovered.permits(device),"Interrupted first establishment recovers original legacy permission");
+        const auto state=recovered.read(incarnation,rows);
+        check(state.at("assignments").at(0).at("assignment_id")==before.at("assignments").at(0).at("assignment_id"),"Establishment recovery cannot invent a new assignment identity");
+    }
+    for(const bool remove_directory:{true,false}) {
+        const auto directory=root+(remove_directory?"/missing-directory":"/missing-anchor");
+        ControllerRetirementBook established(directory,source,self,rows);
+        if(remove_directory)std::filesystem::remove_all(directory);else std::filesystem::remove(directory+".established");
+        rejects([&]{(void)established.permits(device);},"Live missing authority or anchor inhibits dispatch");
+        rejects([&]{ControllerRetirementBook missing(directory,source,self,rows);},"Missing established namespace or anchor cannot recreate permission");
+        if(remove_directory)check(!std::filesystem::exists(directory),"Missing-directory refusal cannot create a replacement authority");
+    }
+    for(const bool restore_book:{true,false}) {
+        const auto directory=root+(restore_book?"/stale-book":"/stale-anchor");
+        ControllerRetirementBook guarded(directory,source,self,rows);const auto before=guarded.read(incarnation,rows);
+        const auto image_path=restore_book?directory+"/authority.json":directory+".established";
+        std::ifstream old_image(image_path,std::ios::binary);const std::string old_bytes((std::istreambuf_iterator<char>(old_image)),{});old_image.close();
+        auto request=intent;request["assignment_id"]=before.at("assignments").at(0).at("assignment_id");request["expected_assignment_revision"]=before.at("assignments").at(0).at("assignment_revision");request["expected_retirement_generation"]=before.at("generation");
+        guarded.retire(request,before.at("revision"),incarnation,rows);
+        {std::ofstream restored(image_path,std::ios::binary);restored<<old_bytes;}
+        rejects([&]{(void)guarded.permits(device);},"Restoring either old authority image alone inhibits live permission");
+        rejects([&]{ControllerRetirementBook mismatched(directory,source,self,rows);},"A stale book or stale external anchor cannot recreate permission on restart");
+    }
+    std::filesystem::remove(root+"/book/authority.json");
+    rejects([&]{ControllerRetirementBook missing(root+"/book",source,self,rows);},"missing initialized history is not recreated");
+}
 int main(){
+    controller_retirement_records();
     {
         std::uint64_t controller=100000,transport=1000;
         const auto origin=wtp_fleet_observation_origin([&]{return controller;},[&]{
@@ -227,7 +313,7 @@ int main(){
         const auto full_ini=std::string(path)+"/full-runtime.ini";
         WtpFleetStore full_runtime(full_ini+".wtp-assignments.json",self);
         const auto preserved=full_runtime.update({},[&](Json& d){d=full.first;});
-        start_wtp_fleet(full_ini,self);
+        start_wtp_fleet_private_storage_for_test(full_ini,self,full_ini+".controller-retirements");
         const auto running_full=wtp_fleet_api("GET","","");
         check(running_full.status==200 && Json::parse(running_full.body).at("outputs").size()==32,"32 crash-retained contexts start");
         stop_wtp_fleet();
@@ -379,7 +465,7 @@ int main(){
           crash_saved.first.at("assignments").size()==1 &&
           crash_saved.first.at("assignments").at(0)==b,
           "crash fixture saves exactly one complete assignment in an array");
-    start_wtp_fleet(ini,self);
+    start_wtp_fleet_private_storage_for_test(ini,self,ini+".controller-retirements");
     const auto running=wtp_fleet_api("GET","","");
     check(running.status==200,"real fleet manager started");
     const auto output=Json::parse(running.body).at("outputs").at(std::string(32,'b'));

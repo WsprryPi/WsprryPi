@@ -12593,7 +12593,8 @@
             "pico-wspr",
             "pico-message",
             "pico-gray-line",
-            "stop"
+            "stop",
+            "migration"
           ]
         },
         "schema_id": {
@@ -12681,6 +12682,16 @@
             },
             "schema_id": {
               "const": "urn:wsprry:control:1:stop"
+            }
+          }
+        },
+        {
+          "properties": {
+            "resource": {
+              "const": "migration"
+            },
+            "schema_id": {
+              "const": "urn:wsprry:control:1:migration"
             }
           }
         }
@@ -15737,7 +15748,8 @@
           "enum": [
             "invalid",
             "unvalidated",
-            "storage_unavailable"
+            "storage_unavailable",
+            "initialization"
           ]
         }
       },
@@ -15829,6 +15841,441 @@
         "action"
       ],
       "additionalProperties": false
+    },
+    "migration-controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controller_id",
+        "assignment_id",
+        "assignment_revision"
+      ],
+      "properties": {
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        }
+      }
+    },
+    "migration-retirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controller_id",
+        "assignment_id",
+        "transition_id",
+        "retirement_generation",
+        "receipt_digest"
+      ],
+      "properties": {
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "retirement_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        }
+      }
+    },
+    "migration-job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controller_id",
+        "job_id",
+        "boot_id",
+        "state"
+      ],
+      "properties": {
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "job_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "accepted",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "target-migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "binding",
+        "capability_revision",
+        "operation_id",
+        "expected_revision",
+        "expected_authority_generation",
+        "controllers"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "target-migration"
+        },
+        "binding": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "capability_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "expected_authority_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "controllers": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/migration-controller"
+          }
+        }
+      }
+    },
+    "target-migration-rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "binding",
+        "capability_revision",
+        "operation_id",
+        "expected_revision",
+        "expected_authority_generation",
+        "resume_controller_id",
+        "resume_assignment_id"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "target-migration"
+        },
+        "binding": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "capability_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "expected_authority_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "resume_controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "resume_assignment_id": {
+          "$ref": "#/$defs/target-id"
+        }
+      }
+    },
+    "target-migration-read": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "binding",
+        "authority_generation",
+        "transition_id",
+        "state",
+        "controllers",
+        "retirements",
+        "jobs",
+        "staged_revision"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "target-migration"
+        },
+        "binding": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "authority_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "transition_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "unclassified",
+            "legacy",
+            "retiring",
+            "reconciling",
+            "staged",
+            "native",
+            "rollback",
+            "held"
+          ]
+        },
+        "controllers": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/migration-controller"
+          }
+        },
+        "retirements": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/migration-retirement"
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/migration-job"
+          }
+        },
+        "staged_revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "controller-retirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "controller_id",
+        "controller_incarnation",
+        "operation_id",
+        "transition_id",
+        "target_id",
+        "assignment_id",
+        "expected_assignment_revision",
+        "expected_retirement_generation"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "controller-retirement"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_incarnation": {
+          "$ref": "#/$defs/target-id"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "expected_retirement_generation": {
+          "$ref": "#/$defs/target-generation"
+        }
+      }
+    },
+    "controller-retirement-operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "controller_id",
+        "target_id",
+        "assignment_id",
+        "operation_id",
+        "transition_id",
+        "state",
+        "generation"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "controller-retirement-operation"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "state": {
+          "enum": [
+            "retiring",
+            "retired"
+          ]
+        },
+        "generation": {
+          "$ref": "#/$defs/target-generation"
+        }
+      }
+    },
+    "controller-retirement-entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "assignment_id",
+        "assignment_revision",
+        "state",
+        "receipt"
+      ],
+      "properties": {
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "legacy",
+            "retiring",
+            "retired",
+            "rollback",
+            "held"
+          ]
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/controller-retirement-operation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "controller-retirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "controller_id",
+        "controller_incarnation",
+        "generation",
+        "revision",
+        "assignments"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "controller-retirements"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_incarnation": {
+          "$ref": "#/$defs/target-id"
+        },
+        "generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "assignments": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/controller-retirement-entry"
+          }
+        }
+      }
     }
   },
   "management_routes": {
@@ -16530,7 +16977,13 @@
       "host-readiness",
       "configuration-recovery",
       "configuration-recovery-save",
-      "configuration-recovery-action"
+      "configuration-recovery-action",
+      "target-migration",
+      "target-migration-rollback",
+      "target-migration-read",
+      "controller-retirement",
+      "controller-retirement-operation",
+      "controller-retirements"
     ],
     "definitions": [
       "target-id",
@@ -16569,7 +17022,17 @@
       "host-readiness",
       "configuration-recovery",
       "configuration-recovery-save",
-      "configuration-recovery-action"
+      "configuration-recovery-action",
+      "migration-controller",
+      "migration-retirement",
+      "migration-job",
+      "target-migration",
+      "target-migration-rollback",
+      "target-migration-read",
+      "controller-retirement",
+      "controller-retirement-operation",
+      "controller-retirement-entry",
+      "controller-retirements"
     ],
     "browser_session": "host/management-session",
     "reconciliation_reads": {
@@ -16595,13 +17058,15 @@
     "host_routes": {
       "GET": [
         "host/readiness",
-        "host/configuration-recovery"
+        "host/configuration-recovery",
+        "host/retirements"
       ],
       "PUT": [
         "host/configuration-recovery"
       ],
       "POST": [
-        "host/configuration-recovery"
+        "host/configuration-recovery",
+        "host/retirements"
       ]
     }
   },

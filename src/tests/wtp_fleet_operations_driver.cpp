@@ -137,7 +137,7 @@ int main(int argc,char** argv) {
       const auto broken=ini+".broken";
       {std::ofstream file(broken+".wtp-assignments.json");file<<"{broken";}
       if(chmod((broken+".wtp-assignments.json").c_str(),0600)!=0)throw std::runtime_error("private corrupt fixture");
-      start_wtp_fleet(broken,std::string(32,'f'));
+      start_wtp_fleet_private_storage_for_test(broken,std::string(32,'f'),broken+".controller-retirements");
     }
     if(request.value("replace",false))start_wtp_fleet_for_test(ini,std::string(32,'f'),hooks);
     const auto result=wtp_fleet_api(request.value("method","GET"),request.value("body",""),request.value("etag",""),request.value("resource","operations"),request.value("ids",""));

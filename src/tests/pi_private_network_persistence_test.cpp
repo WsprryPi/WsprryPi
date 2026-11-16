@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "arg_parser.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "privileged_network_admin.hpp"
@@ -20,6 +21,7 @@ template<class F>void refuses(F action){bool denied=false;try{action();}catch(..
 void put(const std::string &path,const std::string &value){std::ofstream file(path);file<<value;file.close();check(bool(file)&&!chmod(path.c_str(),0600),"Private fixture file");}
 std::string bytes(const std::string &path){std::ifstream file(path);return {std::istreambuf_iterator<char>(file),{}};}
 void fixture(const std::string &ini){
+    testing::set_wtp_pi_private_state_path(ini+".ledger");
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
     config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";
@@ -54,7 +56,7 @@ int main(){
                 bytes(policy)=="previous Apache policy\n"&&owner.store().settings()["configuration_generation"]=="3"&&
                 owner.store().settings()["configuration"]==old["configuration"]&&owner.store().settings()["revision"]!=old["revision"],
                 "Failed reload restores exact private bytes through a second complete transaction without reviving an old revision");
-            PiManagedStore cold(ini,self,owner.catalog().pi_management_anchor(self,{}));cold.recover();
+            PiManagedStore cold(ini,self,owner.catalog().pi_management_anchor(self,{}));cold.bind_recurrence_storage(ini+".ledger.recurrence-"+self+"/authority.json",true);cold.recover();
             check(cold.settings()==owner.store().settings()&&active_privileged_network_mode()==PrivilegedNetworkMode::enforced,
                 "Cold recovery validates the complete rolled-back private policy generation");
         }else{
@@ -88,7 +90,7 @@ int main(){
                 stopped["scheduling"]==record["scheduling"]&&
                 read_privileged_network_ini_value(bytes(ini))==std::optional<std::string>("insecure-disabled"),
                 "Existing Stop joins the complete transaction without saving transient values or changing schedule enablement");
-            PiManagedStore cold(ini,self,owner.catalog().pi_management_anchor(self,{}));cold.recover();
+            PiManagedStore cold(ini,self,owner.catalog().pi_management_anchor(self,{}));cold.bind_recurrence_storage(ini+".ledger.recurrence-"+self+"/authority.json",true);cold.recover();
             check(cold.settings()==stopped,"Cold recovery agrees with the existing Stop save");
         }
     }

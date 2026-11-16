@@ -7,6 +7,8 @@
 #include "pi_managed_records.hpp"
 #include "scheduling.hpp"
 #include "runtime_config_bridge.hpp"
+#include "recurrence_admission.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include <charconv>
 #include <stdexcept>
 #include <filesystem>
@@ -36,8 +38,8 @@ struct PiManagedStartup::State {
          catalog(ini+".wtp-devices.json"),
          store(ini,self,anchor()){}
     PiManagementAnchor anchor(){
-        return {[this]{return catalog.pi_management_anchor(self,bootstrap_active).read();},
-            [this](const auto &history,const auto &commit){catalog.pi_management_anchor(self,bootstrap_active).coordinate(history,commit);}};
+        return {[this]{return catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).read();},
+            [this](const auto &history,const auto &commit){catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).coordinate(history,commit);}};
     }
     void source(const nlohmann::json &internal){
         require(internal.is_object()&&internal.contains("Meta")&&internal["Meta"].is_object()&&
@@ -81,6 +83,7 @@ PiManagedStartup::~PiManagedStartup(){
     iniFile.set_file_writer({});
     set_config_persistence_owner({},{},{});
     set_native_solar_snapshot_provider({});
+    set_legacy_recurrence_admission([]{return LegacyRecurrenceAdmission::Held;});
     // Teardown/failure is never permission to revert to an unguarded output
     // lane. A new explicitly prepared owner or process restart replaces this.
     set_wtp_pi_management_readiness([]{return false;});
@@ -148,7 +151,17 @@ void PiManagedStartup::prepare(){
             state->store.persist_private(internal,before,after);
         });
     // Recover committed images before the component or application reads INI.
+    state->store.validate_initial_source();
+    const auto recurrence=prepare_pi_recurrence_storage(state->self,state->ini);
+    state->store.bind_recurrence_storage(recurrence.path,true);
     state->store.recover();
+    state->store.prepare_installation(recurrence.prior_output_history);
+    set_legacy_recurrence_admission([state]{
+        if(!state->validated||(state->phase!=State::Phase::Bootstrapping&&state->phase!=State::Phase::Ready))return LegacyRecurrenceAdmission::Held;
+        const auto authority=state->store.recurrence_authority();
+        if(authority["state"]=="unclassified"||authority["state"]=="legacy"||authority["state"]=="rollback")return LegacyRecurrenceAdmission::Open;
+        return authority["state"]=="retiring"?LegacyRecurrenceAdmission::DrainAcceptedPair:LegacyRecurrenceAdmission::Held;
+    });
     state->phase=State::Phase::Bootstrapping;
     set_native_solar_snapshot_provider([state]{
         require(state->validated&&(state->phase==State::Phase::Bootstrapping||state->phase==State::Phase::Ready));

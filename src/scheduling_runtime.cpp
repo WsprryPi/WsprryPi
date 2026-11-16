@@ -993,6 +993,7 @@ bool wspr_loop()
                     {"test_tone", test_tone_status_json(tone_status)}}.dump());
             }
             wsprrypi::poll_wtp_pi_endpoint();
+            wsprrypi::poll_pi_managed_migration();
             if (ini_reload_pending.load(std::memory_order_acquire) &&
                 !web_test_tone.load() && !transmitter_reload_should_defer() &&
                 wtp_pi_begin_configuration())

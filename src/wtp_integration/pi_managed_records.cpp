@@ -34,6 +34,8 @@ std::string family(const std::string &self,const std::string &route){
     if(route==prefix+"enable")return "target-enable";
     if(route==prefix+"disable")return "target-action";
     if(route==prefix+"stop")return "target-stop";
+    if(route==prefix+"migration")return "target-migration";
+    if(route==prefix+"migration/rollback")return "target-migration-rollback";
     return {};
 }
 bool unresolved(const Json &entry){return entry["receipt"]["state"]=="pending"||entry["receipt"]["state"]=="unknown";}

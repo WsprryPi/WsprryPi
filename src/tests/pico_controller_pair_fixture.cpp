@@ -2,6 +2,7 @@
 // Actual controller HTTP/catalog/context/journal stack, no local output.
 // Only the OS identity and loopback transport admission are typed fixture seams.
 #include "controller_runtime.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "scheduling.hpp"
 #include "version.hpp"
 #include "web_server.hpp"
@@ -18,6 +19,7 @@ int main(int argc,char **argv) {
     if(argc<3)return 2;
     set_hardware_platform_detection_enabled(false);webServer.bind_loopback_for_test();
     const std::string credentials=argv[1];
+    wsprrypi::testing::set_wtp_pi_private_state_path(credentials+"/fixture-ledger");
     try {configure_controller_only(argc-1,argv+1);}catch(...){return 2;}
     wsprrypi::WtpCatalog catalog(config.ini_filename+".wtp-devices.json");
     auto controller=std::make_shared<wsprrypi::PicoTargetController>(catalog,[]{return std::optional<WtpSettings>{};},config.ini_filename+".management",std::string(32,'c'),

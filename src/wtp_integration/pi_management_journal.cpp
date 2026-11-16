@@ -3,6 +3,7 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <array>
+#include <algorithm>
 #include <cerrno>
 #include <filesystem>
 #include <fcntl.h>
@@ -84,7 +85,7 @@ PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::m
     std::set<std::string> unique;
     const auto storage=std::filesystem::weakly_canonical(directory_);
     for(auto &[kind,path]:destinations_){
-        require(kind=="ini"||kind=="settings"||kind=="operations"||kind=="authority"||kind=="progress"||kind=="pair");
+        require(kind=="ini"||kind=="settings"||kind=="operations"||kind=="authority"||kind=="recurrence"||kind=="retirement-anchor"||kind=="legacy"||kind=="progress"||kind=="pair");
         require(!path.empty());
         const auto owner_directory=std::filesystem::canonical(parent(path));
         struct stat owner{};
@@ -163,13 +164,19 @@ void PiManagementJournal::prepare(const std::vector<Image> &images,const std::op
     const auto previous=decision();require(previous==replace_rollback);
     if(previous){
         require(previous->at("state")=="prepared");validate_prepared_inputs(*previous);
-        require(previous->at("records").size()==images.size());
+        const bool add_recurrence=previous->at("records").size()+1==images.size()&&
+            std::none_of(previous->at("records").begin(),previous->at("records").end(),[](const auto &row){return row.at("kind")=="recurrence";});
+        require(previous->at("records").size()==images.size()||add_recurrence);
         for(const auto &image:images){
             bool found=false;
             for(const auto &row:previous->at("records"))if(row["kind"]==image.kind){
                 require(row["old_digest"]==(image.expected_old_digest?Json(*image.expected_old_digest):Json(nullptr)));found=true;
             }
-            require(found);
+            // The current schema may extend an exact retained first-write
+            // proof only by the newly introduced recurrence image. Its current
+            // absent/bootstrap bytes are independently checked below; no old
+            // row may change its original before-image.
+            require(found||(add_recurrence&&image.kind=="recurrence"));
         }
     }
     Json data{{"schema","pi-management-transaction/1"},{"transaction_id",fresh()},{"device_id",self_},{"state","prepared"},{"records",Json::array()}};

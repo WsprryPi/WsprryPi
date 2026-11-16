@@ -1,5 +1,6 @@
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
+#include "recurrence_admission.hpp"
 #include "config_handler.hpp"
 #include "arg_parser.hpp"
 #include "test_tone_response.hpp"
@@ -47,6 +48,7 @@ TestToneRequest request() {
     r.frequency_hz = 14097100; return r;
 }
 void setup(ModeType mode = ModeType::WSPR) {
+    wsprrypi::set_legacy_recurrence_admission({});
     set_test_tone_lifecycle_hook_for_test({});
     (void)stop_transmission_by_user_request(false);
     clear_wtp_pi_control_hooks();
@@ -145,6 +147,31 @@ void stop_and_stale_owners() {
     restore.release(); assert(done(ending).stopped); assert(done(stopping_end).transmit_disabled);
     assert(!config.transmit && !current_test_tone_status().owned);
     set_test_tone_lifecycle_hook_for_test({});
+}
+void retired_recurrence_preserves_manual_work() {
+    for(const auto mode:{ModeType::WSPR,ModeType::QRSS}) {
+        setup(mode);
+        wsprrypi::set_legacy_recurrence_admission([]{return wsprrypi::LegacyRecurrenceAdmission::Held;});
+        const auto tone=start_test_tone(request());assert(tone.started&&web_test_tone.load());
+        set_test_tone_lifecycle_hook_for_test([mode](std::string_view point){
+            // Model an independently permitted Transmit change after cleanup,
+            // when the restoration callback releases the configuration lock.
+            if(mode==ModeType::WSPR&&point=="before_restore")config.transmit=true;
+        });
+        const auto ended=end_test_tone();
+        set_test_tone_lifecycle_hook_for_test({});
+        assert(ended.stopped&&ended.output_inactive&&!ended.scheduler_restored&&!ended.restoration_failed);
+        assert(ended.message.find("recurring scheduling remains disabled")!=std::string::npos);
+        assert(!web_test_tone.load()&&!current_test_tone_status().owned);
+        assert(!wsprrypi::legacy_recurrence_admitted());
+    }
+    setup(ModeType::QRSS);
+    wsprrypi::set_legacy_recurrence_admission([]{return wsprrypi::LegacyRecurrenceAdmission::Held;});
+    auto once=config;once.use_ini=false;once.transmit=true;
+    assert(start_non_wspr_transmission_now_for_test(once));
+    assert(!wsprrypi::legacy_recurrence_admitted());
+    (void)stop_transmission_by_user_request(false);
+    wsprrypi::set_legacy_recurrence_admission({});
 }
 void restoration_failure_and_stop_fence() {
     setup();
@@ -361,7 +388,7 @@ public:
     }
 };
 int main() {
-    ordered_transactions(); stop_and_stale_owners(); restoration_failure_and_stop_fence(); events_reload_and_failure();
+    retired_recurrence_preserves_manual_work(); ordered_transactions(); stop_and_stale_owners(); restoration_failure_and_stop_fence(); events_reload_and_failure();
     TestToneLifecycleTest::run();
     set_test_tone_lifecycle_hook_for_test({});
     stop_runtime_components_for_test();

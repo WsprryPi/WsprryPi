@@ -39,6 +39,10 @@
 #ifndef _SCHEDULING_HPP
 #define _SCHEDULING_HPP
 
+// Parent lifecycle-lock observation; includes the interval between paired frames.
+bool legacy_recurrence_transition_idle() noexcept;
+bool legacy_recurrence_has_accepted_work() noexcept;
+
 // Project headers
 #include "config_types.hpp"
 #include "ppm_manager.hpp"

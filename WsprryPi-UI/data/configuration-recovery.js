@@ -66,8 +66,16 @@
             });
             return;
         }
-        const choice = variants.find(item => item.type === typeof actual) || variants.find(item => item.type === 'string') ||
+        let choice = variants.find(item => item.type === typeof actual) || variants.find(item => item.type === 'string') ||
             variants.find(item => ['integer','number','boolean'].includes(item.type)) || rule;
+        let labels = null;
+        if(client.current.validation === 'initialization') {
+            const options = section === 'Operation' && key === 'Transmit Backend'
+                ? {gpio:'Raspberry Pi GPIO','rp1-gpclk':'Raspberry Pi 5 GPIO (RP1)',si5351:'Si5351',wtp:'Remote output (WTP)'}
+                : section === 'Operation' && key === 'Mode' ? {WSPR:'WSPR',QRSS:'QRSS',FSKCW:'FSKCW',DFCW:'DFCW',TONE:'Tone'}
+                : section === 'WTP' && key === 'Transport' ? {network_plain:'Local network',usb:'USB'} : null;
+            if(options) {labels=options;choice={...choice,enum:Object.keys(options)};}
+        }
         const row = element('div','mb-3'), id = 'recovery-field-' + (++serial), label = element('label','form-label',key);
         label.htmlFor = id;row.append(label);parent.append(row);
         const original = savedHint(value);if(original) {original.id = id + '-saved';row.append(original);}
@@ -76,13 +84,13 @@
             input = element('select','form-select');
             const values = choice.enum || [true,false];
             const placeholder = element('option','',invalid || actual === undefined ? 'Choose a value' : 'Choose another value');placeholder.value = '';input.append(placeholder);
-            values.forEach((option,index) => {const item = element('option','',typeof option === 'boolean' ? option ? 'Yes' : 'No' : String(option));item.value = String(index);input.append(item);});
+            values.forEach((option,index) => {const item = element('option','',typeof option === 'boolean' ? option ? 'Yes' : 'No' : labels?.[option] || String(option));item.value = String(index);input.append(item);});
             input.value = values.findIndex(option => option === actual) < 0 ? '' : String(values.findIndex(option => option === actual));
             input.addEventListener('change',() => {if (input.value !== '') commit(values[Number(input.value)]);});
         } else {
             input = element('input','form-control');input.type = ['integer','number'].includes(choice.type) ? 'number' : 'text';
             if (input.type === 'number') {input.step = choice.type === 'integer' ? '1' : 'any';if (choice.minimum !== undefined) input.min = choice.minimum;if (choice.maximum !== undefined) input.max = choice.maximum;}
-            if (choice.maxLength) input.maxLength = choice.maxLength;
+        if (choice.maxLength) input.maxLength = choice.maxLength;
             input.value = actual !== undefined && ['string','number'].includes(typeof actual) ? String(actual) : '';
             if (invalid && typeof value.saved_text === 'string') {
                 try {const saved = JSON.parse(value.saved_text);if (['string','number'].includes(typeof saved)) input.value = String(saved);} catch (_) {}
@@ -109,11 +117,19 @@
         if(client.current.validation === 'storage_unavailable') {
             container.append(element('p','form-text','No verified saved settings are available. The saved history has been retained.'));return;
         }
-        for (const [section,values] of Object.entries(client.draft)) {
-            const group = element('details','py-3 border-bottom'), title = element('summary','h5 mb-0',section), fields = element('div','mt-3');
-            group.open = Object.values(values).some(unknown);group.append(title,fields);container.append(group);
+        const initializing = client.current.validation === 'initialization';
+        const sections = Object.entries(client.draft);
+        if(initializing) {
+            const order = ['WSPR','Operation'];
+            sections.sort(([left],[right]) => (order.includes(left) ? order.indexOf(left) : 2) - (order.includes(right) ? order.indexOf(right) : 2));
+        }
+        for (const [section,values] of sections) {
+            const titleText = initializing && section === 'WSPR' ? 'Station' : section;
+            const group = element('details','py-3 border-bottom'), title = element('summary','h5 mb-0',titleText), fields = element('div','mt-3');
+            group.open = initializing && ['WSPR','Operation'].includes(section) || Object.values(values).some(unknown);group.append(title,fields);container.append(group);
             for (const [key,value] of Object.entries(values)) {
                 if (section === 'WTP' && privateKeys.has(key)) continue;
+                if (client.current.validation === 'initialization' && section === 'Operation' && ['Transmit','Enable on Boot'].includes(key)) continue;
                 const rule = control.controllerPiConfigurationField(section,key);
                 if (!rule) throw new Error('unavailable_configuration_shape');
                 field(section,key,rule,value,fields,next => {client.set(section,key,next);buttons();});
@@ -173,16 +189,29 @@
     }
     function accept(value) {
         if (!control.validControllerDocument(value,'configuration-recovery')) return false;
+        const installing = value.validation === 'initialization';
         active = true;
         try {client.accept(value);} catch (_) {feedback('Saved settings changed. Your existing draft is retained.');}
         const notice = node('configurationRecoveryNotice');if (notice) notice.hidden = false;
         const panel = node('configurationRecoveryPanel');if (panel) panel.hidden = false;
         if(panel && notice?.querySelector('a')) notice.querySelector('a').setAttribute('href','#configurationRecoveryPanel');
+        if (installing) {
+            const link = notice?.querySelector('a');
+            const title = notice?.querySelector('h2');if(title) title.textContent = 'Initial setup required';
+            if (link) {link.textContent = 'Review initial settings';link.href = node('installationSetup') ? '#configurationRecoveryPanel' :
+                root.WSPRRYPI_PATHS?.basePath ? root.WSPRRYPI_PATHS.basePath + '/index.php?page=maintenance' : 'index.php?page=maintenance';}
+            if (panel && !node('installationSetup')) panel.hidden = true;
+            if (node('configurationRecoveryTitle')) node('configurationRecoveryTitle').textContent = 'Set up this transmitter';
+            if (node('configurationRecoveryExplanation')) node('configurationRecoveryExplanation').textContent = 'Review these initial settings, then save them. Nothing transmits during setup.';
+            if (node('configurationRecoveryStartupHint')) node('configurationRecoveryStartupHint').textContent = 'Setup saves transmission and scheduling disabled. Enabling a schedule is a separate step.';
+            for (const id of ['configurationRecoverySave','configurationRecoverySaveBottom']) if(node(id)) node(id).textContent = 'Save initial settings';
+            for (const id of ['configurationRecoveryRepair','configurationRecoveryRepairHint','configurationRecoveryResetSection']) if(node(id)) node(id).hidden = true;
+        }
         if (node('configPageTitle')) node('configPageTitle').textContent = 'Recover saved settings';
         if (node('configSaveStatusHint')) node('configSaveStatusHint').textContent = 'Reviewing settings does not save them. Recovery changes require Save.';
         if (node('configSaveStatus')) node('configSaveStatus').textContent = 'Unconfirmed draft';
         lockOrdinaryControls();
-        try {build();} catch (_) {blocked = true;feedback('The recovery editor is unavailable. Reload to verify the page before making changes.');}
+        try {if(!installing || node('installationSetup')) build();} catch (_) {blocked = true;feedback('The recovery editor is unavailable. Reload to verify the page before making changes.');}
         buttons();
         root.PicoFirmwareSafety?.render?.();
         if (!value.writable) {

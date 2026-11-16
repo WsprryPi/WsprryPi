@@ -19,14 +19,14 @@ def schema_digest(schema):
 def pi_resource_descriptors(schema):
     """Bind each Pi resource to the closed current types and approved policies.
 
-    The full controller definition closure deliberately invalidates all three
+    The full controller definition closure deliberately invalidates all Pi resource
     digests on any coordinated controller-schema change. Immutable policy-source
     revisions bind the incorporated value/authority semantics as well as shape.
     These are type identities, never resource permission advertisements on Pico.
     """
     definitions = {name:schema['$defs'][name] for name in schema['controller_adapter']['definitions']}
     result = {}
-    for resource, definition in [('pi-config','pi-config'), ('pi-scheduling','pi-scheduling'), ('stop','target-stop')]:
+    for resource, definition in [('pi-config','pi-config'), ('pi-scheduling','pi-scheduling'), ('stop','target-stop'), ('migration','target-migration')]:
         identity = 'urn:wsprry:control:1:' + resource
         document = {'$id':identity, '$ref':'#/$defs/'+definition, '$defs':definitions,
                     'policy_dependencies':schema['pi_management_policies']}
@@ -137,9 +137,9 @@ def validate(policy, schema, stable_release=False):
     reconciliation.update({'progress/update':'progress','progress/apply':'progress','udp-logging/test':'udp-logging','restart':'hostname','ap':'hostname'})
     if adapter['reconciliation_reads'] != reconciliation or any(value not in adapter['pico_routes']['GET'] for value in reconciliation.values()):
         raise ValueError('Controller reconciliation read contract differs')
-    if adapter['documents'] != ['targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-context', 'target-status', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action'] or adapter['definitions'] != ['target-id', 'target-digest', 'target-generation', 'target', 'target-binding', 'targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'pi-band-preferences', 'pi-wspr-list', 'pi-config', 'pi-solar-ordinary', 'pi-solar-gray', 'pi-scheduling', 'pi-candidate', 'target-observed-output', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-counter', 'target-capability', 'target-context', 'target-clock', 'target-status', 'pi-recovery-unavailable', 'pi-recovery-preserved', 'pi-recovery-path', 'pi-recovery-config', 'pi-recovery-candidate', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action']:
+    if adapter['documents'] != ['targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-context', 'target-status', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action', 'target-migration', 'target-migration-rollback', 'target-migration-read', 'controller-retirement', 'controller-retirement-operation', 'controller-retirements'] or adapter['definitions'] != ['target-id', 'target-digest', 'target-generation', 'target', 'target-binding', 'targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'pi-band-preferences', 'pi-wspr-list', 'pi-config', 'pi-solar-ordinary', 'pi-solar-gray', 'pi-scheduling', 'pi-candidate', 'target-observed-output', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-counter', 'target-capability', 'target-context', 'target-clock', 'target-status', 'pi-recovery-unavailable', 'pi-recovery-preserved', 'pi-recovery-path', 'pi-recovery-config', 'pi-recovery-candidate', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action', 'migration-controller', 'migration-retirement', 'migration-job', 'target-migration', 'target-migration-rollback', 'target-migration-read', 'controller-retirement', 'controller-retirement-operation', 'controller-retirement-entry', 'controller-retirements']:
         raise ValueError('Controller document registry differs')
-    if adapter['host_routes'] != {'GET': ['host/readiness', 'host/configuration-recovery'], 'PUT': ['host/configuration-recovery'], 'POST': ['host/configuration-recovery']}:
+    if adapter['host_routes'] != {'GET': ['host/readiness', 'host/configuration-recovery', 'host/retirements'], 'PUT': ['host/configuration-recovery'], 'POST': ['host/configuration-recovery', 'host/retirements']}:
         raise ValueError('Controller host recovery routes differ')
     if any(name not in schema['$defs'] for name in adapter['definitions']):
         raise ValueError('Missing controller document definition')

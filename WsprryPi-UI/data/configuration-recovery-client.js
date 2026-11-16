@@ -154,6 +154,36 @@
                     throw new RecoveryError('boot_changed');
                 return value;
             },
+            async retirements(body=null,revision=null) {
+                const method=body?'POST':'GET',headers={};
+                if(body){
+                    if(!control.validControllerDocument(body,'controller-retirement')||!/^"[0-9a-f]{64}"$/.test(revision||''))throw new RecoveryError('candidate_invalid');
+                    headers['Content-Type']='application/json';headers['X-WsprryPico-Request']='1';
+                    headers['X-WsprryPi-CSRF']=await session();headers['If-Match']=revision;
+                }
+                const response=await request(base+'/host/retirements',{method,headers,...(body?{body:JSON.stringify(body)}:{})});
+                try{return {data:await document(response,body?'controller-retirement-operation':'controller-retirements'),etag:response.headers.get('ETag'),status:response.status};}
+                catch(error){if(error.code==='csrf_failed')token='';throw error;}
+            },
+            // Current native-target migration only. Closed routes and families
+            // share the same bounded parser and protected browser session.
+            async targetRequest(device,resource,{method='GET',body=null} = {}) {
+                if(!/^[0-9a-f]{32}$/.test(device)) throw new RecoveryError('target_mismatch');
+                const read = {context:'target-context',settings:'target-settings',migration:'target-migration-read'};
+                const operation = /^operations\/[0-9a-f]{32}$/.test(resource);
+                const write = method === 'POST' && ['migration','migration/rollback'].includes(resource);
+                if(!(method === 'GET' && (own(read,resource) || operation)) && !write) throw new RecoveryError('unsupported_resource');
+                const family = write ? resource.endsWith('/rollback') ? 'target-migration-rollback' : 'target-migration' : operation ? 'target-operation' : read[resource];
+                const headers = {};
+                if(write) {
+                    if(!control.validControllerDocument(body,family) || body.binding.device_id !== device) throw new RecoveryError('candidate_invalid');
+                    headers['Content-Type']='application/json';headers['X-WsprryPico-Request']='1';
+                    headers['X-WsprryPi-CSRF']=await session();headers['If-Match']='"'+body.expected_revision+'"';
+                }
+                const response=await request(base+'/targets/'+device+'/'+resource,{method,headers,...(write?{body:JSON.stringify(body)}:{})});
+                try {return {data:await document(response,write?'target-operation':family),status:response.status,etag:response.headers.get('ETag')};}
+                catch(error) {if(error.code==='csrf_failed') token='';throw error;}
+            },
             set(section,key,value) {
                 if (!draft || !own(draft,section) || !own(draft[section],key) || section === 'WTP' && privateKeys.has(key))
                     throw new RecoveryError('read_only_field');

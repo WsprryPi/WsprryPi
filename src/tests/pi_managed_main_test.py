@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", required=True)
     parser.add_argument("--network-safety-off", action="store_true")
+    parser.add_argument("--initialization", action="store_true")
     args = parser.parse_args()
     executable = str(Path(args.fixture).resolve())
     with tempfile.TemporaryDirectory(prefix="pi-managed-main-") as temporary:
@@ -37,13 +38,17 @@ def main():
         source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1",
                               "TCP Port": "31417", "Device ID": "b" * 32})
         source["WTP Server"]["Enabled"] = "false"
-        source["CW"]["Fade Shape"] = "invalid"
+        source["CW"]["Fade Shape"] = "raised_cosine" if args.initialization else "invalid"
         port = free_port()
         source["Operation"]["Web Port"] = str(port)
         source["Operation"]["Socket Port"] = str(port + 1)
         with ini.open("w") as output:
             source.write(output)
         ini.chmod(0o600)
+        if args.initialization:
+            stock = Path(str(ini) + ".stock")
+            stock.write_bytes(ini.read_bytes())
+            stock.chmod(0o600)
         original = ini.read_bytes()
         command = [executable, str(ledger), "--backend", "simulated", "-i", str(ini),
                    "--socket-loopback-only", "--socket-loopback-family", "ipv4"]
@@ -68,8 +73,12 @@ def main():
                 status, body, headers = request(port, "GET", "/api/control/v1/host/configuration-recovery", with_headers=True)
                 assert status == 200
                 doc = json.loads(body)
+                assert (doc["validation"] == "initialization") == args.initialization
                 candidate = copy.deepcopy(doc["draft"])
                 candidate["CW"]["Fade Shape"] = "raised_cosine"
+                if args.initialization:
+                    candidate["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": 20})
+                    candidate["WTP Server"]["Enabled"] = False
                 for key in ("TLS CA File", "TLS Client Certificate", "TLS Client Key"):
                     candidate["WTP"][key] = ""
                 # Every other field must be an actual typed saved value;
@@ -90,6 +99,12 @@ def main():
                     "expected_revision": doc["revision"], "operation_id": "e" * 32, "configuration": candidate})
                 status, reply = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, context)
                 assert status == 200, reply
+                if args.initialization:
+                    record = json.loads((Path(str(ledger) + ".recurrence-" + doc["binding"]["device_id"]) / "authority.json").read_text())
+                    settings = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
+                    assert record["state"] == "staged" and record["clean_proof"]
+                    assert record["staged_revision"] == settings["revision"]
+                    assert settings["scheduling"]["enabled"] is False
                 deadline = time.monotonic() + 10
                 while True:
                     assert process.poll() is None, (root / "service.log").read_text()

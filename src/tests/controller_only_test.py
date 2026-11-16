@@ -75,6 +75,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", required=True)
     parser.add_argument("--production-main", action="store_true")
+    parser.add_argument("--private-state", action="store_true")
     arguments = parser.parse_args()
     fixture = str(Path(arguments.fixture).resolve())
     rejection_exit = 1 if arguments.production_main else 2
@@ -83,6 +84,7 @@ def main():
                               stderr=subprocess.DEVNULL).returncode
     with tempfile.TemporaryDirectory(prefix="wsprrypi-controller-") as temporary:
         directory = Path(temporary)
+        launcher = [fixture] + ([str(directory / "fixture-ledger")] if arguments.private_state else [])
         ini = directory / "controller.ini"
         # All local station, startup-transmit, endpoint, and GPIO intent must be
         # irrelevant to this role, without being rewritten or defaulted on disk.
@@ -93,18 +95,18 @@ def main():
                     "[Security]\nPrivileged Network Safety = enforced\n")
         ini.write_text(original)
         ini.chmod(0o600)
-        base = [fixture, "--controller-only", "-i", str(ini)]
+        base = launcher + ["--controller-only", "-i", str(ini)]
         # Every actual input read must reject unsafe file kinds/permissions;
         # no preflight check may reopen a different file through the parser.
         unsafe = directory / "unsafe.ini"
         unsafe.symlink_to(ini)
-        assert rejected([fixture, "--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
         unsafe.unlink();os.link(ini, unsafe)
-        assert rejected([fixture, "--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
         unsafe.unlink();os.mkfifo(unsafe, 0o600)
-        assert rejected([fixture, "--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
         unsafe.unlink();unsafe.write_bytes(b"x" * 1048577);unsafe.chmod(0o600)
-        assert rejected([fixture, "--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
         unsafe.unlink();ini.chmod(0o666)
         assert rejected(base) == rejection_exit
         ini.chmod(0o600)
@@ -115,7 +117,7 @@ def main():
                         ["--list-i2c-adapters"],
                         ["--web-port", "1234", "--socket-port", "1234"]):
             assert rejected(base + options) == rejection_exit, options
-        assert rejected([fixture, "--controller-only"]) == rejection_exit
+        assert rejected(launcher + ["--controller-only"]) == rejection_exit
         assert ini.read_text() == original
 
         # Invalid durable catalogs and journals inhibit admission before a listener
@@ -216,6 +218,16 @@ def main():
                 assert len(token) == 64
                 authorized = {**intent, "Cookie": cookie.split(";", 1)[0], "X-WsprryPi-CSRF": token}
                 assert request(port, "POST", target_path, '{}', {**authorized, "X-WsprryPi-CSRF": "0" * 64})[0] == 403
+                retirement_path = "/api/control/v1/host/retirements"
+                code, payload, retirement_revision = request(port, "GET", retirement_path, with_revision=True)
+                retirement = json.loads(payload)
+                assert code == 200 and retirement["contract"] == "Wsprry-Control/1" and retirement["schema"] == "controller-retirements"
+                assert retirement["assignments"] == [] and retirement_revision == '"' + retirement["revision"] + '"'
+                assert set(retirement) == {"contract", "schema", "controller_id", "controller_incarnation", "generation", "revision", "assignments"}
+                assert request(port, "POST", retirement_path, '{}', intent)[0] == 403
+                assert request(port, "POST", retirement_path, '{}', authorized)[0] == 400
+                assert request(port, "GET", retirement_path + "?proof=forged")[0] == 400
+                assert request(port, "GET", retirement_path, headers={"X-WsprryPi-Client-Address": "not-an-address"})[0] == 403
                 # A valid CSRF session grants no target identity or enrollment.
                 assert request(port, "POST", target_path, '{}', authorized)[0] == 400
                 assert request(port, "GET", "/api/control/v1/targets")[0] == 200

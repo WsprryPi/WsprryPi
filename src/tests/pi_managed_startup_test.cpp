@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "arg_parser.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
@@ -14,6 +15,8 @@
 #include <future>
 #include <thread>
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include "recurrence_authority.hpp"
 #include <unistd.h>
 using namespace wsprrypi;
 namespace {
@@ -22,6 +25,7 @@ template<class F>void refuses(F action){bool denied=false;try{action();}catch(..
 std::string bytes(const std::string &path){std::ifstream input(path,std::ios::binary);return {(std::istreambuf_iterator<char>(input)),{}};}
 void put(const std::string &path,const std::string &value){std::ofstream output(path,std::ios::binary);output<<value;output.close();check(bool(output)&&!chmod(path.c_str(),0600),"Owned fixture after-image");}
 void fixture(const std::string &ini){
+    testing::set_wtp_pi_private_state_path(ini+".ledger");
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
     config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";
@@ -317,6 +321,35 @@ int main(int argc,char **argv){
             "Endpoint teardown closes the durable owner before native hooks are cleared");
         refuses([&]{patch_all_from_web({{"CW",{{"Message","AFTER TEARDOWN"}}}});});
         check(bytes(stopped)==original&&get_public_config_snapshot()==snapshot,"A stopped owner cannot publish or persist another configuration");
+    }
+    // Abrupt process exit at every atomic-directory publication boundary. The
+    // reserved staging namespace remains bounded and is never mistaken for
+    // established authority. This exercises the actual production publisher.
+    for(const auto point:{OwnedStatePublicationPoint::PreparedDirectory,OwnedStatePublicationPoint::WrittenImage,
+        OwnedStatePublicationPoint::StagedImage,OwnedStatePublicationPoint::PublishedDirectory,OwnedStatePublicationPoint::SyncedDirectory}){
+        const auto filename=root+"/bootstrap-"+std::to_string(static_cast<int>(point))+".ini";fixture(filename);
+        const auto child=fork();check(child>=0,"Fork bootstrap crash fixture");
+        if(!child){
+            try{prepare_pi_recurrence_storage(self,filename,[&](auto stage){if(stage==point)_exit(73);});}
+            catch(...){_exit(74);}
+            _exit(75);
+        }
+        int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==73,"Production bootstrap reached selected crash boundary");
+        const auto storage=prepare_pi_recurrence_storage(self,filename);
+        check(std::filesystem::is_regular_file(storage.path)&&!std::filesystem::exists(std::filesystem::path(storage.path).parent_path().string()+".prepare"),
+            "Cold retry publishes one complete directory and consumes its bounded preparation");
+        const auto binding=PiManagementJournal::digest((std::filesystem::canonical(root)/std::filesystem::path(filename).filename()).string());
+        check(parse_recurrence_storage_record(bytes(storage.path),self,binding)["schema"]=="pi-recurrence-bootstrap/1","Published proof is current, closed, and bound to the physical source path");
+        const auto other=filename+".other";put(other,bytes(filename));const auto proof=bytes(storage.path);
+        {PiManagedStartup changed(other,self);refuses([&]{changed.prepare();});}
+        check(bytes(storage.path)==proof&&!std::filesystem::exists(other+".managed-settings.json"),"An alternate INI cannot consume another installation's bootstrap");
+        {PiManagedStartup owner(filename,self);owner.prepare();std::string error;check(load_json(filename,&error,nullptr),"Recovered installation validates normally");}
+        const auto authority=bytes(storage.path);
+        {PiManagedStartup changed(other,self);refuses([&]{changed.prepare();});}
+        check(bytes(storage.path)==authority,"Alternate source selection cannot replace established target authority");
+        check(!unlink(storage.path.c_str()),"Delete owned authority fixture");
+        {PiManagedStartup missing(other,self);refuses([&]{missing.prepare();});}
+        check(!std::filesystem::exists(storage.path),"Missing established device authority is held, never recreated through another filename");
     }
     check(!config.transmit,"No transmitter was enabled by the fixture");
     std::cout<<"PASS: pre-parse WAL recovery, initial semantic validation, selected-profile preservation, all legacy/stock writer gates, explicit readiness, refusal before persistence, external-file fences, and invalid-startup hold\n";

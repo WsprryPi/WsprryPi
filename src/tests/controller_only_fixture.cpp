@@ -3,6 +3,8 @@
 // Fleet storage, and shutdown paths. Only identity acquisition is injected;
 // production main still derives it from the machine ID.
 #include "../controller_runtime.hpp"
+#include "../wtp_endpoint/runtime.hpp"
+#include "../config_handler.hpp"
 #include "../scheduling.hpp"
 #include "../version.hpp"
 #include "../web_server.hpp"
@@ -21,6 +23,7 @@ int main(int argc, char *argv[]) {
     webServer.bind_loopback_for_test();
     try { configure_controller_only(argc, argv); }
     catch (const std::exception &) { return 2; }
+    wsprrypi::testing::set_wtp_pi_private_state_path(config.ini_filename+".fixture-ledger");
     std::signal(SIGTERM, stop);
     std::signal(SIGINT, stop);
     std::atomic_bool done{false};

@@ -173,3 +173,35 @@ normal lease, response replay or retained-job bounds.
 ## Selected Pico amplifier timing
 
 The selected Pico member hardware area places amplifier lead and tail beside pin settings. Each accepts 0–1000 whole milliseconds with 200 ms defaults. Read, explicitly save while idle/unowned, and restart the Pico to activate; saving never operates an output. The `amplifier-timing` resource belongs to `Wsprry-Control/1`; unrelated settings updates preserve it. Amplifier-enable GPIO and polarity are also editable in the selected member hardware plan, with independent pin validation and explicit restart activation. The Pi validates exact descriptor, carrier/profile, device/boot target, shape, range, revision and post-save readback before confirming success. Lead precedes scheduled RF and tail follows normal RF completion without changing waveform duration; faults bypass tail. Native Pi amplifier behavior is independent.
+
+## Installation and local scheduling authority
+
+Before managed transmitter admission, the application atomically establishes a
+private device-identity-owned recurrence record, independently of the INI name.
+A source-bound bootstrap record survives interrupted first initialization. It
+records this installation's pre-admission history; it does not attest that the
+physical hardware has never been used. The invoking OS user's fixed home and
+machine identity select storage; browser paths and HOME overrides do not.
+
+For a clean installation, **Maintenance → Set up this transmitter** exposes an
+unconfirmed draft. Only an explicit validated **Save initial settings** publishes
+it. Transmit, boot enable, and scheduling are disabled. Users manage no files,
+keys, certificates, or proof tokens. Updates and ordinary Reset retain history;
+missing/corrupt established history remains protected recovery. Full erasure
+cannot establish the retirement of unknown external controllers.
+
+An existing local recurrence is inventoried as legacy without bulk conversion.
+**Scheduling ownership → Review migration** binds the current device, boot,
+configuration revision, authority generation, and complete recorded controller
+set. The durable fence prevents new occurrences while accepted pairs drain. Lost
+responses use the original operation receipt and authoritative readback. A reboot
+does not infer completion: retained previous-boot work requires explicit current
+reconciliation. Staging saves scheduling disabled under the same transaction as
+authority and receipt. Native scheduling enablement remains unavailable.
+
+**Review previous schedule** restores only the recorded selected local legacy
+assignment after disabled/reconciled staging is verified. It retains tombstones
+and recovery evidence. The restored configuration may transmit under its saved
+settings. This local rollback grants no authority over an old remote controller.
+Existing fresh Plain-LAN WTP claims and Transmit-off availability retain their
+normal meanings; scheduling disable alone does not release output ownership.

@@ -46,7 +46,7 @@ int main(int argc,char **argv) {
             bool bounded=false;try{(void)wsprrypi::pi_configuration_recovery_draft(source,1);}catch(...){bounded=true;}
             if(!bounded)throw std::runtime_error("Unrepresentable recovery envelope must refuse");
         }
-        for(const auto *resource:{"pi-config","pi-scheduling","stop"}){
+        for(const auto *resource:{"pi-config","pi-scheduling","stop","migration"}){
             auto capability=nlohmann::json::parse(wsprrypi::pi_resource_descriptor(resource));
             capability.update({{"resource",resource},{"read",true},{"write",false},{"activation","unsupported"},{"maximum_bytes",32768}});
             if(!wsprrypi::valid_pi_resource_capability(capability))throw std::runtime_error("Current Pi descriptor refused");

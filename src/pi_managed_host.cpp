@@ -94,6 +94,7 @@ PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,bool au
     return management_.handle(request,authorized);
 }
 nlohmann::json PiManagedHost::target(){return management_.target();}
+void PiManagedHost::advance_migration() noexcept {if(state_.load()==PiHostReadiness::Ready)management_.advance_migration();}
 WtpCatalog &PiManagedHost::catalog(){return owner_.catalog();}
 const std::string &PiManagedHost::device_id() const noexcept{return owner_.device_id();}
 } // namespace wsprrypi

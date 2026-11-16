@@ -7,6 +7,7 @@
 #include "solar_configuration.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
+#include "wtp_endpoint/identity.hpp"
 #include <openssl/rand.h>
 #include <limits>
 #include <charconv>
@@ -26,6 +27,15 @@ bool writable(const PiManagementObservation &observation){
     return !state.remote.owner_id&&!state.remote.output_active&&!state.output_unknown&&!state.stop_reserved&&
         !state.revocation_unavailable&&!state.finishing_remote_job&&
         bool(observation.reserve_configuration)&&bool(observation.release_configuration);
+}
+bool migration_idle(const PiManagementObservation &state){
+    return writable(state)&&!state.authority.local_work_active&&!state.output.owner_id&&!state.output.job_id&&
+        legacy_recurrence_transition_idle();
+}
+PicoHttpResponse operation_document(const Json &receipt){
+    auto response=document(receipt,"target-operation",receipt["revision"].is_string()?receipt["revision"].get<std::string>():std::string{});
+    if(response.status==200&&receipt["state"]=="pending")response.status=202;
+    return response;
 }
 }
 PiLocalManagementService::PiLocalManagementService(PiManagedStore &store,std::string self,std::string name,Observe observe)
@@ -66,12 +76,16 @@ void PiLocalManagementService::refresh_epoch(){
 }
 Json PiLocalManagementService::capabilities(const PiManagementObservation &state) const {
     Json result=Json::array();
-    for(const auto *resource:{"pi-config","pi-scheduling","stop"}){
+    for(const auto *resource:{"pi-config","pi-scheduling","stop","migration"}){
         auto capability=Json::parse(pi_resource_descriptor(resource));
-        const bool config=std::string_view(resource)=="pi-config",stop=std::string_view(resource)=="stop";
+        const bool config=std::string_view(resource)=="pi-config",stop=std::string_view(resource)=="stop",migration=std::string_view(resource)=="migration";
         const bool cancellable=stop&&!state.authority.stop_reserved&&state.reserve_stop&&state.release_stop&&state.cancel_reserved_stop;
-        capability.update({{"resource",resource},{"read",!stop},{"write",((config||std::string_view(resource)=="pi-scheduling")&&writable(state))||cancellable},
-            {"activation",config?"next_occurrence":std::string_view(resource)=="pi-scheduling"?"stored_only":cancellable?"immediate":"unsupported"},{"maximum_bytes",stop&&!cancellable?0:32768}});
+        const auto authority=store_.recurrence_authority();
+        const bool migratable=migration&&writable(state)&&(authority["jobs"].empty()||authority["state"]=="retiring")&&
+            authority["controllers"].size()==1&&authority["controllers"][0]["controller_id"]==self_&&
+            (authority["state"]=="legacy"||authority["state"]=="rollback"||authority["state"]=="staged"||authority["state"]=="retiring");
+        capability.update({{"resource",resource},{"read",!stop},{"write",((config||std::string_view(resource)=="pi-scheduling")&&writable(state))||cancellable||migratable},
+            {"activation",config?"next_occurrence":std::string_view(resource)=="pi-scheduling"?"stored_only":cancellable||migratable?"immediate":"unsupported"},{"maximum_bytes",stop&&!cancellable?0:32768}});
         if(!valid_pi_resource_capability(capability))throw std::logic_error("Pi descriptor mismatch");
         result.push_back(std::move(capability));
     }
@@ -114,33 +128,75 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
                 {"binding",bound},{"capability_revision",capability_revision},{"capabilities",caps},{"configuration_revision",revision}},"target-context");
         if(request.method=="GET"&&resource=="settings")
             return document(settings_document(saved),"target-settings",revision);
+        if(request.method=="GET"&&resource=="migration"){
+            const auto authority=store_.recurrence_authority();
+            return document({{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",bound},
+                {"authority_generation",authority["generation"]},{"transition_id",authority["transition_id"]},{"state",authority["state"]},
+                {"controllers",authority["controllers"]},{"retirements",authority["retirements"]},{"jobs",authority["jobs"]},
+                {"staged_revision",authority["staged_revision"]}},"target-migration-read",revision);
+        }
         if(request.method=="GET"&&resource=="status")
             return document({{"contract","Wsprry-Control/1"},{"schema","target-status"},{"binding",bound},{"revision",revision},
                 {"active_revision",nullptr},{"observed_output",output(*state)},{"observation_age_ms",0},
                 {"schedule_enabled",saved["scheduling"]["enabled"]},{"solar_enabled",saved["scheduling"]["solar"]["enabled"]},
                 {"transmit_effective",state->authority.effective_local_enable&&!state->authority.stop_reserved},{"execution_owner",self_},
                 {"destination_id",state->destination_id?Json(*state->destination_id):Json(nullptr)},
-                {"authority_state","unclassified"},{"phase","unknown"},{"waiting_reason","authority"},
+                {"authority_state",store_.recurrence_authority()["state"]},{"phase","unknown"},{"waiting_reason","authority"},
                 {"clock",{{"state","unknown"},{"uncertainty_ns",nullptr},{"holdover_age_ns",nullptr},{"generation","0"}}},
                 {"selection","unknown"},{"selected_frequencies_hz",Json::array()},{"next_start_utc_ns",nullptr},
                 {"forecast","unknown"},{"prolonged_window",nullptr}},"target-status",revision);
         const bool stopping=resource=="stop"&&request.method=="POST";
-        if(!stopping&&(resource!="settings"||request.method!="PUT"))return refuse(404,"unsupported_resource");
+        const bool rollback=resource=="migration/rollback"&&request.method=="POST";
+        const bool migration=rollback||(resource=="migration"&&request.method=="POST");
+        if(!stopping&&!migration&&(resource!="settings"||request.method!="PUT"))return refuse(404,"unsupported_resource");
         Json body;
         try{body=strict_browser_json(request.body,16);}catch(...){return refuse(400,"invalid_json");}
-        if(!valid_controller_document(body,stopping?"target-stop":"target-save"))return refuse(400,"invalid_shape");
+        if(!valid_controller_document(body,migration?(rollback?"target-migration-rollback":"target-migration"):stopping?"target-stop":"target-save"))return refuse(400,"invalid_shape");
         if(body["binding"]["device_id"]!=self_)return refuse(409,"target_mismatch");
-        if(body["binding"]["boot_id"]!=bound["boot_id"])return refuse(409,"boot_changed");
-        if(body["binding"]["profile_generation"]!=bound["profile_generation"])return refuse(409,"profile_changed");
-        if(body["binding"]["connection_generation"]!=bound["connection_generation"])return refuse(409,"connection_changed");
         if(request.revision.empty())return refuse(428,"revision_required");
         if(request.revision!="\""+body["expected_revision"].get<std::string>()+"\"")return refuse(412,"revision_conflict");
         const PiManagedStore::Operation operation{self_,"1",request.path,body};
-        if(const auto replay=store_.replay(operation))return document(*replay,"target-operation",(*replay)["revision"]);
+        // Exact retained replies grant no new mutation. The accepted write may
+        // itself retire the connection context through bounded receipt eviction.
+        // Absent/reused operations still require all current bindings below.
+        if(const auto replay=store_.replay(operation))return operation_document(*replay);
+        if(body["binding"]["boot_id"]!=bound["boot_id"])return refuse(409,"boot_changed");
+        if(body["binding"]["profile_generation"]!=bound["profile_generation"])return refuse(409,"profile_changed");
+        if(body["binding"]["connection_generation"]!=bound["connection_generation"])return refuse(409,"connection_changed");
         // A successful Stop can itself change writable capabilities by ending
         // remote ownership. Exact historical replies grant no new mutation.
         if(body["capability_revision"]!=capability_revision)return refuse(409,"capability_changed");
         if(body["expected_revision"]!=revision)return refuse(412,"revision_conflict");
+        if(migration){
+            const auto authority=store_.recurrence_authority();
+            if(body["expected_authority_generation"]!=authority["generation"])return refuse(412,"revision_conflict");
+            const bool draining=!rollback&&authority["state"]!="retiring"&&writable(*state)&&legacy_recurrence_has_accepted_work();
+            if((!migration_idle(*state)&&!draining)||(!authority["jobs"].empty()&&authority["state"]!="retiring"))return refuse(409,"authority_pending");
+            if(authority["controllers"].size()!=1||authority["controllers"][0]["controller_id"]!=self_)return refuse(409,"authority_pending");
+            if(!rollback&&body["controllers"]!=authority["controllers"])return refuse(409,"authority_pending");
+            if(rollback&&(body["resume_controller_id"]!=self_||body["resume_assignment_id"]!=authority["controllers"][0]["assignment_id"]))return refuse(409,"authority_pending");
+            if((rollback&&authority["state"]!="staged")||(!rollback&&authority["state"]!="legacy"&&authority["state"]!="rollback"&&authority["state"]!="retiring"))return refuse(409,"authority_pending");
+            if(!state->reserve_configuration())return refuse(409,"authority_pending");
+            struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
+            const auto current=observe();if(!current||binding(*current)!=bound||
+                (!migration_idle(*current)&&!(draining&&writable(*current)&&legacy_recurrence_has_accepted_work())))return refuse(409,"authority_pending");
+            if(!rollback){
+                std::optional<Json> job;
+                if(!migration_idle(*current))job=Json{{"controller_id",self_},{"job_id",current->output.job_id.value_or(WtpPiBootIdentity{}.new_boot_id())},
+                    {"boot_id",bound["boot_id"]},{"state","accepted"}};
+                store_.persist_migration(jConfig,[]{},operation,false,job);
+                const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
+                return operation_document(*receipt);
+            }
+            const auto candidate=rollback?store_.rollback_configuration():saved["configuration"];
+            const auto legacy=get_public_config_snapshot();configuration.unlock();tone.unlock();
+            patch_config_with_persistence_coordinator(candidate,legacy.second,[&](const auto &internal,const auto &writer){
+                if(!legacy_recurrence_transition_idle())throw std::runtime_error("authority_pending");
+                store_.persist_migration(internal,writer,operation,rollback);
+            });
+            const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
+            return document(*receipt,"target-operation",(*receipt)["revision"]);
+        }
         if(stopping){
             if(!state->reserve_stop||!state->release_stop||!state->cancel_reserved_stop)return refuse(409,"unsupported_resource");
             if(body["observed_output"]!=output(*state))return refuse(409,"output_changed");
@@ -215,5 +271,22 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         if(std::string(error.what())=="request_id_reuse")return refuse(409,"request_id_reuse");
         return refuse(503,"storage_unavailable");
     }
+}
+void PiLocalManagementService::advance_migration() noexcept {
+    try{
+        if(!store_.migration_pending())return;
+        std::unique_lock operation(mutex_,std::try_to_lock);if(!operation.owns_lock())return;
+        std::unique_lock tone(test_tone_lifecycle_mutex(),std::try_to_lock);if(!tone.owns_lock())return;
+        std::unique_lock configuration(config_update_mutex(),std::try_to_lock);if(!configuration.owns_lock())return;
+        const auto authority=store_.recurrence_authority();if(authority["state"]!="retiring")return;
+        const auto state=observe();if(!state||!migration_idle(*state))return;
+        // A reboot cannot manufacture the outcome of an earlier accepted job.
+        // It needs explicit, current-bound reconciliation through POST instead.
+        for(const auto &job:authority["jobs"])if(job["boot_id"]!=binding(*state)["boot_id"])return;
+        if(!state->reserve_configuration())return;
+        struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
+        const auto current=observe();if(!current||binding(*current)!=binding(*state)||!migration_idle(*current))return;
+        store_.complete_migration();
+    }catch(...){}
 }
 } // namespace wsprrypi

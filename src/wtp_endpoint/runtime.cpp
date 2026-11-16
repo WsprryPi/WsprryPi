@@ -12,6 +12,8 @@
 #include "WTP-Server/include/wtp_server/inhibited_rf_engine.hpp"
 #include "wtp_pi_control.hpp"
 #include "wtp_managed_output.hpp"
+#include "recurrence_authority.hpp"
+#include "wtp_integration/pi_management_journal.hpp"
 
 #include "json.hpp"
 #include "logging.hpp"
@@ -29,6 +31,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <tuple>
+#include <filesystem>
 
 #include "backend_capabilities.hpp"
 #include "wtp_endpoint/capabilities.hpp"
@@ -354,6 +357,40 @@ auto output_settings(const ArgParserConfig& s) {
         s.allow_non_amateur_frequency};
 }
 } // namespace
+
+bool wtp_pi_has_prior_output_history() noexcept {
+    try{
+        std::lock_guard lifecycle(lifecycle_mutex);
+        std::string path=fixture_private_state_path;
+        if(path.empty()){
+            const auto owner=getpwuid(geteuid());if(!owner||!owner->pw_dir||!*owner->pw_dir)return true;
+            path=std::string(owner->pw_dir)+"/.wsprrypi-wtp";
+        }
+        struct stat info{};if(!::lstat(path.c_str(),&info))return true;
+        return errno!=ENOENT;
+    }catch(...){return true;}
+}
+std::string private_device_state_directory(PrivateDeviceDomain domain,const std::string &device){
+    if(device.size()!=32||device.find_first_not_of("0123456789abcdef")!=std::string::npos)
+        throw std::runtime_error("private_device_identity_unavailable");
+    std::lock_guard lifecycle(lifecycle_mutex);
+    const std::string label=domain==PrivateDeviceDomain::Recurrence?"recurrence":"controller-retirements";
+    if(!fixture_private_state_path.empty())return fixture_private_state_path+"."+label+"-"+device;
+    const auto owner=getpwuid(geteuid());
+    if(!owner||!owner->pw_dir||!*owner->pw_dir)throw std::runtime_error("private_device_owner_unavailable");
+    return std::string(owner->pw_dir)+"/.wsprrypi-"+label+"-"+device;
+}
+PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device,const std::string &ini,
+    const std::function<void(OwnedStatePublicationPoint)> &checkpoint){
+    const bool prior=wtp_pi_has_prior_output_history();
+    const auto parent=std::filesystem::canonical(std::filesystem::path(ini).has_parent_path()?std::filesystem::path(ini).parent_path():".");
+    const auto binding=PiManagementJournal::digest((parent/std::filesystem::path(ini).filename()).string());
+    const auto storage=prepare_owned_state_directory(private_device_state_directory(PrivateDeviceDomain::Recurrence,device),
+        [&]{return recurrence_bootstrap_record(device,binding,WtpPiBootIdentity{}.new_boot_id()).dump();},
+        [&](const auto &bytes){if(parse_recurrence_storage_record(bytes,device,binding)["schema"]!="pi-recurrence-bootstrap/1")
+            throw std::runtime_error("recurrence_storage_hold");},checkpoint);
+    return {storage.file,storage.existed,prior};
+}
 
 bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) {
     std::lock_guard lifecycle(lifecycle_mutex);

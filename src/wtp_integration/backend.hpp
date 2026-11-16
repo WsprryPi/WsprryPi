@@ -33,6 +33,8 @@ public:
 struct WtpDispatchPermit {
   std::mutex mutex;
   bool allowed{true};
+  bool retiring{};
+  std::optional<std::string> loaded_job;
   void revoke() { std::lock_guard lock(mutex); allowed=false; }
 };
 // Explicit developer construction, not a production factory registration.

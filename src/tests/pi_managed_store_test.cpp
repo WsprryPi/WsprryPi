@@ -276,6 +276,38 @@ int main(int argc,char **argv){
   put(future+".managed-settings.json",canonical_pi_management_json(future_record));
   PiManagedStore cold_future(future,self,future_catalog.pi_management_anchor(self,{}));refuses([&]{cold_future.recover();});
   check(!cold_future.initialized()&&bytes(future)==original_ini,"File activation refuses before parser, repair or output admission");
+  // A first installation records its boundary before a protected setup save.
+  // Test both a missing INI and the untouched template installed by the normal
+  // installer. Neither is a claim about the hardware's earlier lifetime.
+  for(const auto *kind:{"absent","stock"}){
+      const auto initial=root+"/installation-"+kind+".ini";
+      auto internal=jConfig;internal["Meta"]["INI Filename"]=initial;
+      internal["Operation"]["Transmit"]=false;internal["Operation"]["Enable on Boot"]="Never";
+      if(std::string(kind)=="stock"){
+          const auto stock=serialize_config_ini_projection_for_management(internal);
+          put(initial,stock);put(initial+".stock",stock);
+      }
+      WtpCatalog catalog(initial+".wtp-devices.json");PiManagedStore first(initial,self,catalog.pi_management_anchor(self,{}));
+      first.recover();first.prepare_installation();check(first.installation_pending(),"Explicit startup establishes pending installation before use");
+      refuses([&]{first.settings();});refuses([&]{first.initialize(internal);});
+      const auto record=bytes(initial+".recurrence-authority.json");
+      PiManagedStore cold(initial,self,catalog.pi_management_anchor(self,{}));cold.recover();cold.prepare_installation();
+      check(cold.installation_pending()&&bytes(initial+".recurrence-authority.json")==record,"Restart retains original installation identity without enabling output");
+      auto setup=recovery_operation;setup.request["expected_revision"]=cold.recovery_revision();setup.request["operation_id"]=std::string(32,'7');
+      setup.request["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
+      for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})setup.request["configuration"]["WTP"][key]="";
+      auto enabled=internal;enabled["Operation"]["Transmit"]=true;
+      refuses([&]{cold.persist_recovery(enabled,[]{},setup);});
+      check(cold.installation_pending()&&bytes(initial+".recurrence-authority.json")==record,"An initial enable refuses before any final mutation");
+      cold.persist_recovery(internal,[]{},setup);
+      check(!cold.installation_pending()&&cold.settings()["scheduling"]["enabled"]==false&&
+          cold.recurrence_authority()["state"]=="staged"&&cold.recurrence_authority()["staged_revision"]==cold.settings()["revision"]&&
+          cold.replay(setup).has_value(),"Setup atomically stages disabled settings, authority and receipt");
+      PiManagedStore restarted(initial,self,catalog.pi_management_anchor(self,{}));restarted.recover();
+      check(restarted.replay(setup)==cold.replay(setup)&&restarted.recurrence_authority()==cold.recurrence_authority(),"Cold readback retains exact setup receipt and authority");
+      check(!unlink((initial+".recurrence-authority.json").c_str()),"Delete authority fixture");
+      PiManagedStore missing(initial,self,catalog.pi_management_anchor(self,{}));refuses([&]{missing.recover();});
+  }
   check(!config.transmit,"No output admitted");
   std::cout<<"PASS: explicit Pi store initialization, legacy/native transaction parity, revision ABA, exact replay, authorization isolation, held uncertainty, restart recovery, and external replacement/deletion refusal without output\n";
  }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}

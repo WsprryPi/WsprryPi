@@ -9,6 +9,7 @@ namespace wsprrypi {
 std::optional<std::string> pi_managed_ini_argument(int argc,char *argv[]);
 std::shared_ptr<PiManagedHost> prepare_pi_managed_host(const std::string &ini);
 std::shared_ptr<PiManagedHost> pi_managed_host();
+void poll_pi_managed_migration() noexcept;
 bool pi_managed_host_selected();
 // These exact native-host routes always require enforced network admission,
 // independently of the saved policy used by other management resources.

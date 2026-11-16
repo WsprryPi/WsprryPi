@@ -15,6 +15,7 @@ public:
     using Observe=std::function<std::optional<PiManagementObservation>()>;
     PiLocalManagementService(PiManagedStore &,std::string self,std::string name,Observe);
     PicoHttpResponse handle(const BrowserRequest &,bool authorized_local);
+    void advance_migration() noexcept;
     nlohmann::json target();
 private:
     nlohmann::json capabilities(const PiManagementObservation &) const;

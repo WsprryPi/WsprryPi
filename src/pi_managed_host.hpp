@@ -25,6 +25,7 @@ public:
     PiHostReadiness state();
     PicoHttpResponse recovery(const BrowserRequest &,bool authorized);
     PicoHttpResponse management(const BrowserRequest &,bool authorized);
+    void advance_migration() noexcept;
     nlohmann::json target();
     WtpCatalog &catalog();
     const std::string &device_id() const noexcept;

@@ -16,6 +16,7 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <semaphore>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -147,12 +148,14 @@ int main(){
  for(unsigned i=0;i<32;++i){auto id=std::string(30,'0')+"0123456789abcdef"[i/16]+"0123456789abcdef"[i%16];auto peer=std::make_shared<Peer>(id,i%2!=0);peers.emplace(id,peer);ordered.push_back(std::move(peer));}
  std::mutex streams_mutex;std::vector<std::shared_ptr<MemoryStream>> streams;
  std::mutex storage_mutex;std::condition_variable storage_cv;bool block_storage=false,storage_entered=false;
+ std::atomic_bool block_retirement{false},retirement_entered{false};
  std::mutex host_mutex;std::condition_variable host_cv;bool block_host=false,host_entered=false;
  std::atomic<std::uint64_t> policy_offset{0};
  std::atomic_bool fail_deleted_publication{false};
  std::atomic_bool invalid_assignment_host{false};
  std::mutex exit_mutex;std::condition_variable exit_cv;bool block_exit=false,exit_entered=false;
  WtpFleetTestHooks hooks;
+ hooks.before_retirement_persist=[&]{retirement_entered=true;while(block_retirement)std::this_thread::sleep_for(std::chrono::milliseconds(1));};
  hooks.monotonic_now=[&]{return WtpSteadyClock{}.now_ms()+policy_offset.load();};
  hooks.before_persist=[&]{std::unique_lock lock(storage_mutex);if(block_storage){storage_entered=true;storage_cv.notify_all();storage_cv.wait(lock,[&]{return !block_storage;});}};
  hooks.after_persist=[&]{
@@ -183,20 +186,32 @@ int main(){
   return status;
  };
  struct Cleanup{std::string path;~Cleanup(){stop_wtp_fleet();std::filesystem::remove_all(path);}}cleanup{path};
+ hooks.retirement_directory=std::string(path)+"/empty-installation-retirements";
  start_wtp_fleet_for_test(ini,self,hooks);check(snapshot().at("maximum_outputs")==32,"advertised capacity is 32");
  Json schedule={{"mode","tone"},{"frequency_hz",14097100},{"duration_ms",1000},{"period_seconds",60},{"phase_seconds",0}};
  {
   WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=ordered[0]->id;
   invalid_assignment_host=true;
   const auto invalid=command({{"operation","assign"},{"name","Malformed Pi probe"},{"settings",wtp_settings_json(settings)},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",31415}});
-  check(invalid.status==409,"malformed initial Pi host observation refuses assignment");
+  check(invalid.status==409&&invalid_assignment_host,"New legacy assignment refuses before host inspection");
   await([&]{return !snapshot().at("outputs").contains(ordered[0]->id);},"refused new assignment releases its temporary context");
   check(snapshot().at("storage_error")=="","malformed host observation cannot poison unrelated Fleet journal health");
   WtpFleetJournal journal(ini+".wtp-fleet-contexts.json",self);
   check(journal.snapshot().at("contexts").empty(),"refused uncreated assignment cannot leave frozen retirement authority");
  }
- for(const auto& peer:ordered){WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=peer->id;settings.allow_frequency_adjustment=true;
-  succeeds({{"operation","assign"},{"name","Output "+peer->id},{"settings",wtp_settings_json(settings)},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",31415}});}
+ // Seed actual supported legacy v1 rows before starting their production
+ // owners. This does not bypass the new-assignment refusal through a test hook.
+ stop_wtp_fleet();invalid_assignment_host=false;
+ hooks.retirement_directory=std::string(path)+"/legacy-installation-retirements";
+ WtpFleetStore existing(ini+".wtp-assignments.json",self);
+ existing.update({},[&](Json &data){for(const auto& peer:ordered){
+  WtpSettings settings;settings.transport="network_plain";settings.hostname="127.0.0.1";settings.tcp_port=31417;settings.device_id=peer->id;settings.allow_frequency_adjustment=true;
+  data["assignments"].push_back({{"device_id",peer->id},{"name","Output "+peer->id},{"settings",wtp_settings_json(settings)},
+      {"schedule",schedule},{"enabled",false},{"product",peer->product},{"management_port",31415},
+      {"revocation_generation",peer->product=="WsprryPi"?peer->revocation()["revocation_generation"]:Json(nullptr)},
+      {"last_start_ns","0"},{"in_flight",false}});
+ }});
+ start_wtp_fleet_for_test(ini,self,hooks);
  // A no-op Pause must revoke an accepted Enable even though its ETag has
  // not changed. Admission and immutable GET remain responsive during fsync.
  await([]{return snapshot().at("outputs").begin().value().value("can_resume",false);},"first output ready");
@@ -213,15 +228,23 @@ int main(){
  PicoHttpResponse pausing;
  {
   httplib::Server http;http.new_task_queue=[] {return new httplib::ThreadPool(4);};
+  http.set_logger([](const auto &,const auto &response){if(response.status!=200&&response.status!=202)
+      std::cerr<<"Fixture HTTP refusal: "<<response.status<<" "<<response.body<<'\n';});
   web_server_routes::register_control(http,[](auto&){});
   const auto port=http.bind_to_any_port("127.0.0.1");check(port>0,"private HTTP fixture bound");
   std::thread listener([&]{http.listen_after_bind();});
   struct HttpCleanup {httplib::Server& server;std::thread& listener;~HttpCleanup(){server.stop();if(listener.joinable())listener.join();}} http_cleanup{http,listener};
+  await([&]{return http.is_running();},"HTTP fixture entered its listening lifecycle");
+  // Saturate every HTTP worker, while bounding new TCP handshakes separately
+  // from the 24 logical reads. The server's listen backlog is five; overflowing
+  // that OS queue tests SYN admission rather than cached-handler responsiveness.
+  std::counting_semaphore<4> connections(4);
   std::vector<std::future<void>> reads;
   for(unsigned n=0;n<24;++n)reads.push_back(std::async(std::launch::async,[&,n]{
+   connections.acquire();struct ConnectionSlot{std::counting_semaphore<4> &gate;~ConnectionSlot(){gate.release();}} slot{connections};
    httplib::Client browser("127.0.0.1",port);browser.set_read_timeout(2,0);
    const auto result=browser.Get(n%2?"/api/control/v1/host/fleet/operations":"/api/control/v1/host/fleet");
-   check(result && result->status==200,"real HTTP cached reads cannot wait for fsync or transport");
+   check(result && result->status==200,"real HTTP cached reads cannot wait for fsync or transport: "+(result?std::to_string(result->status)+" "+result->body:httplib::to_string(result.error())));
    check(Json::parse(result->body).at("outputs").size()==32,"HTTP projection retains all contexts");
   }));
   auto request=original.at("request");request["operation"]="pause";request["action_id"]=wtp_random_identity();
@@ -229,7 +252,8 @@ int main(){
   httplib::Client browser("127.0.0.1",port);browser.set_read_timeout(2,0);
   const auto result=browser.Post("/api/control/v1/host/fleet",{{"Origin","http://127.0.0.1:"+std::to_string(port)},
    {"X-WsprryPico-Request","1"},{"If-Match",original.at("etag").get<std::string>()}},request.dump(),"application/json");
-  check(result && result->status==202,"real HTTP priority Pause bypasses a blocked owner");
+  check(result && result->status==202,"real HTTP priority Pause bypasses a blocked owner: "+
+      (result?std::to_string(result->status)+" "+result->body:httplib::to_string(result.error())));
   pausing={static_cast<unsigned>(result->status),result->body,result->get_header_value("ETag")};
   for(auto& read:reads)read.get();
  }
@@ -319,7 +343,7 @@ int main(){
  const auto full=wtp_fleet_api("GET","","");
  auto extra=Json{{"operation","assign"},{"name","33rd"},{"settings",snapshot().at("assignments")[0].at("settings")},{"schedule",schedule},{"enabled",false},{"consent_plain",true},{"management_port",1}};
  extra["settings"]["Device ID"]=std::string(32,'e');
- const auto refused=command(extra);check(refused.status==409 && refused.body.find("at most 32")!=std::string::npos,"33rd refused before unknown peer factory");check(wtp_fleet_api("GET","","").etag==full.etag,"33rd preserves persistent revision");
+ const auto refused=command(extra);check(refused.status==409 && refused.body.find("target-owned scheduling")!=std::string::npos,"33rd refused before unknown peer factory");check(wtp_fleet_api("GET","","").etag==full.etag,"33rd preserves persistent revision");
  stop_wtp_fleet();start_wtp_fleet_for_test(ini,self,hooks);check(snapshot().at("assignments").size()==32,"32 assignments reload");
  auto all_armed=[&](unsigned count){for(unsigned i=0;i<count;++i){const auto& peer=*ordered[i];if(!peer.clock.at_barrier() || peer.authority.snapshot().remote.state!=server::State::Armed)return false;}return true;};
  auto all_complete=[&](unsigned first,unsigned end){const auto state=snapshot();for(unsigned i=first;i<end;++i){const auto& wtp=state.at("outputs").at(ordered[i]->id).at("wtp");if(!wtp.contains("last_report") || wtp.at("last_report").is_null() || wtp.at("last_report").at("outcome")!="complete")return false;}return true;};
@@ -381,7 +405,7 @@ int main(){
  await([&]{return all_complete(1,30);},"healthy peers complete despite takeover and failed targets");
  for(unsigned i=1;i<32;++i)succeeds({{"operation","pause"},{"device_id",ordered[i]->id}});
  await([&]{const auto state=snapshot();return state.at("assignments").size()==31 && state.at("outputs").contains(ordered[0]->id) && state.at("outputs").at(ordered[0]->id).value("revoked",false);},"unreachable removed context is retained");
- const auto retained=command(extra);check(retained.status==409 && retained.body.find("at most 32")!=std::string::npos,"31 assignments plus retained context refuse another");
+ const auto retained=command(extra);check(retained.status==409 && retained.body.find("target-owned scheduling")!=std::string::npos,"31 assignments plus retained context refuse another");
  check(command({{"operation","recover"},{"device_id",ordered[0]->id}}).status==409,"unreachable retired context cannot release capacity");ordered[0]->online=true;
  await([&]{return command({{"operation","recover"},{"device_id",ordered[0]->id}}).status==200;},"successful cleanup reclaims capacity");
  succeeds({{"operation","recover"},{"device_id",ordered[31]->id}});
@@ -437,6 +461,51 @@ int main(){
  check(history_request("RELEASE",std::monostate{},'5').ok,"foreign history owner releases itself");
  history_peer->clock.advance_paused(history_peer->clock.now_ms()+1000);
  await([&]{return snapshot().at("outputs").at(history_id).value("can_resume",false);},"terminal history does not block fresh unowned eligibility");
+ // Retire through the production controller interface. Unknown/offline work
+ // stays pending, and a healthy accepted job drains without Pause or ABORT.
+ const auto retirement_read=[](){const auto r=wtp_fleet_api("GET","","","retirements");check(r.status==200,r.body);return Json::parse(r.body);};
+ const auto retirement_for=[&](const std::string &id){const auto state=retirement_read();for(const auto &row:state.at("assignments"))if(row.at("target_id")==id)return row;throw std::runtime_error("Missing retirement row");};
+ const auto retire_target=[&](const std::string &id){const auto before=retirement_read();Json row;for(const auto &r:before.at("assignments"))if(r.at("target_id")==id)row=r;
+  Json intent={{"contract","Wsprry-Control/1"},{"schema","controller-retirement"},{"controller_id",before.at("controller_id")},
+    {"controller_incarnation",before.at("controller_incarnation")},{"operation_id",wtp_random_identity()},{"transition_id",wtp_random_identity()},
+    {"target_id",id},{"assignment_id",row.at("assignment_id")},{"expected_assignment_revision",row.at("assignment_revision")},{"expected_retirement_generation",before.at("generation")}};
+  const auto revision="\""+before.at("revision").get<std::string>()+"\"";
+  const auto accepted=wtp_fleet_api("POST",intent.dump(),revision,"retirements");check(accepted.status==202||accepted.status==200,accepted.body);
+  const auto replay=wtp_fleet_api("POST",intent.dump(),revision,"retirements");check(replay.status==202||replay.status==200,"exact retirement replay remains recoverable");
+  check(Json::parse(replay.body).at("operation_id")==intent.at("operation_id"),"replay returns the same operation");
+  return intent;
+ };
+ retire_target(ordered[30]->id);
+ check(retirement_for(ordered[30]->id).at("state")=="retiring","offline output cannot supply retirement proof");
+ check(command({{"operation","enable"},{"device_id",ordered[30]->id}}).status==409,"direct enable cannot bypass pending retirement");
+ const auto drain_peer=ordered[3];const auto drain_id=drain_peer->id;
+ auto restoration=snapshot().at("assignments");
+ const auto old_row=std::find_if(restoration.begin(),restoration.end(),[&](const auto &row){return row.at("device_id")==drain_id;});
+ const auto drain_start=wtp_fleet_decimal(old_row->at("last_start_ns"))+60000000000ULL;(*old_row)["enabled"]=true;
+ drain_peer->clock.horizon((drain_start-utc_base)/1000000-1);succeeds({{"operation","enable"},{"device_id",drain_id}});
+ await([&]{return drain_peer->clock.at_barrier()&&drain_peer->authority.snapshot().remote.state==server::State::Armed;},"retirement fixture owns an accepted job");
+ const auto starts_before=drain_peer->engine.starts.load();block_retirement=true;retirement_entered=false;
+ auto retirement_write=std::async(std::launch::async,[&]{retire_target(drain_id);});
+ struct ReleaseRetirement {std::atomic_bool &blocked;~ReleaseRetirement(){blocked=false;}} release_retirement{block_retirement};
+ await([&]{return retirement_entered.load();},"retirement enqueue fence precedes durable intent");
+ check(drain_peer->authority.snapshot().remote.state==server::State::Armed,"retirement cannot abort accepted work");
+ drain_peer->clock.horizon((drain_start-utc_base)/1000000+10000);
+ await([&]{return snapshot().at("outputs").at(drain_id).at("message").get<std::string>().find("durable decision")!=std::string::npos;},"pre-publication fence remains unconfirmed after accepted work drains");
+ check(retirement_for(drain_id).at("state")=="legacy","enqueue fence alone cannot invent durable retirement");
+ const auto before_decision=snapshot().at("assignments");
+ check(std::find_if(before_decision.begin(),before_decision.end(),[&](const auto &row){return row.at("device_id")==drain_id;})->at("enabled")==true,"uncommitted retirement cannot clear saved flags");
+ block_retirement=false;retirement_write.get();
+ await([&]{return retirement_for(drain_id).at("state")=="retired";},"accepted job finishes and positively confirms retirement");
+ check(drain_peer->engine.starts==starts_before+1,"accepted job finishes exactly once");
+ check(!drain_peer->authority.snapshot().remote.owner_id,"retirement verifies released output ownership");
+ check(command({{"operation","enable"},{"device_id",drain_id}}).status==409,"direct enable cannot reopen retired assignment");
+ stop_wtp_fleet();
+ {WtpFleetStore restored(ini+".wtp-assignments.json",self);restored.update({},[&](Json &data){data["assignments"]=restoration;});}
+ start_wtp_fleet_for_test(ini,self,hooks);
+ await([&]{return snapshot().at("outputs").at(drain_id).at("message").get<std::string>().find("retired")!=std::string::npos;},"retired fence survives old assignment restoration and restart");
+ check(!snapshot().at("outputs").at(drain_id).value("can_resume",true),"restored saved row cannot resume");
+ check(retirement_for(ordered[30]->id).at("state")=="retiring","unknown offline work remains retained after restart");
+ check(drain_peer->engine.starts==starts_before+1,"restart and restoration cannot start another occurrence");
  stop_wtp_fleet();WtpFleetStore stopped(ini+".wtp-assignments.json",self);check(stopped.snapshot().first.at("assignments").size()==30,"takeover and removal persist");
 #ifdef __linux__
  rusage usage{};getrusage(RUSAGE_SELF,&usage);

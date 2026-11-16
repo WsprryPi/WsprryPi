@@ -10,6 +10,33 @@ require __DIR__ . '/../card_header.php';
             </div>
 
             <div class="card-body tab-content bg-body">
+                <div id="installationSetup">
+                    <?php require __DIR__ . '/configuration-recovery.php'; ?>
+                </div>
+                <section id="recurrenceMigration" class="maintenance-pane mb-4" aria-labelledby="recurrenceMigrationTitle" hidden>
+                    <h2 id="recurrenceMigrationTitle" class="maintenance-pane__title h5">Scheduling ownership</h2>
+                    <p id="recurrenceMigrationState" class="maintenance-pane__body">Checking saved scheduling history…</p>
+                    <p id="recurrenceMigrationDevice" class="small text-break mb-2"></p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button id="recurrenceMigrationReview" type="button" class="btn btn-outline-primary" disabled>Review migration</button>
+                        <button id="recurrenceMigrationRollback" type="button" class="btn btn-outline-secondary" hidden>Review previous schedule</button>
+                        <button id="recurrenceMigrationRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
+                        <button id="recurrenceMigrationRetry" type="button" class="btn btn-outline-secondary" hidden>Check saved result</button>
+                    </div>
+                    <section id="recurrenceMigrationConfirmation" class="mt-3 pt-3 border-top" aria-labelledby="recurrenceMigrationConfirmationTitle" hidden>
+                        <h3 id="recurrenceMigrationConfirmationTitle" class="h6">Review this device</h3>
+                        <p id="recurrenceMigrationSummary" class="small text-break"></p>
+                        <div class="form-check mb-3">
+                            <input id="recurrenceMigrationConsent" type="checkbox" class="form-check-input">
+                            <label id="recurrenceMigrationConsentLabel" for="recurrenceMigrationConsent" class="form-check-label"></label>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button id="recurrenceMigrationConfirm" type="button" class="btn btn-primary" disabled>Confirm migration</button>
+                            <button id="recurrenceMigrationCancel" type="button" class="btn btn-outline-secondary">Cancel review</button>
+                        </div>
+                    </section>
+                    <p id="recurrenceMigrationFeedback" class="mt-3 mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+                </section>
                 <section
                     id="maintenanceResult"
                     class="maintenance-result d-none mb-4"

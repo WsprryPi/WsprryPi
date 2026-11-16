@@ -12829,6 +12829,1695 @@
         ],
         "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       }
+    },
+    {
+      "name": "P501 approved exact migration intent",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "P501 pending authoritative migration read",
+      "family": "target-migration-read",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null
+      },
+      "valid": true
+    },
+    {
+      "name": "P501 selected rollback intent",
+      "family": "target-migration-rollback",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "resume_controller_id": "cccccccccccccccccccccccccccccccc",
+        "resume_assignment_id": "dddddddddddddddddddddddddddddddd"
+      },
+      "valid": true
+    },
+    {
+      "name": "P501 refuse unknown control",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse zero authority generation",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "0",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse extra proof",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "proof": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse numeric authority generation",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": 1,
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse duplicate controller row",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse unbounded inventory",
+      "family": "target-migration",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse fabricated clean state",
+      "family": "target-migration-read",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "clean",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse unknown job disposition",
+      "family": "target-migration-read",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "job_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "state": "idle"
+          }
+        ],
+        "staged_revision": null
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse rollback inventory injection",
+      "family": "target-migration-rollback",
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "resume_controller_id": "cccccccccccccccccccccccccccccccc",
+        "resume_assignment_id": "dddddddddddddddddddddddddddddddd",
+        "controllers": []
+      },
+      "valid": false
+    },
+    {
+      "name": "P501 refuse conflicting revisions for one assignment identity",
+      "family": "target-migration",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "ffffffffffffffffffffffffffffffff",
+        "expected_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_authority_generation": "1",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      }
+    },
+    {
+      "name": "P503 automatic installation uses the one current recovery view",
+      "family": "configuration-recovery",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "configuration-recovery",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "writable": true,
+        "draft": {
+          "Operation": {
+            "LED Pin": -1,
+            "Amp Pin": -1,
+            "Web Port": 80,
+            "Socket Port": 8000,
+            "Shutdown Button": -1,
+            "Transmit": false,
+            "Use LED": false,
+            "Use Amp": false,
+            "Amp Pin Active High": false,
+            "Use Shutdown": false,
+            "Mode": "WSPR",
+            "Transmit Backend": "gpio",
+            "Enable on Boot": "Never"
+          },
+          "GPIO": {
+            "Transmit Pin": 4,
+            "Power Level": 7,
+            "RP1 Drive mA": 8,
+            "Frequency Residual PPM": 0,
+            "Manual PPM": 0,
+            "Use System Clock Frequency Estimate": false,
+            "Use Direct PPS Calibration": false
+          },
+          "Calibration": {
+            "PPM": 0
+          },
+          "Si5351": {
+            "Adapter Identity": "",
+            "I2C Address": "0x60",
+            "Reference Source": "crystal",
+            "TX Output": "CLK0",
+            "I2C Bus": 1,
+            "Reference Frequency": 25000000,
+            "Crystal Load Capacitance": 8,
+            "Power Level": 1
+          },
+          "WSPR": {
+            "Call Sign": "AA0NT",
+            "Grid Square": "EM18",
+            "Frequency": "20m",
+            "Frequency Profile": "existing_common",
+            "Planner Preference": "auto",
+            "TX Power": 20,
+            "Use Random Offset": false,
+            "Band Preferences": {}
+          },
+          "CW": {
+            "Message": "TEST",
+            "Fade In Ms": 0,
+            "Fade Out Ms": 0,
+            "Fade Slice Ms": 0,
+            "Start Minute": 0,
+            "Start Second": 0,
+            "Repeat Minutes": 10,
+            "Base Frequency": 14096900,
+            "Shift Hz": 500,
+            "Dot Seconds": 3,
+            "Intra Element Gap": 1,
+            "Inter Character Gap": 3,
+            "Inter Word Gap": 7,
+            "DFCW Intra Element Gap": 1,
+            "DFCW Inter Character Gap": 3,
+            "DFCW Inter Word Gap": 7,
+            "Fade Shape": "none"
+          },
+          "Band GPIO": {
+            "2200m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "630m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "160m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "80m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "60m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "40m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "30m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "20m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "17m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "15m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "12m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "10m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "8m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "6m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "5m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "4m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "2m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "1.25m": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            },
+            "70cm": {
+              "GPIO": -1,
+              "Enabled": false,
+              "Active High": false
+            }
+          },
+          "WTP": {
+            "Transport": "usb",
+            "Hostname": "",
+            "TLS Server Identity": "",
+            "TLS CA File": {
+              "state": "preserved"
+            },
+            "TLS Client Certificate": {
+              "state": "preserved"
+            },
+            "TLS Client Key": {
+              "state": "preserved"
+            },
+            "Endpoint": "",
+            "USB Serial": "",
+            "Device ID": "",
+            "Allow Frequency Adjustment": false,
+            "TCP Port": 0,
+            "USB Vendor ID": 0,
+            "USB Product ID": 0,
+            "Start Uncertainty ns": 1000000
+          },
+          "WTP Server": {
+            "Enabled": false,
+            "Port": 24601,
+            "Interface": "auto"
+          }
+        },
+        "defaulted_fields": [
+          "CW.Message"
+        ],
+        "validation": "initialization"
+      }
+    },
+    {
+      "name": "current controller-retirement",
+      "family": "controller-retirement",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "closed controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1",
+        "extra": true
+      }
+    },
+    {
+      "name": "unknown major controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing contract controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing schema controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing controller_id controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing controller_incarnation controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing operation_id controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing transition_id controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing target_id controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing assignment_id controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing expected_assignment_revision controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_retirement_generation": "1"
+      }
+    },
+    {
+      "name": "missing expected_retirement_generation controller-retirement",
+      "family": "controller-retirement",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "expected_assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "current controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "closed controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2",
+        "extra": true
+      }
+    },
+    {
+      "name": "unknown major controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing contract controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing schema controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing controller_id controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing operation_id controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing transition_id controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing target_id controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing assignment_id controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "state": "retiring",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing state controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "generation": "2"
+      }
+    },
+    {
+      "name": "missing generation controller-retirement-operation",
+      "family": "controller-retirement-operation",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirement-operation",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "transition_id": "dddddddddddddddddddddddddddddddd",
+        "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "assignment_id": "ffffffffffffffffffffffffffffffff",
+        "state": "retiring"
+      }
+    },
+    {
+      "name": "current controller-retirements",
+      "family": "controller-retirements",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "closed controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ],
+        "extra": true
+      }
+    },
+    {
+      "name": "unknown major controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing contract controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing schema controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing controller_id controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing controller_incarnation controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing generation controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing revision controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "missing assignments controller-retirements",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    },
+    {
+      "name": "retirement receipt wrong controller_id",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "00000000000000000000000000000000",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "retirement receipt wrong target_id",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "00000000000000000000000000000000",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "retirement receipt wrong assignment_id",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "00000000000000000000000000000000",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate retirement target",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          },
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "00000000000000000000000000000000",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "legacy",
+            "receipt": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate retirement assignment",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          },
+          {
+            "target_id": "00000000000000000000000000000000",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "legacy",
+            "receipt": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "inconsistent retirement legacy",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "legacy",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "inconsistent retirement retired",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retired",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "future retirement receipt generation",
+      "family": "controller-retirements",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "controller-retirements",
+        "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "controller_incarnation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "generation": "2",
+        "revision": "2222222222222222222222222222222222222222222222222222222222222222",
+        "assignments": [
+          {
+            "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "assignment_id": "ffffffffffffffffffffffffffffffff",
+            "assignment_revision": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "retiring",
+            "receipt": {
+              "contract": "Wsprry-Control/1",
+              "schema": "controller-retirement-operation",
+              "controller_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "operation_id": "cccccccccccccccccccccccccccccccc",
+              "transition_id": "dddddddddddddddddddddddddddddddd",
+              "target_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "assignment_id": "ffffffffffffffffffffffffffffffff",
+              "state": "retiring",
+              "generation": "3"
+            }
+          }
+        ]
+      }
     }
   ],
   "recovery_cases": [

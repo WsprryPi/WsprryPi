@@ -109,6 +109,7 @@ async function main() {
             const style=document.createElement('style');style.textContent='*{scroll-behavior:auto!important}';document.head.append(style);
         })()`;
         await evaluate(mock);
+        await evaluate("SetupTargets.localLoaded()");
         await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
         await evaluate(`configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearConfigLoadFailureState();document.getElementById('fleet-tab').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-output-list").textContent.includes("Garden Pico")'), 'independent output rows');
@@ -140,9 +141,8 @@ async function main() {
         await evaluate(`document.getElementById('fleet-refresh').click()`);
         await waitFor(async()=>await evaluate(`document.getElementById('fleet-device').options.length===2`),'catalog loaded');
         assert.equal(await evaluate(`document.getElementById('configPageTitle').textContent`),'Fleet');
-        const fleetHint = await evaluate(`document.getElementById('configSaveStatusHint').textContent`);
-        assert.match(fleetHint,/Fleet changes use Save buttons\./);
-        assert.match(fleetHint,/This Pi's Use Pico and connection settings autosave\./);
+        assert.equal(await evaluate(`document.getElementById('configSaveStatusHint').hidden`),true,'Fleet hides local autosave guidance');
+        assert.match(await evaluate(`document.getElementById('fleet-schedules-description').textContent`),/Adding schedules is unavailable/);
         await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));`);
         assert.equal(await evaluate('configAutosaveDirty'),false,'Selecting a profile must not queue host autosave');
         await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-name').value='Unsaved name';document.getElementById('fleet-name').dispatchEvent(new Event('input',{bubbles:true}));`);
@@ -154,17 +154,10 @@ async function main() {
         await evaluate(`document.getElementById('fleet-edit').click();document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-editor-cancel').click()`);
         assert.equal(await evaluate('document.activeElement.id'),'fleet-device','Hidden opener falls back to device selector');
         await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'))`);
-        await evaluate('document.getElementById("fleet-schedule-new").click()');
-        await waitFor(async () => await evaluate('!document.getElementById("fleet-schedule-editor").hidden'), 'assignment editor');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'2'.repeat(32),'Assignment retains selected saved output');
-        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management-field').hidden`),true,'USB Pico hides Pi HTTP port');
-        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-management').value='31416';`);
-        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management-field').hidden`),false,'Network Pi retains HTTP port');
-        await evaluate(`document.getElementById('fleet-schedule-device').value='2'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
-        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').value`),'31416','Hidden port retains its draft value');
-        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
-        assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').value`),'31416','Returning to Pi preserves custom port');
-        await evaluate(`document.getElementById('fleet-schedule-management').value='31415';document.getElementById('fleet-schedule-device').value='2'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));`);
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-new").disabled'),true,'New legacy schedules remain unavailable');
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden'),'existing assignment editor');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned','Existing draft retains its output');
         await evaluate(`configAutosaveSuspended=false;configAutosaveDirty=false;document.getElementById('fleet-schedule-frequency').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-listener-port').dispatchEvent(new Event('input',{bubbles:true}));`);
         assert.equal(await evaluate('configAutosaveDirty'),false,'Schedule and listener drafts are independent');
         await evaluate(`document.getElementById('wtp_endpoint').dispatchEvent(new Event('input',{bubbles:true}));`);
@@ -190,14 +183,12 @@ async function main() {
         await evaluate(`window.__fleetConflict=false;document.getElementById('fleet-schedule-editor-review').click();document.getElementById('fleet-schedule-save').click();`);
         await waitFor(async () => await evaluate('document.getElementById("fleet-schedule-editor").hidden'), 'assignment saved');
         assert.equal(await evaluate('__host.Operation.Transmit'), false);
-        assert.equal(await evaluate('__fleet.assignments.length'), 3);
-        assert.equal(await evaluate(`JSON.parse(__requests.filter(r=>r.url.endsWith('/host/fleet')&&r.options.method==='POST').at(-1).options.body).management_port`),31415,'USB assignment retains current API field');
+        assert.equal(await evaluate('__fleet.assignments.length'), 2);
+        assert.equal(await evaluate(`JSON.parse(__requests.filter(r=>r.url.endsWith('/host/fleet')&&r.options.method==='POST').at(-1).options.body).operation`),'schedule','Editing cannot create another assignment');
         // A successful status refresh while a draft is open must not rebase its
-        // If-Match revision. Cover both editing and creating an assignment.
-        for (const editing of [true,false]) {
-            await evaluate(editing
-                ? `Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`
-                : `document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        // If-Match revision for an existing assignment.
+        {
+            await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click()`);
             await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
             await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft ready');
             const draftRevision=await evaluate('__fleetRevision');
@@ -214,10 +205,10 @@ async function main() {
         }
         // Opening another editor may fail before its fields are populated.
         // The still-visible draft must retain its original target authority.
-        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`);
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click()`);
         await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'original target draft');
-        await evaluate(`window.__catalogLoadFailure=true;document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await evaluate(`window.__catalogLoadFailure=true;Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();document.getElementById('fleet-draft-continue').click()`);
         await waitFor(async()=>await evaluate('(document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Catalog unavailable") || document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable")) && !document.getElementById("fleet-schedule-save").disabled'),'failed editor switch');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").disabled'),true);
@@ -227,47 +218,24 @@ async function main() {
         const viewports=[{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}];
         // Continuing a retained draft owns the editor until its catalog read
         // completes. A competing New/Edit must not overwrite that target.
-        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section'))[1].querySelectorAll('button')[3].click()`);
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click()`);
         await evaluate("if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()");
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft for delayed restoration');
-        await evaluate(`document.getElementById('fleet-schedule-duration').value='8';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-cancel').click();window.__draftBeforeRestore=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');document.getElementById('fleet-schedule-feedback').textContent='';document.getElementById('fleet-schedule-new').click();window.__catalogLoadFailure=true;document.getElementById('fleet-draft-continue').click();`);
-        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable") && !document.getElementById("fleet-schedule-new").disabled'),'visible retained-draft restore failure');
+        await evaluate(`document.getElementById('fleet-schedule-duration').value='8';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-cancel').click();window.__draftBeforeRestore=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');document.getElementById('fleet-schedule-feedback').textContent='';Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();window.__catalogLoadFailure=true;document.getElementById('fleet-draft-continue').click();`);
+        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-feedback").textContent.includes("Catalog unavailable") && !document.getElementById("fleet-schedule-refresh").disabled'),'visible retained-draft restore failure');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),true,'failed restoration does not expose an unpopulated editor');
         assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__draftBeforeRestore'),'failed restore retains original draft');
-        await evaluate(`window.__catalogLoadFailure=false;document.getElementById('fleet-schedule-new').click();window.__holdNextCatalog=true;document.getElementById('fleet-draft-continue').click();`);
+        await evaluate(`window.__catalogLoadFailure=false;Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();window.__holdNextCatalog=true;document.getElementById('fleet-draft-continue').click();`);
         await waitFor(()=>evaluate('typeof __releaseCatalog==="function"'),'held draft catalog read');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-new").disabled'),true,'restoring a draft must block competing editor actions');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true,'no save while restoration is pending');
-        await evaluate("document.getElementById('fleet-schedule-new').click();__releaseCatalog()");
+        await evaluate("Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();__releaseCatalog()");
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-save").disabled && !document.getElementById("fleet-schedule-editor").hidden'),'restored draft ready');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'assigned');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'8');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-editor-heading").textContent'),'Edit output schedule');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-save").textContent'),'Save schedule');
         assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__draftBeforeRestore'),'restoration preserves original target and revision');
-        await evaluate("document.getElementById('fleet-schedule-cancel').click()");
-        // A catalog profile ID is not a frozen output identity. Continuing a
-        // new-assignment draft must not inherit a changed profile's settings.
-        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
-        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'new target-bound draft');
-        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-duration').value='9';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-cancel').click();window.__newBoundDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__beforeRebindPosts=__requests.filter(r=>r.options.method==='POST').length;window.__catalogDeviceOverride='6'.repeat(32);document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
-        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Saved output changed") && !document.getElementById("fleet-schedule-new").disabled'),'changed catalog profile cannot retarget retained draft');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),false,'changed draft stays inspectable');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true);
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").disabled'),true);
-        for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('changed-draft-'+theme,'fleet-schedule-editor');}
-        assert.match(await evaluate('document.getElementById("fleet-schedule-device").selectedOptions[0].textContent'),/changed/);
-        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__newBoundDraft'));
-        assert.equal(await evaluate("__requests.filter(r=>r.options.method==='POST').length"),await evaluate('__beforeRebindPosts'));
-        await evaluate(`window.__catalogDeviceOverride='';document.getElementById('fleet-schedule-cancel').click();const unbound=JSON.parse(__newBoundDraft);delete unbound.draftProfileBinding;sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',JSON.stringify(unbound));document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
-        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && document.getElementById("fleet-schedule-editor-feedback").textContent.includes("Saved output changed") && document.getElementById("fleet-output-list").getAttribute("aria-busy")==="false"'),'unbound earlier draft cannot infer current profile authority');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-save").disabled'),true);
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'9','unbound entries remain inspectable');
-        assert.equal(await evaluate("__requests.filter(r=>r.options.method==='POST').length"),await evaluate('__beforeRebindPosts'));
-        await evaluate(`document.getElementById('fleet-schedule-cancel').click();sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',__newBoundDraft);document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
-        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'unchanged profile restores original draft');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'9');
-        assert.equal(await evaluate('document.getElementById("fleet-schedule-device").value'),'1'.repeat(32));
         await evaluate("document.getElementById('fleet-schedule-cancel').click()");
         async function capture(section, element) {
             for(const viewport of viewports){
@@ -355,7 +323,7 @@ async function main() {
         await waitFor(dialogClosed,'Remove completed');
         assert.equal(await evaluate('document.activeElement.id'),'fleet-schedule-refresh');
         await capture('outputs','fleet-schedules');
-        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
         await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden'),'editor reopened');
         await capture('assignment','fleet-schedule-editor');
         for (const mode of ['wspr','qrss','fskcw','dfcw']) {
@@ -366,37 +334,22 @@ async function main() {
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=true;`);
         await waitFor(async()=>await evaluate('document.getElementById("fleet-listener-feedback").textContent.includes("Listening")'),'listener status');
         await capture('listener','fleet-listener');
-        await evaluate(`document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
+        await evaluate(`document.getElementById('fleet-device').selectedIndex=-1;document.getElementById('fleet-device').dispatchEvent(new Event('change',{bubbles:true}));Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
         await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'unselected assignment');
-        assert.equal(await evaluate(`document.getElementById('fleet-schedule-device').value`),'','No catalog selection must not silently choose the first device');
+        assert.equal(await evaluate(`document.getElementById('fleet-schedule-device').value`),'assigned','Clearing the catalog selection cannot retarget an existing schedule');
         const beforeUnselected=await fleetPosts();
-        await evaluate(`document.getElementById('fleet-schedule-save').click()`);
-        assert.equal(await fleetPosts(),beforeUnselected,'Unselected output cannot be saved');
-        await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=false;document.getElementById('wtp-management').open=true;WtpManagement.invalidate();`);
-        assert.match(await evaluate(`document.getElementById('gpio-drive-status').textContent`),/has not been read/);
-        assert.doesNotMatch(await evaluate(`document.getElementById('gpio-drive-status').textContent`),/changed|preserved/);
-        assert.doesNotMatch(await evaluate(`document.getElementById('filter-selector-controls-status').textContent`),/Entries preserved/);
-        assert.equal(await evaluate(`document.getElementById('wtp-management-availability').compareDocumentPosition(document.getElementById('wtp-usb-settings')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Prerequisites precede forms');
-        assert.equal(await evaluate(`document.getElementById('wtp-gps-controls').compareDocumentPosition(document.getElementById('wtp-member-hardware-save')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Hardware save follows GPS');
-        assert.equal(await evaluate(`document.getElementById('wtp-si5351-controls').compareDocumentPosition(document.getElementById('wtp-member-hardware-save')) & Node.DOCUMENT_POSITION_FOLLOWING`),4,'Hardware save follows Si5351');
-        assert.equal(await evaluate(`document.getElementById('wtp-complete-station').open || document.getElementById('wtp-combined-settings').open`),false,'Alternative forms are disclosed explicitly');
-        await evaluate(`document.querySelector('#wtp-complete-station summary').focus()`);
-        await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-        await client.send('Input.dispatchKeyEvent',{type:'char',text:'\r',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-        await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-        assert.equal(await evaluate(`document.getElementById('wtp-complete-station').open`),true,'Keyboard opens complete station alternative');
-        await evaluate(`document.getElementById('wtp-complete-station').open=false;document.getElementById('radio-tab').click()`);
-        await waitFor(async()=>await evaluate(`document.getElementById('configPageTitle').textContent==='Signal setup'`),'restored host guidance');
-        assert.match(await evaluate(`document.getElementById('configSaveStatusHint').textContent`),/Changes save automatically/);
+        assert.equal(await fleetPosts(),beforeUnselected,'Catalog selection alone cannot save an existing schedule');
+        await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-listener').open=false;document.getElementById('radio-tab').click()`);
+        await waitFor(()=>evaluate(`document.getElementById('configPageTitle').textContent.toLowerCase()==='signal setup'`),'restored local guidance');
         await evaluate(`document.getElementById('fleet-tab').click()`);
-        await waitFor(async()=>await evaluate(`document.getElementById('configPageTitle').textContent==='Fleet'`),'restored Fleet guidance');
+        await waitFor(()=>evaluate(`document.getElementById('configPageTitle').textContent==='Fleet'`),'restored Fleet guidance');
         // The real disabled/first-read state is a useful operator path of its own.
         // Capture at all requested sizes and themes, with actual fixed chrome.
         for (const theme of ['light','dark']) {
             await evaluate(`applyThemePreference('${theme}')`);
             for (const viewport of viewports) {
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-                await evaluate(`document.getElementById('wtp-hardware-settings').open=false;document.getElementById('wtp-complete-station').open=false;document.getElementById('wtp-combined-settings').open=false;window.scrollTo({top:0,behavior:'instant'});document.getAnimations().forEach(a=>a.finish());`);
+                await evaluate(`window.scrollTo({top:0,behavior:'instant'});document.getAnimations().forEach(a=>a.finish());`);
                 await client.settleRendering();
                 const screenshot=async name=>{
                     const shot=await client.send('Page.captureScreenshot',{format:'png'});
@@ -404,10 +357,10 @@ async function main() {
                 };
                 assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,'Fleet '+theme+' overflow');
                 await screenshot('fleet');
-                await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
+                await evaluate(`document.getElementById('fleet-device').value='known:'+'2'.repeat(32);document.getElementById('fleet-device').dispatchEvent(new Event('change'));Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
                 await waitFor(async()=>await evaluate(`!document.getElementById('fleet-schedule-editor').hidden && !document.getElementById('fleet-schedule-save').disabled`),'USB draft visual state');
                 await evaluate(`document.getElementById('fleet-schedule-editor').scrollIntoView({block:'start'});window.scrollBy(0,-180);`);
-                assert.equal(await evaluate(`document.getElementById('fleet-schedule-management').getBoundingClientRect().height`),0,'USB port removed from layout');
+                assert.equal(await evaluate(`document.getElementById('fleet-schedule-device').value`),'assigned','Visual draft remains bound to the existing assignment');
                 assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'USB draft overflow');
                 await screenshot('usb-assignment');
                 const draft=await evaluate(`JSON.stringify([...document.querySelectorAll('#fleet-schedule-editor input,#fleet-schedule-editor select')].map(e=>[e.id,e.value,e.checked]))`);
@@ -421,19 +374,7 @@ async function main() {
                 await evaluate(`document.getElementById('fleet-schedule-cancel').click();document.getElementById('fleet-edit').click();document.getElementById('fleet-editor-cancel').click();document.getElementById('fleet-edit').scrollIntoView({block:'center'});`);
                 assert.equal(await evaluate('document.activeElement.id'),'fleet-edit');
                 await screenshot('profile-cancel-focus');
-                for (const [name,id] of [['management','wtp-management'],['station','wtp-usb-progress-heading'],['complete-station','wtp-complete-station'],['gps','wtp-gps-controls'],['hardware-actions','wtp-member-validate'],['capability-guidance','wtp-platform-limits'],['alternatives','wtp-combined-settings']]) {
-                    await evaluate(`document.getElementById('wtp-hardware-settings').open=true;if(document.getElementById('${id}').tagName==='DETAILS')document.getElementById('${id}').open=true;document.getElementById('${id}').scrollIntoView({block:'start'});window.scrollBy(0,-180);document.getAnimations().forEach(a=>a.finish());`);
-                    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true,name+' '+theme+' overflow');
-                    await screenshot(name);
-                }
-                const contrast=await evaluate(`(()=>{const s=getComputedStyle(document.getElementById('wtp-selection-hint'));return {color:s.color,bg:getComputedStyle(document.body).backgroundColor};})()`);
-                const rgb=text=>text.match(/[\d.]+/g).map(Number);
-                const fg=rgb(contrast.color),bg=rgb(contrast.bg),alpha=fg[3]??1;
-                const luminance=values=>values.slice(0,3).map(v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
-                const f=luminance(fg.map((v,i)=>v*alpha+bg[i]*(1-alpha))),b=luminance(bg);
-                const ratio=(Math.max(f,b)+0.05)/(Math.min(f,b)+0.05);
-                assert(ratio>=4.5,theme+' help-text contrast');
-                console.log(viewport.name+' '+theme+' help-text contrast: '+ratio.toFixed(2)+':1');
+
             }
         }
 
@@ -459,15 +400,15 @@ async function main() {
         await evaluate(`delete __fleet.outputs[__retainedId];document.getElementById('fleet-schedule-refresh').click()`);
         await waitFor(()=>evaluate('!Array.from(document.querySelectorAll("#fleet-output-list section")).some(row=>row.textContent.includes("Removed output 99999999"))'),'retained fixture retired');
         // A foreign success body is not evidence that this save persisted.
-        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await evaluate(`Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft before uncorrelated save reply');
         await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('fleet-schedule-duration').value='5';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-plain').checked=true;document.getElementById('fleet-schedule-plain').dispatchEvent(new Event('change',{bubbles:true}));window.__uncorrelatedDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__uncorrelatedRows=JSON.stringify(__fleet.assignments);window.__uncorrelatedPosts=__requests.filter(r=>r.url.endsWith('/host/fleet')&&r.options.method==='POST').length;window.__corruptFleetReply=true;document.getElementById('fleet-schedule-save').click()`);
-        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("does not match this request") && FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-new").disabled'),'foreign save success remains unconfirmed');
+        await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent.includes("does not match this request") && FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-refresh").disabled'),'foreign save success remains unconfirmed');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-editor").hidden'),false);
         assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__uncorrelatedDraft'));
         assert.equal(await evaluate('JSON.stringify(__fleet.assignments)'),await evaluate('__uncorrelatedRows'));
-        assert.equal(await evaluate('FleetClient.snapshot().actions.filter(a=>a.operation==="assign").length'),1);
-        assert.equal(await evaluate('FleetClient.snapshot().actions.find(a=>a.operation==="assign").assignment_generation'),null,'foreign success cannot bind an uncreated assignment');
+        assert.equal(await evaluate('FleetClient.snapshot().actions.some(a=>a.operation==="schedule" && a.device_id===JSON.parse(__uncorrelatedDraft).editId && a.state==="outcome_unconfirmed")'),true);
+        assert.equal(await evaluate('FleetClient.snapshot().actions.filter(a=>a.device_id===JSON.parse(__uncorrelatedDraft).editId).every(a=>a.assignment_generation!==null)'),true,'foreign success cannot replace the saved assignment binding');
         assert.equal(await evaluate('__requests.filter(r=>r.url.endsWith("/host/fleet")&&r.options.method==="POST").length'),await evaluate('__uncorrelatedPosts+1'),'no automatic retry of the uncertain save');
         for(const theme of ['light','dark']) {await evaluate(`applyThemePreference('${theme}')`);await capture('uncorrelated-reply-'+theme,'fleet-schedule-editor');}
         await evaluate(`window.__corruptFleetReply=false;document.getElementById('fleet-schedule-editor-review').click();document.getElementById('fleet-schedule-cancel').click()`);
@@ -494,7 +435,7 @@ async function main() {
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'editor for unproven earlier entries');
         await evaluate(`document.getElementById('fleet-schedule-duration').value='8';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('fleet-schedule-save').click()`);
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-save").disabled && JSON.parse(sessionStorage.getItem("wsprrypi.fleet.editor.draft.1"))?.editorAction?.action_id'),'second pending save accepted');
-        await evaluate(`window.__legacyPending=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')).editorAction;document.getElementById('fleet-schedule-cancel').click();const retained=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1'));for(const key of Object.keys(retained.editorAction))if(!["action_id","device_id"].includes(key))delete retained.editorAction[key];sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',JSON.stringify(retained));document.getElementById('fleet-schedule-new').click();document.getElementById('fleet-draft-continue').click()`);
+        await evaluate(`window.__legacyPending=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')).editorAction;document.getElementById('fleet-schedule-cancel').click();const retained=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1'));for(const key of Object.keys(retained.editorAction))if(!["action_id","device_id"].includes(key))delete retained.editorAction[key];sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',JSON.stringify(retained));Array.from(document.querySelectorAll('#fleet-output-list section')).at(-1).querySelectorAll('button')[3].click();document.getElementById('fleet-draft-continue').click()`);
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'unproven submitted entries restored');
         await evaluate(`document.getElementById('fleet-schedule-cancel').click();__fleetActions[__legacyPending.action_id].state='confirmed';__fleetActions[__legacyPending.action_id].work_pending=false;void FleetClient.refresh()`);
         await waitFor(()=>evaluate('FleetClient.outcome(__legacyPending.device_id)?.state==="confirmed"'),'legacy save confirmation received');
@@ -508,13 +449,23 @@ async function main() {
         await evaluate(`const action=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')).editorAction;__fleetActions[action.action_id].state='confirmed';__fleetActions[action.action_id].work_pending=false;void FleetClient.refresh()`);
         await waitFor(()=>evaluate('document.getElementById("fleet-schedule-editor").hidden && sessionStorage.getItem("wsprrypi.fleet.editor.draft.1")===null'),'unchanged submitted entries clear on matching confirmation');
         await evaluate("window.__pendingSave=false");
+        // A draft saved by an earlier version remains inspectable, even with
+        // an unchanged profile. Forcing its button cannot create legacy work.
+        await evaluate(`document.querySelector('#fleet-output-list section').querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'existing source for retained earlier draft');
+        await evaluate(`(async()=>{document.getElementById('fleet-schedule-duration').value='11';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));const draft=JSON.parse(sessionStorage.getItem('wsprrypi.fleet.editor.draft.1'));const catalog=await(await fetch('/api/control/v1/host/devices',{method:'GET'})).json();const profile=catalog.profiles.find(p=>p.id==='1'.repeat(32));draft.editId='';draft.editorContext=null;draft.draftTarget=null;draft.editorAction=null;draft.fields['fleet-schedule-device']=profile.id;draft.draftProfileBinding={id:profile.id,name:profile.name,settings:Object.fromEntries(Object.entries(profile.settings).sort(([a],[b])=>a<b?-1:a>b?1:0))};document.getElementById('fleet-schedule-cancel').click();sessionStorage.setItem('wsprrypi.fleet.editor.draft.1',JSON.stringify(draft));window.__earlierDraft=JSON.stringify(draft);window.__earlierPosts=__requests.filter(r=>r.options.method==='POST').length;document.querySelector('#fleet-output-list section').querySelectorAll('button')[3].click();document.getElementById('fleet-draft-continue').click();})()`);
+        await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && document.getElementById("fleet-schedule-save").disabled && document.getElementById("fleet-schedule-device").value==="1".repeat(32)'),'earlier new-assignment draft is read-only');
+        assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'11');
+        assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__earlierDraft'));
+        await evaluate("document.getElementById('fleet-schedule-save').disabled=false;document.getElementById('fleet-schedule-save').click()");
+        assert.equal(await evaluate('__requests.filter(r=>r.options.method==="POST").length'),await evaluate('__earlierPosts'),'DOM bypass cannot create a controller schedule');
+        assert.match(await evaluate('document.getElementById("fleet-schedule-editor-feedback").textContent'),/target-owned scheduling/);
+        await evaluate("document.getElementById('fleet-schedule-cancel').click()");
         // Capacity is advertised, never inferred from the historical UI bound.
         await evaluate(`window.__originalFleet=structuredClone(__fleet);__fleet.assignments=Array.from({length:31},(_,i)=>({...__originalFleet.assignments[0],device_id:i.toString(16).padStart(32,'0'),name:'Remote '+(i+1)+' '+('Long device name ').repeat(3),enabled:false,in_flight:false}));__fleet.outputs={};document.getElementById('fleet-schedule-refresh').click();`);
-        await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===31 && !document.getElementById("fleet-schedule-new").disabled'),'31 allows final assignment');
-        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click();`);
-        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'32nd assignment editor');
-        await evaluate(`document.getElementById('fleet-schedule-device').value='1'.repeat(32);document.getElementById('fleet-schedule-device').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-mode').value='tone';document.getElementById('fleet-schedule-mode').dispatchEvent(new Event('change'));document.getElementById('fleet-schedule-duration').value='3';document.getElementById('fleet-schedule-plain').checked=true;document.getElementById('fleet-schedule-save').click();`);
-        await waitFor(async()=>await evaluate('document.querySelectorAll("#fleet-output-list section").length===32 && document.getElementById("fleet-schedule-new").disabled'),'32 prevents 33rd assignment');
+        await waitFor(()=>evaluate('document.querySelectorAll("#fleet-output-list section").length===31 && document.getElementById("fleet-schedule-new").disabled'),'31 retained rows cannot create legacy schedules');
+        await evaluate(`__fleet.assignments.push({...__fleet.assignments[0],device_id:'f'.repeat(32),name:'Existing output 32'});document.getElementById('fleet-schedule-refresh').click()`);
+        await waitFor(()=>evaluate('document.querySelectorAll("#fleet-output-list section").length===32 && document.getElementById("fleet-schedule-new").disabled'),'32 existing assignments render');
         assert.match(await evaluate('document.getElementById("fleet-schedule-capacity").textContent'),/32 of 32/);
         for(const theme of ['light','dark'])for(const viewport of viewports){
             await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
@@ -534,7 +485,7 @@ async function main() {
         await evaluate(`delete __fleet.outputs['f'.repeat(32)];__fleet.assignments.push({...__fleet.assignments[0],device_id:'f'.repeat(32),name:'Reassigned output'});document.getElementById('fleet-schedule-refresh').click();`);
         await waitFor(async()=>await evaluate('Array.from(document.querySelectorAll("#fleet-output-list section")).some(row=>row.textContent.includes("Reassigned output") && Array.from(row.querySelectorAll("button")).every(button=>!button.hidden))'),'reassignment restores all actions on reused identity row');
         await evaluate(`__fleet.assignments.pop();document.getElementById('fleet-schedule-refresh').click();`);
-        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled'),'reconciliation reclaims capacity');
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-refresh").disabled'),'reconciliation reclaims capacity');
         for(const invalid of [null,0,-1,1.5,'32',true,Number.MAX_SAFE_INTEGER+1]){
             await evaluate(`__fleet.maximum_outputs=${JSON.stringify(invalid)};document.getElementById('fleet-schedule-refresh').click();`);
             await waitFor(async()=>await evaluate('document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-feedback").textContent.includes("capacity")'),'invalid capacity disables admission');
@@ -550,14 +501,14 @@ async function main() {
             fs.writeFileSync(path.join(output,viewport.name+'-fleet-unreadable.png'),Buffer.from(shot.data,'base64'));
         }
         await evaluate(`__fleet.maximum_outputs=32;document.getElementById('fleet-schedule-refresh').click();`);
-        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-new").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 32")'),'UI derives capacity from server');
+        await waitFor(async()=>await evaluate('!document.getElementById("fleet-schedule-refresh").disabled && document.getElementById("fleet-schedule-capacity").textContent.includes("of 32")'),'UI derives capacity from server');
         assert.equal(await evaluate('Array.from(document.querySelectorAll("#fleet-output-list button")).some(button=>!button.disabled)'),true,'valid refresh restores row actions');
         // A persisted page return resumes the Setup consumer as well as the
         // shared client. Existing drafts retain their original review binding.
-        await evaluate(`document.getElementById('fleet-schedule-new').click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
+        await evaluate(`document.querySelector('#fleet-output-list section').querySelectorAll('button')[3].click();if(!document.getElementById('fleet-draft-choice').hidden)document.getElementById('fleet-draft-discard').click()`);
         await waitFor(()=>evaluate('!document.getElementById("fleet-schedule-editor").hidden && !document.getElementById("fleet-schedule-save").disabled'),'draft before persisted page return');
         await evaluate(`document.getElementById('fleet-schedule-duration').value='7';document.getElementById('fleet-schedule-duration').dispatchEvent(new Event('input',{bubbles:true}));window.__returnDraft=sessionStorage.getItem('wsprrypi.fleet.editor.draft.1');window.__returnPosts=__requests.filter(r=>r.options.method==='POST').length;window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));__fleet.assignments[0].name='Updated while away';window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));`);
-        await waitFor(()=>evaluate('FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-new").disabled'),'Setup resumes after persisted page return');
+        await waitFor(()=>evaluate('FleetClient.snapshot().valid && !document.getElementById("fleet-schedule-refresh").disabled'),'Setup resumes after persisted page return');
         assert.equal(await evaluate("document.querySelector('#fleet-output-list section h5').textContent"),'Updated while away','Setup consumer must render the newly accepted snapshot after return');
         assert.equal(await evaluate('document.getElementById("fleet-schedule-duration").value'),'7');
         assert.equal(await evaluate("sessionStorage.getItem('wsprrypi.fleet.editor.draft.1')"),await evaluate('__returnDraft'),'return does not rebase or discard the draft');

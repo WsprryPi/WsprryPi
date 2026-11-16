@@ -21,6 +21,7 @@
     const text = name => byId("fleet-schedule-" + name).value.trim();
     let data = null, revision = "", editorRevision = "", profiles = [], editId = "", busy = false, closed = false, visible = false, timer, observedAt = 0, listenerBusy = false;
     const rows = new Map();
+    let retirementView=false;
     let pendingConfirmation = null, editorContext = null, draftTarget = null, draftDirty = false, editorAction = null, draftProfileBinding = null, draftProfileChanged = false;
     const draftKey = "wsprrypi.fleet.editor.draft.1";
     function profileBinding(profile) {
@@ -30,10 +31,11 @@
     }
     function editorFields() {
         const fields = {};
-        byId("fleet-schedule-editor").querySelectorAll("input,select").forEach(node => {fields[node.id] = node.type === "checkbox" ? node.checked : node.value;});
+        byId("fleet-schedule-editor").querySelectorAll("input,select").forEach(node => {if(node.closest("#controllerRetirement"))return;fields[node.id] = node.type === "checkbox" ? node.checked : node.value;});
         return fields;
     }
     function preserveDraft(force = false) {
+        if(retirementView)return;
         if (byId("fleet-schedule-editor").hidden && force !== true) return;
         const fields = editorFields();
         if (!editId && !draftProfileChanged) draftProfileBinding = profileBinding(profiles.find(p => p.id === fields["fleet-schedule-device"]));
@@ -84,7 +86,7 @@
             }
             if (saved.editId) {const option = root.document.createElement("option");option.value = "assigned";option.textContent = saved.draftTarget?.name || saved.editId;selector.append(option);}
             editorAction = saved.editorAction || null;
-            editId = saved.editId;editorRevision = saved.editorRevision;editorContext = saved.editorContext;draftTarget = saved.draftTarget;
+            retirementView=false;editId = saved.editId;root.ControllerRetirement?.select(editId,saved.draftTarget?.name);editorRevision = saved.editorRevision;editorContext = saved.editorContext;draftTarget = saved.draftTarget;
             for (const [id, value] of Object.entries(saved.fields)) {const node = byId(id);if (node && node.closest("#fleet-schedule-editor")) {if (node.type === "checkbox") node.checked = value === true;else if (typeof value === "string") node.value = value;}}
             byId("fleet-schedule-editor-heading").textContent = editId ? "Edit output schedule" : "Assign a schedule";
             byId("fleet-schedule-save").textContent = editId ? "Save schedule" : "Save assignment";
@@ -142,7 +144,7 @@
         }
         return value;
     }
-    function canAssign() {return data && validCapacity(data) && occupied(data) < data.maximum_outputs;}
+    function canAssign() {return false;} // New recurrence requires a target-owned scheduler.
     function createRow(id) {
         const row = root.document.createElement("section");
         row.className = "py-3 border-bottom";
@@ -151,11 +153,11 @@
         const status = root.document.createElement("p");status.className = "form-text text-break mb-2";
         const actions = root.document.createElement("div");actions.className = "d-flex flex-wrap gap-2";
         const buttons = {};
-        for (const [action, label] of [["enable", "Resume"], ["pause", "Pause and stop"], ["recover", "Reconcile"], ["edit", "Edit schedule"], ["remove", "Remove assignment"], ["review", "Review current state"]]) {
+        for (const [action, label] of [["enable", "Resume"], ["pause", "Pause and stop"], ["recover", "Reconcile"], ["edit", "Edit schedule"], ["remove", "Remove assignment"], ["review", "Review current state"], ["retire", "Retire schedule"]]) {
             const button = root.document.createElement("button");button.type = "button";
             button.className = "btn btn-sm " + (action === "remove" ? "btn-outline-danger" : "btn-outline-secondary");
             button.textContent = label;
-            button.addEventListener("click", () => action === "edit" ? openEditor(id) : action === "review" ? undefined : mutate(action, id, button));
+            button.addEventListener("click", () => action === "edit" ? openEditor(id) : action === "retire" ? openEditor(id,true) : action === "review" ? undefined : mutate(action, id, button));
             actions.append(button);buttons[action] = button;
             if (action === "review") button.addEventListener("click", () => {try {root.FleetClient.review(id);message("Current state reviewed; any unknown earlier result remains historical.");} catch (error) {message(error.message);}});
         }
@@ -168,8 +170,8 @@
         byId("fleet-schedule-new").disabled = !visible || busy || !canAssign();
         byId("fleet-schedule-refresh").disabled = !visible || busy;
         byId("fleet-schedule-capacity").textContent = data && validCapacity(data)
-            ? `${data.assignments.length} of ${data.maximum_outputs} remote outputs assigned. ${occupied(data) - data.assignments.length} unresolved contexts retained.${canAssign() ? "" : " Capacity reached; remove an assignment or reconcile unresolved outputs first."}`
-            : "Capacity unavailable. Refresh schedules before assigning an output.";
+            ? `${data.assignments.length} of ${data.maximum_outputs} remote outputs assigned. ${occupied(data) - data.assignments.length} unresolved contexts retained.`
+            : "Saved schedule capacity unavailable. Refresh to check existing schedules.";
         if (!data) {
             for (const elements of rows.values())
                 for (const button of Object.values(elements.buttons)) button.disabled = true;
@@ -196,7 +198,8 @@
             elements.buttons.enable.disabled ||= assignment.enabled || assignment.in_flight || !output?.can_resume || observedAge === null || observedAge >= 15000n || output?.actions?.some(a => a.work_pending);
             elements.buttons.pause.disabled ||= output?.can_pause === false || output?.actions?.some(a => a.operation === "pause" && a.work_pending);
             elements.buttons.recover.disabled ||= output?.can_reconcile === false || output?.actions?.some(a => a.work_pending);
-            elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight || output?.state === "recovery_required" || output?.actions?.some(a => a.work_pending);
+            elements.buttons.retire.disabled ||= output?.actions?.some(a=>a.work_pending);
+            elements.buttons.edit.disabled ||= assignment.enabled || assignment.in_flight || ["recovery_required","retiring","retired"].includes(output?.state) || output?.actions?.some(a => a.work_pending);
         }
         for (const [id, output] of retired) {
             if (!rows.has(id)) {const elements = createRow(id);rows.set(id, elements);list.append(elements.row);}
@@ -212,11 +215,11 @@
         if (!current.size) {
             list.replaceChildren();
             const empty = root.document.createElement("p");empty.className = "form-text";empty.dataset.empty = "";
-            empty.textContent = root.ControllerMode?.active ? "No remote schedules assigned. Choose a saved output to assign a schedule."
+            empty.textContent = root.ControllerMode?.active ? "No existing remote schedules. Adding schedules requires target-owned scheduling and is unavailable."
                 : "No remote schedules assigned. This Pi's local schedule remains available.";list.append(empty);
         }
         const removals = data.removals || [];
-        if (removals.length && !busy) message(`${removals.length} assignment${removals.length === 1 ? " was" : "s were"} removed after local takeover. Reassign only when the target is available again.`);
+        if (removals.length && !busy) message(`${removals.length} assignment${removals.length === 1 ? " was" : "s were"} removed after local takeover. Review current output and recovery status before further actions.`);
     }
     async function load() {
         if (closed || busy || !visible) return;
@@ -278,10 +281,10 @@
         }
         return result;
     }
-    async function openEditor(id = "") {
+    async function openEditor(id = "",retirementOnly=false) {
         if (closed || busy || !visible || !data) return;
         if (!id && !canAssign()) return;
-        if (draftDirty || root.sessionStorage.getItem(draftKey)) {
+        if (!retirementOnly && (draftDirty || root.sessionStorage.getItem(draftKey))) {
             const captured = id ? root.FleetClient.capture(id) : null;
             byId("fleet-draft-choice").hidden = false;
             byId("fleet-draft-discard").onclick = () => {
@@ -298,7 +301,7 @@
             byId("fleet-draft-continue").focus();return;
         }
         const assignment = id ? data.assignments.find(row => row.device_id === id) : null;
-        if (id && (!assignment || assignment.enabled || assignment.in_flight)) return;
+        if (id && (!assignment || !retirementOnly&&(assignment.enabled || assignment.in_flight))) return;
         // Bind the draft to the schedule displayed when it was opened. Status
         // polling must not silently authorize overwriting another operator.
         const reviewedRevision = revision;
@@ -312,7 +315,7 @@
             if (!id && !nextProfiles.length) {message("Add and identify a device in Known and nearby devices first.");return;}
             // A failed catalog refresh must leave any existing draft bound to
             // its original target and revision.
-            profiles = nextProfiles;editId = id;editorRevision = reviewedRevision;draftProfileBinding = null;draftProfileChanged = false;
+            profiles = nextProfiles;retirementView=retirementOnly;editId = id;root.ControllerRetirement?.select(editId,assignment?.name);editorRevision = reviewedRevision;draftProfileBinding = null;draftProfileChanged = false;
             editorContext = reviewedContext;draftTarget = assignment;editorAction = null;
             const selector = byId("fleet-schedule-device");selector.replaceChildren();
             const placeholder = root.document.createElement("option");
@@ -329,7 +332,7 @@
                 if (s.duration_ms) byId("fleet-schedule-duration").value = s.duration_ms / 1000;
                 if (s.dot_ms) byId("fleet-schedule-dot").value = s.dot_ms / 1000;
             }
-            byId("fleet-schedule-editor-heading").textContent = id ? "Edit output schedule" : "Assign a schedule";
+            byId("fleet-schedule-editor-heading").textContent = retirementOnly ? "Review saved output schedule" : id ? "Edit output schedule" : "Assign a schedule";
             byId("fleet-schedule-save").textContent = id ? "Save schedule" : "Save assignment";
             byId("fleet-schedule-enabled").checked = false;byId("fleet-schedule-plain").checked = false;
             byId("fleet-schedule-editor").hidden = false;message("", true);modeFields();
@@ -337,15 +340,15 @@
         finally {
             busy = false;setVisible(visible);
             if (!closed && visible) {
-                if (!byId("fleet-schedule-editor").hidden) byId(editId ? "fleet-schedule-mode" : "fleet-schedule-device").focus();
+                if (!byId("fleet-schedule-editor").hidden){const focus=byId(retirementView?"fleet-schedule-editor-heading":editId?"fleet-schedule-mode":"fleet-schedule-device");if(retirementView)focus.setAttribute("tabindex","-1");focus.focus();}
                 load();
             }
         }
     }
     async function save() {
-        if (busy || !visible) return;
+        if (busy || !visible || retirementView || root.ControllerRetirement?.fenced) return;
         if (draftProfileChanged) {message("Saved output changed. Discard this draft and reopen the intended output before saving.", true);return;}
-        if (!editId && !canAssign()) {message("Capacity unavailable or reached. Refresh schedules and review before saving. Your draft is preserved.", true);return;}
+        if (!editId && !canAssign()) {message("Adding schedules requires target-owned scheduling and is unavailable. Your draft is preserved.", true);return;}
         const fields = [...byId("fleet-schedule-editor").querySelectorAll("input,select")].filter(field => !field.disabled && !field.closest("[hidden]"));
         for (const field of fields) if (!field.reportValidity()) return;
         const profile = profiles.find(p => p.id === text("device"));
@@ -415,8 +418,8 @@
                 }
             }
         });
-        byId("fleet-schedule-editor").addEventListener("input", preserveDraft);
-        byId("fleet-schedule-editor").addEventListener("change", preserveDraft);
+        byId("fleet-schedule-editor").addEventListener("input", event=>{if(!event.target.closest("#controllerRetirement"))preserveDraft();});
+        byId("fleet-schedule-editor").addEventListener("change", event=>{if(!event.target.closest("#controllerRetirement"))preserveDraft();});
         byId("fleet-tab").addEventListener("shown.bs.tab", load);
         byId("fleet-schedule-refresh").addEventListener("click", load);
         byId("fleet-schedule-new").addEventListener("click", () => openEditor());
@@ -427,7 +430,7 @@
             const id = editId || profiles.find(p => p.id === text("device"))?.settings["Device ID"];
             try {root.FleetClient.review(id);message("Current state reviewed. Entries retain their original revision; reopen them if the assignment changed.", true);} catch (error) {message(error.message, true);}
         });
-        byId("fleet-schedule-cancel").addEventListener("click", () => {preserveDraft();byId("fleet-schedule-editor").hidden = true;byId("fleet-schedule-new").focus();});
+        byId("fleet-schedule-cancel").addEventListener("click", () => {preserveDraft();byId("fleet-schedule-editor").hidden = true;(rows.get(editId)?.buttons[retirementView?"retire":"edit"]||byId("fleet-schedule-refresh")).focus();});
         byId("fleet-listener").addEventListener("toggle", () => {if (byId("fleet-listener").open) loadListener();});
         byId("fleet-listener-save").addEventListener("click", saveListener);
         const confirmation = byId("fleet-action-confirmation");
@@ -462,7 +465,7 @@
     function setVisible(value) {
         visible = value === true;
         if (root.ControllerMode?.active && byId("fleet-schedules-description"))
-            byId("fleet-schedules-description").textContent = "Assign a schedule to each remote output. This controller has no local transmitter schedule.";
+            byId("fleet-schedules-description").textContent = "Manage existing remote-output schedules. Adding schedules requires target-owned scheduling and is unavailable. This controller has no local transmitter schedule.";
         for (const id of ["fleet-schedules", "fleet-listener"]) {
             const panel = byId(id);
             if (!panel) continue;
@@ -473,9 +476,9 @@
                 continue;
             }
             panel.inert = !visible;
-            panel.querySelectorAll("input,select,button").forEach(control => {control.disabled = !visible || busy || (id === "fleet-listener" && listenerBusy);});
+            panel.querySelectorAll("input,select,button").forEach(control => {if(control.closest("#controllerRetirement"))return;control.disabled = !visible || busy || (retirementView && control.closest("#fleet-schedule-editor") && control.id!=="fleet-schedule-cancel") || (id === "fleet-listener" && listenerBusy);});
         }
-        if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || !!editId || draftProfileChanged;byId("fleet-schedule-save").disabled ||= draftProfileChanged;render();}
+        if (visible) {modeFields();byId("fleet-schedule-device").disabled = busy || retirementView || !!editId || draftProfileChanged;byId("fleet-schedule-save").disabled ||= retirementView || draftProfileChanged || !!root.ControllerRetirement?.fenced || (!editId && !canAssign());render();}
         else {clearTimeout(timer);cancelConfirmation();}
     }
     async function openAssignedEditor(target) {

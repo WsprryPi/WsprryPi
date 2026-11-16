@@ -52,8 +52,9 @@ and requires a fresh config/status read before further work.
 Fleet identifies which actions save explicitly. Device selection and catalog,
 assignment, and listener drafts do not participate in this Pi's automatic
 configuration save. **Use Pico** and this Pi's connection fields retain their
-automatic save behavior. A new output assignment uses the selected saved device;
-without a matching saved selection, choose an output explicitly. The Pi status
+automatic save behavior. Creating a controller-dispatched schedule is unavailable. Existing assignments
+retain their saved output identity; catalog selection cannot retarget them.
+Earlier new-assignment drafts remain inspectable, with Save disabled. The Pi status
 HTTP port is hidden for USB Pico assignments; network profiles retain the field
 for Pi takeover reconciliation. Hiding it preserves the assignment document
 format and the existing port value.
@@ -397,3 +398,53 @@ node WsprryPi-UI/tests/fleet_operation_ui_test.js
 ```
 
 The owning coordinator and browser correlation run unchanged. The network case uses the actual Pico TLS server; the framed USB case uses the actual Pico endpoint driver over a pipe carrier. A separate production Pi authority/engine uses an explicitly constructed simulated backend. Both cases check selected-target isolation, saved scheduling intent, priority Pause and owned cleanup. The canonical USB management pair separately covers production UMP framing/ACK, serialization and journals. The rendered Operations fixture checks presentation, keyboard/modal behavior, freshness and replacement safety in both themes and sizes; it does not qualify the carrier. These are hardware-free software fixtures, not physical USB, clock, GPIO, service or RF evidence.
+
+## Durable controller retirement
+
+`GET /api/control/v1/host/retirements` returns the closed Control/1
+`controller-retirements` document and its quoted SHA-256 revision. It contains
+this controller's identity/incarnation, book generation, and at most 32 assignment
+IDs, target IDs, current assignment revisions, states, and retained receipts.
+Connection settings and frozen recovery data are private.
+
+`POST` on that route accepts only `controller-retirement`: controller ID/current
+incarnation, operation/transition IDs, target/assignment IDs, expected assignment
+revision, and expected book generation. It requires the enforced local browser
+Host/Origin/LAN/proxy checks, management session, CSRF, and strong `If-Match`.
+Exact retained intents return their existing receipt, including after restart;
+ID reuse with changed content refuses. GET performs no recovery writes.
+
+The device-identity-owned private directory under the invoking OS user's home
+contains a checksummed `controller-retirement-book/1` record, with a stable
+private `.established` anchor outside that directory, and the existing
+`pi-management-transaction/1` journal. First publication is atomic before Fleet
+workers start; book establishment and its anchor share one WAL decision. The record binds the physical assignment source, issues persistent
+assignment IDs, and retains frozen rows, observed jobs, intents, completion
+readback, and receipts. Missing/corrupt established history or a different source
+binding holds startup. Restoring assignment v1 or removing its old cleanup journal
+cannot release a retirement fence.
+
+The enqueue permit inhibits new CLAIM/LOAD before persistence. ARM may finish only
+the exact LOAD handed off before that fence. Accepted work drains; retirement
+never silently invokes Pause, ABORT, or a foreign-owner takeover. Unknown/offline
+work remains `retiring`; only fresh matching inactive, unowned terminal/empty
+readback records `retired`. A bounded separate observation-only session may read
+an unresolved endpoint; it cannot dispatch work. Frozen evidence is retained.
+Saved enable/in-flight flags clear only after verified retirement; the tombstone
+already inhibits dispatch if that follow-up write fails. A retired assignment
+cannot be edited, resumed, reconnected for dispatch, or
+reopened by restoring an enabled saved row. An explicit operator stop remains
+separately authorized.
+
+**Retire schedule** opens the saved-assignment review even for busy/offline
+outputs. The configuration fields are read-only in that view. **Review
+retirement** and explicit consent precede the guarded write. **Check saved
+result** reads the retained receipt before an identical retry. Drafts and unknown
+requests stay bound to their original target; the action does not configure or
+enable a replacement schedule.
+
+Local browser retirement is not an authenticated cross-controller proof. The
+scoped machine-retirement protocol and dependent remote-Pi handover remain at the
+deferred security gate. WTP admission, one-shot/manual authorization, Pico
+recurrence, and the shared control major remain unchanged. New target-owned
+schedule enablement is unavailable.

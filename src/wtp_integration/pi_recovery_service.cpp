@@ -55,7 +55,8 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
         try{revision=owner_.store().recovery_revision();}catch(...){healthy=false;state=PiHostReadiness::StorageRecovery;}
         if(state==PiHostReadiness::Ready&&!owner_.admission_ready())state=PiHostReadiness::Starting;
         const auto saved=owner_.draft();
-        const bool editable=healthy&&saved.has_value()&&state==PiHostReadiness::ConfigurationRecovery&&!owner_.configuration_validated();
+        const bool installing=healthy&&owner_.store().installation_pending();
+        const bool editable=healthy&&(saved.has_value()||installing)&&state==PiHostReadiness::ConfigurationRecovery&&!owner_.configuration_validated();
         if(request.path=="/api/control/v1/host/readiness"){
             if(request.method!="GET")return refuse(405,"unsupported_resource");
             return document({{"contract","Wsprry-Control/1"},{"schema","host-readiness"},{"device_id",self_},
@@ -66,7 +67,11 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
             // Initial publication may retire the parser's older file stamp.
             // A verified complete managed record still supplies known saved
             // values for a read-only output/startup hold, never safe defaults.
-            Json known=saved?saved->source:Json::object();
+            Json known=installing?initial_configuration_draft():saved?saved->source:Json::object();
+            if(installing){
+                known["Operation"]["Web Port"]=config.web_port;
+                known["Operation"]["Socket Port"]=config.socket_port;
+            }
             if(!saved&&healthy&&owner_.configuration_validated()&&owner_.store().initialized())
                 known=owner_.store().settings()["configuration"];
             Json defaults=Json::array();
@@ -78,9 +83,9 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
                 }
             Json result{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery"},{"binding",healthy?binding():Json(nullptr)},
                 {"capability_revision",capability_revision_},{"revision",revision},{"writable",editable},{"draft",Json::object()},
-                {"defaulted_fields",defaults},{"validation",healthy?(owner_.configuration_validated()?"unvalidated":"invalid"):"storage_unavailable"}};
+                {"defaulted_fields",defaults},{"validation",healthy?(installing?"initialization":owner_.configuration_validated()?"unvalidated":"invalid"):"storage_unavailable"}};
             const auto budget=32768-result.dump().size();
-            result["draft"]=saved?pi_configuration_recovery_draft(*saved,budget):pi_configuration_recovery_draft(known,budget);
+            result["draft"]=saved&&!installing?pi_configuration_recovery_draft(*saved,budget):pi_configuration_recovery_draft(known,budget);
             return document(result,"configuration-recovery",revision);
         }
         const bool save=request.method=="PUT",action=request.method=="POST";
@@ -98,6 +103,8 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
         if(healthy&&owner_.store().initialized())if(const auto receipt=owner_.store().replay(mutation))return document(*receipt,"target-operation",(*receipt)["revision"]);
         if(!editable)return refuse(503,"authority_pending");
         if(body["expected_revision"]!=revision)return refuse(412,"revision_conflict");
+        if(installing&&(action||body["configuration"]["Operation"]["Transmit"]!=false||
+            body["configuration"]["Operation"]["Enable on Boot"]!="Never"))return refuse(400,"candidate_invalid");
         const auto receipt=owner_.execute_recovery(mutation,[&]{
             validating_candidate=true;
             if(action){persist_stock_configuration(body["action"]=="repair");return;}

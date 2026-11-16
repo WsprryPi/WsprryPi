@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_host.hpp"
 #include "arg_parser.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "controller_runtime.hpp"
@@ -21,6 +22,7 @@ template<class F>void refuses(F action){bool denied=false;try{action();}catch(..
 void put(const std::string &path,const std::string &value){std::ofstream file(path);file<<value;file.close();check(bool(file)&&!chmod(path.c_str(),0600),"Private fixture file");}
 std::string bytes(const std::string &path){std::ifstream file(path);return {std::istreambuf_iterator<char>(file),{}};}
 Json fixture(const std::string &ini){
+    testing::set_wtp_pi_private_state_path(ini+".ledger");
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
     config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";

@@ -401,6 +401,8 @@ bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserve
 void validate_config_ini_input(const std::string &filename);
 // Private metadata guard for an owning-parser snapshot, never a browser path.
 bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &);
+// Explicit first-install draft only; does not publish or validate runtime state.
+nlohmann::json initial_configuration_draft();
 // Validate a private stock preview through the owning INI/config parser, then
 // join the installed transaction owner. Does not publish runtime state or start
 // the file monitor. Repair/Reset uses this before its existing reload lifecycle.

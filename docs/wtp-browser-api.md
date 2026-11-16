@@ -13,6 +13,31 @@ below. Host projections retain explicit `wsprrypi-host/1` scope. That scope does
 not identify a Pico resource version or grant remote authority. Native Pi
 configuration and job-production workflows remain owned by the host application.
 
+## Scheduling authority and retirement
+
+Native local-Pi `GET/POST targets/{device_id}/migration` and
+`POST targets/{device_id}/migration/rollback` use the shared exact
+`target-migration` families, current context/capability/configuration bindings,
+and ordinary durable operation receipts. Migration stages scheduling disabled;
+new enablement is unavailable. Unknown work stays pending, and retained
+previous-boot work requires explicit current reconciliation. Rollback restores
+only the selected recorded local legacy schedule after verified disabled staging.
+
+`GET/POST host/retirements` is the protected controller-local retirement route.
+GET returns `controller-retirements` with a quoted book revision and bounded
+public entries. POST accepts only `controller-retirement`, requires the current
+management browser session/CSRF and strong revision, and returns the retained
+`controller-retirement-operation` receipt. Exact replay cannot create another
+retirement generation. The book contains permanent dispatch fences independent
+of assignment-v1 flags, while offline/unknown work remains pending. See
+[the Fleet storage and workflow contract](wtp-fleet.md#durable-controller-retirement).
+
+These routes are distinct from authenticated cross-controller retirement, which
+remains unavailable with its deferred security boundary. Existing WTP and Pico
+recurrence contracts are unchanged. `host/fleet` rejects new `assign` commands
+before creating a context or contacting a transport; existing assignment editing,
+explicit stop, and ordinary reconciliation retain their guarded paths.
+
 ## Resources and authority
 
 | Backend resource | Authority |

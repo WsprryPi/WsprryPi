@@ -5,6 +5,9 @@
 #include "fleet_test.hpp"
 #include "runtime_config_bridge.hpp"
 #include "fleet_store.hpp"
+#include "controller_retirement.hpp"
+#include "controller_contract.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "fleet_schedule.hpp"
 #include "fleet_recovery.hpp"
 #include "fleet_observation_age.hpp"
@@ -73,11 +76,12 @@ struct FleetContext {
     Json row,retirement,published;
     std::shared_ptr<WtpDispatchPermit> permit{std::make_shared<WtpDispatchPermit>()};
     std::shared_ptr<FleetAction> ordinary,pause;
-    std::shared_ptr<WtpTargetRuntime> target;
+    std::shared_ptr<WtpTargetRuntime> target,retirement_observer;
     std::mutex target_mutex;
-    std::atomic_bool quit{false},recovery{false},finished{false},reclaimable{false};
+    std::atomic_bool quit{false},recovery{false},finished{false},reclaimable{false},recurrence_retired{false};
     std::thread thread;
     bool initial{},dispatched{},removed{},binding_conflict{},cleanup_ok{true};
+    bool retirement_admission{};
     std::mutex notice_mutex;
     std::string external_fault;
     std::uint64_t initial_due{},last_host{};
@@ -107,6 +111,23 @@ bool observed_healthy(const WtpRuntimeStatus& s,const Json& row) {
         s.identity->product==row.at("product").get<std::string>() && s.remote->boot_id==s.identity->boot_id &&
         !s.uncertain && !s.safety_fault;
 }
+const char *retirement_state(wtp::State state) {
+    switch(state){case wtp::State::Empty:return "empty";case wtp::State::Loaded:return "loaded";
+        case wtp::State::Armed:return "armed";case wtp::State::Running:return "running";
+        case wtp::State::Complete:return "complete";case wtp::State::Aborted:return "aborted";
+        case wtp::State::Missed:return "missed";case wtp::State::Failed:return "failed";}
+    throw std::runtime_error("Invalid WTP state");
+}
+Json retirement_observation(const WtpRuntimeStatus &status,const std::string &target) {
+    if(!status.identity||!status.remote||status.identity->device_id!=target||status.identity->boot_id!=status.remote->boot_id)return nullptr;
+    return {{"device_id",target},{"boot_id",status.identity->boot_id},
+        {"owner_id",status.remote->owner_id?Json(*status.remote->owner_id):Json(nullptr)},
+        {"job_id",status.remote->job_id?Json(*status.remote->job_id):Json(nullptr)},
+        {"output_active",status.remote->output_active},{"state",retirement_state(status.remote->state)},
+        {"submitted_job_id",status.job_id.empty()?Json(nullptr):Json(status.job_id)},
+        {"session_id",status.session_id.empty()?Json(nullptr):Json(status.session_id)},
+        {"controller_owner_id",status.owner_id.empty()?Json(nullptr):Json(status.owner_id)}};
+}
 bool observed_idle(const WtpRuntimeStatus& s) {
     return s.remote && !s.remote->owner_id && !s.remote->output_active &&
         (s.remote->state==wtp::State::Empty || s.remote->state==wtp::State::Complete ||
@@ -118,12 +139,16 @@ public:
         :store_(ini+".wtp-assignments.json",self),journal_(ini+".wtp-fleet-contexts.json",self),
          self_id_(self),hooks_(std::move(hooks)),incarnation_(wtp_random_identity()) {
         const auto saved=store_.snapshot();config_=saved.first;etag_=saved.second;
+        const auto retirement_directory=hooks_.retirement_directory.empty()?private_device_state_directory(PrivateDeviceDomain::ControllerRetirements,self):hooks_.retirement_directory;
+        retirement_book_=std::make_unique<ControllerRetirementBook>(retirement_directory,ini+".wtp-assignments.json",self,config_.at("assignments"));
         Json entries=Json::array();
         try {entries=journal_.snapshot().at("contexts");}
         catch(const std::exception& e){journal_error_=bounded(e.what(),512);}
         unsigned index=0;
         for(const auto& row:config_.at("assignments")) {
-            auto c=create_context(row,index++);contexts_.emplace(c->id,c);
+            auto c=create_context(row,index++);
+            if(!retirement_book_->permits(c->id)){std::lock_guard permit(c->permit->mutex);c->permit->retiring=true;}
+            contexts_.emplace(c->id,c);
         }
         for(const auto& entry:entries) {
             const auto id=entry.at("assignment").at("device_id").get<std::string>();
@@ -168,6 +193,7 @@ public:
     }
     PicoHttpResponse request(const std::string& method,const std::string& body,const std::string& revision,
                              const std::string& resource,const std::string& ids) {
+        if(resource=="retirements")return retirement_request(method,body,revision);
         if(method=="GET") {
             std::lock_guard lock(mutex_);
             const auto now=now_checked();
@@ -182,9 +208,13 @@ public:
         const auto command=strict_browser_json(body);
         validate_command(command);
         const auto operation=command.at("operation").get<std::string>();
+        // Existing v1 assignments retain their owner and recovery behavior.
+        // Creating another controller-dispatched recurrence would bypass the
+        // target-owned scheduling interlock. No current target can enable that
+        // replacement here; do not create a disabled legacy assignment either.
+        if(operation=="assign")throw std::runtime_error("New schedules require target-owned scheduling; no compatible target scheduler is available");
         const auto action_id=command.at("action_id").get<std::string>();
-        const auto id=operation=="assign"?parse_wtp_settings(command.at("settings"),true).device_id:
-            command.at("device_id").get<std::string>();
+        const auto id=command.at("device_id").get<std::string>();
         std::shared_ptr<FleetContext> stop;
         PicoHttpResponse response;
         {
@@ -204,14 +234,11 @@ public:
             if(!accepting_ && operation!="pause")throw std::runtime_error("Fleet replacement pending; new work inhibited");
             if(!journal_error_.empty() && operation!="pause" && operation!="recover")throw std::runtime_error(journal_error_);
             auto found=contexts_.find(id);
-            if(operation=="assign") {
-                if(found!=contexts_.end() || id==self_id_)throw std::runtime_error("Duplicate, self or unresolved output");
-                if(contexts_.size()>=32)throw std::runtime_error("Fleet supports at most 32 remote contexts; reconcile unresolved outputs first");
-                if(!command.at("assignment_generation").is_null() || !command.at("reviewed_control_revision").is_null())
-                    throw std::runtime_error("New assignment cannot reuse a context review");
-            } else {
+            {
                 if(found==contexts_.end())throw std::runtime_error("Output context no longer exists");
                 auto& c=*found->second;
+                if(c.retirement_admission)throw std::runtime_error("Retirement intent is being recorded");
+                if(operation!="pause"&&!retirement_book_->permits(id))throw std::runtime_error("Retired or retiring assignment cannot resume or change");
                 if(!journal_error_.empty() && operation=="pause" && (!c.published.contains("identity") || c.published.at("identity").is_null()))
                     throw std::runtime_error("Corrupt recovery storage: no verified live owner for Pause");
                 if(c.quit)throw std::runtime_error("Owner retirement is stopping work; replacement pending");
@@ -237,10 +264,6 @@ public:
             if(found!=contexts_.end() && operation!="pause" && found->second->ordinary &&
                !found->second->ordinary->pending && now<found->second->ordinary->deadline && terminal_count()>=256)
                 throw std::runtime_error("Busy: output result protection active");
-            if(operation=="assign") {
-                auto c=create_context(Json{{"device_id",id}},0);
-                c->row=nullptr;found=contexts_.emplace(id,c).first;
-            }
             auto& c=*found->second;
             if(c.control==UINT64_MAX)throw std::runtime_error("Control revision exhausted");
             auto action=std::make_shared<FleetAction>();
@@ -265,7 +288,7 @@ public:
                 c.pause=action;
             } else {
                 c.ordinary=action;
-                if(operation!="enable" && operation!="assign")c.permit->revoke();
+                if(operation!="enable")c.permit->revoke();
             }
             ++publication_;
             if(!c.thread.joinable()) {
@@ -385,6 +408,9 @@ private:
             p["can_pause"]=!clock_fault_ && !c->published.value("revoked",false) && !c->quit &&
                 (journal_error_.empty() || (c->published.contains("identity") && !c->published.at("identity").is_null()));
             p["can_reconcile"]=!clock_fault_ && journal_error_.empty() && !c->quit && !c->binding_conflict;
+            {std::lock_guard permit(c->permit->mutex);if(c->permit->retiring){
+                p["can_resume"]=false;p["can_reconcile"]=false;p["state"]=c->recurrence_retired?"retired":"retiring";
+            }}
             if(p.contains("age_origin_ms") && p["age_origin_ms"].is_string()) {
                 const auto origin=wtp_fleet_decimal(p["age_origin_ms"]);
                 p["observation_age_ms"]=now>=origin?Json(std::to_string(now-origin)):Json(nullptr);
@@ -433,9 +459,65 @@ private:
     void make_owner(FleetContext& c,const WtpSettings& settings) {
         set_target(c,make_target(hooks_,settings,[this,&c]{return dispatch_allowed(c);}));
     }
+    PicoHttpResponse retirement_request(const std::string &method,const std::string &body,const std::string &revision) {
+        Json assignments;
+        {std::lock_guard lock(mutex_);assignments=config_.at("assignments");}
+        if(method=="GET") {
+            const auto document=retirement_book_->read(incarnation_,assignments);
+            if(!valid_controller_document(document,"controller-retirements"))return controller_target_error(503,"storage_unavailable");
+            return {200,document.dump(),"\""+document.at("revision").get<std::string>()+"\""};
+        }
+        if(method!="POST")return controller_target_error(405,"unsupported_resource");
+        Json intent;try{intent=strict_browser_json(body,16);}catch(...){return controller_target_error(400,"invalid_json");}
+        if(!valid_controller_document(intent,"controller-retirement"))return controller_target_error(400,"invalid_shape");
+        if(revision.empty())return controller_target_error(428,"revision_required");
+        if(revision.size()!=66||revision.front()!='"'||revision.back()!='"'||revision.substr(1,64).find_first_not_of("0123456789abcdef")!=std::string::npos)
+            return controller_target_error(400,"invalid_shape");
+        // Read-only replay remains available even if an operator has removed
+        // the old v1 row. It neither needs a live carrier nor grants new work.
+        try {
+            if(const auto receipt=retirement_book_->replay(intent,revision.substr(1,64)))
+                return {receipt->at("state")=="retired"?200U:202U,receipt->dump(),{}};
+        }catch(const ControllerRetirementConflict&){return controller_target_error(409,"revision_conflict");}
+        catch(...){return controller_target_error(503,"storage_unavailable");}
+        std::shared_ptr<FleetContext> selected;
+        {
+            std::lock_guard lock(mutex_);
+            const auto found=contexts_.find(intent.at("target_id"));
+            if(found==contexts_.end())return controller_target_error(409,"target_mismatch");
+            selected=found->second;auto &c=*selected;
+            if(c.retirement_admission||(c.ordinary&&c.ordinary->pending)||(c.pause&&c.pause->pending)||c.quit)return controller_target_error(409,"authority_pending");
+            c.retirement_admission=true;assignments=config_.at("assignments");
+            // The enqueue lock closes the pre-dispatch race. ARM may finish
+            // only a LOAD handed off before this fence; no new CLAIM/LOAD.
+            {std::lock_guard permit(c.permit->mutex);c.permit->retiring=true;}
+        }
+        auto &c=*selected;PicoHttpResponse response;
+        try {
+            if(hooks_.before_retirement_persist)hooks_.before_retirement_persist();
+            const auto receipt=retirement_book_->retire(intent,revision.size()==66&&revision.front()=='"'&&revision.back()=='"'?revision.substr(1,64):std::string{},incarnation_,assignments,
+                target(c)?retirement_observation(target(c)->app->status(),c.id):Json(nullptr));
+            response={receipt.at("state")=="retired"?200U:202U,receipt.dump(),{}};
+        }catch(const ControllerRetirementConflict&) {
+            // A definite pre-write conflict can be reviewed again. It cannot
+            // be confused with a committed decision awaiting publication.
+            try {if(retirement_book_->permits(c.id)){std::lock_guard permit(c.permit->mutex);c.permit->retiring=false;}}catch(...){}
+            response=controller_target_error(409,"revision_conflict");
+        }catch(...) {
+            // Missing/changed authority or a publication failure stays fenced.
+            response=controller_target_error(503,"storage_unavailable");
+        }
+        {std::lock_guard lock(mutex_);c.retirement_admission=false;++publication_;}
+        return response;
+    }
     bool dispatch_allowed(FleetContext& c) {
         if(c.quit || c.recovery || !storage_error().empty())return false;
-        {std::lock_guard lock(c.permit->mutex);if(!c.permit->allowed)return false;}
+        bool draining=false;
+        {std::lock_guard lock(c.permit->mutex);if(!c.permit->allowed)return false;
+         draining=c.permit->retiring;if(draining&&!c.permit->loaded_job)return false;}
+        // An accepted LOAD drains without waiting behind retirement fsync.
+        // The backend still permits ARM only for that exact pre-fence job.
+        if(!draining)try{if(!retirement_book_->permits(c.id))return false;}catch(...){return false;}
         try {
             const auto row=row_for(store_.snapshot().first,c.id);
             if(!row || !row->at("enabled").get<bool>())return false;
@@ -521,6 +603,7 @@ private:
     }
     bool eligible(FleetContext& c,const Json& row,std::string& reason) {
         try {
+            if(!retirement_book_->permits(c.id))throw std::runtime_error("This controller assignment is retired or retiring");
             if(c.quit || c.recovery || c.removed || !c.retirement.is_null())throw std::runtime_error("Reconcile unresolved work before resuming");
             {std::lock_guard lock(mutex_);if(!journal_error_.empty())throw std::runtime_error(journal_error_);}
             auto t=target(c);if(!t)throw std::runtime_error("Output has not been inspected");
@@ -622,31 +705,8 @@ private:
         bool effects=a.operation=="pause";
         try {
             const auto& cmd=a.command;
-            if(a.operation=="assign") {
-                const auto settings=parse_wtp_settings(cmd.at("settings"),true);
-                make_owner(c,settings);auto t=target(c);
-                c.row={{"device_id",c.id},{"settings",cmd.at("settings")},{"name",cmd.at("name")},
-                    {"schedule",cmd.at("schedule")},{"enabled",false},{"product","WsprryPico"},
-                    {"management_port",cmd.at("management_port")},{"revocation_generation",nullptr},{"last_start_ns","0"},{"in_flight",false}};
-                const auto started=now_ms();const auto result=t->app->inspect();c.initial=true;
-                const auto s=t->app->status();
-                if(!s.identity || now_ms()-started>=45000)throw std::runtime_error("Output inspection unavailable or expired");
-                c.row["product"]=s.identity->product;
-                if(!observed_healthy(s,c.row))throw std::runtime_error(result.error);
-                if(c.row.at("product")=="WsprryPi") {
-                    // Seed from one closed, boot-bound observation. An
-                    // uncreated assignment has no cleanup authority to retire
-                    // if a second, unchecked sample differs from the first.
-                    c.last_host=now_ms();auto state=host_read(c,c.row);
-                    c.row["revocation_generation"]=state.at("revocation_generation");
-                    if(!apply_host(c,c.row,std::move(state),c.last_host))throw std::runtime_error("Pi assignment was revoked");
-                }
-                check_caps(c.row,s);
-                if(cmd.at("enabled").get<bool>()){std::string why;if(!eligible(c,c.row,why))throw std::runtime_error(why);}
-                if(!current(c,a))throw std::runtime_error("Action superseded before assignment persistence");
-                c.row["enabled"]=cmd.at("enabled");
-                update_config(a.etag,[&](Json& d){if(!current(c,a))throw std::runtime_error("Action superseded");effects=true;d["assignments"].push_back(c.row);});
-            } else {
+            if(a.operation=="assign")throw std::runtime_error("New controller schedules are unavailable");
+            {
                 auto saved=store_.snapshot();auto row=row_for(saved.first,c.id);
                 // A durable deletion may precede a failed publication/fsync
                 // acknowledgment. Frozen retirement authority remains valid,
@@ -724,7 +784,7 @@ private:
                 c.permit->revoke();if(effects && !c.removed)pause_saved(c);
                 complete(c,a,"superseded","Newer intent revoked activation");return;
             }
-            if((a.operation=="enable" || a.operation=="assign") && c.row.value("enabled",false)) {
+            if(a.operation=="enable" && c.row.value("enabled",false)) {
                 std::lock_guard lock(mutex_);
                 std::lock_guard permit(c.permit->mutex);
                 if(a.fence==c.control && !c.quit && !c.recovery)c.permit->allowed=true;
@@ -734,9 +794,6 @@ private:
             c.permit->revoke();
             if(effects)latch(c,e.what());
             complete(c,a,effects?"outcome_unconfirmed":"refused",e.what());
-            if(a.operation=="assign" && !row_for(store_.snapshot().first,c.id)) {
-                c.removed=true;c.retirement=nullptr;
-            }
         }
     }
     void publish(FleetContext& c) {
@@ -803,8 +860,46 @@ private:
         p["utc_anchor_ms"]=std::to_string(now_ms());
         std::lock_guard lock(mutex_);if(p!=c.published){c.published=std::move(p);++publication_;}
     }
+    void pause_retired(FleetContext &c) {
+        c.recurrence_retired=true;
+        if(c.row.value("enabled",false)||c.row.value("in_flight",false)) {
+            // The durable tombstone is already authoritative. Clearing saved
+            // flags is a monotonic follow-up, never a grant or loss of proof.
+            update_config({},[&](Json &data){if(row_for(data,c.id))modify_row(data,c.id,[](Json &row){row["enabled"]=false;row["in_flight"]=false;});});
+            c.row["enabled"]=false;c.row["in_flight"]=false;
+        }
+    }
+    void tick_retirement(FleetContext &c) {
+        auto original=target(c);
+        if(original&&original->app->active()){c.message="Retirement pending: accepted work is finishing";return;}
+        if(!retirement_book_->pending(c.id)){
+            // The enqueue fence precedes the durable intent. A worker may
+            // observe that interval, or a definite pre-publication failure.
+            // Neither is retirement proof or permission to clear saved flags.
+            if(retirement_book_->permits(c.id)){c.message="Retirement pending: the durable decision has not been verified";return;}
+            pause_retired(c);c.message="This controller's schedule is retired";return;
+        }
+        if(!original){make_owner(c,parse_wtp_settings(c.row.at("settings"),true));original=target(c);}
+        (void)original->app->take_completion();
+        auto observed=original;
+        const auto phase=original->app->status().session_phase;
+        if(phase==wtp::SessionPhase::Fault||phase==wtp::SessionPhase::IdentityChanged||original->app->status().phase==WtpSchedulePhase::Blocked) {
+            // Retain the unresolved owner and its evidence. A separate bounded
+            // observation-only session cannot submit CLAIM, LOAD, or ARM.
+            if(!c.retirement_observer)c.retirement_observer=make_target(hooks_,parse_wtp_settings(c.row.at("settings"),true),[]{return false;},original->output_lease_snapshot());
+            observed=c.retirement_observer;
+        }
+        if(observed->app->status().session_phase==wtp::SessionPhase::Ready)(void)observed->app->poll_idle();
+        else (void)observed->app->inspect();
+        const auto status=observed->app->status();const auto now=observed->clock.now_ms();
+        if(observed_healthy(status,c.row)&&observed_idle(status)&&status.status_age_origin_ms&&now>=*status.status_age_origin_ms&&now-*status.status_age_origin_ms<15000) {
+            retirement_book_->confirm_idle(c.id,retirement_observation(status,c.id));pause_retired(c);c.message="Retirement confirmed; this saved schedule cannot resume";
+        }else c.message="Retirement pending: inactive, unowned output has not been verified";
+    }
     void tick(FleetContext& c) {
         if(c.row.is_null() || c.removed)return;
+        bool fenced;{std::lock_guard permit(c.permit->mutex);fenced=c.permit->retiring;}
+        if(fenced||!retirement_book_->permits(c.id)){tick_retirement(c);return;}
         if(!storage_error().empty() || !c.retirement.is_null())return;
         if(!c.initial && c.recovery)return; // Restored crash barrier: no initial carrier work.
         if(!target(c))make_owner(c,parse_wtp_settings(c.row.at("settings"),true));
@@ -845,7 +940,7 @@ private:
         try {
             update_config({},[&](Json& d){modify_row(d,c.id,[&](Json& r){
                 std::lock_guard permit(c.permit->mutex);
-                if(!c.permit->allowed || c.quit || !r.value("enabled",false) || r.at("schedule")!=c.row.at("schedule"))throw std::runtime_error("Dispatch revoked");
+                if(!c.permit->allowed || c.permit->retiring || c.quit || !r.value("enabled",false) || r.at("schedule")!=c.row.at("schedule"))throw std::runtime_error("Dispatch revoked");
                 r["last_start_ns"]=std::to_string(next);r["in_flight"]=true;
             });});
             c.row["last_start_ns"]=std::to_string(next);c.row["in_flight"]=true;c.dispatched=true;
@@ -892,7 +987,7 @@ private:
         std::lock_guard lock(mutex_);
         for(auto& a:{c.ordinary,c.pause})if(a && a->pending){a->pending=false;a->completed=now_ms();a->record["state"]="outcome_unconfirmed";a->record["work_pending"]=false;a->record["reason"]="Controller owner retired; review restored barriers";}
     }
-    WtpFleetStore store_;WtpFleetJournal journal_;
+    WtpFleetStore store_;WtpFleetJournal journal_;std::unique_ptr<ControllerRetirementBook> retirement_book_;
     std::string self_id_;WtpFleetTestHooks hooks_;std::string incarnation_;
     WtpSteadyClock clock_;std::uint64_t last_clock_{},publication_{1};bool accepting_{true},clock_fault_{};
     std::atomic_bool exiting_{false};std::thread reaper_;
@@ -921,8 +1016,14 @@ void start_wtp_fleet(const std::string& ini,const std::string& self) {
     try{replace_manager(ini,self);}
     catch(const std::exception&){ /* The lifecycle owner published the failure. */ }
 }
+void start_wtp_fleet_private_storage_for_test(const std::string &ini,const std::string &self,const std::string &directory) {
+    if(directory.empty())throw std::runtime_error("Explicit private fixture namespace required");
+    WtpFleetTestHooks hooks;hooks.retirement_directory=directory;
+    try{replace_manager(ini,self,std::move(hooks));}catch(const std::exception&){}
+}
 void start_wtp_fleet_for_test(const std::string& ini,const std::string& self,WtpFleetTestHooks hooks) {
     if(!hooks.create_target || !hooks.revocation_status)throw std::runtime_error("Explicit Fleet fixture providers required");
+    if(hooks.retirement_directory.empty())hooks.retirement_directory=ini+".controller-retirements";
     replace_manager(ini,self,std::move(hooks));
 }
 void stop_wtp_fleet() noexcept {
@@ -935,9 +1036,10 @@ PicoHttpResponse wtp_fleet_api(const std::string& method,const std::string& body
                               const std::string& resource,const std::string& ids) {
     std::shared_ptr<Fleet> current;std::string error;
     {std::lock_guard lock(manager_mutex);current=manager;error=startup_error;}
+    if(!current&&resource=="retirements")return controller_target_error(503,"storage_unavailable");
     if(!current)return {503,Json{{"error",{{"code","fleet_unavailable"},{"message",error}}}}.dump(),{}};
     try{return current->request(method,body,revision,resource,ids);}
-    catch(const std::exception& e){const std::string reason=e.what();return {reason=="revision_conflict"?412U:409U,
+    catch(const std::exception& e){if(resource=="retirements")return controller_target_error(503,"storage_unavailable");const std::string reason=e.what();return {reason=="revision_conflict"?412U:409U,
         Json{{"error",{{"code",reason=="revision_conflict"?"revision_conflict":"fleet_request_rejected"},{"message",bounded(reason,512)}}}}.dump(),{}};}
 }
 } // namespace wsprrypi

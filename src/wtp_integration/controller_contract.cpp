@@ -63,6 +63,7 @@ bool match(const Json &value,const Json &rule,const Json &definitions,unsigned d
     if(value.is_array()) {
         if(value.size()<rule.value("minItems",0U)||value.size()>rule.value("maxItems",512U))return false;
         if(rule.contains("items"))for(const auto &item:value)if(!match(item,rule["items"],definitions,depth+1))return false;
+        if(rule.value("uniqueItems",false))for(std::size_t i=0;i<value.size();++i)for(std::size_t j=0;j<i;++j)if(value[i]==value[j])return false;
     }
     if(value.is_string()) {
         const auto &text=value.get_ref<const std::string&>();
@@ -98,6 +99,24 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
         const auto &documents=adapter["documents"];
         if(std::find(documents.begin(),documents.end(),name)==documents.end()||!definitions.contains(std::string(name))||
             !match(value,definitions[std::string(name)],definitions,0))return false;
+        if(name=="target-migration"||name=="target-migration-read"||name=="target-migration-rollback"){
+            for(const auto *key:{"controllers","retirements","jobs"})if(value.contains(key)){
+                std::set<std::pair<std::string,std::string>> seen;
+                for(const auto &row:value.at(key))if(!seen.emplace(row.at("controller_id").get<std::string>(),
+                    row.at(std::string_view(key)=="jobs"?"job_id":"assignment_id").get<std::string>()).second)return false;
+            }
+        }
+        if(name=="controller-retirements") {
+            std::set<std::string> targets,assignments;
+            for(const auto &row:value.at("assignments")) {
+                if(!targets.insert(row.at("target_id").get<std::string>()).second||!assignments.insert(row.at("assignment_id").get<std::string>()).second)return false;
+                const auto &receipt=row.at("receipt");
+                if(row.at("state")=="legacy"&&!receipt.is_null())return false;
+                if(row.at("state")=="retiring"||row.at("state")=="retired")if(receipt.is_null()||receipt.at("state")!=row.at("state"))return false;
+                if(!receipt.is_null()&&(receipt.at("controller_id")!=value.at("controller_id")||receipt.at("target_id")!=row.at("target_id")||receipt.at("assignment_id")!=row.at("assignment_id")||
+                    std::stoull(receipt.at("generation").get<std::string>())>std::stoull(value.at("generation").get<std::string>())))return false;
+            }
+        }
         if(name=="targets") {std::set<std::string> ids;for(const auto &target:value["targets"])if(!ids.insert(target["device_id"]).second)return false;}
         if(name=="target-context") {
             for(const auto *field:{"device_id","profile_generation","connection_generation"})

@@ -41,6 +41,7 @@
 // Primary header for this source file
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
+#include "recurrence_admission.hpp"
 #include "chipset_offsets.hpp"
 #include "rp1_route_bridge.hpp"
 #include "rp1_pps_calibration.hpp"
@@ -1743,6 +1744,19 @@ bool active_wspr_plan_has_more_frames_after_current() noexcept
            (active_wspr_frame_index + 1U) < active_wspr_plan.frameCount();
 }
 
+bool legacy_recurrence_transition_idle() noexcept
+{
+    // Called with the parent lifecycle lock. An accepted paired plan remains
+    // owned between frames even when the instantaneous output is inactive.
+    return !active_wspr_plan_in_progress && !web_test_tone.load();
+}
+bool legacy_recurrence_has_accepted_work() noexcept
+{
+    return !web_test_tone.load() && (active_wspr_plan_in_progress ||
+        ((config.mode==ModeType::QRSS||config.mode==ModeType::FSKCW||config.mode==ModeType::DFCW)&&
+         non_wspr_schedule_generation.load(std::memory_order_acquire)>0));
+}
+
 bool is_managed_persistent_mode() noexcept
 {
     return config.use_ini;
@@ -2907,6 +2921,7 @@ bool start_non_wspr_transmission_now_for_test(const ArgParserConfig &cfg)
 bool launch_scheduled_non_wspr_if_current(std::uint64_t generation)
 {
     std::lock_guard transaction(test_tone_lifecycle_mutex());
+    if (!wsprrypi::legacy_recurrence_admitted()) return false;
     if (exiting_wspr.load(std::memory_order_acquire) || web_test_tone.load() ||
         generation != non_wspr_schedule_generation.load(std::memory_order_acquire))
         return false;
@@ -2920,6 +2935,7 @@ bool launch_scheduled_non_wspr_if_current(std::uint64_t generation)
 
 void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
 {
+    if (!wsprrypi::legacy_recurrence_admitted()) return;
     if (cfg.mode != ModeType::QRSS &&
         cfg.mode != ModeType::FSKCW &&
         cfg.mode != ModeType::DFCW)

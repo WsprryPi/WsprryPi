@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config_types.hpp"
+#include "owned_state_directory.hpp"
 #include "wtp_endpoint/management_observation.hpp"
 
 #include <string>
@@ -8,6 +9,20 @@
 #include <optional>
 
 namespace wsprrypi {
+
+// Pre-startup observation only: no directory creation, output, or ledger writes.
+// Existing or unreadable prior endpoint state prevents new-install eligibility.
+bool wtp_pi_has_prior_output_history() noexcept;
+struct PiRecurrenceStorage {
+    std::string path;
+    bool existed{},prior_output_history{};
+};
+// Trusted pre-parser startup only. Fixed OS-owner/device namespace, independent
+// of INI filename, HTTP parameters, HOME overrides, or selected output backend.
+enum class PrivateDeviceDomain {Recurrence,ControllerRetirements};
+std::string private_device_state_directory(PrivateDeviceDomain,const std::string &device_id);
+PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device_id,const std::string &ini,
+    const std::function<void(OwnedStatePublicationPoint)> &checkpoint = {});
 
 // Lives in the normal singleton-owning managed service, not a second daemon.
 bool start_wtp_pi_endpoint(const ArgParserConfig& config, std::string* error);

@@ -603,6 +603,9 @@ first disables the new recurrence, drains/reconciles accepted work, and verifies
 that state before automatically resuming the explicitly selected old assignment.
 Unknown rollback outcomes stay pending. Clean-install initialization needs
 positive target-local evidence of no prior authority, not merely an empty catalog.
+P5-03 defines that evidence as this installation having accepted no work since
+its authority record was established, with automatic provenance and explicit
+Maintenance setup; it does not attest that erased hardware was never used.
 These are required implementation/validation obligations under the approved
 semantics, not claims that current code implements the migration workflow.
 

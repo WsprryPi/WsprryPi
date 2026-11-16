@@ -92,6 +92,7 @@ PrivilegedOperationClass classify_privileged_http_operation(
 
     if (path.starts_with("/api/control/v1/")) {
         if((path=="/api/control/v1/host/readiness"&&method=="GET")||
+            (path=="/api/control/v1/host/retirements"&&(method=="GET"||method=="POST"))||
             (path=="/api/control/v1/host/configuration-recovery"&&(method=="GET"||method=="PUT"||method=="POST")))
             return PrivilegedOperationClass::protected_operation;
         if((path=="/api/control/v1/targets"&&method=="GET")||
@@ -102,8 +103,8 @@ PrivilegedOperationClass classify_privileged_http_operation(
             if(relative.size()<34||relative[32]!='/'||relative.substr(0,32).find_first_not_of("0123456789abcdef")!=std::string_view::npos)
                 return PrivilegedOperationClass::reject;
             relative.remove_prefix(33);
-            if((method=="GET"&&(relative=="context"||relative=="settings"||relative=="status"))||
-                (method=="PUT"&&relative=="settings")||(method=="POST"&&relative=="stop"))
+            if((method=="GET"&&(relative=="context"||relative=="settings"||relative=="status"||relative=="migration"))||
+                (method=="PUT"&&relative=="settings")||(method=="POST"&&(relative=="stop"||relative=="migration"||relative=="migration/rollback")))
                 return PrivilegedOperationClass::protected_operation;
             if(relative.starts_with("pico/")&&wsprrypi::controller_pico_route(relative.substr(5),method))
                 return PrivilegedOperationClass::protected_operation;

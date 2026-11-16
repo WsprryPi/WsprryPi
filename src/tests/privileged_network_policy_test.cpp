@@ -40,6 +40,14 @@ int main() {
     expect_http("GET", "/api/wtp", Classification::read_only);
     expect_http("GET", "/api/wtp/recover", Classification::reject);
     expect_http("PUT", "/api/wtp", Classification::reject);
+    for(const auto *method:{"GET","POST"})expect_http(method,"/api/control/v1/host/retirements",Classification::protected_operation);
+    for(const auto *method:{"PUT","DELETE","PATCH"})expect_http(method,"/api/control/v1/host/retirements",Classification::reject);
+    const std::string target="/api/control/v1/targets/"+std::string(32,'a');
+    expect_http("GET",target+"/migration",Classification::protected_operation);
+    for(const auto *suffix:{"/migration","/migration/rollback"})expect_http("POST",target+suffix,Classification::protected_operation);
+    expect_http("GET",target+"/migration/rollback",Classification::reject);
+    expect_http("PUT",target+"/migration",Classification::reject);
+    expect_http("POST",target+"/migration/unknown",Classification::reject);
     expect_http("GET","/api/control/v1/host/readiness",Classification::protected_operation);
     for(const auto *method:{"POST","PUT","DELETE"})expect_http(method,"/api/control/v1/host/readiness",Classification::reject);
     for(const auto *method:{"GET","PUT","POST"})expect_http(method,"/api/control/v1/host/configuration-recovery",Classification::protected_operation);
