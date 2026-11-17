@@ -3,9 +3,9 @@
 Status: ▧ not started · ⏳ in progress · ✅ complete.
 
 These indicators track phase execution, not prompt preparation. Phase 1 is
-design-only; its completion does not claim application implementation. All eight
-prompts have been prepared and reviewed. At preparation (2026-11-15), no implementation
-phase had started.
+design-only; its completion does not claim application implementation. The original
+eight prompts were prepared and reviewed on 2026-11-15, before implementation
+started. Phase 6 was split into separately prompted 6.1 and 6.2 on 2026-11-16.
 
 Follow the [authoritative plan](device-owned-solar-scheduling-plan.md) for
 [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473). Each prompt requires
@@ -32,11 +32,15 @@ separate authorization to execute and successful prerequisite gates.
    from controller-owned schedules before allowing new schedule enables.
    [Phase 5 prompt](issue-473/05-authority-transition.md) ·
    [Phase-5 implementation and validation](issue-473/phase-5-progress.md)
-6. ▧ **Integrate device-owned recurrence:** Apply solar policies to Pi scheduling,
-   including ownership, enablement, restart handling, and status. Complete the
-   [deferred Pi pairing/TLS and remote-management gate](issue-473/deferred-pi-security.md)
-   before this phase can finish or phase 7 can begin.
-   [Phase 6 prompt](issue-473/06-device-recurrence.md)
+6. ▧ **Device-owned recurrence and secure remote management:** Both subphases
+   require separate execution authority and acceptance before phase 7.
+   - ▧ **6.1 Integrate device-owned recurrence:** Apply solar policies to Pi
+     scheduling, including ownership, enablement, restart handling, and status.
+     [Phase 6.1 prompt](issue-473/06-device-recurrence.md)
+   - ▧ **6.2 Complete Pi security and remote management:** Deliver automatic
+     pairing/TLS, authenticated remote adapters, and deferred editor/handover
+     integration. [Phase 6.2 prompt](issue-473/06-2-pi-security.md) ·
+     [Security-gate requirements](issue-473/deferred-pi-security.md)
 7. ▧ **Add shared Scheduling UI:** Provide target-specific scheduling controls
    and verify autonomous remote operation.
    [Phase 7 prompt](issue-473/07-scheduling-ui.md)

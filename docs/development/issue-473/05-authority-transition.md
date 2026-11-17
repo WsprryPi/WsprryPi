@@ -10,7 +10,7 @@ ownership, storage, security, and recovery decisions. Require phases 1–4 gates
 Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
 acceptance covers local Pi and existing Pico management. Implement independently
 eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
-associated migration remain unavailable until the end-of-phase-6 security gate.
+associated migration remain unavailable until the phase-6.2 security gate.
 Carry their acceptance obligations into that gate; do not substitute unsecured
 transport, fabricated capability, or host writes for remote target operations.
 Existing security and target-local authority checks remain enforced.
@@ -38,7 +38,7 @@ to reconcile uncertain work; preserve them until safe retirement is verified.
    ownership, positively confirm old-authority retirement, save the target schedule
    disabled, and verify authoritative persistence. Enablement is a separate explicit
    step guarded by this interlock and the complete runtime readiness contract.
-   Do not implement the phase 7 enable UI or activate unfinished phase 6 recurrence.
+   Do not implement the phase 7 enable UI or activate unfinished phase 6.1 recurrence.
 4. An offline previous controller or unknown outstanding work blocks new enablement
    until positively resolved. Establish clean-install eligibility from authoritative
    target ownership records, not an empty browser/controller catalog. Support a
@@ -85,4 +85,4 @@ The gate requires crash-safe target-enforced fencing and reconciliation before a
 new enablement can be exposed. If a predecessor design cannot prove retirement,
 report the design gap for approval rather than weaken the interlock. No journal
 cleanup or legacy-runtime removal is authorized here. End with the shared report
-and review loop; stop before phase 6.
+and review loop; stop before phase 6.1.

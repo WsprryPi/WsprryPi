@@ -7,7 +7,7 @@ and [pairing workflow](phase-1-pairing.md). No phase-2 implementation is authori
 
 Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS
 and controller-to-remote-Pi management are deferred to the
-[end-of-phase-6 security milestone](deferred-pi-security.md). These approved
+[phase-6.2 security milestone](deferred-pi-security.md). These approved
 design contracts remain unchanged; phase 2 no longer claims their implementation.
 Existing WTP/Pico TLS and the requirement for an automatic certificate-free
 operator workflow remain unchanged.

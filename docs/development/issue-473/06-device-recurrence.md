@@ -1,20 +1,21 @@
-# Phase 6 prompt: Pi device-owned recurrence and ownership integration
+# Phase 6.1 prompt: Pi device-owned recurrence and ownership integration
 
-Execute only phase 6 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473)
+Execute only phase 6.1 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473)
 when separately authorized. Read the [execution rules](execution-rules.md), the full
 [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions.
 Require phases 1–5 gates, especially target-local authority fencing. Read
 `docs/simulated-backend.md` before designing application tests.
 
-## Deferred Pi security acceptance
+## Phase 6.1 boundary
 
-The user-approved [security milestone](deferred-pi-security.md) is a mandatory
-part of this phase's final gate, after independent recurrence development and
-before phase 7. Complete new automatic Pi pairing/TLS, authenticated remote Pi
-management, and deferred remote editor/authority integration and evidence.
-Qualify the provider first; no fallback or manual-credential substitute is
-authorized. Keep remote management unavailable until its applicable gates pass.
-This document is future execution scope, not authorization to begin phase 6 now.
+The user split phase 6 into separately executed subphases on 2026-11-16.
+This prompt covers recurrence integration only. The [phase 6.2 prompt](06-2-pi-security.md)
+covers automatic pairing/TLS, authenticated remote Pi management, and deferred
+remote editor/handover acceptance under the [security gate](deferred-pi-security.md).
+Phase 6.1 may pass its own gate independently; overall phase 6 cannot complete
+and phase 7 cannot begin until both subphases pass. Keep remote Pi management
+unavailable until its applicable security gates pass. Executing this prompt does
+not authorize beginning phase 6.2 or phase 7.
 
 ## Objective and inspection
 
@@ -93,4 +94,4 @@ UI or UI documentation changes and record visual evidence.
 The gate requires safe admission and ownership through actual application paths,
 restart-safe bounded progress, truthful status, and successful applicable suites.
 Software simulation does not qualify GPIO, timing, physical USB, installation,
-services, or RF. End with the shared report and review loop; stop before phase 7.
+services, or RF. End with the shared report and review loop; stop before phase 6.2.

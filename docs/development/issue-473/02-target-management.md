@@ -10,7 +10,7 @@ Require the phase 1 gate before implementation; report missing approvals explici
 Implement bounded, protected local Pi and existing authenticated Pico management
 adapters, with explicit controller-only operation. Under the approved
 [sequencing amendment](deferred-pi-security.md), new Pi pairing/TLS and the
-controller-to-remote-Pi adapter/lifecycle move to the mandatory end-of-phase-6
+controller-to-remote-Pi adapter/lifecycle move to the mandatory phase-6.2
 security milestone. Preserve their approved design; keep those paths unavailable.
 Management context must be independent of the controller's output backend, active claims, and jobs.
 

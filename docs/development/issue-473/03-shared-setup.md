@@ -10,7 +10,7 @@ Require phases 1–2 acceptance evidence for the intended candidate sources.
 Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
 acceptance covers local Pi and existing Pico management. Implement independently
 eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
-associated migration remain unavailable until the end-of-phase-6 security gate.
+associated migration remain unavailable until the phase-6.2 security gate.
 Carry their acceptance obligations into that gate; do not substitute unsecured
 transport, fabricated capability, or host writes for remote target operations.
 Existing security and target-local authority checks remain enforced.

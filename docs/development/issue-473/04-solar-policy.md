@@ -11,7 +11,7 @@ admission, authority migration, or the Scheduling UI.
 Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
 acceptance covers local Pi and existing Pico management. Implement independently
 eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
-associated migration remain unavailable until the end-of-phase-6 security gate.
+associated migration remain unavailable until the phase-6.2 security gate.
 Carry their acceptance obligations into that gate; do not substitute unsecured
 transport, fabricated capability, or host writes for remote target operations.
 Existing security and target-local authority checks remain enforced.
@@ -40,7 +40,7 @@ separate scope approval and must remain independently buildable/testable.
 3. Preserve Pi WSPR lists, explicit skip entries, selector metadata, and backend-
    qualified frequency rules. Model independent progression for explicit period
    lists and shared ordinary progression for inherited lists. Evaluation is pure;
-   progress advancement belongs to accepted occurrences/skips in phase 6. CW uses
+   progress advancement belongs to accepted occurrences/skips in phase 6.1. CW uses
    current base-frequency/shift semantics; validate every derived tone.
 4. Add defaults, parsing, strict validation, internal structures/copies, atomic
    persistence, serialization, target API adapters, and reload propagation together.
@@ -86,4 +86,4 @@ runtime solar admission or UI controls before their phases exist.
 The gate requires deterministic geometry, strict round-trip configuration, preserved
 baseline behavior, failed-write safety, and all applicable shared-interface checks.
 New scheduling enablement must remain unavailable until phase 5 authority fencing
-and phase 6 admission exist. End with the shared report and review loop; stop here.
+and phase 6.1 admission exist. End with the shared report and review loop; stop here.

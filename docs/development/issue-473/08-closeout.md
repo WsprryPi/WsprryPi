@@ -7,7 +7,7 @@ acceptance evidence for phases 1–7. Reinspect actual sources, repository autho
 branches, dirty changes, and companion availability before relying on prior results.
 
 The [deferred Pi security milestone](deferred-pi-security.md) must already have
-passed at the end of phase 6. Verify its actual provider, automatic lifecycle,
+passed as phase 6.2, alongside completed phase 6.1 recurrence acceptance. Verify its actual provider, automatic lifecycle,
 remote editor/migration integration, current-source tests, and documentation;
 phase-2 completion under the narrowed gate is not remote-security evidence.
 

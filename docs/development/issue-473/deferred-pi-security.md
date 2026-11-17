@@ -1,7 +1,12 @@
-# Deferred Pi management security milestone
+# Phase 6.2: Pi security and remote-management gate
 
-Status: sequencing amendment approved by the user on 2026-11-16. Implementation
-is deferred; this document does not authorize executing a later phase.
+Status: sequencing amendment approved by the user on 2026-11-16. The user split
+phase 6 into recurrence integration (6.1) and this security gate
+(6.2) on 2026-11-16. Neither subphase has started; each requires separate execution
+authority. Use the [phase 6.2 execution prompt](06-2-pi-security.md).
+
+The [implementation plan](phase-6-2-implementation-plan.md) expands this gate
+without authorizing implementation or changing the approved contracts.
 
 ## Scope and placement
 
@@ -9,10 +14,11 @@ Keep all eight phases. Phase 2 completes the local Pi service, existing Pico
 management, explicit controller-only role, protected persistence/recovery, and
 readiness foundations. New controller-to-remote-Pi management, automatic Pi
 pairing, its new TLS transport, and the dependent lifecycle/acceptance work move
-to a mandatory milestone at the end of phase 6, before phase 7 may start.
-Phases 3–6 may implement independent local Pi and existing Pico behavior when
-separately authorized. Phase 6 cannot be marked complete until this milestone
-and deferred remote checks from phases 3 and 5 pass. Phase 8 cannot waive it.
+to mandatory phase 6.2, after recurrence integration in phase 6.1 and before
+phase 7 may start. Phases 3–6 may implement independent local Pi and existing
+Pico behavior when separately authorized. Phase 6.1 has its own recurrence acceptance gate. Overall
+phase 6 cannot be marked complete until both 6.1 and 6.2, including deferred remote
+checks from phases 3 and 5, pass. Phase 8 cannot waive this requirement.
 
 This supersedes only implementation order and affected acceptance gates. D02,
 D07, the phase-1 pairing workflow, and normative security/storage contracts remain
@@ -43,6 +49,32 @@ approved pairing-wire amendment. No dependency or wire amendment is approved her
   keep its configuration disabled and preserve all uncertainty/retirement evidence.
 - Nothing here permits early recurrence enablement, reduced validation, relaxed
   origin/CSRF checks, or cleanup of authority/recovery records.
+
+## Pairing flows to consider at this gate
+
+Recorded at the user's request on 2026-11-16. Review these proposed flows when
+designing and implementing this milestone; recording them does not authorize
+implementation or supersede the approved security contracts above.
+
+- **Direct USB Pico:** A Pico connected by USB to the managing device should
+  automatically negotiate pairing.
+- **IP-connected Pi or Pico:** Allow the target to generate a pairing code for
+  entry on the managing device to negotiate pairing.
+- **Pico connected by USB to a managed Pi:** The attached Pico should automatically
+  negotiate pairing through that Pi.
+
+User clarification (2026-11-16): when managing a Pi, use that existing authenticated
+connection to negotiate management of attached Picos automatically. No separate
+delegation switch, child-scope approval, or additional operator pairing step is
+required. Preserve device/context validation and existing resource/safety checks.
+This clarification does not approve the other pending research recommendations.
+
+Define the backend authorization and identity binding for management negotiated
+through the Pi, including key ownership and replacement/revocation effects,
+without adding a separate operator grant workflow. Define the trust basis
+for automatic USB negotiation rather than assuming USB presence alone grants
+management authority. Review any required Pico contract changes with the affected
+producers and consumers under explicit companion-repository authority.
 
 ## Required work and acceptance
 

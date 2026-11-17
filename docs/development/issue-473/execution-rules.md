@@ -44,10 +44,13 @@ parent-only task expands into them. Preserve component independence and attribut
 The user approved the [sequencing amendment](deferred-pi-security.md) on
 2026-11-16. It narrows phase 2 to local Pi/existing Pico management and foundations;
 new Pi pairing/TLS, controller-to-remote-Pi management, and dependent remote
-editor/migration acceptance belong to the end-of-phase-6 security gate. Phases
+editor/migration acceptance belong to the phase 6.2 security gate. Phases
 3–6 may proceed on independently eligible paths when separately authorized.
 Remote Pi management stays unavailable; no unauthenticated substitute is allowed.
-Phase 6 cannot complete and phase 7 cannot begin until that gate passes. Phase 8
+The user split phase 6 on 2026-11-16: phase 6.1 is recurrence integration, and
+phase 6.2 is this security/remote-management gate. Each requires separate execution
+authority and acceptance; phase 6.1 completion does not authorize phase 6.2. Overall
+phase 6 cannot complete and phase 7 cannot begin until both pass. Phase 8
 cannot waive it. All other predecessor, security, authority, documentation, and
 paired-integration gates remain binding. This changes sequencing, not the approved
 security contracts, existing WTP/Pico transports, or phase-execution authority.

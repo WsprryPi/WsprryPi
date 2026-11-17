@@ -26,7 +26,7 @@ ownership remain independent. These decisions authorize no phase-2 implementatio
 
 The user deferred new automatic Pi pairing/TLS and controller-to-remote-Pi
 management to the [mandatory security milestone](issue-473/deferred-pi-security.md)
-at the end of phase 6, before phase 7. Phase 2 is assessed on local Pi management,
+in phase 6.2, after phase 6.1 recurrence integration and before phase 7. Phase 2 is assessed on local Pi management,
 existing Pico management, controller-only operation, persistence/recovery, and
 readiness. Phases 3–6 may proceed only on independently eligible paths when
 separately authorized. Remote Pi editor/migration acceptance moves with that
@@ -318,7 +318,7 @@ remain for unmigrated work; it receives no new solar scheduling implementation.
 New assignments use target-owned scheduling only. Target-local admission enforces
 the interlock independently of the UI and current controller process.
 
-### 6. Pi device-owned recurrence and ownership integration
+### 6.1 Pi device-owned recurrence and ownership integration
 
 - Integrate admission into existing WSPR and repeating QRSS/FSKCW/DFCW paths.
   Preserve pair planning, random offsets, mode timing, selector metadata, backend
@@ -334,10 +334,24 @@ Gate: actual application paths pass accelerated and bounded real-time simulation
 for admission, pair refusal, shifts, rotation, skips, lifecycle failures, clock
 steps, restarts, disable/enable, cancellation, and no duplicate/catch-up work.
 
-Phase 6 also completes the [deferred Pi security milestone](issue-473/deferred-pi-security.md),
-including deferred remote editor/migration integration, before its acceptance
-gate can pass. Independent recurrence development can precede that work, but no
-remote Pi management becomes available before the full security gate.
+Phase 6.1 may complete its recurrence gate independently. It does not authorize
+phase 6.2 or expose unsecured remote Pi management.
+
+### 6.2 Pi security and remote-management gate
+
+Complete the [security milestone](issue-473/deferred-pi-security.md) using the
+[phase 6.2 prompt](issue-473/06-2-pi-security.md): qualify the pairing provider,
+deliver automatic pairing/TLS and its lifecycle, authenticated remote Pi adapters,
+and deferred remote editor/migration integration. Existing WTP and Pico transports
+remain unchanged. Resolve the recorded USB trust/delegation proposals before
+implementing those flows; recording them alone does not approve new contracts.
+
+Gate: all provider, lifecycle, remote-management, handover, production browser,
+paired network/USB, documentation, and adversarial-review requirements in the
+security milestone pass. Both 6.1 and 6.2 require separate execution authority;
+overall phase 6 remains incomplete and phase 7 stays blocked until both pass.
+This subdivision was approved by the user on 2026-11-16 and changes no security,
+ownership, or recurrence contract.
 
 ### 7. Shared Scheduling tab and native remote operation
 
