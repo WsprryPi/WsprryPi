@@ -103,7 +103,7 @@ public:
   bool connect(wtp::ByteStream &);
   bool disconnect(); // local closure only, while Idle/Blocked
   bool submit(TransmissionRequest, std::string job_id,
-              std::uint64_t uncertainty_ns, WtpSchedulePolicy = {});
+              std::uint64_t uncertainty_ns, WtpSchedulePolicy = {},std::function<bool()> launch_guard = {});
   WtpScheduleReport run(); // one frozen job, including bounded cleanup
   void request_stop() noexcept;
   // Reload cancels waiting work and defers after commitment.
@@ -122,6 +122,7 @@ private:
     WtpPlanOptions options;
     WtpSchedulePolicy policy;
     std::uint64_t dispatch{}, arm_notice{}, anchor_utc{}, anchor_mono{};
+    std::function<bool()> launch_guard;
   };
   void publish(); // Sole owner only. Readers never touch backend/session.
   bool fail(std::string);

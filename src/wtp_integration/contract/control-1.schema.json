@@ -12614,8 +12614,7 @@
             "immediate",
             "next_occurrence",
             "restart",
-            "unsupported",
-            "stored_only"
+            "unsupported"
           ]
         },
         "maximum_bytes": {
@@ -12694,34 +12693,6 @@
               "const": "urn:wsprry:control:1:migration"
             }
           }
-        }
-      ],
-      "allOf": [
-        {
-          "anyOf": [
-            {
-              "properties": {
-                "activation": {
-                  "enum": [
-                    "immediate",
-                    "next_occurrence",
-                    "restart",
-                    "unsupported"
-                  ]
-                }
-              }
-            },
-            {
-              "properties": {
-                "activation": {
-                  "const": "stored_only"
-                },
-                "resource": {
-                  "const": "pi-scheduling"
-                }
-              }
-            }
-          ]
         }
       ]
     },
@@ -12984,7 +12955,33 @@
             }
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "forecast": {
+                  "const": "known"
+                },
+                "next_start_utc_ns": {
+                  "$ref": "#/$defs/target-counter"
+                }
+              }
+            },
+            {
+              "properties": {
+                "forecast": {
+                  "const": "unknown"
+                },
+                "next_start_utc_ns": {
+                  "type": "null"
+                }
+              }
+            }
+          ]
+        }
+      ]
     },
     "pi-recovery-unavailable": {
       "type": "object",

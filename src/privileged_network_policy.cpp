@@ -104,7 +104,7 @@ PrivilegedOperationClass classify_privileged_http_operation(
                 return PrivilegedOperationClass::reject;
             relative.remove_prefix(33);
             if((method=="GET"&&(relative=="context"||relative=="settings"||relative=="status"||relative=="migration"))||
-                (method=="PUT"&&relative=="settings")||(method=="POST"&&(relative=="stop"||relative=="migration"||relative=="migration/rollback")))
+                (method=="PUT"&&relative=="settings")||(method=="POST"&&(relative=="stop"||relative=="enable"||relative=="disable"||relative=="migration"||relative=="migration/rollback")))
                 return PrivilegedOperationClass::protected_operation;
             if(relative.starts_with("pico/")&&wsprrypi::controller_pico_route(relative.substr(5),method))
                 return PrivilegedOperationClass::protected_operation;

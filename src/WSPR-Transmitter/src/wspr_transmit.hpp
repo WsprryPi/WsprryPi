@@ -42,6 +42,7 @@
 #include <thread>
 #include <variant>
 #include <vector>
+#include "scheduled_launch.hpp"
 
 // POSIX and system headers
 #include <sys/time.h> // for struct timeval
@@ -315,7 +316,8 @@ public:
      */
     void configureExecution(const TransmissionRequest &request);
     void configureExecution(const wsprrypi::TransmissionRequest& request,
-                            const TransmissionRequest& legacy_request);
+                            const TransmissionRequest& legacy_request,
+                            std::function<bool()> launch_guard = {});
 
     void selectBackend(wsprrypi::BackendKind backend_kind);
     void selectBackend(
@@ -565,6 +567,7 @@ private:
         LogLevel level;
         std::string msg;
         double value;
+        TransmissionCallback callback;
     };
 
     void startFaultMonitoring();
@@ -793,6 +796,8 @@ private:
      *   internal timing scheduler and transmit thread.
      */
     TransmissionRequest current_request_{};
+    wsprrypi::ScheduledLaunch scheduled_launch_{};
+    void refuseScheduledLaunch();
     wsprrypi::ExecutionPlan current_execution_plan_{};
     wsprrypi::TransmissionMode current_execution_mode_{
         wsprrypi::TransmissionMode::WSPR};

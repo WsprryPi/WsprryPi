@@ -1399,7 +1399,7 @@ semantics-test:
 	$(Q)$(MAKE) --no-print-directory semantics-test-full \
 		BACKENDS=$(DEFAULT_BACKENDS) ANCILLARY_GPIO=1
 
-semantics-test-full: recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-full: solar-clock-test recurrence-progress-test native-recurrence-test native-recurrence-main-test scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running runtime semantics tests."
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running cleanup lifecycle tests."
@@ -1427,7 +1427,7 @@ semantics-test-portable:
 	$(Q)$(MAKE) --no-print-directory semantics-test-portable-profile \
 		BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-semantics-test-portable-profile: recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-portable-profile: solar-clock-test recurrence-progress-test native-recurrence-test native-recurrence-main-test scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	$(Q)echo "Running portable UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
 	$(Q)echo "Running portable GPIO band fail-closed policy tests."
@@ -2507,8 +2507,35 @@ solar-geometry-pair-test:
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pi_solar_geometry_pair"
 
 .PHONY: recurrence-authority-record-test
+.PHONY: solar-clock-test
+.PHONY: native-recurrence-test
+$(BIN_DIR)/native_recurrence_test: tests/native_recurrence_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+native-recurrence-test: $(BIN_DIR)/native_recurrence_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/native_recurrence_test
+.PHONY: native-recurrence-main-test
+native-recurrence-main-test: $(BIN_DIR)/pi_managed_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 tests/native_recurrence_main_test.py --fixture $(BIN_DIR)/pi_managed_main_fixture
+.PHONY: recurrence-progress-test
+$(BIN_DIR)/recurrence_progress_test: tests/recurrence_progress_test.cpp recurrence_progress.cpp recurrence_progress.hpp wtp_integration/pi_management_journal.cpp wtp_integration/pi_management_journal.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $(OPENSSL_CFLAGS) tests/recurrence_progress_test.cpp recurrence_progress.cpp wtp_integration/pi_management_journal.cpp -o $@ $(OPENSSL_LIBS)
+recurrence-progress-test: $(BIN_DIR)/recurrence_progress_test
+	$(Q)$(BIN_DIR)/recurrence_progress_test
+
+$(BIN_DIR)/solar_clock_test: tests/solar_clock_test.cpp solar_clock.cpp solar_clock.hpp solar_policy.cpp solar_policy.hpp solar_geometry.cpp solar_geometry.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWSPR-Reference/src/wspr tests/solar_clock_test.cpp solar_clock.cpp solar_policy.cpp solar_geometry.cpp -o $@
+solar-clock-test: $(BIN_DIR)/solar_clock_test
+	$(Q)$(BIN_DIR)/solar_clock_test
+
 $(BIN_DIR)/recurrence_authority_record_test: tests/recurrence_authority_record_test.cpp recurrence_authority.cpp recurrence_authority.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. tests/recurrence_authority_record_test.cpp recurrence_authority.cpp -o $@
 recurrence-authority-record-test: $(BIN_DIR)/recurrence_authority_record_test
 	$(Q)$(BIN_DIR)/recurrence_authority_record_test
+
+.PHONY: scheduled-launch-test
+scheduled-launch-test:
+	$(Q)$(MAKE) -C WSPR-Transmitter/src scheduled-launch-test BACKENDS=simulated SUDO=

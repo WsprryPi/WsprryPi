@@ -230,6 +230,7 @@ std::chrono::system_clock::time_point
 WsprTransmitter::TransmissionScheduler::nextEvent() const
 {
     using namespace std::chrono;
+    if(parent_->scheduled_launch_.bound())return parent_->scheduled_launch_.start;
 
     auto now = system_clock::now();
     auto secs = duration_cast<seconds>(now.time_since_epoch()).count();
@@ -288,6 +289,9 @@ void WsprTransmitter::TransmissionScheduler::run()
         constexpr auto kLateTolerance = std::chrono::milliseconds(50);
         if (now_check + kLateTolerance >= when)
         {
+            if(parent_->scheduled_launch_.bound()){
+                parent_->refuseScheduledLaunch();return;
+            }
             when += std::chrono::seconds(2 * 60);
         }
 
@@ -324,6 +328,9 @@ void WsprTransmitter::TransmissionScheduler::run()
         const auto now = std::chrono::system_clock::now();
         if (now > when + kLateTolerance)
         {
+            if(parent_->scheduled_launch_.bound()){
+                parent_->refuseScheduledLaunch();return;
+            }
             continue;
         }
 
@@ -364,6 +371,9 @@ void WsprTransmitter::TransmissionScheduler::run()
         const auto now_post_join = std::chrono::system_clock::now();
         if (now_post_join > when + kLateTolerance)
         {
+            if(parent_->scheduled_launch_.bound()){
+                parent_->refuseScheduledLaunch();return;
+            }
             continue;
         }
 
@@ -376,7 +386,7 @@ void WsprTransmitter::TransmissionScheduler::run()
 
         last_when = when;
 
-        if (parent_->one_shot_.load(std::memory_order_acquire))
+        if (parent_->scheduled_launch_.bound()||parent_->one_shot_.load(std::memory_order_acquire))
         {
             break;
         }
@@ -574,6 +584,8 @@ wsprrypi::StartupQuiesceResult WsprTransmitter::quiesceForStartup()
 
 void WsprTransmitter::setTransmissionCallbacks(TransmissionCallback cb)
 {
+    std::lock_guard lock(callback_mtx_);
+    if(!cb)callback_queue_.clear();
     on_transmit_cb_ = std::move(cb);
 }
 
@@ -677,6 +689,7 @@ std::string WsprTransmitter::reloadDeferDebugState() const
 void WsprTransmitter::clearExecutionStateAfterStop() noexcept
 {
     current_request_ = TransmissionRequest{};
+    scheduled_launch_={};
     current_execution_plan_ = wsprrypi::ExecutionPlan{};
     current_execution_mode_ = wsprrypi::TransmissionMode::WSPR;
     current_cw_message_.clear();
@@ -772,6 +785,7 @@ void WsprTransmitter::configureExecution(
 
     shutdown();
     requireBackendCleanup("legacy execution reconfiguration");
+    scheduled_launch_={};
 
     stop_requested_.store(false);
 
@@ -832,7 +846,8 @@ void WsprTransmitter::configureExecution(
 
 void WsprTransmitter::configureExecution(
     const wsprrypi::TransmissionRequest& request,
-    const TransmissionRequest& legacy_request)
+    const TransmissionRequest& legacy_request,
+    std::function<bool()> launch_guard)
 {
     if (!hasSelectedBackend())
     {
@@ -882,6 +897,7 @@ void WsprTransmitter::configureExecution(
 
     shutdown();
     requireBackendCleanup("canonical execution reconfiguration");
+    scheduled_launch_={request.slot.start_time,std::move(launch_guard)};
 
     stop_requested_.store(false);
 
@@ -1045,7 +1061,10 @@ void WsprTransmitter::startAsync()
         // boundary. This emulates the final timer stage used by the normal
         // window scheduler (which sleeps to an absolute CLOCK_REALTIME
         // boundary).
-        if (activeExecutionIsWspr() &&
+        if(scheduled_launch_.bound()){
+            scheduled_start_rt_ns_.store(std::chrono::duration_cast<std::chrono::nanoseconds>(scheduled_launch_.start.time_since_epoch()).count(),std::memory_order_release);
+        }
+        else if (activeExecutionIsWspr() &&
             transmit_now_.load(std::memory_order_acquire))
         {
             struct timespec now_rt{};
@@ -1395,7 +1414,7 @@ inline void WsprTransmitter::fire_transmit_cb(
             event,
             level,
             msg,
-            value});
+            value,on_transmit_cb_});
     }
 
     callback_cv_.notify_one();
@@ -1423,7 +1442,7 @@ void WsprTransmitter::callback_worker_loop()
 
             pending = std::move(callback_queue_.front());
             callback_queue_.pop_front();
-            cb = on_transmit_cb_;
+            cb = std::move(pending.callback);
         }
 
         if (cb)
@@ -1904,6 +1923,10 @@ void WsprTransmitter::transmit()
         }
 
         // Fire callback as close to the first symbol as possible.
+        if(!scheduled_launch_.current(std::chrono::system_clock::now())||
+            (scheduled_launch_.bound()&&std::chrono::system_clock::now()-scheduled_launch_.start>std::chrono::milliseconds(50))){
+            refuseScheduledLaunch();return;
+        }
         state_.store(State::TRANSMITTING, std::memory_order_release);
         fire_transmit_cb(TransmissionCallbackEvent::STARTING, LogLevel::INFO, "", current_request_.actual_rf_frequency_hz);
 
@@ -2240,6 +2263,13 @@ void WsprTransmitter::beginTransmissionOutput()
     throw std::runtime_error(
         "Legacy transmission output is unavailable because the GPIO backend was not compiled.");
 #endif
+}
+
+void WsprTransmitter::refuseScheduledLaunch()
+{
+    if(!observeBackendCleanup("scheduled admission refusal"))return;
+    state_.store(State::CANCELLED,std::memory_order_release);
+    fire_transmit_cb(TransmissionCallbackEvent::CANCELLED,LogLevel::INFO,"Prepared occurrence is no longer current.",0.0);
 }
 
 void WsprTransmitter::endTransmissionOutput()

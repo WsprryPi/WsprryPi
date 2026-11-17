@@ -8,6 +8,8 @@
 #include "scheduling.hpp"
 #include "runtime_config_bridge.hpp"
 #include "recurrence_admission.hpp"
+#include "controller_contract.hpp"
+#include "native_recurrence.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include <charconv>
 #include <stdexcept>
@@ -83,6 +85,7 @@ PiManagedStartup::~PiManagedStartup(){
     iniFile.set_file_writer({});
     set_config_persistence_owner({},{},{});
     set_native_solar_snapshot_provider({});
+    reset_native_recurrence_observation();
     set_legacy_recurrence_admission([]{return LegacyRecurrenceAdmission::Held;});
     // Teardown/failure is never permission to revert to an unguarded output
     // lane. A new explicitly prepared owner or process restart replaces this.
@@ -159,7 +162,9 @@ void PiManagedStartup::prepare(){
     set_legacy_recurrence_admission([state]{
         if(!state->validated||(state->phase!=State::Phase::Bootstrapping&&state->phase!=State::Phase::Ready))return LegacyRecurrenceAdmission::Held;
         const auto authority=state->store.recurrence_authority();
-        if(authority["state"]=="unclassified"||authority["state"]=="legacy"||authority["state"]=="rollback")return LegacyRecurrenceAdmission::Open;
+        if(authority["state"]=="native")return LegacyRecurrenceAdmission::Native;
+        if(authority["state"]=="unclassified"||authority["state"]=="legacy"||authority["state"]=="rollback")
+            return state->store.settings()["scheduling"]["enabled"]==true?LegacyRecurrenceAdmission::Open:LegacyRecurrenceAdmission::DrainAcceptedPair;
         return authority["state"]=="retiring"?LegacyRecurrenceAdmission::DrainAcceptedPair:LegacyRecurrenceAdmission::Held;
     });
     state->phase=State::Phase::Bootstrapping;
@@ -170,6 +175,15 @@ void PiManagedStartup::prepare(){
         const auto text=saved.at("configuration_generation").get<std::string>();
         const auto parsed=std::from_chars(text.data(),text.data()+text.size(),result.generation);
         require(parsed.ec==std::errc{}&&parsed.ptr==text.data()+text.size()&&result.generation>0);
+        const auto authority=state->store.recurrence_authority();result.native=authority["state"]=="native";
+        result.device_id=state->self;
+        const auto generation=authority["generation"].get<std::string>();
+        const auto decoded=std::from_chars(generation.data(),generation.data()+generation.size(),result.authority_generation);
+        require(decoded.ec==std::errc{}&&decoded.ptr==generation.data()+generation.size()&&result.authority_generation);
+        if(result.native)result.progress=state->store.recurrence_progress();
+        auto intent=saved["scheduling"];intent["enabled"]=false;
+        result.intent_revision=PiManagementJournal::digest(canonical_pi_management_json(nlohmann::json{
+            {"configuration",saved["configuration"]},{"scheduling",intent}}));
         result.revision=saved.at("revision").get<std::string>();return result;
     });
 }

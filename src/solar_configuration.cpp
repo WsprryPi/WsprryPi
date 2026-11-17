@@ -44,7 +44,6 @@ SolarWsprList parse_list(const Json &v,const ArgParserConfig &ordinary){
 }
 void validate_stored_solar(const Json &value){
     require(valid_pi_scheduling_shape(value));const auto &solar=value.at("solar");
-    require(solar.at("enabled")==false);
     const auto &locator=solar.at("location").at("locator");
     require(locator.is_null()||solar_locator_center(locator.get<std::string>()).has_value());
     for(const auto *name:{"day","night","morning","evening"}){
@@ -57,6 +56,7 @@ void validate_stored_solar(const Json &value){
 SolarPolicyConfig parse_solar_configuration(const Json &value,const ArgParserConfig &ordinary,const Json *previous,bool validate_changes){
     validate_stored_solar(value);SolarPolicyConfig result;result.schedule_enabled=value.at("enabled").get<bool>();
     const auto &solar=value.at("solar");const auto &location=solar.at("location").at("locator");
+    result.solar_enabled=solar.at("enabled").get<bool>();
     if(!location.is_null())result.locator=location.get<std::string>();
     for(const auto &[name,period]:std::initializer_list<std::pair<const char *,SolarPeriodPolicy *>>{{"day",&result.day},{"night",&result.night},{"morning",&result.morning},{"evening",&result.evening}}){
         const auto &source=solar.at(name);const auto old=previous?&previous->at("solar").at(name):nullptr;

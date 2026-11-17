@@ -15,6 +15,7 @@
 #include "wtp_pi_control.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "scheduling_internal.hpp"
+#include "native_recurrence.hpp"
 
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
@@ -121,7 +122,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS transmission at frequency: ",
-                          transmitter_format_frequency_mhz(config.qrss.frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -130,7 +131,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW transmission at mark frequency: ",
-                          transmitter_format_frequency_mhz(config.fskcw.mark_frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -139,7 +140,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started DFCW transmission at dot frequency: ",
-                          transmitter_format_frequency_mhz(config.dfcw.dot_frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -247,6 +248,11 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
         {
             reset_active_wspr_plan_state();
         }
+        if(!continuing_wspr_plan&&wsprrypi::native_occurrence_active()){
+            const bool inactive=transmitter_output_inactive_confirmed();
+            wsprrypi::finish_native_occurrence(inactive);
+            if(config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(inactive);
+        }
 
         if (shutdown_when_idle && do_config)
         {
@@ -311,6 +317,10 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             "transmission failure",
             true,
             true);
+        reset_active_wspr_plan_state();
+        const bool native_work=wsprrypi::native_occurrence_active();
+        wsprrypi::finish_native_occurrence(transmitter_output_inactive_confirmed());
+        if(native_work&&config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
         send_ws_message("transmit", "failed", reason);
 
         if (config.use_ini)
@@ -346,6 +356,10 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             runtime_should_hold_selector_gpios_initialized(config),
             "transmission cancellation",
             true);
+        reset_active_wspr_plan_state();
+        const bool native_work=wsprrypi::native_occurrence_active();
+        wsprrypi::finish_native_occurrence(transmitter_output_inactive_confirmed());
+        if(native_work&&config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
         if (suppress_ws_event)
         {
             llog.logS(
@@ -994,6 +1008,7 @@ bool wspr_loop()
             }
             wsprrypi::poll_wtp_pi_endpoint();
             wsprrypi::poll_pi_managed_migration();
+            wsprrypi::poll_native_recurrence();
             if (ini_reload_pending.load(std::memory_order_acquire) &&
                 !web_test_tone.load() && !transmitter_reload_should_defer() &&
                 wtp_pi_begin_configuration())

@@ -121,7 +121,7 @@ std::uint64_t WtpApplication::preparation_lead_ns() const {
              1000000ULL +
          automatic_schedule_margin_ns;
 }
-void WtpApplication::prepare(TransmissionRequest request) {
+void WtpApplication::prepare(TransmissionRequest request,std::function<bool()> launch_guard) {
   std::lock_guard lock(control_);
   if (active_ || skip_pending_)
     throw std::runtime_error("Pico work is active");
@@ -180,7 +180,7 @@ void WtpApplication::prepare(TransmissionRequest request) {
     throw std::runtime_error("Pico capabilities are unavailable");
   if (!scheduler_.submit(std::move(request), job_prefix_ + suffix,
                          capabilities->maximum_arm_uncertainty_ns,
-                         production_schedule_policy))
+                         production_schedule_policy,std::move(launch_guard)))
     throw std::runtime_error(scheduler_.diagnostic());
 }
 void WtpApplication::prepare_skip() {

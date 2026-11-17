@@ -232,6 +232,14 @@ bool wtp_runtime_ready() noexcept {
   return r && !firmware_operation_active.load() &&
       !(r->settings.transport == "usb" && wsprrypi::pico_usb_update_blocked(r->settings.usb_serial)) && r->app->ready();
 }
+bool wtp_runtime_output_inactive_confirmed() noexcept {
+  try{
+    const auto r=get();if(!r||!r->app->replaceable()||!r->app->ready())return false;
+    const auto s=r->app->status();
+    return s.session_phase==wsprrypi::wtp::SessionPhase::Ready&&s.remote&&!s.remote->owner_id&&!s.remote->output_active&&
+        s.remote->state!=wsprrypi::wtp::State::Loaded&&s.remote->state!=wsprrypi::wtp::State::Armed&&s.remote->state!=wsprrypi::wtp::State::Running;
+  }catch(...){return false;}
+}
 bool wtp_runtime_invalidate_for_reload() {
   std::lock_guard operation(operation_mutex);
   if(managed_gate)return true;
@@ -281,13 +289,13 @@ wsprrypi::TransmissionMode wtp_runtime_mode() noexcept {
   auto r = get();
   return r ? r->app->mode() : wsprrypi::TransmissionMode::WSPR;
 }
-void wtp_runtime_prepare(wsprrypi::TransmissionRequest r) {
+void wtp_runtime_prepare(wsprrypi::TransmissionRequest r,std::function<bool()> launch_guard) {
   std::lock_guard operation(operation_mutex);
   require_management_admission();
   if(!output_admitted())throw std::runtime_error("managed_host_not_ready");
   auto target = require();
   target->refresh_usb_time(true);
-  target->app->prepare(std::move(r));
+  target->app->prepare(std::move(r),std::move(launch_guard));
 }
 std::chrono::nanoseconds wtp_runtime_preparation_lead() {
   return std::chrono::nanoseconds(require()->app->preparation_lead_ns());
@@ -298,6 +306,7 @@ void wtp_runtime_start() {
   if(!output_admitted())throw std::runtime_error("managed_host_not_ready");
   require()->app->start();
 }
+std::uint64_t wtp_runtime_prepared_request_id(){return require()->app->status().request_id.value;}
 wsprrypi::CleanupResult wtp_runtime_stop() {
   auto r = get();
   if (r) r->usb_cancelled = true; // Interrupt bounded USB I/O before waiting for operation authority.

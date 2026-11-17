@@ -18,7 +18,8 @@ public:
         std::string bytes;
     };
     // Paths are fixed by the owner, never supplied by a browser. This private
-    // directory is exclusively owned by this coordinator.
+    // directory is exclusively owned by this coordinator. At most seven fixed
+    // destinations may be registered; a decision retains its six-image bound.
     PiManagementJournal(std::string directory, std::string self,
         std::map<std::string,std::string> destinations);
     // No final path changes during preparation. Failure leaves admission held;

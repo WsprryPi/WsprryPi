@@ -371,6 +371,12 @@ debug: build/bin/$(TEST_OUT)
 	$(Q)echo "Debug build completed successfully."
 
 test: legacy-tone-frequency-test simulated-backend-test simulated-backend-realtime-test transmission-controller-contract-test si5351-planner-test si5351-transition-test startup-quiesce-test
+
+.PHONY: scheduled-launch-test
+scheduled-launch-test:
+	$(Q)mkdir -p build/bin
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG scheduled_launch_test.cc -o build/bin/scheduled_launch_test
+	$(Q)./build/bin/scheduled_launch_test
 	$(Q)echo "Hardware-free component tests completed successfully."
 
 si5351-test: build/bin/si5351_backend_harness

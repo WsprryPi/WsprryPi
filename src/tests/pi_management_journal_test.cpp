@@ -40,6 +40,10 @@ int main(int argc,char **argv){
   struct Remove{std::string path;~Remove(){std::filesystem::remove_all(path);}} remove{root};
   const auto destinations=paths(root);const auto ini=destinations.at("ini"),settings=destinations.at("settings"),operations=destinations.at("operations");
   PiManagementJournal journal(root+"/transaction",self,destinations);
+  auto registered=destinations;registered["progress"]=root+"/progress.json";registered["recurrence"]=root+"/recurrence.json";registered["legacy"]=root+"/legacy.json";
+  PiManagementJournal bounded(root+"/bounded-transaction",self,registered);
+  std::vector<PiManagementJournal::Image> too_many;for(const auto &[kind,path]:registered){(void)path;too_many.push_back({kind,std::nullopt,"unpublished"});}
+  refuses([&]{bounded.prepare(too_many);});check(!bounded.decision(),"Seven registered destinations never permit seven transaction images");
   iniFile.set_file_writer([&](const std::string &path,const std::string &image){check(path==ini,"Fixed journal INI destination");journal.write_committed_ini(image);});
   struct ClearWriter{~ClearWriter(){iniFile.set_file_writer({});}} clear_writer;
   check(!journal.decision()&&!std::filesystem::exists(root+"/transaction"),"Read does not create authority");

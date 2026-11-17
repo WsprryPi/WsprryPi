@@ -45,6 +45,11 @@ int main() {
     const std::string target="/api/control/v1/targets/"+std::string(32,'a');
     expect_http("GET",target+"/migration",Classification::protected_operation);
     for(const auto *suffix:{"/migration","/migration/rollback"})expect_http("POST",target+suffix,Classification::protected_operation);
+    for(const auto *suffix:{"/enable","/disable"}){
+        expect_http("POST",target+suffix,Classification::protected_operation);
+        expect_http("GET",target+suffix,Classification::reject);
+        expect_http("PUT",target+suffix,Classification::reject);
+    }
     expect_http("GET",target+"/migration/rollback",Classification::reject);
     expect_http("PUT",target+"/migration",Classification::reject);
     expect_http("POST",target+"/migration/unknown",Classification::reject);

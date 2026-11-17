@@ -32,11 +32,12 @@ separate authorization to execute and successful prerequisite gates.
    from controller-owned schedules before allowing new schedule enables.
    [Phase 5 prompt](issue-473/05-authority-transition.md) ·
    [Phase-5 implementation and validation](issue-473/phase-5-progress.md)
-6. ▧ **Device-owned recurrence and secure remote management:** Both subphases
+6. ⏳ **Device-owned recurrence and secure remote management:** Both subphases
    require separate execution authority and acceptance before phase 7.
-   - ▧ **6.1 Integrate device-owned recurrence:** Apply solar policies to Pi
+   - ✅ **6.1 Integrate device-owned recurrence:** Apply solar policies to Pi
      scheduling, including ownership, enablement, restart handling, and status.
-     [Phase 6.1 prompt](issue-473/06-device-recurrence.md)
+     [Phase 6.1 prompt](issue-473/06-device-recurrence.md) ·
+     [Phase 6.1 progress](issue-473/phase-6-1-progress.md)
    - ▧ **6.2 Complete Pi security and remote management:** Deliver automatic
      pairing/TLS, authenticated remote adapters, and deferred editor/handover
      integration. [Phase 6.2 prompt](issue-473/06-2-pi-security.md) ·

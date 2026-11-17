@@ -69,10 +69,17 @@ struct SolarEvaluation {
 // No Pico-specific frequency ceiling is built into this evaluator.
 using SolarFrequencyPredicate=std::function<bool(ModeType,std::span<const std::uint64_t>)>;
 std::optional<std::uint64_t> solar_decimal_hz(std::string_view) noexcept;
+std::optional<std::uint64_t> solar_frequency_nhz(long double) noexcept;
 bool solar_clock_ready(const SolarClockObservation&) noexcept;
 // Cursors are immutable proposed selection inputs. Evaluation advances none of
 // them, obtains no authority, and persists/prepares/dispatches nothing.
 SolarEvaluation evaluate_solar_policy(const SolarPolicyConfig&,const SolarModeIntent&,
     const SolarEvaluationContext&,const std::array<std::size_t,5>& cursors,
     const SolarFrequencyPredicate&);
+// Evaluate the complete occurrence against one immutable snapshot. Equal tones
+// from different policies do not permit a pair to straddle a policy boundary.
+// Starts are strictly increasing; current WSPR supports at most two frames.
+SolarEvaluation evaluate_solar_occurrence(const SolarPolicyConfig&,const SolarModeIntent&,
+    const SolarEvaluationContext&,std::span<const std::uint64_t> intended_starts,
+    const std::array<std::size_t,5>& cursors,const SolarFrequencyPredicate&);
 }

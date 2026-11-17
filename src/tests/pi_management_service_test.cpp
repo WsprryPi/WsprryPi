@@ -121,7 +121,7 @@ int main(){
   check(invalid.dump().size()==32768,"Maximum-sized complete request fixture");
   negative(invalid);
   check(call("settings","PUT",invalid,revision).status==400,"An unreadable complete candidate is rejected before persistence");
-  check(call("enable","POST",save,revision).status==404&&call("stop","POST",save,revision).status==400,"Unimplemented activation and malformed Stop cannot gain authority");
+  check(call("enable","POST",save,revision).status==400&&call("stop","POST",save,revision).status==400,"Malformed activation and Stop cannot gain authority");
   const auto committed=call("settings","PUT",save,revision);check(committed.status==200,"Validated service save");
   const auto receipt=Json::parse(committed.body);check(receipt["state"]=="committed"&&receipt["binding"]==context["binding"]&&store.settings()["configuration"]["CW"]["Message"]=="SERVICE SAVE","Durable receipt and saved configuration");
   const auto after=bytes(ini);check(call("settings","PUT",save,revision).body==committed.body&&bytes(ini)==after,"Exact replay does not repeat a write");
@@ -174,7 +174,7 @@ int main(){
   const auto held_status=Json::parse(call("status").body),held_context=Json::parse(call("context").body);
   check(held_status["transmit_effective"]==false&&Json::parse(call("settings").body)["pending_application"]=="held",
       "A retained cancellation fence reports held application and no effective transmit permission");
-  for(const auto &cap:held_context["capabilities"])check(cap["write"]==false,"A retained cancellation fence cannot advertise another writable operation");
+  for(const auto &cap:held_context["capabilities"])check(cap["write"]==(cap["resource"]=="pi-scheduling"),"A retained cancellation fence permits only safe scheduling disable");
   authority.release_observed_stop();authority.end_local_work(true);
   fail_cancel=false;claim();
   stop_context=Json::parse(call("context").body);stop_settings=Json::parse(call("settings").body);
@@ -221,8 +221,8 @@ int main(){
   const auto solar_context=Json::parse(call("context").body);
   bool stored_only=false;
   for(const auto &cap:solar_context["capabilities"])if(cap["resource"]=="pi-scheduling")
-      stored_only=cap["write"]==true&&cap["activation"]=="stored_only";
-  check(stored_only,"Solar capability explicitly advertises storage without activation");
+      stored_only=cap["write"]==true&&cap["activation"]=="next_occurrence";
+  check(stored_only,"Solar capability advertises target-owned next-occurrence activation");
   auto draft=store.settings()["scheduling"];
   draft["solar"]["location"]["locator"]="EM18AA12";
   draft["solar"]["morning"]["enabled"]=true;
@@ -366,6 +366,50 @@ int main(){
   const auto reconciled=call("migration","POST",reconcile,"\""+reconcile["expected_revision"].get<std::string>()+"\"");
   check(reconciled.status==200&&!store.migration_pending()&&store.settings()["scheduling"]["enabled"]==false&&bytes(ini)==drain_ini&&
       store.receipt(self,"1",draining["operation_id"])->at("state")=="committed","Explicit current-boot reconciliation completes retained intent and its earlier receipt atomically");
+  const auto native_context=Json::parse(call("context").body),native_saved=store.settings();
+  Json enable{{"contract","Wsprry-Control/1"},{"schema","target-enable"},{"binding",native_context["binding"]},
+      {"capability_revision",native_context["capability_revision"]},{"operation_id","123456789abcdef0123456789abcdef2"},
+      {"expected_revision",native_saved["revision"]},{"candidate_digest",native_saved["candidate_digest"]}};
+  const auto enable_etag="\""+enable["expected_revision"].get<std::string>()+"\"";
+  auto wrong_enable=enable;wrong_enable["candidate_digest"]=std::string(64,'f');
+  check(call("enable","POST",wrong_enable,enable_etag).status==412&&store.settings()==native_saved,
+      "Enable binds the complete saved candidate before storage or activation");
+  const auto enabled=call("enable","POST",enable,enable_etag);
+  check(enabled.status==200&&store.recurrence_authority()["state"]=="native"&&store.settings()["scheduling"]["enabled"]==true&&
+      store.settings()["configuration"]==native_saved["configuration"]&&bytes(ini)==drain_ini,
+      "Explicit native enable preserves Transmit, boot, INI, and completed retirement evidence");
+  check(store.recurrence_progress()->snapshot()["consumed_through_utc_ns"]=="0","First native enable creates bounded authoritative progress before admission");
+  const auto progress_owner=store.recurrence_progress();
+  RecurrenceListDigests digests;digests.fill(PiManagementJournal::digest(""));
+  const std::array<std::uint32_t,5> sizes{2,0,0,0,0};
+  progress_owner->reserve(std::string(32,'a'),100,220,std::string(64,'b'),1,1,0,digests,sizes,0);
+  const auto disable_context=Json::parse(call("context").body),disable_saved=store.settings();
+  Json disable{{"contract","Wsprry-Control/1"},{"schema","target-action"},{"binding",disable_context["binding"]},
+      {"capability_revision",disable_context["capability_revision"]},{"operation_id","123456789abcdef0123456789abcdef3"},{"expected_revision",disable_saved["revision"]}};
+  check(authority.begin_test_tone(),"Independent accepted-work fixture");
+  check(call("disable","POST",disable,"\""+disable["expected_revision"].get<std::string>()+"\"").status==200&&
+      !store.settings()["scheduling"]["enabled"].get<bool>()&&authority.snapshot().local_work_active&&bytes(ini)==drain_ini,
+      "Disable preserves accepted work and output ownership without cancellation");
+  check(call("enable","POST",enable,enable_etag).body==enabled.body&&!store.settings()["scheduling"]["enabled"].get<bool>(),
+      "Historical enable replay cannot undo a later durable disable");
+  check(store.recurrence_progress()==progress_owner,"Settings publication retains the one live progress coordinator");
+  progress_owner->resolve(true,digests);
+  check(store.recurrence_progress()->snapshot()["cursors"]["ordinary"]["index"]==1,"Terminal progress after a disable is visible to the same owner");
+  authority.end_local_work(true);
+  PiManagedStore native_cold(ini,self,catalog.pi_management_anchor(self,{}));native_cold.recover();
+  check(native_cold.recurrence_authority()["state"]=="native"&&!native_cold.settings()["scheduling"]["enabled"].get<bool>(),"Restart retains independent native disable and progress");
+  auto native_rollback=rollback;const auto native_rollback_context=Json::parse(call("context").body);
+  native_rollback["binding"]=native_rollback_context["binding"];native_rollback["capability_revision"]=native_rollback_context["capability_revision"];
+  native_rollback["expected_revision"]=store.settings()["revision"];native_rollback["expected_authority_generation"]=store.recurrence_authority()["generation"];
+  native_rollback["operation_id"]="123456789abcdef0123456789abcdef4";
+  const auto resumed=call("migration/rollback","POST",native_rollback,"\""+native_rollback["expected_revision"].get<std::string>()+"\"");
+  check(resumed.status==200&&store.recurrence_authority()["state"]=="rollback","Disabled reconciled native recurrence can explicitly resume its selected old assignment");
+  auto retire_again=migrate;const auto retire_context=Json::parse(call("context").body);
+  retire_again["binding"]=retire_context["binding"];retire_again["capability_revision"]=retire_context["capability_revision"];
+  retire_again["expected_revision"]=store.settings()["revision"];retire_again["expected_authority_generation"]=store.recurrence_authority()["generation"];
+  retire_again["controllers"]=store.recurrence_authority()["controllers"];retire_again["operation_id"]="123456789abcdef0123456789abcdef5";
+  check(call("migration","POST",retire_again,"\""+retire_again["expected_revision"].get<std::string>()+"\"").status==200&&
+      store.recurrence_authority()["state"]=="staged","A subsequent handover stages disabled without erasing prior native progress");
   // A trusted legacy writer can already own a candidate near the storage
   // limit. The adapter must bound the complete readback envelope as well.
   auto large_internal=jConfig;large_internal["CW"]["Message"]="";
@@ -378,6 +422,12 @@ int main(){
   check(bounded.status==503&&bounded.body.size()<32768&&Json::parse(bounded.body)["error"]["code"]=="payload_too_large",
       "An oversized legacy readback becomes a bounded typed refusal, never an oversized success");
   check(!config.transmit,"No transmission requested");
+  for(const auto *suffix:{".recurrence-progress.json",".recurrence-progress-initialization.json"}){
+      const auto path=ini+suffix,backup=path+".held";check(!rename(path.c_str(),backup.c_str()),"Missing established progress fixture");
+      bool refused=false;try{PiManagedStore missing(ini,self,catalog.pi_management_anchor(self,{}));missing.recover();}catch(...){refused=true;}
+      check(refused,"Established progress cannot be reinitialized even after rollback and staging");
+      check(!rename(backup.c_str(),path.c_str()),"Restore isolated progress evidence");
+  }
   std::cout<<"PASS: Pi local context/settings/status, policy-bound capabilities, semantic/read-only/binding refusals, actual configuration/WAL writes, exact replay/lookup, and racing-claim preservation without output\n";
  }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}
 }

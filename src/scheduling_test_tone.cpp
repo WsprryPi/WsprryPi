@@ -6,6 +6,7 @@
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
 #include "recurrence_admission.hpp"
+#include "native_recurrence.hpp"
 
 #include "band_lookup.hpp"
 #include "frequency_semantics.hpp"
@@ -875,6 +876,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     }
 
     const bool output_inactive = stop_tone_output();
+    wsprrypi::finish_native_occurrence(output_inactive&&remote_stopped);
     transmitter_set_callbacks(transmitter_cb);
     transmitter_clear_execution_state_after_stop();
     clear_committed_execution_request();

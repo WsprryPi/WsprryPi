@@ -2,6 +2,8 @@
 #pragma once
 #include "pi_management_anchor.hpp"
 #include "pi_management_journal.hpp"
+#include "recurrence_progress.hpp"
+#include <memory>
 #include <functional>
 #include <cstdint>
 #include <mutex>
@@ -41,6 +43,10 @@ public:
     nlohmann::json settings();
     // Private target-owned record. Reads never infer initialization from absence.
     nlohmann::json recurrence_authority();
+    std::shared_ptr<RecurrenceProgress> recurrence_progress();
+    // Exact saved-candidate enable and independent drain-only disable. Never
+    // changes Transmit/boot or grants manual/external execution permission.
+    void persist_scheduling(const Operation &,bool enabled,const std::string &accepted_occurrence={});
     // Caller holds native configuration/admission reservation and has verified
     // complete controller inventory and output/pair reconciliation. No RF here.
     nlohmann::json rollback_configuration();
@@ -98,6 +104,8 @@ private:
     bool recurrence_bound_{},require_recurrence_{};
     std::uint64_t context_epoch_{1};
     nlohmann::json settings_,operations_,recurrence_,legacy_,bootstrap_;
+    nlohmann::json progress_initialization_;
+    std::shared_ptr<RecurrenceProgress> progress_;
     std::optional<nlohmann::json> initial_rollback_;
     std::map<std::string,std::optional<PiManagementJournal::Observation>> initial_observations_;
     std::map<std::string,PiManagementJournal::Observation> observations_;

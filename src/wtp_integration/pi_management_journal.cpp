@@ -75,7 +75,10 @@ void write_file(const std::string &path,const std::string &bytes,mode_t mode,boo
 }
 std::string PiManagementJournal::digest(const std::string &value){std::array<unsigned char,SHA256_DIGEST_LENGTH> bytes{};SHA256(reinterpret_cast<const unsigned char *>(value.data()),value.size(),bytes.data());std::string result;for(auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;}
 PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::map<std::string,std::string> paths):directory_(std::move(dir)),self_(std::move(self)),wal_(directory_+"/transaction.json"),destinations_(std::move(paths)){
-    require(!directory_.empty()&&hex(self_,32)&&!destinations_.empty()&&destinations_.size()<=6);
+    // The fixed owner namespace may contain seven destinations; each complete
+    // decision still contains at most six images. Initialization adds progress
+    // proof only to the no-INI enable transaction, never a seventh image.
+    require(!directory_.empty()&&hex(self_,32)&&!destinations_.empty()&&destinations_.size()<=7);
     const auto directory_parent=std::filesystem::canonical(parent(directory_));
     struct stat directory_owner{};
     require(!::lstat(directory_parent.c_str(),&directory_owner)&&S_ISDIR(directory_owner.st_mode)&&directory_owner.st_uid==geteuid()&&!(directory_owner.st_mode&0022));

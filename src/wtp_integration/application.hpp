@@ -17,7 +17,7 @@ public:
   ~WtpApplication();
   StartupQuiesceResult inspect();
   bool poll_idle(); // Bounded read-only STATUS, at most once per second while idle.
-  void prepare(TransmissionRequest);
+  void prepare(TransmissionRequest,std::function<bool()> launch_guard = {});
   void prepare_skip();
   std::uint64_t preparation_lead_ns() const;
   bool skipping() const noexcept { return skip_pending_.load(); }

@@ -1,5 +1,17 @@
 # WSPR Transmitter
 
+Canonical requests can bind one execution to `slot.start_time` and supply an
+optional application-neutral final-launch guard to `configureExecution()`.
+Bound WSPR slots use the existing scheduler and are never moved to another
+window after delay. Bound message requests wait for that same start. A late or
+refused launch cleans up and reports cancellation; a cleanup failure reports
+failure. Ordinary unbound scheduling and empty guards preserve existing behavior.
+Queued callbacks retain the handler that owned the event when it was queued;
+replacing the handler cannot retarget an earlier completion. The component does
+not interpret solar policy, storage records, or ownership.
+Run `make scheduled-launch-test BACKENDS=simulated SUDO=` in `src` for the standalone binding/guard
+contract; parent simulated execution tests cover the actual worker integration.
+
 `WSPR-Transmitter` is a C++20 component for generating WSPR (Weak Signal
 Propagation Reporter) RF transmissions with precise symbol timing.
 

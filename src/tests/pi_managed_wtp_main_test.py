@@ -65,7 +65,7 @@ def main():
                 status, body, headers = read_managed(port, base + "settings", with_headers=True);assert status == 200;saved = json.loads(body)
                 status, body = read_managed(port, base + "status");assert status == 200
                 observed = json.loads(body)
-                assert observed["destination_id"] is None and observed["transmit_effective"] is False and observed["phase"] == "unknown"
+                assert observed["destination_id"] is None and observed["transmit_effective"] is False and observed["phase"] == "waiting" and observed["waiting_reason"] == "transmit_off", observed
                 status, body = request(port, "GET", "/api/wtp");assert status == 200 and json.loads(body)["ready"] is False
                 auth = {"Origin": f"http://127.0.0.1:{port}", "Content-Type": "application/json", "X-WsprryPico-Request": "1"}
                 status, _, session = request(port, "POST", "/api/control/v1/host/management-session",
@@ -85,7 +85,7 @@ def main():
                 snapshot = json.loads(body)
                 assert snapshot["saved"]["scheduling"] == candidate["scheduling"]
                 for cap in context["capabilities"]:
-                    if cap["resource"] == "pi-scheduling":assert cap["activation"] == "stored_only" and cap["write"]
+                    if cap["resource"] == "pi-scheduling":assert cap["activation"] == "next_occurrence" and cap["write"]
                 before = ini.read_bytes()
                 status, body, headers = read_managed(port, base + "settings", with_headers=True)
                 auth["If-Match"] = headers["ETag"]

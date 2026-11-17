@@ -11,8 +11,10 @@
 #include "logging.hpp"
 #include "scheduling.hpp"
 #include <mutex>
+#include <deque>
+#include <algorithm>
 #include <stdexcept>
-namespace { std::mutex callback_mutex; TransmitterRuntimeCallback runtime_callback; }
+namespace { std::mutex callback_mutex; TransmitterRuntimeCallback runtime_callback;std::deque<std::pair<std::uint64_t,TransmitterRuntimeCallback>> execution_callbacks; }
 
 #include <utility>
 
@@ -54,16 +56,27 @@ void transmitter_configure_execution(const TransmissionRequest &request)
         if (request.isSkipWindow()) { wtp_runtime_prepare_skip(); return; }
         throw std::runtime_error("Pico requires a complete canonical finite job");
     }
+    wsprTransmitter.setTransmissionCallbacks(transmitter_callbacks());
     wsprTransmitter.configureExecution(request);
 }
 
 void transmitter_configure_execution(
     const wsprrypi::TransmissionRequest &request,
-    const TransmissionRequest &legacy_request)
+    const TransmissionRequest &legacy_request,std::function<bool()> launch_guard,TransmitterRuntimeCallback callback)
 {
-    if (wtp_runtime_selected()) { wtp_runtime_prepare(request); return; }
-    wsprTransmitter.configureExecution(request, legacy_request);
+    if(!callback)callback=transmitter_callbacks();
+    if (wtp_runtime_selected()) {
+        wtp_runtime_prepare(request,std::move(launch_guard));
+        const auto request_id=wtp_runtime_prepared_request_id();std::lock_guard lock(callback_mutex);
+        std::erase_if(execution_callbacks,[&](const auto &entry){return entry.first==request_id;});
+        execution_callbacks.emplace_back(request_id,std::move(callback));
+        while(execution_callbacks.size()>2)execution_callbacks.pop_front();
+        return;
+    }
+    wsprTransmitter.setTransmissionCallbacks(std::move(callback));
+    wsprTransmitter.configureExecution(request, legacy_request,std::move(launch_guard));
 }
+TransmitterRuntimeCallback transmitter_callbacks(){std::lock_guard lock(callback_mutex);return runtime_callback;}
 
 wsprrypi::StartupQuiesceResult transmitter_quiesce_for_startup()
 {
@@ -77,7 +90,7 @@ void transmitter_set_thread_scheduling(int policy, int priority)
 
 void transmitter_set_callbacks(TransmitterRuntimeCallback callback)
 {
-    { std::lock_guard lock(callback_mutex); runtime_callback = callback; }
+    { std::lock_guard lock(callback_mutex); runtime_callback = callback;if(!callback)execution_callbacks.clear(); }
     wsprTransmitter.setTransmissionCallbacks(std::move(callback));
 }
 
@@ -114,7 +127,7 @@ wsprrypi::CleanupResult transmitter_stop_and_join()
 
 bool transmitter_output_inactive_confirmed() noexcept
 {
-    if (wtp_runtime_selected()) return false;
+    if (wtp_runtime_selected()) return wtp_runtime_output_inactive_confirmed();
     return wsprTransmitter.lastCleanupResult().ok &&
            wsprTransmitter.getState() != WsprTransmitState::TRANSMITTING;
 }
@@ -146,7 +159,11 @@ void transmitter_poll_events()
     auto result = wtp_runtime_completion();
     if (!result) return;
     TransmitterRuntimeCallback callback;
-    { std::lock_guard lock(callback_mutex); callback = runtime_callback; }
+    { std::lock_guard lock(callback_mutex);
+        const auto binding=std::find_if(execution_callbacks.begin(),execution_callbacks.end(),[&](const auto &entry){return entry.first==result->request_id.value;});
+        if(binding!=execution_callbacks.end()){callback=binding->second;execution_callbacks.erase(binding);}
+        else if(result->skipped)callback=runtime_callback;
+    }
     if (!callback) return;
     const auto outcome = result->outcome;
     callback(result->skipped ? WsprTransmissionCallbackEvent::SKIPPED

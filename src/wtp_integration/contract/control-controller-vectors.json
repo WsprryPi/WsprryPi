@@ -12726,7 +12726,7 @@
       }
     },
     {
-      "name": "Pi stored-only solar draft",
+      "name": "Pi native recurrence activation",
       "family": "target-context",
       "valid": true,
       "value": {
@@ -12753,7 +12753,7 @@
             "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "read": true,
             "write": true,
-            "activation": "stored_only",
+            "activation": "next_occurrence",
             "maximum_bytes": 32768
           }
         ],
@@ -14517,6 +14517,167 @@
             }
           }
         ]
+      }
+    },
+    {
+      "name": "Superseded Pi stored-only activation",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-scheduling",
+            "schema_id": "urn:wsprry:control:1:pi-scheduling",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": true,
+            "activation": "stored_only",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "name": "Pi bounded next-start forecast",
+      "family": "target-status",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-status",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "active_revision": null,
+        "observed_output": {
+          "generation": "1",
+          "owner_id": null,
+          "job_id": null
+        },
+        "observation_age_ms": null,
+        "schedule_enabled": true,
+        "solar_enabled": false,
+        "transmit_effective": false,
+        "execution_owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "destination_id": null,
+        "authority_state": "legacy",
+        "phase": "unknown",
+        "waiting_reason": "authority",
+        "clock": {
+          "state": "unknown",
+          "uncertainty_ns": null,
+          "holdover_age_ns": null,
+          "generation": "0"
+        },
+        "selection": "unknown",
+        "selected_frequencies_hz": [],
+        "next_start_utc_ns": "1800000000000000000",
+        "forecast": "known",
+        "prolonged_window": null
+      }
+    },
+    {
+      "name": "Known forecast requires start",
+      "family": "target-status",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-status",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "active_revision": null,
+        "observed_output": {
+          "generation": "1",
+          "owner_id": null,
+          "job_id": null
+        },
+        "observation_age_ms": null,
+        "schedule_enabled": true,
+        "solar_enabled": false,
+        "transmit_effective": false,
+        "execution_owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "destination_id": null,
+        "authority_state": "legacy",
+        "phase": "unknown",
+        "waiting_reason": "authority",
+        "clock": {
+          "state": "unknown",
+          "uncertainty_ns": null,
+          "holdover_age_ns": null,
+          "generation": "0"
+        },
+        "selection": "unknown",
+        "selected_frequencies_hz": [],
+        "next_start_utc_ns": null,
+        "forecast": "known",
+        "prolonged_window": null
+      }
+    },
+    {
+      "name": "Unknown forecast cannot assert start",
+      "family": "target-status",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-status",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "active_revision": null,
+        "observed_output": {
+          "generation": "1",
+          "owner_id": null,
+          "job_id": null
+        },
+        "observation_age_ms": null,
+        "schedule_enabled": true,
+        "solar_enabled": false,
+        "transmit_effective": false,
+        "execution_owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "destination_id": null,
+        "authority_state": "legacy",
+        "phase": "unknown",
+        "waiting_reason": "authority",
+        "clock": {
+          "state": "unknown",
+          "uncertainty_ns": null,
+          "holdover_age_ns": null,
+          "generation": "0"
+        },
+        "selection": "unknown",
+        "selected_frequencies_hz": [],
+        "next_start_utc_ns": "1800000000000000000",
+        "forecast": "unknown",
+        "prolonged_window": null
       }
     }
   ],

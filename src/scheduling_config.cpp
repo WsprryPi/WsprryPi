@@ -17,9 +17,11 @@
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_pi_control.hpp"
 #include "recurrence_admission.hpp"
+#include "native_recurrence.hpp"
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -30,6 +32,7 @@ class WtpLocalConfigurationReservation {
 public:
     WtpLocalConfigurationReservation() : held_(wtp_pi_begin_configuration()) {}
     ~WtpLocalConfigurationReservation() { if (held_) wtp_pi_end_configuration(); }
+    void release() noexcept { if (held_) { wtp_pi_end_configuration(); held_=false; } }
     explicit operator bool() const noexcept { return held_; }
 private:
     bool held_;
@@ -53,9 +56,16 @@ bool set_config(bool force)
     // Migration never uses ordinary configuration or a restarted scheduler to
     // reopen a retired recurring assignment. Manual tone admission is separate.
     const auto recurrence=wsprrypi::legacy_recurrence_admission();
-    if (recurrence!=wsprrypi::LegacyRecurrenceAdmission::Open &&
+    const bool native=recurrence==wsprrypi::LegacyRecurrenceAdmission::Native;
+    if(native&&wsprrypi::native_occurrence_active()&&!active_wspr_plan_in_progress)return true;
+    if (recurrence!=wsprrypi::LegacyRecurrenceAdmission::Open && !native&&
         !(recurrence==wsprrypi::LegacyRecurrenceAdmission::DrainAcceptedPair &&
-          active_wspr_plan_in_progress && !force && !ini_reload_pending.load())) return true;
+          active_wspr_plan_in_progress && !force && !ini_reload_pending.load())){
+        if(!active_wspr_plan_in_progress&&transmitter_state()!=WsprTransmitState::TRANSMITTING){
+            transmitter_stop_and_join();current_transmission_request=TransmissionRequest{};
+        }
+        return true;
+    }
 
     // Exit if we are shutting down
     if (exiting_wspr.load())
@@ -332,7 +342,7 @@ bool set_config(bool force)
             runtime_transmit_enabled(working_config);
 
         std::string selector_gpio_error;
-        if (!sync_configured_selector_gpio_idle_state(
+        if (!native&&!sync_configured_selector_gpio_idle_state(
                 working_config,
                 keep_selector_gpio_initialized,
                 &selector_gpio_error))
@@ -471,6 +481,11 @@ bool set_config(bool force)
 
             if (!has_non_wspr_cli_startup_request(working_config.mode))
             {
+                // Native work is prepared immediately for its frozen future
+                // slot. Finish configuration before acquiring output ownership;
+                // the ordinary authority and final launch guards still apply.
+                if (wsprrypi::legacy_recurrence_admission()==wsprrypi::LegacyRecurrenceAdmission::Native)
+                    local_configuration.release();
                 schedule_next_non_wspr_launch(working_config);
             }
 
@@ -500,6 +515,16 @@ bool set_config(bool force)
             force ? WsprFrequencyEntry{} : active_wspr_plan_frequency_entry;
         bool next_active_wspr_plan_in_progress =
             force ? false : active_wspr_plan_in_progress;
+        std::shared_ptr<wsprrypi::NativeOccurrence> native_plan;
+        struct NativeReservation {
+            std::shared_ptr<wsprrypi::NativeOccurrence> &plan;
+            ~NativeReservation(){if(plan&&!plan->accepted){
+                wsprrypi::refuse_native_occurrence(plan);
+                if(plan->reserved){deassert_transmit_gpio_outputs(&config,false,"native occurrence refused");release_idle_selector_gpio_reservations();}
+            }}
+        } native_reservation{native_plan};
+        bool native_request_prepared=false;
+        std::optional<std::chrono::system_clock::time_point> native_start;
         if (force)
         {
             shutdown_after_wspr_plan.store(false, std::memory_order_release);
@@ -513,9 +538,47 @@ bool set_config(bool force)
             next_current_dial_frequency = next_active_wspr_plan_dial_frequency;
             next_current_frequency_entry = next_active_wspr_plan_frequency_entry;
             do_config = true;
+            if(native){
+                native_plan=wsprrypi::active_native_occurrence();
+                if(!native_plan||next_active_wspr_frame_index>=native_plan->starts.size()||!wsprrypi::native_launch_current(native_plan)){
+                    reset_active_wspr_plan_state();wsprrypi::finish_native_occurrence(transmitter_output_inactive_confirmed());return true;
+                }
+                native_start=std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(native_plan->starts[next_active_wspr_frame_index])));
+            }
         }
         else
         {
+            if(native){
+                const auto first=wsprrypi::next_native_wspr_start(working_config);
+                const auto frames=prepared_wspr_occurrence_frame_count(working_config);
+                if(!frames||frames>2)throw std::runtime_error("Unsupported native WSPR occurrence size");
+                std::vector<std::uint64_t> starts{first};if(frames==2)starts.push_back(first+120'000'000'000ULL);
+                native_plan=wsprrypi::prepare_native_occurrence(working_config,starts);
+                const auto &evaluation=native_plan->evaluation;
+                if(evaluation.outcome!=wsprrypi::SolarOutcome::Allowed){
+                    if(evaluation.outcome==wsprrypi::SolarOutcome::Skipped)wsprrypi::defer_native_skip(native_plan);
+                    if(candidate_ready_to_commit){
+                        commit_runtime_config_candidate(prepared_candidate);apply_runtime_config_side_effects();set_managed_reload_tx_inhibited(false);
+                    }
+                    (void)finalize_reload_pending();return true;
+                }
+                if(!runtime_transmit_preparation_enabled(working_config))return true;
+                next_current_frequency_entry=*evaluation.intent->wspr_entry;
+                next_current_dial_frequency=next_current_frequency_entry.dial_frequency_hz;
+                if(!configure_current_wspr_transmission(working_config,committed_ppm,next_current_dial_frequency,next_current_frequency_entry,
+                    next_active_wspr_plan,next_active_wspr_frame_index,next_active_wspr_plan_dial_frequency,next_active_wspr_plan_frequency_entry,
+                    next_active_wspr_plan_in_progress,next_active_wspr_plan_placement,next_transmission_request))return true;
+                std::vector<std::uint64_t> tones;
+                for(unsigned tone=0;tone<4;++tone){
+                    const auto value=wsprrypi::solar_frequency_nhz(static_cast<long double>(next_transmission_request.actual_rf_frequency_hz)+(static_cast<long double>(tone)-1.5L)*1.46484375L);
+                    if(!value)return true;
+                    tones.push_back(*value);
+                }
+                if(!wsprrypi::reserve_native_occurrence(native_plan,nlohmann::json{{"revision",native_plan->snapshot.revision},
+                    {"center_hz",next_transmission_request.actual_rf_frequency_hz},{"offset_hz",next_transmission_request.applied_offset_hz},{"frames",frames}},tones))return true;
+                native_request_prepared=true;do_config=true;
+                native_start=std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(first)));
+            }else{
             if (!working_config.wspr_frequency_entries.empty())
             {
                 next_frequency_entry_index =
@@ -528,6 +591,7 @@ bool set_config(bool force)
                 force);
             next_current_dial_frequency =
                 next_current_frequency_entry.dial_frequency_hz;
+            }
         }
 
         const bool frequency_entry_changed =
@@ -723,7 +787,7 @@ bool set_config(bool force)
             }
             else
             {
-                if (!configure_current_wspr_transmission(
+                if (!native_request_prepared&&!configure_current_wspr_transmission(
                         working_config,
                         committed_ppm,
                         next_current_dial_frequency,
@@ -883,7 +947,11 @@ bool set_config(bool force)
 
             // Backend preparation may throw. Publish the candidate plan and its
             // placement only after the request has been accepted.
-            commit_execution_request(next_transmission_request);
+            if(native){
+                const auto commit=[&]{commit_execution_request(next_transmission_request,native_start,[native_plan]{return wsprrypi::native_launch_current(native_plan);},wsprrypi::native_execution_callback(native_plan));};
+                if(native_plan->accepted){if(!wsprrypi::native_launch_current(native_plan))return true;commit();}
+                else if(!wsprrypi::accept_native_occurrence(native_plan,commit))return true;
+            }else commit_execution_request(next_transmission_request);
             current_dial_frequency = next_current_dial_frequency;
             current_frequency_entry = next_current_frequency_entry;
             freq_iterator = next_freq_iterator;
@@ -931,6 +999,8 @@ bool set_config(bool force)
                 llog.logS(DEBUG, "Setup complete.");
             }
             llog.logS(INFO, "Waiting for next transmission window.");
+            if (wsprrypi::legacy_recurrence_admission()==wsprrypi::LegacyRecurrenceAdmission::Native)
+                local_configuration.release();
             transmitter_start_async();
         }
 #ifdef DEBUG_WSPR_TRANSMIT

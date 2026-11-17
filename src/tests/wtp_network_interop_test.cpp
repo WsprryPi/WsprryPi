@@ -159,6 +159,14 @@ int main(int argc, char **argv) {
       while (clock.now_ms() < deadline) { if (auto r = app.take_completion()) return *r; clock.wait_ms(2); }
       throw std::runtime_error("application completion deadline");
     };
+    app.prepare(request(),[]{return false;}); app.start();
+    const auto refused = finish();
+    CHECK(refused.outcome == WtpScheduleOutcome::Invalidated && !refused.arm_handed_off && app.replaceable());
+    unsigned guard_checks = 0;
+    app.prepare(request(),[&]{return ++guard_checks == 1;}); app.start();
+    const auto stale = finish();
+    CHECK(guard_checks == 2 && stale.outcome != WtpScheduleOutcome::Complete && !stale.arm_handed_off && app.replaceable());
+    std::cout << "Actual TLS occurrence guard refused before CLAIM and invalidated before ARM with confirmed cleanup\n";
     app.prepare(request()); app.start();
     auto completed = finish();
     if (completed.outcome != WtpScheduleOutcome::Complete) std::cerr << completed.error << '\n';

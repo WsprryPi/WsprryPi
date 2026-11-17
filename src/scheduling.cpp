@@ -42,6 +42,7 @@
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
 #include "recurrence_admission.hpp"
+#include "native_recurrence.hpp"
 #include "chipset_offsets.hpp"
 #include "rp1_route_bridge.hpp"
 #include "rp1_pps_calibration.hpp"
@@ -329,7 +330,7 @@ void commit_band_gpio_snapshot_to_request(
     BandGPIOPrepareStatus prepare_status) noexcept;
 static void commit_execution_request(
     const wsprrypi::TransmissionRequest &controller_request,
-    const TransmissionRequest &legacy_request);
+    const TransmissionRequest &legacy_request,std::function<bool()> launch_guard = {},TransmitterRuntimeCallback callback = {});
 void clear_committed_execution_request() noexcept;
 static bool refresh_committed_band_gpio_selection() noexcept;
 void assert_transmit_gpio_outputs(const char *context) noexcept;
@@ -1367,7 +1368,7 @@ static void freeze_gpio_correction_provenance(
  * @param request Fully built execution request for one transmitter run.
  */
 void commit_execution_request(
-    const TransmissionRequest &request)
+    const TransmissionRequest &request,std::optional<std::chrono::system_clock::time_point> start,std::function<bool()> launch_guard,TransmitterRuntimeCallback callback)
 {
     if (!request.isTone() && !request.isSkipWindow())
     {
@@ -1380,8 +1381,9 @@ void commit_execution_request(
         payload.prepared = request.payload;
         payload.base_frequency_hz = request.actual_rf_frequency_hz;
         controller_request.payload = payload;
+        if(start)controller_request.slot.start_time=*start;
         if (!suppress_scheduler_execution_for_test)
-            transmitter_configure_execution(controller_request, candidate);
+            transmitter_configure_execution(controller_request, candidate,std::move(launch_guard),std::move(callback));
         current_transmission_request = std::move(candidate);
         committed_gpio_correction_provenance = std::move(candidate_provenance);
         current_controller_request_for_test_storage = std::move(controller_request);
@@ -1484,7 +1486,7 @@ static wsprrypi::HardwareProfile to_controller_profile(
 
 static void commit_execution_request(
     const wsprrypi::TransmissionRequest &controller_request,
-    const TransmissionRequest &legacy_request)
+    const TransmissionRequest &legacy_request,std::function<bool()> launch_guard,TransmitterRuntimeCallback callback)
 {
     current_transmission_request = legacy_request;
     current_transmission_request.hardware_profile =
@@ -1521,7 +1523,7 @@ static void commit_execution_request(
         return;
     }
 
-    transmitter_configure_execution(controller_request, current_transmission_request);
+        transmitter_configure_execution(controller_request, current_transmission_request,std::move(launch_guard),std::move(callback));
 }
 
 /**
@@ -2636,7 +2638,7 @@ static bool prepare_and_commit_non_wspr_request(
     const ArgParserConfig &cfg,
     const wsprrypi::TransmissionRequest &controller_request,
     TransmissionRequest legacy_request,
-    const WsprFrequencyEntry &frequency_entry)
+    const WsprFrequencyEntry &frequency_entry,const std::shared_ptr<wsprrypi::NativeOccurrence> &native_plan)
 {
     BandGPIOResolution selector_resolution;
     const BandGPIOPrepareStatus selector_status =
@@ -2655,12 +2657,16 @@ static bool prepare_and_commit_non_wspr_request(
         legacy_request,
         selector_resolution,
         selector_status);
+    if(native_plan){
+        return wsprrypi::accept_native_occurrence(native_plan,[&]{commit_execution_request(controller_request,legacy_request,
+            [native_plan]{return wsprrypi::native_launch_current(native_plan);},wsprrypi::native_execution_callback(native_plan));});
+    }
     commit_execution_request(controller_request, legacy_request);
     return true;
 }
 
 bool start_non_wspr_transmission_now(const ArgParserConfig &cfg,
-    std::optional<std::chrono::system_clock::time_point> scheduled_start)
+    std::optional<std::chrono::system_clock::time_point> scheduled_start,std::shared_ptr<wsprrypi::NativeOccurrence> native_plan)
 {
     const double committed_ppm = cfg.ppm;
     std::string policy_error;
@@ -2719,7 +2725,7 @@ bool start_non_wspr_transmission_now(const ArgParserConfig &cfg,
                 cfg,
                 controller_request,
                 std::move(legacy_request),
-                selector_entry))
+                selector_entry,native_plan))
         {
             llog.logE(ERROR, "QRSS mode could not prepare band GPIO selector.");
             return false;
@@ -2792,7 +2798,7 @@ bool start_non_wspr_transmission_now(const ArgParserConfig &cfg,
                 cfg,
                 controller_request,
                 std::move(legacy_request),
-                selector_entry))
+                selector_entry,native_plan))
         {
             llog.logE(ERROR, "FSKCW mode could not prepare band GPIO selector.");
             return false;
@@ -2873,7 +2879,7 @@ bool start_non_wspr_transmission_now(const ArgParserConfig &cfg,
                 cfg,
                 controller_request,
                 std::move(legacy_request),
-                selector_entry))
+                selector_entry,native_plan))
         {
             llog.logE(ERROR, "DFCW mode could not prepare band GPIO selector.");
             return false;
@@ -2935,7 +2941,9 @@ bool launch_scheduled_non_wspr_if_current(std::uint64_t generation)
 
 void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
 {
-    if (!wsprrypi::legacy_recurrence_admitted()) return;
+    const bool native=wsprrypi::legacy_recurrence_admission()==wsprrypi::LegacyRecurrenceAdmission::Native;
+    if (!native&&!wsprrypi::legacy_recurrence_admitted()) return;
+    if(native&&wsprrypi::native_occurrence_active())return;
     if (cfg.mode != ModeType::QRSS &&
         cfg.mode != ModeType::FSKCW &&
         cfg.mode != ModeType::DFCW)
@@ -2954,6 +2962,31 @@ void schedule_next_non_wspr_launch(const ArgParserConfig &cfg)
     }
 
     auto next_launch = next_non_wspr_schedule_time(cfg);
+    if(native){
+        try{
+            if(cfg.transmit_backend==TransmitBackendKind::WTP){
+                const auto earliest=std::chrono::system_clock::now()+wtp_runtime_preparation_lead();
+                if(next_launch<earliest){
+                    if(cfg.schedule_repeat_minutes<=0)return;
+                    const auto interval=std::chrono::minutes(cfg.schedule_repeat_minutes);
+                    const auto count=(earliest-next_launch)/interval+1;next_launch+=interval*count;
+                }
+            }
+            const auto start=std::chrono::duration_cast<std::chrono::nanoseconds>(next_launch.time_since_epoch()).count();if(start<=0)return;
+            const std::array<std::uint64_t,1> starts{static_cast<std::uint64_t>(start)};
+            const auto plan=wsprrypi::prepare_native_occurrence(cfg,starts);
+            if(plan->evaluation.outcome!=wsprrypi::SolarOutcome::Allowed)return;
+            const auto &tones=plan->evaluation.intent->nominal_tones_nhz;
+            ArgParserConfig selected=cfg;selected.qrss.frequency_hz=selected.fskcw.space_frequency_hz=selected.dfcw.dot_frequency_hz=static_cast<double>(tones.front())/1e9;
+            if(tones.size()==2){selected.fskcw.mark_frequency_hz=selected.dfcw.dash_frequency_hz=static_cast<double>(tones.back())/1e9;}
+            if(!wsprrypi::reserve_native_occurrence(plan,nlohmann::json{{"revision",plan->snapshot.revision},{"tones_nhz",tones}},tones))return;
+            try{
+                if(!start_non_wspr_transmission_now(selected,next_launch,plan))wsprrypi::refuse_native_occurrence(plan);
+            }catch(...){wsprrypi::refuse_native_occurrence(plan);throw;}
+            if(!plan->accepted)wsprrypi::refuse_native_occurrence(plan);
+        }catch(const std::exception &error){llog.logS(WARN,"Native recurrence waiting: ",error.what());}
+        return;
+    }
     if (cfg.transmit_backend == TransmitBackendKind::WTP) {
         if (cfg.schedule_repeat_minutes <= 0) throw std::runtime_error("Pico repeat interval must be positive");
         const auto earliest = std::chrono::system_clock::now() + wtp_runtime_preparation_lead();
@@ -3087,6 +3120,18 @@ void commit_band_gpio_snapshot_to_request(
  * @param request_out Receives the committed request snapshot for one slot.
  * @return `true` if the request was built successfully.
  */
+std::size_t prepared_wspr_occurrence_frame_count(const ArgParserConfig &cfg)
+{
+    const auto preference=wspr_planner_preference_to_plan_preference(cfg.wspr.planner_preference);
+    const bool upgrade=is_auto_paired_upgrade_eligible(cfg);
+    PreparedWsprTransmission plan;
+    try{plan=build_prepared_wspr_transmission(cfg.wspr.callsign,cfg.wspr.grid_square,cfg.wspr.power_dbm,preference);}
+    catch(...){if(!upgrade)throw;plan=build_prepared_wspr_transmission(cfg.wspr.callsign,cfg.wspr.grid_square,cfg.wspr.power_dbm,wspr::TransmissionPlanPreference::RequirePaired);}
+    if(cfg.wspr.planner_preference==WsprPlannerPreference::Auto&&upgrade&&plan.frameCount()<=1)
+        plan=build_prepared_wspr_transmission(cfg.wspr.callsign,cfg.wspr.grid_square,cfg.wspr.power_dbm,wspr::TransmissionPlanPreference::RequirePaired);
+    return plan.frameCount();
+}
+
 bool configure_current_wspr_transmission(
     const ArgParserConfig &cfg,
     double committed_ppm,
@@ -3496,6 +3541,21 @@ WsprRuntimeStatusSnapshot current_tx_runtime_status_snapshot()
     {
         snapshot.next_transmission_at =
             format_local_schedule_time(next_non_wspr_schedule_time(config));
+    }
+    const auto native_observation=wsprrypi::native_recurrence_observation();
+    if(!native_observation.empty()){
+        snapshot.next_transmission_at.clear();
+        if(!native_observation["next_start_utc_ns"].is_null()){
+            const auto when=std::stoull(native_observation["next_start_utc_ns"].get<std::string>());
+            if(when<=static_cast<std::uint64_t>(INT64_MAX))snapshot.next_transmission_at=format_local_schedule_time(
+                std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(when))));
+        }
+        if(const auto occurrence=wsprrypi::active_native_occurrence();occurrence&&config.mode!=ModeType::WSPR&&!occurrence->realized_tones.empty()){
+            snapshot.frequency_hz=static_cast<double>(occurrence->realized_tones.front())/1e9;
+            snapshot.offset_hz=occurrence->realized_tones.size()==2?static_cast<double>(occurrence->realized_tones.back()-occurrence->realized_tones.front())/1e9:0;
+        }else if(!wsprrypi::native_occurrence_active()&&native_observation["waiting_reason"]!="none"){
+            snapshot.frequency_hz=0;snapshot.offset_hz=0;snapshot.frequency_is_skip=false;
+        }
     }
 
     if (config.mode != ModeType::WSPR ||

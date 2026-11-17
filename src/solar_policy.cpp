@@ -23,6 +23,29 @@ std::optional<std::uint64_t> shifted(std::uint64_t base,std::int64_t shift){
     return base-magnitude;
 }
 }
+SolarEvaluation evaluate_solar_occurrence(const SolarPolicyConfig &policy,const SolarModeIntent &ordinary,
+    const SolarEvaluationContext &snapshot,std::span<const std::uint64_t> starts,
+    const std::array<std::size_t,5> &cursors,const SolarFrequencyPredicate &allowed){
+    const auto refusal=[&](SolarWait reason){SolarEvaluation result;result.observation=snapshot;result.waiting=reason;return result;};
+    if(starts.empty()||starts.size()>2||(ordinary.mode!=ModeType::WSPR&&starts.size()!=1))return refusal(SolarWait::Configuration);
+    for(std::size_t i=0;i<starts.size();++i)if(!starts[i]||(i&&starts[i]<=starts[i-1]))return refusal(SolarWait::Date);
+    auto context=snapshot;context.intended_utc_ns=starts.front();
+    auto first=evaluate_solar_policy(policy,ordinary,context,cursors,allowed);
+    if(first.outcome!=SolarOutcome::Allowed&&first.outcome!=SolarOutcome::Skipped)return first;
+    for(std::size_t i=1;i<starts.size();++i){
+        context.intended_utc_ns=starts[i];const auto next=evaluate_solar_policy(policy,ordinary,context,cursors,allowed);
+        if(next.outcome!=first.outcome||next.selected_period!=first.selected_period||!first.intent||!next.intent)return refusal(SolarWait::Period);
+        const auto &a=*first.intent,&b=*next.intent;
+        if(a.mode!=b.mode||a.cursor_scope!=b.cursor_scope||a.cursor_index!=b.cursor_index||a.wspr_profile!=b.wspr_profile||
+            a.wspr_preferences!=b.wspr_preferences||a.nominal_tones_nhz!=b.nominal_tones_nhz||a.wspr_entry.has_value()!=b.wspr_entry.has_value())return refusal(SolarWait::Period);
+        if(a.wspr_entry){
+            const auto &x=*a.wspr_entry,&y=*b.wspr_entry;
+            if(x.token!=y.token||x.dial_frequency_hz!=y.dial_frequency_hz||x.selector_gpio!=y.selector_gpio||
+                x.selector_gpio_active_high!=y.selector_gpio_active_high||x.allow_band_gpio_fallback!=y.allow_band_gpio_fallback)return refusal(SolarWait::Period);
+        }
+    }
+    return first;
+}
 std::optional<std::uint64_t> solar_decimal_hz(std::string_view text) noexcept {
     if(text.empty()||text.size()>30)return {};
     const auto dot=text.find('.');const auto integer=text.substr(0,dot);
@@ -48,6 +71,7 @@ bool solar_clock_ready(const SolarClockObservation &clock) noexcept {
     const auto growth=clock.holdover_age_ns/20000+(clock.holdover_age_ns%20000!=0);
     return growth<=max_error-clock.maximum_error_ns;
 }
+std::optional<std::uint64_t> solar_frequency_nhz(long double hz) noexcept {return nano_hz(hz);}
 SolarEvaluation evaluate_solar_policy(const SolarPolicyConfig &policy,const SolarModeIntent &ordinary,
     const SolarEvaluationContext &context,const std::array<std::size_t,5> &cursors,
     const SolarFrequencyPredicate &allowed){

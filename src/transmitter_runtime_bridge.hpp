@@ -35,7 +35,9 @@ void transmitter_clear_execution_state_after_stop() noexcept;
 void transmitter_configure_execution(const TransmissionRequest &request);
 void transmitter_configure_execution(
     const wsprrypi::TransmissionRequest &request,
-    const TransmissionRequest &legacy_request);
+    const TransmissionRequest &legacy_request,
+    std::function<bool()> launch_guard = {},TransmitterRuntimeCallback callback = {});
+TransmitterRuntimeCallback transmitter_callbacks();
 wsprrypi::StartupQuiesceResult transmitter_quiesce_for_startup();
 void transmitter_set_thread_scheduling(int policy, int priority);
 void transmitter_set_callbacks(TransmitterRuntimeCallback callback);

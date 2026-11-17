@@ -66,5 +66,27 @@ int main(){
     ordinary.wspr.entries[0].dial_frequency_hz=-1;assert(evaluate_solar_policy(policy,ordinary,context,cursors,check).waiting==SolarWait::Frequency);
     ordinary.wspr.entries[0].dial_frequency_hz=1e30;assert(evaluate_solar_policy(policy,ordinary,context,cursors,check).waiting==SolarWait::Frequency);
     policy.schedule_enabled=false;assert(evaluate_solar_policy(policy,ordinary,context,cursors,check).outcome==SolarOutcome::Disabled);
+    // The complete-pair gate precedes all mutable scheduler work. Even exactly
+    // equal inherited tones cannot bridge day/night or gray-line policy identity.
+    policy={};policy.solar_enabled=true;policy.locator="JJ00";
+    ordinary={};ordinary.wspr.entries={{"20m",14095600,-1,false,true}};
+    context={};context.configuration_generation=context.location_generation=1;
+    context.clock={SolarClockState::Synchronized,solar_first_utc_ns,1,1,0,true};cursors={};
+    bool crossing_tested=false,same_tested=false;
+    for(std::uint64_t offset=0;offset<86400;offset+=120){
+        const std::array<std::uint64_t,2> starts{solar_first_utc_ns+offset*1'000'000'000ULL,solar_first_utc_ns+(offset+120)*1'000'000'000ULL};
+        context.intended_utc_ns=starts[0];const auto a=evaluate_solar_policy(policy,ordinary,context,cursors,check);
+        context.intended_utc_ns=starts[1];const auto b=evaluate_solar_policy(policy,ordinary,context,cursors,check);
+        const auto complete=evaluate_solar_occurrence(policy,ordinary,context,starts,cursors,check);
+        assert(a.intent&&b.intent&&a.intent->nominal_tones_nhz==b.intent->nominal_tones_nhz);
+        if(a.selected_period!=b.selected_period){assert(complete.outcome==SolarOutcome::Held&&!complete.intent);crossing_tested=true;}
+        else{assert(complete.outcome==SolarOutcome::Allowed);same_tested=true;}
+    }
+    assert(crossing_tested&&same_tested);
+    const std::array<std::uint64_t,2> invalid_starts{100,100};
+    assert(evaluate_solar_occurrence(policy,ordinary,context,invalid_starts,cursors,check).outcome==SolarOutcome::Held);
+    assert(evaluate_solar_occurrence(policy,ordinary,context,{},cursors,check).outcome==SolarOutcome::Held);
+    ordinary.mode=ModeType::QRSS;
+    assert(evaluate_solar_occurrence(policy,ordinary,context,invalid_starts,cursors,check).waiting==SolarWait::Configuration);
     std::cout<<"PASS: disabled baseline, exact decimal/overflow, precedence, inheritance/scoped cursors, skips, CW tones, and clock/location holds\n";
 }

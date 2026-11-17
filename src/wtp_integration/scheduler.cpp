@@ -144,7 +144,7 @@ bool WtpScheduler::disconnect() {
   return true;
 }
 bool WtpScheduler::submit(TransmissionRequest request, std::string job_id,
-                          std::uint64_t uncertainty, WtpSchedulePolicy policy) {
+                          std::uint64_t uncertainty, WtpSchedulePolicy policy,std::function<bool()> launch_guard) {
   if (phase() != WtpSchedulePhase::Idle || pending_)
     return fail("WTP scheduler has pending or unresolved work");
   error_.clear();
@@ -212,7 +212,7 @@ bool WtpScheduler::submit(TransmissionRequest request, std::string job_id,
               *start - lead,
               caps.minimum_arm_lead_ns + policy.arm_submission_ms * 1000000,
               *now,
-              mono};
+              mono,std::move(launch_guard)};
   used_jobs_.insert(pending_->options.job_id);
   stopped_ = false;
   invalidated_ = false;
@@ -248,6 +248,8 @@ bool WtpScheduler::admit_arm() {
     return fail("WTP stop requested before ARM handoff");
   if (dispatch_admission_ && !dispatch_admission_())
     return fail("Output assignment was revoked or could not be reconciled before ARM");
+  try{if(pending_->launch_guard&&!pending_->launch_guard())return fail("Prepared occurrence is no longer current before ARM");}
+  catch(...){return fail("Prepared occurrence admission failed before ARM");}
   const auto now = observe();
   if (!now)
     return false;
@@ -352,6 +354,8 @@ WtpScheduleReport WtpScheduler::run() {
     if (dispatch_admission_ && !dispatch_admission_())
       return finish(WtpScheduleOutcome::Invalidated,
                     "Output assignment was revoked or could not be reconciled before CLAIM");
+    try{if(pending_->launch_guard&&!pending_->launch_guard())return finish(WtpScheduleOutcome::Invalidated,"Prepared occurrence is no longer current before CLAIM");}
+    catch(...){return finish(WtpScheduleOutcome::Invalidated,"Prepared occurrence admission failed before CLAIM");}
     if (!backend_.schedule(pending_->options))
       return finish(WtpScheduleOutcome::Failed, backend_.diagnostic());
     if (stopped_) {
