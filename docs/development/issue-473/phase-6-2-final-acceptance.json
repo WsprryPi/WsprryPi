@@ -3243,6 +3243,26 @@
       "path": "/Users/lbussy/GitHub/WsprryPi/build/phase62-final-application-package-matrix-standard-shell.log",
       "sha256": "9d8b754eaaec84bff693ba19b748d65f47babddf4825fe2edbf7511bae9f4607",
       "result": "pass"
+    },
+    "phase62-final-operator-docs-corrected-build.log": {
+      "path": "/Users/lbussy/GitHub/WsprryPi/build/phase62-final-operator-docs-corrected-build.log",
+      "sha256": "93c0eba018b95a481f56eb2a2138b5e8149e1f9245aff6234d36696a7fac5710",
+      "result": "pass"
+    },
+    "phase62-final-operator-docs-corrected-render.log": {
+      "path": "/Users/lbussy/GitHub/WsprryPi/build/phase62-final-operator-docs-corrected-render.log",
+      "sha256": "612b6878a5f8004da28f9536e619ffb0d7b7678742817f68a1d1dd7a8ae6e4ac",
+      "result": "pass"
+    },
+    "phase62-final-diagram-render.log": {
+      "path": "/Users/lbussy/GitHub/WsprryPi/build/phase62-final-diagram-render.log",
+      "sha256": "f7f50aa21fc189da93497e51e421eef88f62e24bdc7fc6f82ab9c4e17005e773",
+      "result": "pass"
+    },
+    "phase62-final-committed-contract-regeneration.log": {
+      "path": "/Users/lbussy/GitHub/WsprryPi/build/phase62-final-committed-contract-regeneration.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "pass"
     }
   },
   "later_non_runtime_deltas": [
@@ -3269,5 +3289,16 @@
       true,
       false
     ]
+  },
+  "operator_documentation": {
+    "repository": "/Users/lbussy/GitHub/WsprryPi-Docs",
+    "branch": "codex/issue-473-device-owned-scheduling",
+    "revision": "ca03728870b501734d8139a8a3e9f5557266ad73",
+    "files": {
+      "docs/User_Interface/Maintenance/index.md": "b530cf796803e01adf3aad332238442ed1a84d0cd5e8816c188abfbb98e445fc",
+      "docs/User_Interface/Maintenance/network_safety.md": "18821452f1f4a5d0169984a3b21dcb6d8900fe6d9ecd90b893322c028546e41b",
+      "docs/User_Interface/Setup/index.md": "7e10ffb17f63277b7b9e48f12a7a9754b6a2f93b47c7d4cbab1fcc9d93ab3831",
+      "docs/User_Interface/Setup/Transmitter/index.md": "3541ff53d18dbebee51e79b3bd22f20d42b0aa3c90ef81813abbde9f459a2bf2"
+    }
   }
 }
