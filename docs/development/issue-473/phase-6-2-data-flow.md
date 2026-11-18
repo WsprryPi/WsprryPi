@@ -224,3 +224,7 @@ The current shared Control/1 contract, independent Pair/1, independent WTP and s
 - [Pairing runtime](../../../src/wtp_integration/pi_pair_runtime.cpp), [pairing history/admission](../../../src/wtp_integration/pi_pair_history.hpp), [remote management owner](../../../src/wtp_integration/pi_pair_remote_controller.cpp).
 - [Native management service](../../../src/wtp_integration/pi_management_service.cpp), [native transaction store](../../../src/wtp_integration/pi_managed_store.cpp), [target authority codec](../../../src/recurrence_authority.cpp).
 - [Retirement exchange](../../../src/wtp_integration/pi_pair_retirement_client.cpp), [source retirement/resume book](../../../src/wtp_integration/controller_retirement.cpp), [Fleet dispatch owner](../../../src/wtp_integration/fleet_runtime.cpp), [actual Pi listener observation](../../../src/wtp_endpoint/runtime.cpp).
+
+## Integrated closeout
+
+The [phase-8 requirement matrix](phase-8-requirement-matrix.md) and [acceptance record](phase-8-acceptance.json) verify the current feature-branch pair and operator workflow against these paths. Closeout adds no endpoint, transport, key purpose, scheduling authority or forwarding path. WTP and browser-hop security reviews remain backlogged; software acceptance does not qualify physical links, deployment, services or RF.

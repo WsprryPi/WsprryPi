@@ -1,7 +1,6 @@
 # Shared device setup and device-owned solar scheduling
 
-Status: implementation plan; phase-specific implementation evidence is recorded
-in the phase list. Updated 2026-11-16.
+Status: implemented and hardware-free software accepted for the identified feature-branch candidates; see the [phase-8 requirement matrix](issue-473/phase-8-requirement-matrix.md) and [acceptance evidence](issue-473/phase-8-acceptance.json). Deployment, installation, services, physical USB, timing, GPIO and RF qualification remain separate. Updated 2026-11-18.
 
 Feature tracking: [WsprryPi #473 — Shared device setup and device-owned solar
 scheduling](https://github.com/WsprryPi/WsprryPi/issues/473). This document is the

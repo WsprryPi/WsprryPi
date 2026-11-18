@@ -1,0 +1,913 @@
+{
+  "schema": "issue473-phase8-acceptance/1",
+  "date": "2026-11-18",
+  "status": "complete",
+  "scope": "Integrated issue473 hardware-free software closeout; feature-branch delivery only, no release/deployment/merge/issue closure/hardware qualification",
+  "requirements": "phase-8-requirement-matrix.md",
+  "progress": "phase-8-progress.md",
+  "source_manifest_sha256": "0c3224da0f2d06bf89964b651b8e002bff809b2d10f4d6eb674817435f1cd40d",
+  "source_pair": {
+    "pi": {
+      "branch": "codex/issue-473-device-owned-scheduling",
+      "tested_revision": "7de3c3019376594c447c4b35124f2a4dfe062edd",
+      "source": "/Users/lbussy/GitHub/WsprryPi"
+    },
+    "pico": {
+      "branch": "codex/issue-473-phase62-paired-candidate",
+      "tested_revision": "ad697eaf982f35f554ffd319694837e901a32205",
+      "source": "/Users/lbussy/GitHub/WsprryPico/build/issue473-phase62-candidate"
+    }
+  },
+  "tested_uncommitted_application_source_changes": [],
+  "later_changes": "Engineering plan/status/matrix/acceptance documents only; no executable or test input changed",
+  "docs": {
+    "branch": "codex/issue-473-device-owned-scheduling",
+    "tested_base_revision": "12873e228b61b86b0c68a3bc08fea830a925ef1f",
+    "tested_changes_sha256": {
+      "docs/User_Interface/Maintenance/index.md": "f5f982ce126c4f6a3189a79812490039fc26cd02f40752ee2726fac1087cbd74",
+      "docs/User_Interface/Setup/Pi_IO/index.md": "b0ea739fedd10039e6573fbaae648c23da3817d9b2289bf4a6fc74100da32454",
+      "docs/User_Interface/Setup/Signal_Setup/cw.md": "b7a143246b1ac6ffd25e4023a1f1dbca01120cb495e56af54f6d9575387013ef",
+      "docs/User_Interface/Setup/Signal_Setup/wspr.md": "393c6f42c076a8e1586f644e9f6cd16aa525d6e55a5867ea915115494f665c4b"
+    },
+    "warnings": 0,
+    "links": {
+      "pages": 12,
+      "local_links_checked": 1022,
+      "errors": []
+    }
+  },
+  "prerequisite_comparison": {
+    "phase": 8,
+    "source_manifest_sha256": "0c3224da0f2d06bf89964b651b8e002bff809b2d10f4d6eb674817435f1cd40d",
+    "candidates": {
+      "pi": {
+        "branch": "codex/issue-473-device-owned-scheduling",
+        "revision": "7de3c3019376594c447c4b35124f2a4dfe062edd"
+      },
+      "pico": {
+        "branch": "codex/issue-473-phase62-paired-candidate",
+        "revision": "ad697eaf982f35f554ffd319694837e901a32205"
+      }
+    },
+    "phase62_comparison": {
+      "pi": {
+        "checked_files": 1416,
+        "changed_since_phase62": [
+          "WsprryPi-UI/data/app_state.php",
+          "WsprryPi-UI/data/configuration-recovery-client.js",
+          "WsprryPi-UI/data/index.css",
+          "WsprryPi-UI/data/pi-target-client.js",
+          "WsprryPi-UI/data/pi-target-editors.js",
+          "WsprryPi-UI/data/pico-target-editors.js",
+          "WsprryPi-UI/data/setup-targets.js",
+          "WsprryPi-UI/data/views/config.php",
+          "WsprryPi-UI/data/views/pico-target-settings.php",
+          "WsprryPi-UI/package.json",
+          "WsprryPi-UI/tests/pairing_actual_browser_test.js",
+          "WsprryPi-UI/tests/pico_target_editor_browser_test.js",
+          "scripts/tests/collect-support-bundle_test.sh",
+          "src/Makefile",
+          "src/tests/native_recurrence_main_test.py",
+          "src/wtp_integration/contract/PROVENANCE.json"
+        ],
+        "production_cpp_delta": []
+      },
+      "pico": {
+        "checked_files": 1064,
+        "changed_since_phase62": [],
+        "production_cpp_delta": []
+      }
+    },
+    "phase7_source_hashes_match": true,
+    "limits": "Comparison reuses exact component evidence only; fresh current-source integrated checks remain required.",
+    "byte_identical_provider_build_and_component_inputs": {
+      "count": 126,
+      "canonical_index_sha256": "3850ca6858bac0d923ce1b6423e86349e8d36f41d53dddc4abc91864777382fe",
+      "reference": "phase-6-2-final-acceptance.json tested_non_document_source_files.pi; current frozen candidate input equality verified"
+    }
+  },
+  "dependency_pins": {
+    "image": "sha256:1d8e51c6e66254c1c3997753250b5466a0144ceab7324903c08903d90ae43ab6",
+    "mbedtls": "0bebf8b8c7f07abe3571ded48a11aa907a1ffb20",
+    "mbedtls_framework": "dff9da04438d712f7647fd995bc90fadd0c0e2ce",
+    "pake": {
+      "provider": "Botan",
+      "version": "3.14.1",
+      "revision": "01af88c039fcfaedc418b1af4d6d3a139674e591",
+      "url": "https://codeload.github.com/randombit/botan/tar.gz/01af88c039fcfaedc418b1af4d6d3a139674e591",
+      "sha256": "617d5a2684cd5a6745e60180fcf2a54e045ff82512e4715ea8a1cd514b18ed4d",
+      "modules": [
+        "spake2p",
+        "pcurves_secp256r1",
+        "scrypt",
+        "auto_rng",
+        "system_rng"
+      ],
+      "license": "BSD-2-Clause"
+    }
+  },
+  "paired_results": [
+    {
+      "stage": "parity",
+      "command": [
+        "python3",
+        "scripts/generate_control_contract.py",
+        "--source",
+        "/work/pico",
+        "--check"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.03
+    },
+    {
+      "stage": "pair-shapes",
+      "command": [
+        "python3",
+        "scripts/generate_pair_contract.py",
+        "--check"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.01
+    },
+    {
+      "stage": "foundations",
+      "command": [
+        "make",
+        "-j4",
+        "pi-pair-contract-test",
+        "pi-pair-crypto-test",
+        "pi-pair-records-test",
+        "pi-pair-tls-test",
+        "local-browser-principal-test",
+        "pi-managed-store-test",
+        "wtp-fleet-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 26.22
+    },
+    {
+      "stage": "network-runtime",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-network-runtime-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 20.91
+    },
+    {
+      "stage": "network-interop",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-network-interop-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 132.82
+    },
+    {
+      "stage": "configuration-interop",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-config-interop-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 491.55
+    },
+    {
+      "stage": "pico-usb-configure",
+      "command": [
+        "cmake",
+        "-S",
+        "/work/pico",
+        "-B",
+        "/work/results/pico-usb",
+        "-DWSPRRY_PICO_BUILD_FIRMWARE=OFF",
+        "-DWSPRRY_PICO_BUILD_TESTS=ON",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "cwd": "/work",
+      "returncode": 0,
+      "elapsed_seconds": 0.19
+    },
+    {
+      "stage": "pico-usb-build",
+      "command": [
+        "cmake",
+        "--build",
+        "/work/results/pico-usb",
+        "--target",
+        "usb_management_driver",
+        "endpoint_driver",
+        "-j4"
+      ],
+      "cwd": "/work",
+      "returncode": 0,
+      "elapsed_seconds": 0.15
+    },
+    {
+      "stage": "pi-usb-build",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-usb-pair-client-build",
+        "wtp-usb-management-test",
+        "wtp-fleet-operations-driver-build",
+        "build/bin/pico_management_usb_pair_client",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 7.96
+    },
+    {
+      "stage": "ui-usb-settings",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/wtp_usb_settings_test.js"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.01
+    },
+    {
+      "stage": "usb-pair",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/wtp_usb_pair_test.js",
+        "src/build/wtp-network/wtp_usb_pair_client",
+        "/work/results/pico-usb/usb_management_driver"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 5.6
+    },
+    {
+      "stage": "usb-independent-management",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/pico_management_usb_pair_test.js",
+        "src/build/bin/pico_management_usb_pair_client",
+        "/work/results/pico-usb/usb_management_driver"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.62
+    },
+    {
+      "stage": "usb-paired-pi-management",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/pico_management_usb_pair_test.js",
+        "src/build/bin/pico_management_usb_pair_client",
+        "/work/results/pico-usb/usb_management_driver",
+        "--paired-pi"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 58.11
+    },
+    {
+      "stage": "usb-fleet",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/fleet_operations_pair_test.js",
+        "src/build/bin/wtp_fleet_operations_driver",
+        "usb",
+        "/work/results/pico-usb/endpoint_driver",
+        "/work/pi/src/build/wtp-network/credentials-v3"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 7.23
+    }
+  ],
+  "foundations": [
+    {
+      "stage": "strict",
+      "command": [
+        "g++",
+        "-std=c++20",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-fsyntax-only",
+        "-Isrc",
+        "-Isrc/tests",
+        "-Isrc/build/generated",
+        "-DWSPRRYPI_HAVE_AVAHI",
+        "-Isrc/INI-Handler/src",
+        "-Isrc/WTP-Server/include",
+        "-Isrc/WTP-Client/include",
+        "-Isrc/WSPR-Reference/src/wspr",
+        "-Isrc/Chipset-Offsets/src",
+        "-Isrc/Mailbox/src",
+        "-Isrc/LCBLog/src",
+        "-Isrc/MonitorFile/src",
+        "-Isrc/PPM-Manager/src",
+        "-Isrc/Signal-Handler/src",
+        "-Isrc/Singleton/src",
+        "-Isrc/WSPR-Transmitter/src",
+        "-D_REENTRANT",
+        "src/wtp_integration/pi_pair_history.cpp",
+        "src/wtp_integration/pi_pair_history_record.cpp",
+        "src/wtp_integration/pi_pair_retirement_key.cpp",
+        "src/wtp_integration/pi_pair_admission.cpp",
+        "src/wtp_integration/pi_pair_peers.cpp",
+        "src/wtp_integration/pi_pair_catalog_store.cpp",
+        "src/wtp_integration/pi_management_journal.cpp",
+        "src/wtp_integration/management_browser_session.cpp",
+        "src/wtp_integration/pi_pair_window.cpp",
+        "src/wtp_integration/pi_pair_http.cpp",
+        "src/wtp_integration/pi_pair_tls.cpp",
+        "src/wtp_integration/pi_pair_server.cpp",
+        "src/wtp_integration/pi_pair_client.cpp",
+        "src/wtp_integration/pi_pair_history_outgoing.cpp",
+        "src/wtp_integration/pi_pair_discovery.cpp",
+        "src/wtp_integration/pi_pair_guarded_http.cpp",
+        "src/wtp_integration/pi_pair_discovery_browser.cpp",
+        "src/wtp_integration/pi_pair_discovery_publisher.cpp",
+        "src/wtp_integration/pi_pair_socket.cpp",
+        "src/wtp_integration/pi_pair_bootstrap_client.cpp",
+        "src/wtp_integration/pi_pair_history_initial.cpp",
+        "src/wtp_integration/pi_pair_connect.cpp",
+        "src/wtp_integration/pi_pair_usage.cpp",
+        "src/wtp_integration/pi_pair_history_usage.cpp",
+        "src/wtp_integration/pi_management_service.cpp",
+        "src/wtp_integration/pi_pair_renewal.cpp",
+        "src/wtp_integration/pi_pair_maintenance.cpp",
+        "src/wtp_integration/pi_pair_owner.cpp",
+        "src/wtp_integration/pi_pair_service_lifetime.cpp",
+        "src/wtp_integration/pi_pair_local_service.cpp",
+        "src/wtp_integration/pi_pair_machine_service.cpp",
+        "src/wtp_integration/pi_pair_machine_backend.cpp",
+        "src/wtp_integration/pi_pair_remote_controller.cpp",
+        "src/wtp_integration/pi_pair_runtime.cpp",
+        "src/wtp_integration/pi_pair_history_local.cpp",
+        "src/wtp_integration/pi_pair_history_retirement.cpp",
+        "src/wtp_integration/pi_pair_retirement_client.cpp",
+        "src/wtp_integration/pi_managed_store.cpp",
+        "src/wtp_integration/pi_managed_records.cpp",
+        "src/wtp_integration/controller_retirement.cpp",
+        "src/wtp_integration/fleet_store.cpp",
+        "src/wtp_integration/pi_managed_startup.cpp",
+        "src/wtp_integration/usb_management.cpp",
+        "src/wtp_integration/pico_management_target.cpp",
+        "src/wtp_integration/browser_api_pair.cpp",
+        "src/wtp_integration/pico_management_context.cpp",
+        "src/wtp_integration/pico_target_controller.cpp",
+        "src/tests/pi_pair_recovery_test.cpp",
+        "src/tests/pi_pair_retirement_key_test.cpp",
+        "src/tests/pi_pair_admission_test.cpp",
+        "src/tests/pi_pair_history_tls_test.cpp",
+        "src/tests/pi_pair_peers_test.cpp",
+        "src/tests/pi_pair_window_test.cpp",
+        "src/tests/pi_pair_http_test.cpp",
+        "src/tests/pi_pair_tls_test.cpp",
+        "src/tests/pi_pair_server_test.cpp",
+        "src/tests/pi_pair_client_test.cpp",
+        "src/tests/pi_pair_outgoing_rotation_test.cpp",
+        "src/tests/pi_pair_discovery_test.cpp",
+        "src/tests/pi_pair_guarded_http_test.cpp",
+        "src/tests/pi_pair_bootstrap_client_test.cpp",
+        "src/tests/pi_pair_connect_test.cpp",
+        "src/tests/pi_pair_usage_test.cpp",
+        "src/tests/pi_pair_machine_service_test.cpp",
+        "src/tests/pi_pair_owner_test.cpp",
+        "src/tests/pi_pair_service_lifetime_test.cpp",
+        "src/tests/pi_pair_local_test.cpp",
+        "src/tests/pico_management_usb_pair_client.cpp",
+        "src/web_server_pair_routes.cpp",
+        "src/web_server.cpp",
+        "src/wtp_integration/pico_usb_management_channel.cpp",
+        "src/controller_runtime.cpp",
+        "src/pi_managed_host_runtime.cpp",
+        "src/web_server_control_routes.cpp"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 88.64
+    },
+    {
+      "stage": "foundations",
+      "command": [
+        "make",
+        "-j4",
+        "pi-pair-contract-test",
+        "pi-pair-crypto-test",
+        "pi-pair-records-test",
+        "pi-pair-tls-test",
+        "local-browser-principal-test",
+        "pi-managed-store-test",
+        "pi-managed-records-test",
+        "pi-wtp-binding-test",
+        "recurrence-authority-record-test",
+        "pi-pair-operations-test",
+        "pi-pair-recovery-test",
+        "pi-pair-retirement-key-test",
+        "pi-pair-admission-test",
+        "pi-pair-history-tls-test",
+        "pi-pair-peers-test",
+        "pi-management-journal-test",
+        "pi-pair-window-test",
+        "pi-pair-http-test",
+        "pi-pair-server-test",
+        "pi-pair-client-test",
+        "pi-pair-discovery-test",
+        "pi-pair-outgoing-rotation-test",
+        "pi-pair-guarded-http-test",
+        "pi-pair-bootstrap-client-test",
+        "pi-pair-connect-test",
+        "pi-pair-usage-test",
+        "pi-pair-machine-service-test",
+        "pi-pair-resume-refusal-test",
+        "pi-management-service-test",
+        "privileged-network-runtime-test",
+        "pi-pair-owner-test",
+        "pi-pair-service-lifetime-test",
+        "pi-pair-local-test",
+        "pi-pair-local-http-test",
+        "pi-pair-runtime-test",
+        "privileged-network-policy-test",
+        "pi-managed-startup-test",
+        "pi-managed-host-runtime-test",
+        "wtp-fleet-test",
+        "wtp-usb-management-test",
+        "pico-management-target-test",
+        "pico-usb-settings-test",
+        "controller-only-test",
+        "pico-management-journal-test",
+        "pico-management-history-test",
+        "solar-geometry-test",
+        "solar-policy-test",
+        "solar-clock-test",
+        "recurrence-progress-test",
+        "native-recurrence-test",
+        "scheduled-launch-test",
+        "wspr-plan-placement-test",
+        "wtp-managed-output-test",
+        "controller-contract-test",
+        "pi-config-persistence-coordinator-test",
+        "pi-management-anchor-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 67.65
+    },
+    {
+      "stage": "native-recurrence-main-test",
+      "command": [
+        "make",
+        "native-recurrence-main-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 10.58
+    },
+    {
+      "stage": "pi-managed-main-test",
+      "command": [
+        "make",
+        "pi-managed-main-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 1.38
+    },
+    {
+      "stage": "pi-managed-wtp-main-test",
+      "command": [
+        "make",
+        "pi-managed-wtp-main-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 1.54
+    },
+    {
+      "stage": "geometry-pair",
+      "command": [
+        "make",
+        "solar-geometry-pair-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 1.04
+    }
+  ],
+  "native": [
+    {
+      "check": "portable",
+      "command": [
+        "make",
+        "-C",
+        "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase7/native-pi/src",
+        "-j4",
+        "semantics-test-portable",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/Users/lbussy/GitHub/WsprryPi/build/issue473-phase62-provider/cache"
+      ],
+      "returncode": 0
+    },
+    {
+      "check": "actual-pi",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/pairing_actual_browser_test.js",
+        "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase7/native-pi/src/build/bin/pi_pair_browser_fixture"
+      ],
+      "returncode": 0
+    },
+    {
+      "check": "autonomy",
+      "command": [
+        "python3",
+        "src/tests/scheduling_autonomy_test.py",
+        "--fixture",
+        "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase7/native-pi/src/build/bin/scheduling_autonomy_fixture",
+        "--output",
+        "build/phase8-autonomy"
+      ],
+      "returncode": 0
+    }
+  ],
+  "full_linux": [
+    {
+      "stage": "full-semantics",
+      "command": [
+        "make",
+        "-j4",
+        "semantics-test",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 124.2
+    },
+    {
+      "stage": "named-regressions",
+      "command": [
+        "make",
+        "-j1",
+        "non-wspr-repeat-policy-test",
+        "band-gpio-rotation-test",
+        "selector-shutdown-cleanup-test",
+        "band-gpio-default-convergence-test",
+        "guarded-mode-change-persistence-test",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 9.73
+    }
+  ],
+  "network_fleet": {
+    "command": [
+      "docker",
+      "run",
+      "--rm",
+      "--network",
+      "none",
+      "--read-only",
+      "--cap-drop",
+      "ALL",
+      "--security-opt",
+      "no-new-privileges",
+      "--user",
+      "501:20",
+      "--tmpfs",
+      "/tmp:rw,nosuid,nodev,mode=1777",
+      "-v",
+      "issue473-phase62-pairs-1794925578954814000:/work:ro",
+      "-w",
+      "/work/pi",
+      "-e",
+      "WSPRRYPI_DISABLE_HARDWARE_ACCESS=1",
+      "sha256:1d8e51c6e66254c1c3997753250b5466a0144ceab7324903c08903d90ae43ab6",
+      "node",
+      "WsprryPi-UI/tests/fleet_operations_pair_test.js",
+      "src/build/bin/wtp_fleet_operations_driver",
+      "network",
+      "/work/pi/src/build/wtp-network/pico_tls_server",
+      "/work/pi/src/build/wtp-network/credentials-v3"
+    ],
+    "returncode": 0
+  },
+  "other_checks": [
+    {
+      "check": "UI units",
+      "command": "npm test",
+      "cwd": "WsprryPi-UI",
+      "result": "passed",
+      "log": "build/phase8-ui-unit.log",
+      "sha256": "07bbca329b918591439db2d5d1fe19dc2aeb197c7ba1448427a4818777ad3ceb"
+    },
+    {
+      "check": "UI browser suite",
+      "command": "npm run test:browser",
+      "cwd": "WsprryPi-UI",
+      "result": "passed",
+      "log": "build/phase8-ui-browser.log",
+      "sha256": "9de3886f9f3c6d7b5e1725284eaf7e5283e0dc1e1db0068745cb37db3fbd50dd"
+    },
+    {
+      "check": "Actual Pico browser",
+      "command": "python3 build/run-phase8-pico-browser.py",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-pico-browser.log",
+      "sha256": "facc46495958946a834a700ba73b95709d19420a13c7d2c47087ff9157be783e"
+    },
+    {
+      "check": "Provider archive boundary",
+      "command": "python3 scripts/tests/pairing_provider_build_test.py",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-provider-boundary.log",
+      "sha256": "fb557ced90e4e484bb2a10cd7d772d95c100a129703a7ab3915aa96d593fb283"
+    },
+    {
+      "check": "Secret redaction",
+      "command": "python3 scripts/tests/pairing_support_redaction_test.py",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-secret-redaction.log",
+      "sha256": "bbf220d889d409913082932298af56e5c6199e198725dc0cb2584e097ddc68d6"
+    },
+    {
+      "check": "Exact companion selection",
+      "command": "python3 scripts/tests/control_contract_pair_test.py",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-source-selection.log",
+      "sha256": "ec3dde39b9b616565480fbbb5acebc34d24cb3af137c7589de11e9ab87678ad7"
+    },
+    {
+      "check": "Standalone INI component",
+      "command": "make test SUDO= CXX=g++",
+      "cwd": "/work/pi/src/INI-Handler/src (isolated Linux)",
+      "result": "passed",
+      "log": "build/phase8-ini-component-linux.log",
+      "sha256": "18925ad9b1cd7f0509aacc928863ec285807b29a290cb9c0e6673c6e36a66ed9"
+    },
+    {
+      "check": "Rendered guide review",
+      "command": "node build/phase8-docs-render.js",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-docs-render.log",
+      "sha256": "f53c30e211af18dd8ef005f2b6dab12456281372e5a7b68419b806a7f93cd4c0"
+    },
+    {
+      "check": "Local guide links",
+      "command": "python3 build/check-phase8-doc-links.py",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-doc-links.json",
+      "sha256": "2a9d27c435e6f2186d40258b217cf5cc115aeb83602593b0cf7b8cfef0167c2d"
+    },
+    {
+      "check": "Annotated diagram",
+      "command": "node build/phase62-data-flow-render.js",
+      "cwd": ".",
+      "result": "passed",
+      "log": "build/phase8-data-flow-render.log",
+      "sha256": "51a896c8df28675e655a001094a1ada3d0b8452afddec4d22a349214c90ae1ee"
+    },
+    {
+      "check": "Docs strict build",
+      "command": "source docs/.venv/bin/activate; python -m sphinx -E -a -b html -n -W --keep-going docs docs/_build/html",
+      "cwd": "/Users/lbussy/GitHub/WsprryPi-Docs",
+      "result": "passed",
+      "log_sha256": "5a42479b2dec94bb8959c44c62fd893a0335fe8b4a620d9489322b02d53cb410"
+    },
+    {
+      "check": "Docs dependency check",
+      "command": "source docs/.venv/bin/activate; python -m pip check",
+      "cwd": "/Users/lbussy/GitHub/WsprryPi-Docs",
+      "result": "passed",
+      "log_sha256": "25fd1130b12914757b3e4e3c37f3468236c7aa5c41c662e7115ce1c5de9e2464"
+    },
+    {
+      "check": "Docs extension test",
+      "command": "source docs/.venv/bin/activate; python -m unittest discover -s tests -p 'test_*.py' -v",
+      "cwd": "/Users/lbussy/GitHub/WsprryPi-Docs",
+      "result": "passed",
+      "log_sha256": "7693a0abdc97c7ac78f48e8d719c1d583205e0e11791363147faa0ae0629ea06"
+    }
+  ],
+  "visual_evidence_sha256": {
+    "build/phase7-scheduling-ui/capacity-dark-390.png": "cf08fa59d85d881e76c172b127d45ee662d3bb1aac59ca2700a25a4867abc065",
+    "build/phase7-scheduling-ui/capacity-light-390.png": "ab44968545aa0619d28d6eb726ec5df00606ecd9af94af5cfde5f9ca87266c10",
+    "build/phase7-scheduling-ui/failed-target-dark-390.png": "2493e6311fbc13c2fdb2e508010a655ea15ad8dc3e8216e60b016cbd243c0f06",
+    "build/phase7-scheduling-ui/failed-target-light-390.png": "0ebc446e0a3c8d131083852fdca2979211f1cbf34a073e846b77bdde88208a79",
+    "build/phase7-scheduling-ui/full-dark-1440.png": "bfdc00aa302e1c4c91168b53ba5523d3437617b745d5feb5aae974d0c99c7464",
+    "build/phase7-scheduling-ui/full-dark-390.png": "981ab511a546876038917ca6760e670b9be8f428fe3418cd0893f8ad67605f6a",
+    "build/phase7-scheduling-ui/full-light-1440.png": "3ff44e6236a35d123a266b92fca59aaa2bee8706042fc688f7245a2871b86344",
+    "build/phase7-scheduling-ui/full-light-390.png": "ca339cbc7fede1a1e2e86ad8a7e4305eb9080c94a96cfdae3fba52330ffe6ee9",
+    "build/phase7-scheduling-ui/invalid-dark-390.png": "4ca88d764b092e9beae3e5c3fa9ca9960e8456e6fabf08158293402a32997128",
+    "build/phase7-scheduling-ui/invalid-light-390.png": "475caa8e9640f44e2f73d78acbdfd778a52b7f09cdada95ffcb140f94b7203b7",
+    "build/phase7-scheduling-ui/native-capacity-dark-1440.png": "595ab7dd4b08c479b1ff13dec2be9eb322c10ed56586114add320d88989973ee",
+    "build/phase7-scheduling-ui/native-capacity-dark-390.png": "0fe0c6dd5243bcc0f2611c61e6a44a0a4e5e3b6ec5047f6e90b36c2487e6d88e",
+    "build/phase7-scheduling-ui/native-capacity-light-1440.png": "57460417b6adc438847906f470a70d00c907f653a738dded4053250aaa29eff3",
+    "build/phase7-scheduling-ui/native-capacity-light-390.png": "49cc6222dc50336a0dffef2cf9e8aa2012fa5efc39fefc639a0db2b0b576577a",
+    "build/phase7-scheduling-ui/recovery-dark-390.png": "335ff4ab59b9b462bd1d77f04b023e17e71afe714419807abe38295345c32161",
+    "build/phase7-scheduling-ui/recovery-light-390.png": "37b33e5dbc349d5a2fd7e1f544097d965c033bb55ac796696a78ede0671054ce",
+    "build/phase7-scheduling-ui/retained-unavailable-dark-390.png": "6f6643b6e73ade07a470f1f34c1007671db9bbd3de12bf414fcf78c975e6ff4f",
+    "build/phase7-scheduling-ui/retained-unavailable-light-390.png": "f64776e5138fafe6eecdfcb045f073a00cb28d4aad40031fd185f566b7a6df82",
+    "build/phase7-scheduling-ui/scheduling-dark-1440.png": "99c78e1aeaef739715e846e88adcf368a6bd16023783cd630c2ec806990f5940",
+    "build/phase7-scheduling-ui/scheduling-dark-320.png": "94a95f71d044623038b3c18228091d62acff299127d4e7d7a38398e3a5f07db6",
+    "build/phase7-scheduling-ui/scheduling-dark-390.png": "8c43a1d4d0831baa83a86cd02e514e77de725f516b7749661d8af49cc2722486",
+    "build/phase7-scheduling-ui/scheduling-light-1440.png": "632d27424ef67782dd31a0825e5b651ea2df0d3d1781e16b5f334e717936d5cb",
+    "build/phase7-scheduling-ui/scheduling-light-320.png": "fcb65025fc53c12abe9534caac41a9817b5009d5e54ca6fb4237a04d9588fb9c",
+    "build/phase7-scheduling-ui/scheduling-light-390.png": "0bef7fd3a64bf31327a9098f3723ef8dbfe99928082dd1e1824c6148645a6894",
+    "build/phase8-pico-ui/recovery-dark-1440.png": "5bb29407fe8469f015bffaa937443713eb5be9a149a3ca9f548f218e1f44c699",
+    "build/phase8-pico-ui/recovery-dark-390.png": "618ec7a0b74569a8773252f030f49998ed917f553c30a1063e6bf9eac67bfa38",
+    "build/phase8-pico-ui/recovery-light-1440.png": "fe931309d4c34aac4939303ad09febf3709df16c8d14b8f457ce9b7206af0a75",
+    "build/phase8-pico-ui/recovery-light-390.png": "5089798e0027bff3e1bcbf739a0875ebd79e52877d862f1c36fd94f3f1e2c088",
+    "build/phase8-pico-ui/retained-dark-1440.png": "93555edead66f86ceda9c4fdf562409d1d8fd56dac66750fe7588b0b228023c1",
+    "build/phase8-pico-ui/retained-dark-390.png": "6c109d4b8ecd4c9b8a42c60fe4664b0cb0f1d393f84f408a06eaeb3c7f7fbfc0",
+    "build/phase8-pico-ui/retained-light-1440.png": "a1b11cca95fe256bff26459f7481ef812dc53a2c99542def1b59336ef115b307",
+    "build/phase8-pico-ui/retained-light-390.png": "14e5db6093e2b71129488f345e21f469cdab1477aab83daf8888369843c07cb2",
+    "build/phase8-pico-ui/scheduling-dark-1440.png": "69c932fcebce4746b1976721b5e3d0b16e519e01a8f5bd8e5b2e5c6f4c044bef",
+    "build/phase8-pico-ui/scheduling-dark-390.png": "e1118abacf896e20be3d85a3812c9085e4c9dbb3d70911fc41cfa8e02777b17a",
+    "build/phase8-pico-ui/scheduling-light-1440.png": "70fc6825765d04b9e0c5e1b11358758a2b74f8702648521234d1e5e62d75899e",
+    "build/phase8-pico-ui/scheduling-light-390.png": "79c81f56684ca1d33736c75b6df6e0d253e44ebb352043679679bf7168ea06ae",
+    "build/phase8-docs-ui/Advanced_Operations-configuration_troubleshooting-1440.png": "82e15f0413993a5ce388fc827920ee0d7ade3213011bcd9c588e699d03be8ea5",
+    "build/phase8-docs-ui/Advanced_Operations-configuration_troubleshooting-390.png": "53b0d5706ddd7db32891dd15bbd57439e5e9b96bbe124da6a6092f05262d0b1b",
+    "build/phase8-docs-ui/Advanced_Operations-ini_configuration-runtime-1440.png": "e560d66abddf06c1f0571f4902d03564151caeb301a52129e48925bde5bfb611",
+    "build/phase8-docs-ui/Advanced_Operations-ini_configuration-runtime-390.png": "2896ceb107184534bb4f052062b97b75e16dda1eb65d30f735feb7f877c01166",
+    "build/phase8-docs-ui/User_Interface-Maintenance-index-1440.png": "bb936236441493ff14f4c4154a99f81f91a221a769463a774dd391ab9e8cc63d",
+    "build/phase8-docs-ui/User_Interface-Maintenance-index-390.png": "1e61f673cdd205bf3c820792a6e87e15108f94f24e454747a7634f0cb7a39b55",
+    "build/phase8-docs-ui/User_Interface-Maintenance-index-detail-1440.png": "6100871e75e4c71ad582ea753468407684e566b9598f334314a02515877cb7b7",
+    "build/phase8-docs-ui/User_Interface-Maintenance-index-detail-390.png": "1153c321788c187835599b55ab3d34af733f381dabe02ea97cc42477ff7b7b9e",
+    "build/phase8-docs-ui/User_Interface-Setup-Pi_IO-index-1440.png": "73df94dc95116b2d3aa66c0b32f348c20035cc6450d04833285b0d54b1c370fa",
+    "build/phase8-docs-ui/User_Interface-Setup-Pi_IO-index-390.png": "76d2524b1a3e7f9e6228f01c6f27e24c4ebdd57d5e3004f200ea0863e3fba169",
+    "build/phase8-docs-ui/User_Interface-Setup-Scheduling-index-1440.png": "d9dcc143b261ec2a2dc85b875e92a73efbc3650651739be63945b07e4bf91880",
+    "build/phase8-docs-ui/User_Interface-Setup-Scheduling-index-390.png": "c9eb9d41661e4544c81b080791a48b4a41a352d43852db3de97755673a771e8e",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-cw-1440.png": "3e653595170a28db146af0a19f70ec5669d7c4efbec3e139343418df40f6aa8e",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-cw-390.png": "aba963304cfc51c01eb04dfe64200a4a32f80a7339584aebf6c9ca5d031631df",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-cw-detail-1440.png": "4a2ebc077c3eeb8f7efde054247bb1afdaccf1208c0a76437fd4883343c6bb0f",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-cw-detail-390.png": "eff6f2e6bdba89cb9a402bcb5d861e17524cafb0928cfba5bd39e486bbb21d35",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-index-1440.png": "b5d9cb7e12f8e87ad5b833e26037c8141ae58dfc465fd4b5e1daaea4ce646532",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-index-390.png": "d0f524870ad1ec7e0f62d9a1ad5e14e7d4e4ec21e17a0923cee54a5bb71cb2a7",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-wspr-1440.png": "55fd58514f4a0a22199ea64395df18c722b074e15339d1113a26e37fd46ea969",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-wspr-390.png": "d8e463d6d60cc652ccab22c841037edfebd75e1241fea4606ebee294259c81fc",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-wspr-detail-1440.png": "e842e4be2f9adc13e775e03cbcbd1b39f772dd64b0529675ecb35a23e6950704",
+    "build/phase8-docs-ui/User_Interface-Setup-Signal_Setup-wspr-detail-390.png": "7a5bc870d6a270ad0b95ec55148f663b6c47e4c6d92202edb98d8754d16ba0b7",
+    "build/phase8-docs-ui/User_Interface-Setup-Transmitter-index-1440.png": "628e28f8e38f8e13d383a10def2d2630fd7b64334dab2dbc842eb5cc5645c5b3",
+    "build/phase8-docs-ui/User_Interface-Setup-Transmitter-index-390.png": "74cc20e86d5d8b5fc62a258d9b9f9c539f8534a1f81e8fa3953280ed1a4ff70c",
+    "build/phase8-docs-ui/User_Interface-Setup-index-1440.png": "c4fdb3ec3236945444233f72979e8833ec265b42c7e3fe80f993c4c1ac8669dd",
+    "build/phase8-docs-ui/User_Interface-Setup-index-390.png": "9f49a02387f385bcbceb2a04a0af183137aa188195d602daa69aca664829013b",
+    "build/phase8-docs-ui/first_transmission-1440.png": "8750a3f3b41705bcaf448fe7e7eb7b25aa048708403011264dc865dd87080d04",
+    "build/phase8-docs-ui/first_transmission-390.png": "fbba3ac5002478db9911e750ee3210a16014c3f2792c76642af1f1963e459e80"
+  },
+  "autonomy": {
+    "evidence": "phase-8-autonomy-evidence.json",
+    "sha256": "e15cdaf654c31e4f599f2cbcadc0986ce6271c5cef09040ccbe0807065f31472",
+    "sites": [
+      {
+        "device": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "locator": "EM18IG",
+        "admissions": 3,
+        "executions": 2
+      },
+      {
+        "device": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "locator": "MK88IG",
+        "admissions": 3,
+        "executions": 2
+      }
+    ],
+    "observation": "Browser and isolated controller absent before first output; fresh target-owned admissions and simulated executions during absence; settled future reservations, consumed slots and plan IDs unchanged on reconnect"
+  },
+  "review": {
+    "independent_impeccable": "Final full reviewer and documenter records in phase-8-progress.md; no material finding remains in accepted scope",
+    "own_assessment": "Requirements, approvals, exact-source evidence, producer/consumer parity, state tables, threat boundaries, privacy, false qualification and complete diffs assessed after corrections"
+  },
+  "resolved_validation_attempts": [
+    "Actual-main fixture lease collision resolved by serial runner, no production policy change",
+    "Memory-bound parallel links and incomplete disposable outputs resolved by serial rebuild; all final focused checks pass",
+    "Default Mac standalone INI command rejects existing GNU filesystem linker flag; supported GNU/Linux standalone passes and Mac parent portable integration passes",
+    "WSPR detail screenshot omitted new paragraph; recaptured and independently verified"
+  ],
+  "limits": [
+    "Software evidence only; no physical USB, deployed LAN, installed services, installation, timing precision, GPIO/I2C/MMIO or RF qualification",
+    "No independent cryptographic audit or future dependency release qualification",
+    "Native Pi GPS unsupported; Mac native solar health unknown; Pico Pi-style day/night profiles and atomic combined master unsupported",
+    "WTP role/TLS and browser-hop HTTPS/WSS remain separate backlog work",
+    "Pico candidate available on paired feature ref, not claimed delivered to devel/main",
+    "Pip cache permission advisory disables cache; dependency consistency passes"
+  ],
+  "components_modified": [],
+  "preserved_unrelated": {
+    "path": "docs/development/sqlite-feasibility-implementation-prompt.md",
+    "sha256": "1c5c525183ce97f752b9e8e21d58d21fa194cad92ff5bab0327c301985f872a6"
+  },
+  "actual_pico_browser_command": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--read-only",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--user",
+    "501:20",
+    "--tmpfs",
+    "/tmp:rw,nosuid,nodev,mode=1777",
+    "-v",
+    "issue473-phase62-pairs-1794925578954814000:/work",
+    "-v",
+    "/Users/lbussy/GitHub/WsprryPi/WsprryPi-UI:/work/pi/WsprryPi-UI:ro",
+    "-v",
+    "/Users/lbussy/GitHub/WsprryPi/build/phase8-pico-ui:/out",
+    "-w",
+    "/work/pi",
+    "-e",
+    "WSPRRYPI_DISABLE_HARDWARE_ACCESS=1",
+    "-e",
+    "CHROME_BIN=/usr/bin/chromium",
+    "-e",
+    "WSPRRYPI_EDITOR_SCREENSHOTS=/out",
+    "sha256:1d8e51c6e66254c1c3997753250b5466a0144ceab7324903c08903d90ae43ab6",
+    "node",
+    "WsprryPi-UI/tests/pico_controller_http_pair_test.js",
+    "/work/pi/src/build/wtp-network",
+    "/work/pi/src/build/bin/pico_controller_pair_fixture",
+    "--browser"
+  ],
+  "test_environment": {
+    "WSPRRYPI_DISABLE_HARDWARE_ACCESS": "1",
+    "software_only": true,
+    "isolated_Linux": "network none, read-only container root, unprivileged test user, task-only volumes and tmpfs",
+    "full_Linux_profile": "default physical plus simulated backend capabilities; hardware access disabled",
+    "native_profile": "macOS explicit simulated portable subset"
+  }
+}
