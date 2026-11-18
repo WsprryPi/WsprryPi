@@ -1,0 +1,7 @@
+{
+  "schema": "constructed-retirement-fixture/1",
+  "context_json": "{\"authorization_generation\":\"7\",\"client_role\":\"target\",\"controller_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"pair_id\":\"cccccccccccccccccccccccccccccccc\",\"purpose\":\"Wsprry-Pair/1/retirement-tls\",\"server_role\":\"controller\",\"target_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+  "salt_hex": "dc167638975a4195934a27fe0d3877a243c5f7de84230aa4bb051129690c4e3e",
+  "verifier": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "transport_psk": "teVqNve93DTESQCPu-2kXEQU9TnWRYw_830NkkCDjV4"
+}

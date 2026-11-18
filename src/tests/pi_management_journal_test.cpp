@@ -66,6 +66,8 @@ int main(int argc,char **argv){
   check(!rename(replacement.c_str(),ini.c_str()),"External replacement fixture");
   check(journal.inspect("ini")->bytes==before&&journal.inspect("ini")->signature!=observation->signature,
       "Equal-byte external replacement changes the owner observation");
+  refuses([&]{journal.prepare({{"ini",before_hash,"forbidden stale observation",observation->signature}});});
+  check(!journal.decision()&&bytes(ini)==before,"Caller observation is checked before staging, not just captured after an ABA replacement");
   refuses([&]{(void)journal.inspect("unapproved");});
   refuses([&]{journal.prepare({{"ini",before_hash,std::string(1048577,'x')}});});
   check(!std::filesystem::exists(root+"/transaction"),"Capacity refusal precedes staging");

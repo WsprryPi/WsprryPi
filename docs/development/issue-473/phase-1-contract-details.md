@@ -151,6 +151,16 @@ a process into or out of the role is an explicit restart choice, not Device
 selection or an automatic runtime fallback. Startup must still load/validate
 controller-owned catalog/auth/recovery state before accepting management writes.
 
+## Phase-6.2 approved amendments
+
+On 2026-11-17 the user approved D62-01–D62-05 and required companion scope.
+The exact current pairing profile below incorporates D62-01; provider security,
+maintenance, platform, and packaging qualification remains mandatory. D62-03
+clarifies assignment identity below. The approved decision register specifies
+the additional gateway, registration, retirement-purpose, and remote-resume
+closures to be materialized together before their implementation is accepted.
+No WTP, existing Pico authentication, or control-major change is authorized.
+
 ## Exact pairing bootstrap and UI command shapes
 
 All auth messages are closed JSON, <=4096 bytes and depth <=8, no compressed body,
@@ -164,7 +174,9 @@ protected same-origin browser access; machine routes cannot create a window.
 
 `P = {contract:"Wsprry-Pair/1"}` is expanded into each shape below; each
 shape then has exactly its one explicitly listed schema field.
-No body contains a key supplied by browser JS. The code alphabet is exactly
+`Suite` is exactly `SPAKE2+-P256-SHA256-HKDF-HMAC`; it is not a negotiated range.
+Reject missing, unknown, or inconsistent advertised/returned suites before PAKE
+work or mutation. No body contains a key supplied by browser JS. The code alphabet is exactly
 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`; input may remove the displayed hyphen and
 ASCII spaces and uppercase ASCII, then must have exactly eight alphabet symbols.
 The normalized code is passed only from the controller's trusted browser session
@@ -175,10 +187,10 @@ to its own backend, not as a URL or a public-bootstrap field.
 | Target UI `POST /api/control/v1/host/pairing/window` | `{contract:"Wsprry-Control/1",schema:"pair-window",operation_id:ID,action:pair\|replace\|recover,expected_authorization_generation:U64}` | `{contract:"Wsprry-Control/1",schema:"pair-window",window_id:ID,device_id:ID,boot_id:ID,authorization_generation:U64,code:string,expires_in_ms:120000}`; code visible only to requesting target-local browser session |
 | Target UI `POST /api/control/v1/host/pairing/remove` | `{contract:"Wsprry-Control/1",schema:"pair-remove",operation_id:ID,expected_authorization_generation:Generation}` | Ordinary durable operation receipt; no code/key |
 | Controller UI `POST /api/control/v1/host/pairing/connect` | `{contract:"Wsprry-Control/1",schema:"pair-connect",operation_id:ID,discovery_id:ID,expected_device_id:ID,code:string}` | Ordinary durable operation receipt with the target's binding; pair becomes enrolled only on confirmed commit |
-| Public `GET /api/pair/v1/window` | None | `{P,schema:"window",device_id:ID,boot_id:ID,open:boolean,window_id:ID\|null,pair_id:ID\|null,authorization_generation:U64}`; no code/owner name |
-| Public `POST /api/pair/v1/hello` | `{P,schema:"hello",window_id:ID,pair_id:ID,action:pair\|replace\|recover,controller_id:ID,controller_boot_id:ID,target_id:ID,target_boot_id:ID,authorization_generation:U64,controller_nonce:B32}` | `{P,schema:"challenge",pair_id:ID,target_nonce:B32}` |
-| Public `POST /api/pair/v1/exchange` | `{P,schema:"exchange",pair_id:ID,pA:Point}` | `{P,schema:"exchange",pair_id:ID,pB:Point}` |
-| Public `POST /api/pair/v1/confirm` | `{P,schema:"confirm",pair_id:ID,cA:B32}` | `{P,schema:"confirmed",pair_id:ID,cB:B32}` |
+| Public `GET /api/pair/v1/window` | None | `{P,schema:"window",suite:Suite,device_id:ID,boot_id:ID,open:boolean,window_id:ID\|null,pair_id:ID\|null,authorization_generation:U64,action:pair\|replace\|recover\|null}`; action and IDs are nonnull exactly while open; no code/owner name |
+| Public `POST /api/pair/v1/hello` | `{P,schema:"hello",suite:Suite,window_id:ID,pair_id:ID,action:pair\|replace\|recover,controller_id:ID,controller_boot_id:ID,target_id:ID,target_boot_id:ID,authorization_generation:U64,controller_nonce:B32}` | `{P,schema:"challenge",suite:Suite,pair_id:ID,target_nonce:B32}` |
+| Public `POST /api/pair/v1/exchange` | `{P,schema:"exchange",pair_id:ID,pA:Point}` | `{P,schema:"exchange",pair_id:ID,pB:Point,cB:B32}` |
+| Public `POST /api/pair/v1/confirm` | `{P,schema:"confirm",pair_id:ID,cA:B32}` | `{P,schema:"confirmed",pair_id:ID}` |
 | Public `POST /api/pair/v1/commit` | `{P,schema:"commit",pair_id:ID,request_digest:Digest,proof:B32}` | `{P,schema:"committed",pair_id:ID,authorization_generation:Generation,receipt_digest:Digest,proof:B32}` |
 
 Initial key_epoch is 1. Successful normal pair/replace advances the target authorization
@@ -187,6 +199,10 @@ The controller stages the expected next generation before commit. Overflow
 refuses without reviving old authority. Scrypt work is serialized to one active
 derivation per process (32 MiB algorithm memory plus bounded worker overhead);
 exhaustion returns busy rather than an unbounded crypto queue.
+
+P62-06/P62-07 define separate LAN-only `_wsprry-mgmt._tcp.local.` discovery, with fixed SRV port 31418 and dedicated target `wsprry-management-<device_id>.local.` publishing only reachable RFC1918 IPv4 and ULA IPv6 addresses supported by the actual bootstrap listener. TXT is exactly `txtvers=1` first, `binding=Wsprry-Pair/1`, `id=<device_id>`, `boot=<boot_id>`, `http-port=<actual guarded HTTP port>`, `suite=SPAKE2+-P256-SHA256-HKDF-HMAC`, and `control-sha256=<current canonical Control/1 digest>`. No code, key, window, owner or paired state is advertised. Native DNS instance labels obey the 63-byte wire limit. No name, port, address scope or WTP advertisement fallback is added.
+
+Protected `GET /api/control/v1/host/pairing/discovery` returns exactly `{contract:"Wsprry-Control/1",schema:"pair-discovery",available:boolean,discoveries:[Discovery]}`. `Discovery` is exactly `{discovery_id:ID,device_id:ID,boot_id:ID,name:string,host:string,bootstrap_port:integer,management_port:31418,suite:"SPAKE2+-P256-SHA256-HKDF-HMAC",control_schema_digest:Digest}`; name is at most 64 Unicode scalars/256 UTF-8 bytes without controls, host is the dedicated identity hostname, and bootstrap port is 1–65535. At most 64 unique device/handle observations are returned, expiring after 30 seconds without live resolution; withdrawals remove their observations immediately. Unavailable discovery has no observations. Reads never start discovery or pairing, and the saved Off policy blocks this new route. The backend maps its discovery IDs to exact validated observations and rechecks identities, boot, suite, digest, every resolved address and self refusal before connection. Discovery remains an unauthenticated locator and never enrolls or grants management authority. P62-08's public window action is copied into the existing hello; a stale or changed action refuses without guessing.
 
 Auth refusals and pending replies have exactly
 `{P,schema:"result",pair_id:ID|null,state:pending|rejected|unknown,
@@ -228,21 +244,35 @@ clear ephemeral material. A new window is an explicit target-UI action.
 
 Let `J` be the decision document's canonical JSON and `C` the hello object plus
 the challenge's target_nonce, omitting contract/schema only where explicitly
-shown. SPAKE2 uses A=controller, B=target and the fixed RFC 9382 P-256/SHA256/
-HKDF/HMAC suite and M/N constants. Role identities are UTF-8
-`Wsprry-Pair/1/controller/` + J(C) and `Wsprry-Pair/1/target/` + J(C), respectively.
-Password scalar: scrypt of the normalized ASCII code with salt SHA256(J(C)),
-N=32768,r=8,p=1, output 48 bytes, interpreted big-endian modulo the P-256 group
-order; reject zero. This is an application password mapping into the RFC's `w`,
-not a replacement PAKE. Both ends use CSPRNG ephemeral scalars and reject invalid
-peer points before secret operations. Apply the RFC's complete transcript/key
-confirmation, including both nonempty role identities. No application success
-precedes both confirmations. The exact suite/point/confirmation behavior uses
-[RFC 9382 §§3–6](https://www.rfc-editor.org/rfc/rfc9382.html).
+shown. The single current SPAKE2+ profile uses A=controller/prover and
+B=target/verifier with RFC 9383 P-256/SHA-256/HKDF/HMAC parameters and constants.
+C includes hello's fixed suite and the challenge's target nonce; the returned
+challenge suite must equal hello's suite. Role identities are UTF-8
+`Wsprry-Pair/1/controller/` + J(C) and `Wsprry-Pair/1/target/` + J(C).
+
+Frame the normalized ASCII code and both role identities as
+`LE64(len(code)) || code || LE64(len(prover_id)) || prover_id || LE64(len(verifier_id)) || verifier_id`,
+where lengths count bytes. Apply scrypt with salt SHA256(J(C)), N=32768,r=8,p=1,
+output 96 bytes. Split into two big-endian 48-byte halves and use the provider's
+supported reduction modulo the P-256 group order for w0/w1. Reject either zero,
+consume the failed attempt, and use the supported prehashed API. Do not use the
+provider's different default Argon2 mapping or implement group arithmetic locally.
+The target derives the ephemeral registration record from that same local code;
+it never accepts an operator/network-provisioned registration record.
+
+Pass both nonempty role identities and J(C) through the provider's standard
+context/transcript API. Both ends use OS-CSPRNG ephemeral scalars and reject
+invalid/nonidentity peer points in the selected group. The exchange response
+contains the verifier share pB and verifier confirmation cB. The controller checks
+cB before sending prover confirmation cA; the target checks cA before permitting
+commit. The confirmed reply is an acknowledgement, not another PAKE confirmation.
+Never call a skip-confirmation API. Failure destroys the attempt's ephemeral
+context; an exact retained response is recovery, not a second protocol attempt.
+See [RFC 9383 §§3–4](https://www.rfc-editor.org/rfc/rfc9383.html).
 
 From confirmed K_shared, derive 32-byte keys using HKDF-SHA256 with salt
-SHA256(J(C)) and distinct UTF-8 info labels `Wsprry-Pair/1/tls-psk`,
-`Wsprry-Pair/1/commit`, and `Wsprry-Pair/1/retirement`. Commit request_digest hashes
+SHA256(J(C)) and distinct UTF-8 info labels `Wsprry-Pair/1/spake2plus/tls-psk`,
+`Wsprry-Pair/1/spake2plus/commit`, and `Wsprry-Pair/1/spake2plus/retirement`. Commit request_digest hashes
 J(C); proof is HMAC-SHA256(commit_key, UTF-8 `request/` + request_digest).
 Response proof covers UTF-8 `response/` + J(response without proof).
 Unpadded base64url encodes MAC bytes. TLS PSK identity is ASCII
@@ -278,7 +308,7 @@ pA:Point,nonce:B32}` and response
 `{P,schema:"rotate-prepared",operation_id:ID,next_epoch:Generation,pB:Point,nonce:B32}`.
 Use fresh P-256 ECDH validated points; derive the next TLS PSK with HKDF-SHA256,
 salt=current PSK, IKM=the 32-byte big-endian P-256 ECDH shared x-coordinate,
-and info=J(both prepare objects) prefixed
+and info=J([rotate-prepare request, rotate-prepared response]), in that order with all existing fields, prefixed
 `Wsprry-Pair/1/rotation/`. Confirm preparation through current TLS, persist next
 on both ends, then POST `/api/pair/v1/rotate/commit` with
 `{P,schema:"rotate-commit",operation_id:ID,pair_id:ID,expected_epoch:Generation,
@@ -398,6 +428,8 @@ It returns the stored authenticated retired response or the typed pending/unknow
 result, never repeats retirement or grants settings access. This lets reconnecting
 peers resolve a lost reply without automatically retrying a mutation.
 
+For the approved retirement-only TLS callback, P62-04 fixes the exact closed derivation context to `{purpose:"Wsprry-Pair/1/retirement-tls",target_id:ID,controller_id:ID,pair_id:ID,authorization_generation:Generation,client_role:"target",server_role:"controller"}`. The target is the TLS client and the controller is the server; their stable IDs must differ. Both endpoints use that same target/controller order. Derive 32 bytes with HKDF-SHA256, using the exact retained 32-byte retirement verifier as IKM, SHA256 of UTF-8 `J(context)` as salt, and UTF-8 `Wsprry-Pair/1/retirement-tls-psk` as info. The resulting transport PSK is ephemeral and is not another persisted credential. Identity remains `Wsprry-Retirement/1/{pair_id}/{authorization_generation}` and ALPN remains `wsprry-retirement/1`, under the same TLS 1.3 PSK-DHE and shared connection/deadline limits. Only the two retirement/status POST messages are admitted; their existing body MACs and current transition/assignment checks remain required. This purpose authorizes no normal management, rotation, registration, pairing or resume.
+
 When replacing a manager, retain up to 32 revocation-tombstone retirement keys
 solely for authenticating these retirement receipts/requests, with IDs/generations
 and transition bindings. They authorize no settings/TLS management access.
@@ -406,9 +438,12 @@ recovery-only proofs. A recreated assignment revision does not match a retired
 receipt. This narrow path permits old-peer reconciliation without asking users
 to reinstall keys; if missing/unreachable/unverifiable, migration stays pending.
 Retirement_generation is the target recurrence-authority generation captured
-for this transition; assignment_revision is the old controller's pre-retirement
-store ETag. Its durable tombstone/receipt binds that original revision even after
-the pause changes the store ETag. Exact duplicate requests return the same pending
+for this transition; assignment_revision is the phase-5 immutable per-assignment digest, computed
+from its existing deterministic row serialization after excluding enabled,
+in_flight, and last_start_ns. Preserve that exact projection and retained proofs;
+it is not the controller's whole-store/context ETag. HTTP If-Match still uses the
+current context ETag independently. The durable tombstone/receipt binds the frozen
+assignment digest even when pausing or unrelated rows change the context ETag. Exact duplicate requests return the same pending
 state or receipt; same transition ID with changed fields refuses. Later unrelated
 Fleet edits cannot resume that retired row or invalidate a genuine stored receipt.
 No unchanged WTP traffic is treated as an authenticated retirement proof.
@@ -486,7 +521,7 @@ settings-record rename made that first mutation atomic.
 `pi-management-transaction/1` is a private, <=1048576-byte WAL with exactly
 `{schema,transaction_id:ID,device_id:ID,state:prepared|committed,
 records:[{kind,old_digest:Digest|null,new_digest:Digest,staged_name:string}]}`.
-Kinds are `ini|settings|operations|authority|progress|pair`; at most six unique
+Kinds are `ini|settings|operations|authority|progress|pair`, with P62-05's additional `peers` kind confined to the new private pairing owner; at most six unique
 kinds per transaction. staged_name is a coordinator-generated 32-hex stem within the private state
 directory, never a caller path; its images are exactly `<stem>.old` and
 `<stem>.new`. A null old_digest records authoritative prior absence; recovery
@@ -495,6 +530,8 @@ and checksums are retained until recovery completes. Pair commits use the same
 protocol with their own private paired-record directory; no staged secrets enter
 operator receipts or logs. Directory/path ownership and regular-file/no-symlink
 rules apply to every image, WAL, and final path.
+
+P62-05 adds the private `pi-management-peers/1` outgoing index with the exact profile/revocation shapes and pre-commit staging rules recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-05--bounded-outgoing-pair-storage-image-approved-2026-11-17). It is distinct from the one-active-manager incoming `pi-management-pairs/1` catalog. A pairing owner registers exactly `pair`, `peers`, `operations` and `authority` destinations; the authoritative selector seals the exact bytes of both catalogs and the operation book. A complete coordinated publication contains four images under WAL version 1, preserving the six-image bound and all existing image meanings. The outgoing target's authorization generation is independent of this device's incoming-manager generation. No initial code or commit key is persisted; the pending outgoing TLS/retirement keys grant only authenticated exact-operation readback until the target's commit is confirmed.
 
 1. Under the owning transaction/admission lock, validate complete candidate,
    current bindings/generations, authority, active-work restrictions, and the
@@ -518,3 +555,22 @@ admission owner for managed targets. A noncooperating external editor is not an
 atomic management client; detected file disagreement inhibits admission until a
 fresh valid configuration/recovery decision. Trusted OS administrators remain
 outside the threat boundary; no promise is made against root racing file writes.
+
+P62-09 adds the required private `uncertain` array to `pi-management-peers/1`. It contains frozen awaiting-commit OutgoingProfile records with their original pending epoch-1 pair, endpoint, profile identity/generation, target, initiating operation and context digest. Current profiles remain unique per target and limited to 64; uncertain plus retired rows are limited to 32. Each uncertain row requires its exact unresolved device-owned operation mapping, and pair/operation IDs cannot alias another current or uncertain record. A newer current profile for the same target retains the profile identity and advances its generation. Only explicit protected new intent followed by mutual PAKE may supersede a pending profile. Ordinary lookup excludes uncertain rows; their keys can serve only exact original-operation readback and cannot re-enroll a superseded profile. Authenticated confirmation of the new durable current pair removes obsolete old TLS authority while preserving required unknown operation, retirement and receipt evidence. Unknown records are not capacity-evictable. Image count, WAL version 1, selector binding and operator workflow are unchanged.
+
+P62-10 requires nonnull paired target-context authorization to be exactly `{pair_id:ID,authorization_generation:Generation,renewal_required:boolean}`. The target computes the read-only indication from its current device-owned epoch, service/connection accounting and the prior epoch set captured at unclean startup. Attached-Pico contexts inherit the same parent-pair indication; nonpaired/local contexts retain null authorization. The controller automatically completes or recovers approved rotation and negotiates a fresh current context before settings mutation. The target independently rechecks current pair, generation, epoch, saved/active enforced safety policy and renewal under final admission. A due mutation refuses before writes with existing `authority_pending`; only authenticated current metadata can identify that refusal as renewal. Accepted/unknown mutations are never blindly retried. Reads, exact recovery and rotation remain usable while due, and offline autonomous recurrence continues. No key/certificate controls, counter fields, new WTP message or version change are introduced.
+
+P62-11 adds protected read-only `GET /api/control/v1/host/pairing/operations/{operation_id}` for an exact lowercase hexadecimal ID. It returns the existing closed local pairing operation receipt or target-error from the current selected namespace, never archived evidence or remote scopes. Local pairing command receipts freeze actual local device/boot, the positive pre-command incoming authorization generation as their dedicated local pairing profile generation, and connection generation `1` within that boot. This binding grants no transmitter/Pico settings or migration authority. Preserve the canonical method/path/intent digest and use a redacted public revocation-outcome revision, with tombstone and receipt in the same four-image publication. Current pairing state is a separate observation; a historical receipt cannot assert absence of a newer manager. Existing independently enforced LAN/loopback, Host, Origin, proxy-client, framing and rate guards apply, and saved Safety Off blocks this route. A fresh protected local browser can read the retained redacted result after session retirement; revoked TLS keys cannot. Version 1, private row shapes and retention bounds remain unchanged.
+
+P62-12 defines `gateway.parent` as a distinct server-owned parent management binding: actual paired Pi device ID, the actual pairing-runtime boot bound into discovery/hello, current incoming authorization generation as `profile_generation`, and `connection_generation:"1"`. Check it against the actual paired runtime, outgoing profile and current TLS authorization; gateway pair/generation and authorization must agree. This domain grants no native Pi settings/migration or P62-11 local host-command authority. Rotation retains the binding while refreshing authorization/renewal metadata; parent restart or ownership change invalidates it, and child negotiation/hotplug independently changes the child's actual connection binding. The existing typed paired management read may resolve an already verified child by device ID without another operator grant or private parent catalog ID. Preserve direct/local browser selection rules and all final physical/session/resource checks.
+
+
+## Approved remote accepted-write ownership and explicit review
+
+P62-13 adds the private catalog remote-target index and reuses the existing per-device management journals/epoch anchors under the exact existing limits and storage versions. Actual authenticated context and frozen outgoing pairing membership precede publication and first handoff. Missing or mismatched history and unresolved writes remain barriers across restart, replacement and moved Picos. Remote management never creates a WTP execution profile. The exact closed index and validation boundary are recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-13--approved-remote-management-journal-enrollment-boundary).
+
+P62-14 adds the protected fixed `POST /api/control/v1/targets/{device_id}/operations/{operation_id}/review` request/result, 30-second current-scope readback token and context retirement before acknowledgement. The controller/gateway preserves a historical unknown receipt with only the existing private reviewed marker; review grants no successful-save, enable, output, pairing or scheduling authority. Exact native receipt readback remains separately scoped to its original authenticated pair and operation/binding/digest. The exact current closed review documents, fixed readback mappings, missing/foreign-record cases and unchanged old-pair receipt privacy are recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-14--approved-explicit-unknown-operation-review-boundary).
+
+P62-15 requires `proof:B32` on the current Pair/1 `resume-ack`. Authenticate UTF-8 `Wsprry-Pair/1/resume-ack/` followed by UTF-8 `J(ack without proof)` with HMAC-SHA256 using the original grant pair’s retained retirement verifier, encoded as unpadded base64url. Require both actual current normal-management TLS from that same designated controller and the original-pair proof; matching public IDs or a new pair alone are insufficient. A different current pair may recover only the actual retained outcome of the old grant, never newly consume it. Preserve every existing acknowledgement field and original pair/generation. Unknown or absent source history is not proof of refusal. Retirement TLS remains retirement/status only. This Pi-only Pair/1 amendment changes neither Control/1 nor WTP.
+
+P62-16 requires nullable `wtp_binding` in Control/1 `target-migration-read` and a nonnull copy in Pair/1 `resume-grant`: exactly `{revocation_generation:Counter,wtp_port:Port,management_port:Port}`. Counter is canonical decimal zero through UINT64_MAX; ports are integers 1 through 65535. The target reports only its actual ready WTP listener, coherent authority counter and actual ready backend HTTP listener, bound to the outer boot; otherwise the migration value is null and no grant can be issued. Include the object in the canonical grant digest. New consumption requires the exact current authenticated boot, disabled snapshot, reservation and binding; historical outcome recovery never rebinds or repeats work. The one-use atomic source transaction may refresh only the authenticated Pi hostname, WTP TCP port, HTTP takeover-check port and saved revocation generation of the selected pinned Plain LAN assignment. Preserve its original frozen digest and calculate a new after-image digest under the existing algorithm; retain RF/schedule fields, the frozen enabled flag, reconciled in-flight state and maximum consumed start slot. Fresh retirement is required before returning a resumed assignment to native authority. Ordinary WTP bytes, authentication, admission, mismatch/removal and other connections remain unchanged.

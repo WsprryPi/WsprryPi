@@ -7,7 +7,7 @@
         const entries = new Map();
         let active = null, selection = 0, template;
         const node = id => host.document.getElementById(id);
-        const fingerprint = profile => JSON.stringify([profile.id,profile.name,profile.settings]);
+        const fingerprint = profile => JSON.stringify([profile.managed === true,profile.id,profile.name,profile.settings]);
         const busy = entry => entry.pending > 0 || entry.panel.querySelector('[aria-busy="true"]') !== null;
         function retained() {
             const disclosure = node('pico-target-retained'),list = node('pico-target-retained-list');
@@ -17,7 +17,7 @@
             for (const entry of drafts) {
                 const row = host.document.createElement('details'),title = host.document.createElement('summary');
                 row.className = 'mt-2';title.className = 'text-break';row.dataset.retainedDevice = entry.profile.settings['Device ID'];
-                title.textContent = `${entry.profile.name} · saved profile ${entry.generation || 'not connected'}`;
+                title.textContent = entry.profile.managed ? `${entry.profile.name} · paired connection · retained draft` : `${entry.profile.name} · saved profile ${entry.generation || 'not connected'}`;
                 row.append(title);list.append(row);
                 row.addEventListener('toggle',() => {
                     if (!row.open || row.childElementCount > 1) return;
@@ -68,7 +68,7 @@
         }
         async function generation(entry) {
             const value = await entry.handle.generation();
-            const key = `${entry.profile.settings['Device ID']}:${entry.profile.id}:${value}`;
+            const key = `${entry.profile.settings['Device ID']}:${entry.handle.scope || entry.profile.id}:${value}`;
             if (!entries.has(key) || entries.get(key) === entry) {
                 if (entry.key && entries.get(entry.key) === entry) entries.delete(entry.key);
                 entry.key = key; entries.set(key,entry);
@@ -188,6 +188,12 @@
         function mount(profile, handle, key) {
             const panel = template.content.firstElementChild.cloneNode(true);
             organize(panel);
+            if (profile.managed) {
+                const connection=panel.querySelector('#wtp-management-carrier').closest('.row');connection.hidden=true;connection.inert=true;
+                const source=host.document.createElement('p');source.className='form-text';
+                source.textContent='Connected automatically through paired Pi '+handle.parentDevice.slice(0,8)+'. No separate Pico login is needed.';
+                connection.before(source);
+            }
             const entry = {profile,signature:fingerprint(profile),panel,handle,key,pending:0,epoch:0,paused:false,hold:null,observed:null,recovering:false};
             const scoped = new Proxy(host.document,{get(document,property) {
                 if (property === 'getElementById') return id => id === panel.id ? panel : panel.querySelector('#' + host.CSS.escape(id));
@@ -243,7 +249,7 @@
                 }
                 const generation = handle.state.connected ? await handle.generation() : 'unconnected';
                 if (epoch !== selection) {handle.retire();return;}
-                const key = `${handle.device}:${profile.id}:${generation}`;
+                const key = `${handle.device}:${handle.scope || profile.id}:${generation}`;
                 let entry = entries.get(key);
                 if (!entry) {
                     if (entries.size >= 64) throw Error('The browser is retaining 64 Pico drafts. Open a new page to manage another device; existing drafts stay on this page.');
@@ -254,7 +260,7 @@
                 }
                 active = entry;entry.generation = generation;
                 node('pico-target-panel').append(entry.panel);entry.panel.open = true;
-                node('pico-target-feedback').textContent = 'Settings are bound to this Pico. Read saved settings before editing. Drafts stay with their device and saved profile.';
+                node('pico-target-feedback').textContent = profile.managed ? 'Settings are bound to this Pico through its paired Pi. Read saved settings before editing. Drafts stay with this device and connection.' : 'Settings are bound to this Pico. Read saved settings before editing. Drafts stay with their device and saved profile.';
                 entry.management.setAvailability(handle.state.connected,true);
                 entry.usb.setAvailability(handle.state.connected && handle.state.carrier === 'usb_physical');
                 entry.udp.setAvailability(handle.state.connected);
@@ -272,10 +278,10 @@
             try {
                 try {
                     const prior = await entry.handle.lookup(entry.hold.operation);
-                    entry.hold = prior.recovery;entry.nativeHold = ['pending','unknown'].includes(prior.data.state);
+                    entry.hold = prior.recovery;entry.nativeHold = entry.handle.managed || ['pending','unknown'].includes(prior.data.state);
                 } catch (error) {
                     if (error.status !== 404) throw error;
-                    entry.nativeHold = false;
+                    entry.nativeHold = Boolean(entry.handle.managed);
                 }
                 const result = await entry.handle.request(entry.hold.read);
                 if (active !== entry || entry.paused) return;
@@ -311,23 +317,30 @@
             entry.recovering = true;recovery(entry);
             try {
                 if (entry.nativeHold) {
-                    const result = await entry.handle.request('management',{method:'POST',body:{action:'reconcile',operation_id:entry.hold.operation,readback_revision:entry.observed}});
+                    const result = entry.handle.managed ? await entry.handle.review(entry.hold.operation,entry.observed) :
+                        await entry.handle.request('management',{method:'POST',body:{action:'reconcile',operation_id:entry.hold.operation,readback_revision:entry.observed}});
                     if (active !== entry || entry.paused) return;
                     if (!result.response.ok) throw Error('Review was not accepted. Read this Pico again before another change.');
+                    if (entry.handle.managed) {
+                        try {entry.handle = await client.open(entry.profile);}
+                        catch (error) {entry.paused = true;++entry.epoch;entry.handle.retire();throw error;}
+                        if (active !== entry || entry.paused) {entry.handle.retire();return;}
+                        await generation(entry);
+                    }
                 }
                 client.reviewed(entry.hold.operation,entry.handle.device);
                 entry.hold = null;entry.observed = null;entry.management.invalidate();entry.usb.invalidate();entry.udp.invalidate();
                 node('pico-target-feedback').textContent = 'Current settings reviewed. The earlier outcome remains historical. Your draft is preserved; read saved settings before a new explicit change.';
             } catch (error) {if (active === entry) node('pico-target-feedback').textContent = error.message;}
-            finally {entry.recovering = false;recovery(entry);ledger();}
+            finally {entry.recovering = false;recovery(entry);ledger();notify();}
         }
-        function catalogChanged(profiles) {
-            if (!active || !Array.isArray(profiles)) return;
+        function catalogChanged(profiles,managed = false) {
+            if (!active || Boolean(active.profile.managed)!==managed || !Array.isArray(profiles)) return;
             const current = profiles.find(profile => profile.id === active.profile.id);
             if (current && fingerprint(current) === active.signature) return;
             active.paused = true;++active.epoch;active.handle.retire();active.panel.inert = true;
             recovery(active);
-            node('pico-target-feedback').textContent = 'This saved profile changed or was removed. Its draft is retained separately. Choose the intended saved Pico with Device again.';
+            node('pico-target-feedback').textContent = managed ? 'This paired management source changed or is unavailable. The draft is retained; reconnect the intended Pico with Device.' : 'This saved profile changed or was removed. Its draft is retained separately. Choose the intended saved Pico with Device again.';
             notify();
         }
         function init() {
@@ -343,8 +356,8 @@
             if (node('pico-target-recovery')) node('pico-target-recovery').hidden = true;
             retained();ledger();notify();
         }
-        return Object.freeze({init,select,leave,catalogChanged,operations:() => client.operations(),
-            retainedProfiles:() => Array.from(new Map(Array.from(entries.values()).map(entry => [entry.profile.id,entry.profile])).values()),
+        return Object.freeze({init,select,leave,catalogChanged,managedTargetsChanged:profiles=>catalogChanged(profiles,true),operations:() => client.operations(),
+            retainedProfiles:() => Array.from(new Map(Array.from(entries.values()).map(entry => [(entry.profile.managed ? "paired:" : "local:")+entry.profile.id,entry.profile])).values()),
             get state() {return active ? {device:active.profile.settings['Device ID'],profile:active.profile.id,connected:!!active.handle?.state.connected,
                 pending:active.pending,paused:active.paused,unconfirmed:!!active.hold,generation:active.generation} : null;}});
     }

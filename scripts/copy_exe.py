@@ -93,6 +93,13 @@ def main():
     if not os.access(source, os.X_OK):
         raise RuntimeError(f"Built executable is not executable: {source}")
 
+    notice = git_root / "docs/licenses/botan/BSD-2-Clause.txt"
+    if notice.is_symlink() or not notice.is_file() or not notice.stat().st_size:
+        raise RuntimeError("Required Botan license notice is missing or unsafe")
+    run(["sudo", "install", "-d", "-m", "0755", "/usr/local/share/licenses/wsprrypi"])
+    run(["sudo", "install", "-m", "0644", str(notice),
+         "/usr/local/share/licenses/wsprrypi/BOTAN-LICENSE.txt"])
+
     exists = service_exists(SERVICE_NAME)
     was_active = exists and service_is_active(SERVICE_NAME)
 

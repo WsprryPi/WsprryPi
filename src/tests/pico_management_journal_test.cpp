@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include <sys/stat.h>
 #include <unistd.h>
 using namespace wsprrypi;
@@ -17,9 +18,109 @@ int main() {
         const std::string route="/api/control/v1/targets/"+device+"/pico/station";
         Json binding{{"device_id",device},{"boot_id",std::string(32,'5')},{"profile_generation","1"},{"connection_generation","2"}};
         const auto digest=PicoManagementJournal::digest("request");
+        // Native Pi replies carry operation state. A 202 transport success
+        // must not turn pending into committed or release its write barrier.
+        {
+            const auto native_route="/api/control/v1/targets/"+device+"/settings";
+            const auto native_directory=temporary+"/native";
+            PicoManagementJournal native(native_directory,self,device,PicoManagementHistoryAuthority::isolated());
+            CHECK(!native.reserve(self,native_route,"PUT",binding,"1",operation,digest));
+            Json body{{"contract","Wsprry-Control/1"},{"schema","target-operation"},{"binding",binding},{"operation_id",operation},
+                {"request_digest",digest},{"state","pending"},{"revision",nullptr},{"error",nullptr}};
+            CHECK(!native.finish(operation,{202,body.dump(),{}}));
+            CHECK(native.snapshot()["receipts"][0]["receipt"]["state"]=="pending"&&native.snapshot()["receipts"][0]["response"].is_null());
+            refuses([&]{native.reserve(self,native_route,"PUT",binding,"1",next,digest);});
+            body["state"]="committed";body["revision"]=std::string(64,'f');
+            CHECK(!native.finish(operation,{200,body.dump(),"\""+std::string(64,'f')+"\""})&&native.receipt(operation)==body);
+            CHECK(!native.reserve(self,native_route,"PUT",binding,"1",next,digest));
+            body["operation_id"]=next;body["binding"]["connection_generation"]="3";
+            CHECK(!native.finish(next,{200,body.dump(),{}})&&native.receipt(next)["state"]=="unknown");
+        }
+        {
+            const auto route="/api/control/v1/targets/"+device+"/settings";
+            const auto directory=temporary+"/native-independent-stop";
+            PicoManagementJournal journal(directory,self,device,PicoManagementHistoryAuthority::isolated());
+            CHECK(!journal.reserve(self,route,"PUT",binding,"1",operation,digest));
+            CHECK(!journal.finish(operation,{503,R"({"error":{"code":"transport_unavailable"}})",{}}));
+            const auto unknown=journal.receipt(operation);CHECK(unknown["state"]=="unknown");
+            refuses([&]{journal.reserve(self,route,"PUT",binding,"1",next,digest);});
+            const auto stop_id=std::string(32,'e');CHECK(!journal.reserve_native_stop(self,binding,"1",stop_id,digest));
+            CHECK(journal.receipt(operation)==unknown&&journal.snapshot()["receipts"].back()["receipt"]["state"]=="pending");
+            Json stopped{{"contract","Wsprry-Control/1"},{"schema","target-operation"},{"binding",binding},{"operation_id",stop_id},
+                {"request_digest",digest},{"state","committed"},{"revision",std::string(64,'f')},{"error",nullptr}};
+            CHECK(!journal.finish(stop_id,{200,stopped.dump(),"\""+std::string(64,'f')+"\""}));
+            PicoManagementJournal cold(directory,self,device,PicoManagementHistoryAuthority::isolated());
+            CHECK(cold.receipt(operation)==unknown&&cold.receipt(stop_id)==stopped);
+            refuses([&]{cold.reserve(self,route,"PUT",binding,"1",next,digest);});
+        }
+        for(unsigned scenario=0;scenario<4;++scenario){
+            PicoManagementJournal native(temporary+"/native-malformed-"+std::to_string(scenario),self,device,PicoManagementHistoryAuthority::isolated());
+            const auto native_route="/api/control/v1/targets/"+device+"/settings";
+            CHECK(!native.reserve(self,native_route,"PUT",binding,"1",operation,digest));
+            Json body{{"contract","Wsprry-Control/1"},{"schema","target-operation"},{"binding",binding},{"operation_id",operation},
+                {"request_digest",digest},{"state","committed"},{"revision",std::string(64,'f')},{"error",nullptr}};
+            if(scenario==0)body["revision"]=nullptr;
+            if(scenario==1)body["request_digest"]=std::string(64,'e');
+            if(scenario==2)body["tls_psk"]="artificial-secret";
+            const auto etag=scenario==3?"\""+std::string(64,'e')+"\"":std::string{};
+            CHECK(!native.finish(operation,{200,body.dump(),etag})&&native.receipt(operation)["state"]=="unknown");
+            CHECK(native.snapshot()["receipts"][0]["response"].is_null());
+        }
+        // A lost native reply survives a new journal owner. Only an exact
+        // terminal receipt authenticated to the original pair can resolve it;
+        // even a valid 404 or a different manager's success proves nothing.
+        {
+            const auto native_route="/api/control/v1/targets/"+device+"/settings";
+            const auto native_directory=temporary+"/native-readback";
+            PicoManagementJournal original(native_directory,self,device,PicoManagementHistoryAuthority::isolated());
+            CHECK(!original.reserve(self,native_route,"PUT",binding,"1",operation,digest));
+            original.finish(operation,{503,"{}",{}});
+            PicoManagementJournal cold(native_directory,self,device,PicoManagementHistoryAuthority::isolated());
+            Json body{{"contract","Wsprry-Control/1"},{"schema","target-operation"},{"binding",binding},{"operation_id",operation},
+                {"request_digest",digest},{"state","committed"},{"revision",std::string(64,'f')},{"error",nullptr}};
+            const PicoHttpResponse terminal{200,body.dump(),"\""+std::string(64,'f')+"\""};
+            CHECK(!cold.confirm_native(operation,next,"1",terminal));
+            CHECK(!cold.confirm_native(operation,self,"2",terminal));
+            CHECK(!cold.confirm_native(operation,self,"1",{404,R"({"error":{"code":"operation_unknown"}})",{}}));
+            for(unsigned scenario=0;scenario<6;++scenario){
+                auto altered=body;
+                if(scenario==0)altered["request_digest"]=std::string(64,'e');
+                if(scenario==1)altered["binding"]["boot_id"]=std::string(32,'e');
+                if(scenario==2)altered["operation_id"]=next;
+                if(scenario==3){altered["state"]="pending";altered["revision"]=nullptr;}
+                if(scenario==4){altered["state"]="unknown";altered["revision"]=nullptr;}
+                if(scenario==5)altered["tls_psk"]="artificial-secret";
+                CHECK(!cold.confirm_native(operation,self,"1",{200,altered.dump(),{}}));
+            }
+            CHECK(cold.receipt(operation)["state"]=="unknown");
+            refuses([&]{cold.reserve(self,native_route,"PUT",binding,"1",next,digest);});
+            CHECK(cold.confirm_native(operation,self,"1",terminal)&&cold.receipt(operation)==body);
+            CHECK(cold.confirm_native(operation,self,"1",terminal));
+            CHECK(!cold.reserve(self,native_route,"PUT",binding,"1",next,digest));
+            cold.finish(next,{503,"{}",{}});cold.reconcile(next,binding,std::string(64,'a'));
+            body["operation_id"]=next;
+            CHECK(!cold.confirm_native(next,self,"1",{200,body.dump(),{}}));
+            CHECK(cold.receipt(next)["state"]=="unknown");
+        }
         const auto directory=temporary+"/management";
         PicoManagementJournal journal(directory,self,device);
         CHECK(journal.snapshot()["receipts"].empty()&&!std::filesystem::exists(directory));
+        // Distinct source owners of the same target share admission and epoch;
+        // another target remains independent. A nested owner on this thread is
+        // required by the coordinator/context/journal call chain.
+        {
+            auto held=journal.target_admission();CHECK(held);
+            PicoManagementJournal same(directory,self,device);
+            auto nested=same.target_admission();CHECK(nested&&nested->epoch()==held->epoch());
+            bool blocked=false,independent=false;
+            std::thread concurrent([&]{
+                blocked=!same.target_admission();
+                independent=bool(PicoManagementJournal::target_admission(directory,next));
+            });concurrent.join();CHECK(blocked&&independent);
+            const auto epoch=same.target_epoch();held->retire();
+            CHECK(same.target_epoch()==epoch+1&&journal.target_epoch()==epoch+1);
+        }
+
         CHECK(!journal.reserve(self,route,"PUT",binding,"1",operation,digest));
         CHECK(journal.receipt(operation)["state"]=="unknown");
         PicoManagementJournal reopened(directory,self,device);

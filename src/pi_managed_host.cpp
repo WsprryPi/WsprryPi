@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_host.hpp"
 #include "config_handler.hpp"
+#include "wtp_integration/pi_pair_history.hpp"
 #include "scheduling.hpp"
 #include "wtp_integration/controller_contract.hpp"
 namespace wsprrypi {
 PiManagedHost::PiManagedHost(std::string ini,std::string self,std::string boot,
-    PiLocalManagementService::Observe observe)
-    :owner_(ini,self),recovery_(owner_,self,std::move(boot),[this]{return state();}),
+    PiLocalManagementService::Observe observe,std::function<void(PiPairInitializationProof)> pairing)
+    :owner_(ini,self,std::move(pairing)),recovery_(owner_,self,std::move(boot),[this]{return state();}),
      management_(owner_.store(),self,"This device",std::move(observe)),ini_(std::move(ini)){}
 void PiManagedHost::prepare(){
     if(prepared_)throw std::logic_error("host_already_prepared");
@@ -94,7 +95,22 @@ PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,bool au
     return management_.handle(request,authorized);
 }
 nlohmann::json PiManagedHost::target(){return management_.target();}
+PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,const PiPairPrincipal &principal,PiPairHistory &history,std::string *readback_revision){
+    if(readback_revision)readback_revision->clear();
+    const auto receipts="/api/control/v1/targets/"+device_id()+"/operations/";
+    if(state()!=PiHostReadiness::Ready&&!(request.method=="GET"&&request.path.starts_with(receipts)))
+        return controller_target_error(503,"authority_pending");
+    return management_.handle(request,principal,history,readback_revision);
+}
+PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,const LocalBrowserPrincipal &principal,PiPairHistory &history){
+    if(state()!=PiHostReadiness::Ready)return controller_target_error(503,"authority_pending");
+    return management_.handle(request,principal,history);
+}
+void PiManagedHost::reclaim_pairing_retirements(PiPairHistory &history) noexcept{try{(void)history.reclaim_native_retired(owner_.store());}catch(...){}}
 void PiManagedHost::advance_migration() noexcept {if(state_.load()==PiHostReadiness::Ready)management_.advance_migration();}
+void PiManagedHost::advance_remote_handover(PiPairRetirementClient &client,const std::function<bool()> &cancelled) noexcept {
+    if(state_.load()==PiHostReadiness::Ready)management_.advance_remote_handover(client,cancelled);
+}
 WtpCatalog &PiManagedHost::catalog(){return owner_.catalog();}
 const std::string &PiManagedHost::device_id() const noexcept{return owner_.device_id();}
 } // namespace wsprrypi

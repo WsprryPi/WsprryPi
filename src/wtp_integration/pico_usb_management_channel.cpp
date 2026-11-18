@@ -21,9 +21,9 @@ bool PicoUsbManagementChannel::matches(const WtpSettings &other) const {
         binding_.product_id == other.product_id;
 }
 bool PicoUsbManagementChannel::ensure(const std::string &expected, bool verified_update_reconnect,
-    std::uint64_t operation_deadline) {
+    std::uint64_t operation_deadline,const std::function<bool()> &operation_cancelled) {
     std::lock_guard lock(mutex);
-    if (now() >= operation_deadline || (cancellation && cancellation->load())) return false;
+    if (now() >= operation_deadline || (cancellation && cancellation->load())||(operation_cancelled&&operation_cancelled())) return false;
     if (binding_.transport != "usb" || (pico_usb_update_blocked(binding_.usb_serial) && !verified_update_reconnect)) return false;
     if (!factory_for_test) {
         if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
@@ -42,7 +42,7 @@ bool PicoUsbManagementChannel::ensure(const std::string &expected, bool verified
             const auto deadline = std::min(current + 10000, operation_deadline);
             if (!stream.begin_open(paired, current)) return false;
             while (stream.state() == CdcState::Resetting && current < deadline) {
-                if (cancellation && cancellation->load()) {stream.close();return false;}
+                if ((cancellation&&cancellation->load())||(operation_cancelled&&operation_cancelled())) {stream.close();return false;}
                 stream.poll_open(current);
                 if (stream.state() == CdcState::Resetting) std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 current = now();
@@ -54,7 +54,7 @@ bool PicoUsbManagementChannel::ensure(const std::string &expected, bool verified
         }
         const auto current = now();
         return client && current < operation_deadline && client->hello(expected,
-            static_cast<unsigned>(std::min<std::uint64_t>(2000, operation_deadline-current)));
+            static_cast<unsigned>(std::min<std::uint64_t>(2000, operation_deadline-current)),operation_cancelled);
     } catch (...) {stream.close();return false;}
 }
 std::shared_ptr<PicoUsbManagementChannel> pico_usb_management_channel(const WtpSettings &settings) {

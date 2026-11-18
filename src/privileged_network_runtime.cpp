@@ -10,8 +10,11 @@ std::atomic<bool> setting_missing{true};
 std::atomic<bool> active_state_known{true};
 }
 
+std::mutex &privileged_network_admission_mutex(){static std::mutex gate;return gate;}
+
 void initialize_privileged_network_runtime(
     const std::optional<std::string> &configured_value) {
+    std::lock_guard admission(privileged_network_admission_mutex());
     const auto parsed = parse_privileged_network_mode(configured_value);
     configured_mode.store(parsed.mode, std::memory_order_release);
     active_mode.store(parsed.mode, std::memory_order_release);
@@ -21,11 +24,13 @@ void initialize_privileged_network_runtime(
 }
 
 void set_active_privileged_network_mode(PrivilegedNetworkMode mode) noexcept {
+    std::lock_guard admission(privileged_network_admission_mutex());
     active_mode.store(mode, std::memory_order_release);
     active_state_known.store(true, std::memory_order_release);
 }
 
 void set_privileged_network_runtime_mode(PrivilegedNetworkMode mode) noexcept {
+    std::lock_guard admission(privileged_network_admission_mutex());
     configured_mode.store(mode, std::memory_order_release);
     active_mode.store(mode, std::memory_order_release);
     setting_valid.store(true, std::memory_order_release);
@@ -34,6 +39,7 @@ void set_privileged_network_runtime_mode(PrivilegedNetworkMode mode) noexcept {
 }
 
 void set_privileged_network_runtime_unknown() noexcept {
+    std::lock_guard admission(privileged_network_admission_mutex());
     active_state_known.store(false, std::memory_order_release);
 }
 

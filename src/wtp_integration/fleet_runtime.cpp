@@ -6,7 +6,9 @@
 #include "runtime_config_bridge.hpp"
 #include "fleet_store.hpp"
 #include "controller_retirement.hpp"
+#include "pi_pair_owner.hpp"
 #include "controller_contract.hpp"
+#include "pi_pair_contract.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "fleet_schedule.hpp"
 #include "fleet_recovery.hpp"
@@ -82,6 +84,7 @@ struct FleetContext {
     std::thread thread;
     bool initial{},dispatched{},removed{},binding_conflict{},cleanup_ok{true};
     bool retirement_admission{};
+    std::string applied_resume;
     std::mutex notice_mutex;
     std::string external_fault;
     std::uint64_t initial_due{},last_host{};
@@ -135,18 +138,22 @@ bool observed_idle(const WtpRuntimeStatus& s) {
 }
 class Fleet {
 public:
-    Fleet(const std::string& ini,const std::string& self,WtpFleetTestHooks hooks={})
+    Fleet(const std::string& ini,const std::string& self,WtpFleetTestHooks hooks={},std::function<void(PiPairInitializationProof)> pairing={})
         :store_(ini+".wtp-assignments.json",self),journal_(ini+".wtp-fleet-contexts.json",self),
-         self_id_(self),hooks_(std::move(hooks)),incarnation_(wtp_random_identity()) {
+         pairing_(std::move(pairing)),self_id_(self),hooks_(std::move(hooks)),incarnation_(wtp_random_identity()) {
         const auto saved=store_.snapshot();config_=saved.first;etag_=saved.second;
         const auto retirement_directory=hooks_.retirement_directory.empty()?private_device_state_directory(PrivateDeviceDomain::ControllerRetirements,self):hooks_.retirement_directory;
-        retirement_book_=std::make_unique<ControllerRetirementBook>(retirement_directory,ini+".wtp-assignments.json",self,config_.at("assignments"));
+        retirement_book_=std::make_unique<ControllerRetirementBook>(retirement_directory,ini+".wtp-assignments.json",self,config_.at("assignments"),
+            std::function<void(RetirementWritePoint)>{},pairing_);
+        // Book recovery may atomically publish a committed resume assignment.
+        // The pre-recovery cache must never seed stale connection contexts.
+        const auto recovered=store_.reload();config_=recovered.first;etag_=recovered.second;
         Json entries=Json::array();
         try {entries=journal_.snapshot().at("contexts");}
         catch(const std::exception& e){journal_error_=bounded(e.what(),512);}
         unsigned index=0;
         for(const auto& row:config_.at("assignments")) {
-            auto c=create_context(row,index++);
+            auto c=create_context(row,index++);c->applied_resume=retirement_book_->active_resume(c->id);
             if(!retirement_book_->permits(c->id)){std::lock_guard permit(c->permit->mutex);c->permit->retiring=true;}
             contexts_.emplace(c->id,c);
         }
@@ -190,6 +197,71 @@ public:
         if(hooks_.before_shutdown_join)hooks_.before_shutdown_join();
         if(reaper_.joinable())reaper_.join();
         for(auto& c:owners)if(c->thread.joinable())c->thread.join();
+    }
+    std::optional<Json> machine_resume(const PiPairResumeGrantProof &proof,PiPairHistory &history,const std::function<bool()> &cancelled){
+        if(!cancelled||cancelled()||proof.transport().self_id()!=self_id_||proof.grant()["controller_id"]!=self_id_)return {};
+        if(const auto retained=retirement_book_->resume_receipt(proof.grant())){
+            auto guard=history.admit_resume_grant(proof);return guard&&!cancelled()?retained:std::nullopt;
+        }
+        // A fresh pair can recover the actual old outcome, never newly consume
+        // or newly refuse an old-scope grant on the strength of public IDs.
+        if(!proof.original_scope())return {};
+        const auto target=proof.grant()["target_id"].get<std::string>();std::shared_ptr<FleetContext> context;Json assignments;
+        {
+            std::lock_guard lock(mutex_);const auto found=contexts_.find(target);
+            if(!accepting_||exiting_||found==contexts_.end()||!journal_error_.empty())return {};
+            context=found->second;const auto &c=*context;
+            if(c.quit||c.control==UINT64_MAX||c.retirement_admission||!c.retirement.is_null()||(c.ordinary&&c.ordinary->pending)||(c.pause&&c.pause->pending))return {};
+            context->retirement_admission=true;assignments=config_["assignments"];
+        }
+        struct Release {Fleet &owner;std::shared_ptr<FleetContext> context;~Release(){std::lock_guard lock(owner.mutex_);context->retirement_admission=false;}} release{*this,context};
+        const auto intent=retirement_book_->prepare_resume(proof.grant(),incarnation_,assignments,proof.hostname(),proof.current_target());
+        const auto signed_ack=history.resume_acknowledgement(intent.acknowledgement());if(!signed_ack||cancelled())return {};
+        // Root -> persistence -> book. Signing and peer exchanges occur outside
+        // these locks; only the bounded local complete decision is admitted.
+        auto guard=history.admit_resume_grant(proof);if(!guard||cancelled())return {};
+        std::lock_guard persistence(persistence_mutex_);
+        {std::lock_guard lock(mutex_);if(!accepting_||exiting_||context->quit)return {};}
+        const auto result=retirement_book_->publish_resume(intent,*signed_ack);
+        const auto saved=store_.reload();{std::lock_guard lock(mutex_);config_=saved.first;etag_=saved.second;++publication_;}
+        // The existing owner thread sees the durable disposition and refreshes
+        // its session outside Root/configuration/metadata locks. No CLAIM,
+        // reconnect, job or output action occurs inside this transaction.
+        return result;
+    }
+    bool retirement_scope_closed(const Json &pair,const Json &migration){return retirement_book_->retirement_scope_closed(pair,migration);}
+    PicoHttpResponse machine_retirement(const PiPairRetirementPrincipal &principal,PiPairHistory &history,const std::function<bool()> &cancelled){
+        const auto &wire=principal.request();
+        if((cancelled&&cancelled())||principal.transport().self_id()!=self_id_||wire.at("controller_id")!=self_id_||!history.retirement_finished(principal.transport(),true))
+            return controller_target_error(403,"unauthorized");
+        const auto pending=[&]{return PicoHttpResponse{202,Json{{"contract","Wsprry-Pair/1"},{"schema","operation"},
+            {"operation_id",wire.at("transition_id")},{"pair_id",wire.at("pair_id")},{"authorization_generation",wire.at("authorization_generation")},
+            {"request_digest",PiManagementJournal::digest(canonical_pi_management_json(wire))},{"state","pending"},{"result_digest",nullptr}}.dump(),{}};};
+        if(const auto retained=retirement_book_->machine_receipt(wire))return {retained->at("schema")=="operation"?202U:200U,retained->dump(),{}};
+        if(wire.at("schema")=="retirement-status")return {404,Json{{"contract","Wsprry-Pair/1"},{"schema","result"},
+            {"pair_id",wire.at("pair_id")},{"state","rejected"},{"code","operation_unknown"},{"retryable",false}}.dump(),{}};
+        if(const auto fence=retirement_book_->retired_fence(wire)){
+            const auto response=history.retirement_response(wire,(*fence)["receipt"]);
+            if(!response)return controller_target_error(503,"storage_unavailable");
+            const auto guard=history.admit_retirement(principal);if(!guard||(cancelled&&cancelled()))return controller_target_error(403,"unauthorized");
+            retirement_book_->bind_retired(wire,(*fence)["revision"],*response);
+            return {200,response->dump(),{}};
+        }
+        Json assignments;{std::lock_guard lock(mutex_);if(!accepting_||exiting_)return controller_target_error(503,"storage_unavailable");assignments=config_.at("assignments");}
+        const auto book=retirement_book_->read(incarnation_,assignments);const Json *selected=nullptr;
+        for(const auto &row:book.at("assignments"))if(row.at("target_id")==wire.at("target_id")){selected=&row;break;}
+        if(!selected||selected->at("assignment_id")!=wire.at("assignment_id")||selected->at("assignment_revision")!=wire.at("assignment_revision"))
+            return controller_target_error(409,"revision_conflict");
+        const Json intent={{"contract","Wsprry-Control/1"},{"schema","controller-retirement"},{"controller_id",self_id_},
+            {"controller_incarnation",incarnation_},{"operation_id",wire.at("transition_id")},{"transition_id",wire.at("transition_id")},
+            {"target_id",wire.at("target_id")},{"assignment_id",wire.at("assignment_id")},{"expected_assignment_revision",wire.at("assignment_revision")},
+            {"expected_retirement_generation",book.at("generation")}};
+        // Final actual credential/policy admission covers the local WAL only.
+        // No carrier exchange or callback is performed inside this guard.
+        const auto guard=history.admit_retirement(principal);if(!guard||(cancelled&&cancelled()))return controller_target_error(403,"unauthorized");
+        const auto result=retirement_request("POST",intent.dump(),"\""+book.at("revision").get<std::string>()+"\"",wire);
+        if(result.status!=200&&result.status!=202)return result;
+        return pending();
     }
     PicoHttpResponse request(const std::string& method,const std::string& body,const std::string& revision,
                              const std::string& resource,const std::string& ids) {
@@ -459,7 +531,7 @@ private:
     void make_owner(FleetContext& c,const WtpSettings& settings) {
         set_target(c,make_target(hooks_,settings,[this,&c]{return dispatch_allowed(c);}));
     }
-    PicoHttpResponse retirement_request(const std::string &method,const std::string &body,const std::string &revision) {
+    PicoHttpResponse retirement_request(const std::string &method,const std::string &body,const std::string &revision,const Json &machine_request=nullptr) {
         Json assignments;
         {std::lock_guard lock(mutex_);assignments=config_.at("assignments");}
         if(method=="GET") {
@@ -476,8 +548,10 @@ private:
         // Read-only replay remains available even if an operator has removed
         // the old v1 row. It neither needs a live carrier nor grants new work.
         try {
-            if(const auto receipt=retirement_book_->replay(intent,revision.substr(1,64)))
-                return {receipt->at("state")=="retired"?200U:202U,receipt->dump(),{}};
+            if(machine_request.is_null()){
+                if(const auto receipt=retirement_book_->replay(intent,revision.substr(1,64)))
+                    return {receipt->at("state")=="retired"?200U:202U,receipt->dump(),{}};
+            }
         }catch(const ControllerRetirementConflict&){return controller_target_error(409,"revision_conflict");}
         catch(...){return controller_target_error(503,"storage_unavailable");}
         std::shared_ptr<FleetContext> selected;
@@ -496,7 +570,7 @@ private:
         try {
             if(hooks_.before_retirement_persist)hooks_.before_retirement_persist();
             const auto receipt=retirement_book_->retire(intent,revision.size()==66&&revision.front()=='"'&&revision.back()=='"'?revision.substr(1,64):std::string{},incarnation_,assignments,
-                target(c)?retirement_observation(target(c)->app->status(),c.id):Json(nullptr));
+                target(c)?retirement_observation(target(c)->app->status(),c.id):Json(nullptr),machine_request);
             response={receipt.at("state")=="retired"?200U:202U,receipt.dump(),{}};
         }catch(const ControllerRetirementConflict&) {
             // A definite pre-write conflict can be reviewed again. It cannot
@@ -865,7 +939,7 @@ private:
         if(c.row.value("enabled",false)||c.row.value("in_flight",false)) {
             // The durable tombstone is already authoritative. Clearing saved
             // flags is a monotonic follow-up, never a grant or loss of proof.
-            update_config({},[&](Json &data){if(row_for(data,c.id))modify_row(data,c.id,[](Json &row){row["enabled"]=false;row["in_flight"]=false;});});
+            update_config({},[&](Json &data){if(row_for(data,c.id)&&!retirement_book_->permits(c.id))modify_row(data,c.id,[](Json &row){row["enabled"]=false;row["in_flight"]=false;});});
             c.row["enabled"]=false;c.row["in_flight"]=false;
         }
     }
@@ -893,11 +967,49 @@ private:
         else (void)observed->app->inspect();
         const auto status=observed->app->status();const auto now=observed->clock.now_ms();
         if(observed_healthy(status,c.row)&&observed_idle(status)&&status.status_age_origin_ms&&now>=*status.status_age_origin_ms&&now-*status.status_age_origin_ms<15000) {
-            retirement_book_->confirm_idle(c.id,retirement_observation(status,c.id));pause_retired(c);c.message="Retirement confirmed; this saved schedule cannot resume";
+            retirement_book_->confirm_idle(c.id,retirement_observation(status,c.id),[&](const Json &request,const Json &receipt)->std::optional<Json>{
+                if(hooks_.retirement_signer)return hooks_.retirement_signer(request,receipt);
+                const auto owner=pi_pair_owner();const auto history=owner&&owner->self()==self_id_?owner->history():nullptr;
+                return history?history->retirement_response(request,receipt):std::nullopt;
+            });pause_retired(c);c.message="Retirement confirmed; this saved schedule cannot resume";
         }else c.message="Retirement pending: inactive, unowned output has not been verified";
+    }
+    bool apply_committed_resume(FleetContext &c){
+        const auto resume=retirement_book_->active_resume(c.id);if(resume.empty()||resume==c.applied_resume)return false;
+        {
+            std::lock_guard lock(mutex_);if(c.quit||c.control==UINT64_MAX||c.retirement_admission||(c.ordinary&&c.ordinary->pending)||(c.pause&&c.pause->pending))return true;
+            c.retirement_admission=true;
+        }
+        struct Release {Fleet &owner;FleetContext &context;~Release(){std::lock_guard lock(owner.mutex_);context.retirement_admission=false;}} release{*this,c};
+        if(!c.retirement.is_null())return true;
+        auto original=target(c);if(original&&original->app->active())return true;
+        Json row;
+        {
+            std::lock_guard persistence(persistence_mutex_);const auto saved=store_.reload();const auto current=row_for(saved.first,c.id);
+            if(!current||retirement_book_->active_resume(c.id)!=resume)return true;
+            row=*current;
+            std::lock_guard lock(mutex_);config_=saved.first;etag_=saved.second;++publication_;
+        }
+        // The old permanent fence proved its accepted work ended; the resume
+        // grant separately reconciled the current disabled target. Drop only
+        // this retired session and observation lease, preserving all durable
+        // old fences/outcomes. Fresh WTP inspection/admission remains mandatory.
+        if(c.host_thread.joinable())c.host_thread.join();
+        {std::lock_guard lock(c.target_mutex);c.target.reset();}original.reset();c.retirement_observer.reset();
+        c.row=std::move(row);c.dispatched=false;c.initial=false;c.recovery=false;c.host=nullptr;c.host_origin.reset();c.host_result=nullptr;
+        c.host_error.clear();c.last_host=0;c.initial_due=now_ms();
+        {
+            std::lock_guard lock(mutex_);if(c.quit||retirement_book_->active_resume(c.id)!=resume)return true;
+            if(c.control==UINT64_MAX)throw std::runtime_error("Resume control revision exhausted");
+            ++c.control;c.generation=wtp_random_identity();
+            c.applied_resume=resume;c.recurrence_retired=false;
+            std::lock_guard permit(c.permit->mutex);c.permit->allowed=false;c.permit->retiring=false;c.permit->loaded_job.reset();
+        }
+        c.message="Saved controller schedule restored; fresh output admission required";return true;
     }
     void tick(FleetContext& c) {
         if(c.row.is_null() || c.removed)return;
+        if(apply_committed_resume(c))return;
         bool fenced;{std::lock_guard permit(c.permit->mutex);fenced=c.permit->retiring;}
         if(fenced||!retirement_book_->permits(c.id)){tick_retirement(c);return;}
         if(!storage_error().empty() || !c.retirement.is_null())return;
@@ -988,6 +1100,7 @@ private:
         for(auto& a:{c.ordinary,c.pause})if(a && a->pending){a->pending=false;a->completed=now_ms();a->record["state"]="outcome_unconfirmed";a->record["work_pending"]=false;a->record["reason"]="Controller owner retired; review restored barriers";}
     }
     WtpFleetStore store_;WtpFleetJournal journal_;std::unique_ptr<ControllerRetirementBook> retirement_book_;
+    std::function<void(PiPairInitializationProof)> pairing_;
     std::string self_id_;WtpFleetTestHooks hooks_;std::string incarnation_;
     WtpSteadyClock clock_;std::uint64_t last_clock_{},publication_{1};bool accepting_{true},clock_fault_{};
     std::atomic_bool exiting_{false};std::thread reaper_;
@@ -1003,7 +1116,12 @@ void replace_manager(const std::string& ini,const std::string& self,WtpFleetTest
     std::shared_ptr<Fleet> old;{std::lock_guard lock(manager_mutex);old=manager;}
     if(old)old->shutdown(); // No candidate sessions/writers before old quiescence.
     try {
-        auto candidate=std::make_shared<Fleet>(ini,self.empty()?wtp_pi_device_id():self,std::move(hooks));
+        const auto identity=self.empty()?wtp_pi_device_id():self;std::function<void(PiPairInitializationProof)> pairing;
+        if(self.empty())try{const auto owner=prepare_pi_pair_owner(identity);pairing=[owner](PiPairInitializationProof proof){owner->provision(std::move(proof));};}
+            catch(...){/* Independent pairing storage cannot reopen or stop Fleet authority. */}
+        if(!pairing)if(const auto owner=pi_pair_owner();owner&&owner->self()==identity)
+            pairing=[owner](PiPairInitializationProof proof){owner->provision(std::move(proof));};
+        auto candidate=std::make_shared<Fleet>(ini,identity,std::move(hooks),std::move(pairing));
         std::lock_guard lock(manager_mutex);manager=std::move(candidate);startup_error.clear();
     }catch(const std::exception& e) {
         // The old owner is already quiescent. Do not publish its stopped
@@ -1031,6 +1149,24 @@ void stop_wtp_fleet() noexcept {
     std::shared_ptr<Fleet> old;{std::lock_guard lock(manager_mutex);old=manager;}
     if(old)old->shutdown();
     {std::lock_guard lock(manager_mutex);manager.reset();}
+}
+std::optional<Json> wtp_fleet_resume(const PiPairResumeGrantProof &proof,PiPairHistory &history,const std::function<bool()> &cancelled){
+    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);if(!lifecycle.owns_lock())return {};
+    std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}if(!current)return {};
+    try{return current->machine_resume(proof,history,cancelled);}catch(...){return {};}
+}
+bool wtp_fleet_retirement_scope_closed(const Json &pair,const Json &migration){
+    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);if(!lifecycle.owns_lock())return false;
+    std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}
+    if(!current)return false;
+    try{return current->retirement_scope_closed(pair,migration);}catch(...){return false;}
+}
+PicoHttpResponse wtp_fleet_retirement(const PiPairRetirementPrincipal &principal,PiPairHistory &history,const std::function<bool()> &cancelled){
+    std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}
+    if(!current)return controller_target_error(503,"storage_unavailable");
+    try{return current->machine_retirement(principal,history,cancelled);}
+    catch(const ControllerRetirementConflict &){return controller_target_error(409,"revision_conflict");}
+    catch(...){return controller_target_error(503,"storage_unavailable");}
 }
 PicoHttpResponse wtp_fleet_api(const std::string& method,const std::string& body,const std::string& revision,
                               const std::string& resource,const std::string& ids) {

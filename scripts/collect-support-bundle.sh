@@ -518,9 +518,9 @@ redact_file_in_place() {
 
   perl -0pi -e '
     s#([A-Za-z][A-Za-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@#${1}[REDACTED]@#g;
-    s#("(?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password)"\s*:\s*")[^"]*(")#${1}[REDACTED]${2}#gi;
-    s#((?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password)\s*[:=]\s*)\S+#${1}[REDACTED]#gi;
-    s#((?:--?)(?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password)\s+)\S+#${1}[REDACTED]#gi;
+    s#("(?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password|tls[_-]?psk|retirement[_-]?verifier|private[_-]?key|pairing[_-]?code|commit[_-]?key)"\s*:\s*")[^"]*(")#${1}[REDACTED]${2}#gi;
+    s#((?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password|tls[_-]?psk|retirement[_-]?verifier|private[_-]?key|pairing[_-]?code|commit[_-]?key)\s*[:=]\s*)\S+#${1}[REDACTED]#gi;
+    s#((?:--?)(?:password|pass|passwd|token|secret|api[_-]?key|access[_-]?key|upload[_-]?key|wsprnet[_-]?password|reporter[_-]?password|tls[_-]?psk|retirement[_-]?verifier|private[_-]?key|pairing[_-]?code|commit[_-]?key)\s+)\S+#${1}[REDACTED]#gi;
   ' "$file" 2>/dev/null || true
 }
 

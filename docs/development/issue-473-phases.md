@@ -32,16 +32,19 @@ separate authorization to execute and successful prerequisite gates.
    from controller-owned schedules before allowing new schedule enables.
    [Phase 5 prompt](issue-473/05-authority-transition.md) ·
    [Phase-5 implementation and validation](issue-473/phase-5-progress.md)
-6. ⏳ **Device-owned recurrence and secure remote management:** Both subphases
+6. ✅ **Device-owned recurrence and secure remote management:** Both subphases
    require separate execution authority and acceptance before phase 7.
    - ✅ **6.1 Integrate device-owned recurrence:** Apply solar policies to Pi
      scheduling, including ownership, enablement, restart handling, and status.
      [Phase 6.1 prompt](issue-473/06-device-recurrence.md) ·
      [Phase 6.1 progress](issue-473/phase-6-1-progress.md)
-   - ▧ **6.2 Complete Pi security and remote management:** Deliver automatic
+   - ✅ **6.2 Complete Pi security and remote management:** Deliver automatic
      pairing/TLS, authenticated remote adapters, and deferred editor/handover
      integration. [Phase 6.2 prompt](issue-473/06-2-pi-security.md) ·
+     [Phase 6.2 progress](issue-473/phase-6-2-progress.md) ·
+     [Annotated data-flow diagrams](issue-473/phase-6-2-data-flow.md) ·
      [Security-gate requirements](issue-473/deferred-pi-security.md)
+     Accepted on 2026-11-18 after repeated adversarial review and fixes. Automatic pairing/rotation, native Pi editing, automatic attached-Pico management, authenticated retirement and two restore cycles pass actual protected HTTP/PAKE/TLS/USB-handler and journal fixtures, including unknown replies, revocation, fresh-process crash recovery and positive retired-key closure. The final intended source pair passes strict compilation, 45 foundation targets and both complete network/USB suites. All four Linux package/loading/startup profiles, ARM and Intel Mac application/role checks, portable semantics, full UI/browser checks and rendered operator documentation pass. [Final acceptance evidence](issue-473/phase-6-2-final-acceptance.json) and [review record](issue-473/phase-6-2-progress.md#final-acceptance-and-adversarial-assessment) identify exact sources and qualification limits. WTP and browser-hop security reviews remain backlogged. No hardware, installation, service, timing or RF qualification is claimed; phase 7 has not started.
 7. ▧ **Add shared Scheduling UI:** Provide target-specific scheduling controls
    and verify autonomous remote operation.
    [Phase 7 prompt](issue-473/07-scheduling-ui.md)

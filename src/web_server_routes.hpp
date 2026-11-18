@@ -9,6 +9,7 @@
 #include "support_request_guard.hpp"
 
 #include <functional>
+#include <memory>
 #include <string>
 
 class PrivilegedNetworkAdmin;
@@ -20,6 +21,10 @@ struct Response;
 namespace wsprrypi
 {
 class Rp1GpclkRouteService;
+class PiPairLocalService;
+class PiPairMachineBackend;
+class PiPairRemoteController;
+class PiPairHistory;
 }
 
 namespace web_server_routes
@@ -37,7 +42,16 @@ void register_config(
     CorsHeaderSetter set_cors_headers);
 void register_control(
     httplib::Server &server,
-    CorsHeaderSetter set_cors_headers);
+    CorsHeaderSetter set_cors_headers,
+    std::function<std::shared_ptr<wsprrypi::PiPairLocalService>()> pairing = {},
+    NetworkSnapshotProvider snapshot = {});
+// Lazy owner lookup does not create history or start a listener from a read.
+void register_pairing(httplib::Server &,
+    std::function<std::shared_ptr<wsprrypi::PiPairLocalService>()>,
+    NetworkSnapshotProvider);
+// Selected process owners only; construction opens no listener or session.
+std::shared_ptr<wsprrypi::PiPairMachineBackend> pairing_machine_backend();
+std::shared_ptr<wsprrypi::PiPairRemoteController> pairing_remote_controller(std::shared_ptr<wsprrypi::PiPairHistory>);
 // After HTTP handlers stop, before the process-owned catalog is destroyed.
 void retire_control_management();
 void register_privileged_admin(

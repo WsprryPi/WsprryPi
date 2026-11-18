@@ -17,6 +17,9 @@ SPEC.loader.exec_module(module)
 
 
 class ContainerBuildTest(unittest.TestCase):
+    def test_changed_pairing_notice_refuses_export(self):
+        self.exercise("aarch64-bookworm", failure="pairing-notice")
+
     def exercise(self, target, *, failure=None, existing=False, candidate_version=None):
         with tempfile.TemporaryDirectory() as root:
             output = Path(root) / "artifact with spaces"
@@ -47,6 +50,10 @@ class ContainerBuildTest(unittest.TestCase):
                     (stage / "elf-dynamic.txt").write_text("(NEEDED) Shared library: [libavahi-client.so.3]\n(NEEDED) Shared library: [libavahi-common.so.3]\n")
                     if failure in ("evidence", "avahi-evidence"):
                         (stage / ("elf-dynamic.txt" if failure == "avahi-evidence" else "elf-header.txt")).unlink()
+                    (stage / "BOTAN-LICENSE.txt").write_bytes((module.REPO / "docs/licenses/botan/BSD-2-Clause.txt").read_bytes())
+                    (stage / "PAIRING-PROVIDER.json").write_bytes((module.REPO / "scripts/pairing_provider.json").read_bytes())
+                    if failure == "pairing-notice":
+                        (stage / "BOTAN-LICENSE.txt").write_text("changed attribution")
                     (stage / "wsprrypi").write_bytes(b"binary")
                     if failure == "copy":
                         raise subprocess.CalledProcessError(1, args)

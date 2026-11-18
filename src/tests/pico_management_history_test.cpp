@@ -67,6 +67,48 @@ int main(int argc,char **argv){
   const auto [restored,restored_revision]=migrated.mutate({{"operation","rename"},{"id",id},{"name","Test Pico"}},renamed_revision,{});
   CHECK(restored["profiles"]==legacy["profiles"]&&restored_revision!=old_revision&&migrated.profile(id,restored_revision,{}).generation!="1");
   CHECK(Json::parse(bytes(legacy_path))["version"]==2);
+  // P62-13's private index never appears as a WTP profile. The previous
+  // current seven-field catalog remains byte-for-byte unchanged on reads.
+  const auto seal=[](Json value){value["checksum"]=wtp_catalog_revision(value).substr(1,64);return value;};
+  const auto write_private=[&](const std::string &file,const Json &value){std::ofstream out(file);out<<seal(value).dump();out.close();CHECK(!chmod(file.c_str(),0600));};
+  auto private_catalog=Json::parse(bytes(legacy_path));private_catalog["profiles"]=Json::array();
+  private_catalog["remote_management"]=Json::object();
+  const Json remote{{"parent_id",device},{"profile_id",std::string(32,'1')},{"profile_generation","2"},
+      {"pair_id",std::string(32,'2')},{"authorization_generation","3"},{"product","WsprryPi"}};
+  const auto previous_current=temporary+"/previous-current.json";auto previous=private_catalog;previous.erase("remote_management");write_private(previous_current,previous);
+  WtpCatalog previous_owner(previous_current);const auto previous_bytes=bytes(previous_current);
+  CHECK(previous_owner.snapshot({}).first["profiles"].empty()&&previous_owner.remote_management({}).empty()&&bytes(previous_current)==previous_bytes);
+  for(unsigned scenario=0;scenario<8;++scenario){
+   auto candidate=private_catalog;candidate["remote_management"][device]=remote;auto &row=candidate["remote_management"][device];
+   if(scenario==0)row.erase("pair_id");
+   if(scenario==1)row["private_key"]="forbidden";
+   if(scenario==2)row["parent_id"]=self;
+   if(scenario==3)row["profile_generation"]="0";
+   if(scenario==4)row["authorization_generation"]=3;
+   if(scenario==5)row["product"]="unknown";
+   if(scenario==6)row["pair_id"]=std::string(32,'X');
+   if(scenario==7)row["product"]="WsprryPico"; // A Pico cannot be its parent.
+   const auto file=temporary+"/bad-remote-"+std::to_string(scenario)+".json";write_private(file,candidate);WtpCatalog bad(file);
+   bool refused=false;try{(void)bad.snapshot({});}catch(...){refused=true;}CHECK(refused);
+  }
+  {
+   const auto remote_ini=temporary+"/remote.ini",remote_path=remote_ini+".wtp-devices.json",remote_history=remote_ini+".management";
+   auto candidate=private_catalog;candidate["remote_management"][device]=remote;write_private(remote_path,candidate);
+   WtpCatalog owner(remote_path);const auto before=bytes(remote_path);
+   CHECK(owner.snapshot({}).first["profiles"].empty()&&!owner.snapshot({}).first.contains("remote_management")&&bytes(remote_path)==before);
+   CHECK(owner.management_history_authority({}).read().devices.contains(device));
+   PicoManagementJournal entry(remote_history,self,device,owner.management_history_authority({}));
+   CHECK(!entry.reserve(std::string(32,'2'),"/api/control/v1/targets/"+device+"/settings","PUT",binding(device,"2"),"3",op,digest));
+   const auto record=entry.snapshot(),anchored=Json::parse(bytes(remote_path));
+   auto missing_index=anchored;missing_index.erase("remote_management");write_private(remote_path,missing_index);
+   CHECK(entry.snapshot()["receipts"]==record["receipts"]&&entry.receipt(op)["state"]=="unknown");
+   entry.prune_retired();CHECK(std::filesystem::exists(remote_history+"/"+device+".json")&&owner.management_history_authority({}).read().epochs.contains(device));
+   bool refused=false;try{(void)entry.reserve(std::string(32,'2'),"/api/control/v1/targets/"+device+"/settings","PUT",binding(device,"2"),"3",std::string(32,'e'),digest);}catch(...){refused=true;}CHECK(refused);
+   write_private(remote_path,anchored);CHECK(entry.snapshot()["receipts"]==record["receipts"]);
+   CHECK(std::filesystem::remove(remote_path));
+   const auto child=fork();CHECK(child>=0);if(!child){execl(argv[0],argv[0],"--missing-catalog",remote_path.c_str(),remote_history.c_str(),self.c_str(),device.c_str(),nullptr);_exit(127);}
+   int status{};CHECK(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==0);
+  }
   // Explicit removal retains unresolved authority; reviewed/terminal orphan
   // history is retired and cannot permanently exhaust the directory bound.
   const auto gc_path=temporary+"/gc.json",gc_directory=temporary+"/gc";WtpCatalog gc(gc_path);

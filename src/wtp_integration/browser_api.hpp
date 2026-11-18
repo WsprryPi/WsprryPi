@@ -8,6 +8,8 @@
 #include <mutex>
 #include <set>
 namespace wsprrypi {
+class PiPairPrincipal;
+class PiPairHistory;
 struct BrowserRequest {
   std::string method, path, body, revision;
   bool mutation_context{}; // Guard + same-origin JSON intent checked by HTTP adapter.
@@ -21,9 +23,13 @@ public:
   WtpBrowserApi(Status status, Management management, Cancel cancel)
       : status_(std::move(status)), management_(std::move(management)), cancel_(std::move(cancel)) {}
   PicoHttpResponse handle(const BrowserRequest &);
+  // Actual paired-Pi gateway observation, restricted to typed Pico resources.
+  // This does not grant WTP jobs, carrier selection or firmware administration.
+  PicoHttpResponse handle(const BrowserRequest &,const PiPairPrincipal &,PiPairHistory &);
   void retire_management_reads();
 private:
-  PicoHttpResponse handle_control(const BrowserRequest &);
+  PicoHttpResponse handle_impl(const BrowserRequest &,bool paired);
+  PicoHttpResponse handle_control(const BrowserRequest &,bool paired);
   Status status_;
   Management management_;
   Cancel cancel_;

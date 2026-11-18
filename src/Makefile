@@ -694,11 +694,11 @@ else
 ATOMIC_LIB :=
 endif
 
-LDFLAGS := $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
+LDFLAGS = $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
            $(AVAHI_LIBS) \
-           $(SYSTEMD_LIBS)
+           $(SYSTEMD_LIBS) $(PAIRING_PROVIDER_LINK)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Verbosity control
@@ -717,9 +717,31 @@ endif
 .PHONY: all
 all: release
 
+# The PAKE candidate is isolated from system installations and existing TLS.
+# Ordinary application builds do not enable pairing at this qualification stage.
+PAIRING_PROVIDER_KEY := $(shell python3 ../scripts/build_pairing_provider.py --key --compiler "$(CXX)")
+PAIRING_PROVIDER_ROOT := $(abspath build/pairing-provider/$(PAIRING_PROVIDER_KEY))
+PAIRING_PROVIDER_CACHE ?= $(abspath build/pairing-provider-cache)
+PAIRING_PROVIDER_LIB := $(PAIRING_PROVIDER_ROOT)/sdk/usr/lib/libbotan-3.a
+PAIRING_PROVIDER_INCLUDE := $(PAIRING_PROVIDER_ROOT)/sdk/usr/include/botan-3
+PAIRING_PROVIDER_LINK = $(if $(filter %/pi_pair_crypto.o %/pi_pair_crypto.cpp,$^),$(PAIRING_PROVIDER_LIB))
+CXX_DEBUG_FLAGS += -I"$(PAIRING_PROVIDER_INCLUDE)"
+CXX_RELEASE_FLAGS += -I"$(PAIRING_PROVIDER_INCLUDE)"
+$(filter %/pi_pair_crypto.o,$(CPP_OBJECTS) $(CPP_DEBUG_OBJECTS)): $(PAIRING_PROVIDER_LIB)
+
+$(PAIRING_PROVIDER_LIB): ../scripts/build_pairing_provider.py ../scripts/pairing_provider.json
+	$(Q)python3 ../scripts/build_pairing_provider.py --root "$(PAIRING_PROVIDER_ROOT)" --cache "$(PAIRING_PROVIDER_CACHE)" --compiler "$(CXX)"
+
+.PHONY: pairing-provider-test
+pairing-provider-test: $(PAIRING_PROVIDER_LIB)
+	$(Q)python3 ../scripts/tests/pairing_provider_build_test.py
+	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Werror -DPROVIDER_WITH_OPENSSL $(OPENSSL_CFLAGS) -I"$(PAIRING_PROVIDER_INCLUDE)" tests/pairing_provider/profile_probe.cpp "$(PAIRING_PROVIDER_LIB)" $(OPENSSL_LIBS) -o "$(PAIRING_PROVIDER_ROOT)/profile-probe"
+	$(Q)"$(PAIRING_PROVIDER_ROOT)/profile-probe"
+
 .PHONY: control-contract-check
 control-contract-check:
 	$(Q)python3 ../scripts/generate_control_contract.py --check
+	$(Q)python3 ../scripts/generate_pair_contract.py --check
 
 # One prerequisite per make invocation; optimized release remains a candidate
 # build. Stable publication policy is selected only by an explicit stable tag.
@@ -1198,7 +1220,7 @@ clean:
 	$(Q)$(SUDO) rm -rf build
 	$(Q)$(SUDO) rm -rf ../executables
 
-release: $(BIN_DIR)/$(OUT)
+release: $(BIN_DIR)/$(OUT) pairing-notices
 
 ifeq ($(BUILD_METADATA_QUERY),)
 	$(Q)echo "Release build completed successfully."
@@ -1356,7 +1378,7 @@ machine-power-control-test: $(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)./$(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)python3 $(MACHINE_POWER_REGRESSION_TEST)
 
-debug: $(BIN_DIR)/$(TEST_OUT)
+debug: $(BIN_DIR)/$(TEST_OUT) pairing-notices
 	$(Q)echo "Debug build completed successfully."
 
 test: debug
@@ -1887,13 +1909,13 @@ gdb: debug
 	$(Q)echo "Running debug session."
 	$(Q)$(SUDO) gdb --args ./$(BIN_DIR)/$(TEST_OUT) -D -i $(INI_FILE)
 
-install-binary: release
+install-binary: release install-pairing-notices
 	$(Q)echo "Installing $(OUT) binary to $(PREFIX)."
 	$(Q)$(SUDO) install -d "$(PREFIX)"
 	$(Q)$(SUDO) install -m 755 "$(BIN_DIR)/$(OUT)" "$(PREFIX)/$(OUT)"
 	$(Q)echo "Binary installation complete: $(PREFIX)/$(OUT)"
 
-install: release
+install: release install-pairing-notices
 	$(Q)echo "Installing $(OUT) to $(PREFIX)."
 	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
 	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
@@ -1906,7 +1928,7 @@ install: release
 	$(Q)$(SUDO) systemctl start $(OUT).service || true
 	$(Q)echo "Installation complete."
 
-debuginstall: debug
+debuginstall: debug install-pairing-notices
 	$(Q)echo "Installing DEBUG $(OUT) to $(PREFIX)."
 	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
 	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
@@ -2072,6 +2094,13 @@ wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
 
 wtp-production-test: wtp-production-cpp-test wtp-ui-test
 
+.PHONY: pi-wtp-binding-test
+$(BIN_DIR)/pi_wtp_binding_test: tests/pi_wtp_binding_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-wtp-binding-test: $(BIN_DIR)/pi_wtp_binding_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_wtp_binding_test"
+
 .PHONY: wtp-managed-output-test
 $(BIN_DIR)/wtp_managed_output_test: tests/wtp_managed_output_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -2081,6 +2110,9 @@ wtp-managed-output-test: $(BIN_DIR)/wtp_managed_output_test
 
 .PHONY: pico-management-target-test
 $(BIN_DIR)/pico_management_target_test: tests/pico_management_target_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pi_pair_browser_fixture: tests/pi_pair_browser_fixture.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 $(BIN_DIR)/pico_management_pair_client: tests/pico_management_pair_client.cpp $(SEMANTICS_TEST_DEPS)
@@ -2191,6 +2223,187 @@ $(BIN_DIR)/pi_management_service_test: tests/pi_management_service_test.cpp $(SE
 pi-management-service-test: $(BIN_DIR)/pi_management_service_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_service_test"
 
+$(BIN_DIR)/pi_pair_contract_test: tests/pi_pair_contract_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-contract-test
+pi-pair-contract-test: $(BIN_DIR)/pi_pair_contract_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_contract_test"
+
+$(BIN_DIR)/pi_pair_crypto_test: tests/pi_pair_crypto_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-crypto-test
+pi-pair-crypto-test: $(BIN_DIR)/pi_pair_crypto_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_crypto_test"
+
+$(BIN_DIR)/pi_pair_records_test: tests/pi_pair_records_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-records-test
+pi-pair-records-test: $(BIN_DIR)/pi_pair_records_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_records_test"
+
+$(BIN_DIR)/pi_pair_tls_test: tests/pi_pair_tls_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-tls-test
+pi-pair-tls-test: $(BIN_DIR)/pi_pair_tls_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_tls_test"
+
+$(BIN_DIR)/local_browser_principal_test: tests/local_browser_principal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: local-browser-principal-test
+local-browser-principal-test: $(BIN_DIR)/local_browser_principal_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/local_browser_principal_test"
+
+$(BIN_DIR)/pi_pair_operations_test: tests/pi_pair_operations_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-operations-test
+pi-pair-operations-test: $(BIN_DIR)/pi_pair_operations_test
+	$(Q)python3 tests/pairing_provider/generate_rotation_vector.py --check
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_operations_test"
+
+$(BIN_DIR)/pi_pair_recovery_test: tests/pi_pair_recovery_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-recovery-test
+pi-pair-recovery-test: $(BIN_DIR)/pi_pair_recovery_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_recovery_test"
+
+$(BIN_DIR)/pi_pair_retirement_key_test: tests/pi_pair_retirement_key_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-retirement-key-test
+pi-pair-retirement-key-test: $(BIN_DIR)/pi_pair_retirement_key_test
+	$(Q)python3 tests/pairing_provider/generate_retirement_vector.py --check
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_retirement_key_test"
+
+$(BIN_DIR)/pi_pair_admission_test: tests/pi_pair_admission_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-admission-test
+pi-pair-admission-test: $(BIN_DIR)/pi_pair_admission_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_admission_test"
+
+$(BIN_DIR)/pi_pair_history_tls_test: tests/pi_pair_history_tls_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-history-tls-test
+pi-pair-history-tls-test: $(BIN_DIR)/pi_pair_history_tls_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_history_tls_test"
+
+$(BIN_DIR)/pi_pair_peers_test: tests/pi_pair_peers_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-peers-test
+pi-pair-peers-test: $(BIN_DIR)/pi_pair_peers_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_peers_test"
+
+$(BIN_DIR)/pi_pair_window_test: tests/pi_pair_window_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-window-test
+pi-pair-window-test: $(BIN_DIR)/pi_pair_window_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_window_test"
+
+$(BIN_DIR)/pi_pair_http_test: tests/pi_pair_http_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-http-test
+pi-pair-http-test: $(BIN_DIR)/pi_pair_http_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_http_test"
+
+$(BIN_DIR)/pi_pair_server_test: tests/pi_pair_server_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-server-test
+pi-pair-server-test: $(BIN_DIR)/pi_pair_server_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_server_test"
+
+$(BIN_DIR)/pi_pair_client_test: tests/pi_pair_client_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-client-test
+pi-pair-client-test: $(BIN_DIR)/pi_pair_client_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_client_test"
+
+$(BIN_DIR)/pi_pair_discovery_test: tests/pi_pair_discovery_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-discovery-test
+pi-pair-discovery-test: $(BIN_DIR)/pi_pair_discovery_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_discovery_test"
+
+$(BIN_DIR)/pi_pair_outgoing_rotation_test: tests/pi_pair_outgoing_rotation_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-outgoing-rotation-test
+pi-pair-outgoing-rotation-test: $(BIN_DIR)/pi_pair_outgoing_rotation_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_outgoing_rotation_test"
+
+$(BIN_DIR)/pi_pair_guarded_http_test: tests/pi_pair_guarded_http_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-guarded-http-test
+pi-pair-guarded-http-test: $(BIN_DIR)/pi_pair_guarded_http_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_guarded_http_test"
+
+$(BIN_DIR)/pi_pair_bootstrap_client_test: tests/pi_pair_bootstrap_client_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-bootstrap-client-test
+pi-pair-bootstrap-client-test: $(BIN_DIR)/pi_pair_bootstrap_client_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_bootstrap_client_test"
+
+$(BIN_DIR)/pi_pair_connect_test: tests/pi_pair_connect_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-connect-test
+pi-pair-connect-test: $(BIN_DIR)/pi_pair_connect_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_connect_test"
+
+$(BIN_DIR)/pi_pair_usage_test: tests/pi_pair_usage_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-usage-test
+pi-pair-usage-test: $(BIN_DIR)/pi_pair_usage_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_usage_test"
+
+$(BIN_DIR)/pi_pair_machine_service_test: tests/pi_pair_machine_service_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-machine-service-test
+pi-pair-machine-service-test: $(BIN_DIR)/pi_pair_machine_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test"
+
+.PHONY: pi-pair-resume-refusal-test
+pi-pair-resume-refusal-test: $(BIN_DIR)/pi_pair_machine_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test" --refuse-second
+
+$(BIN_DIR)/pi_pair_owner_test: tests/pi_pair_owner_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-owner-test
+pi-pair-owner-test: $(BIN_DIR)/pi_pair_owner_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_owner_test"
+
+$(BIN_DIR)/pi_pair_service_lifetime_test: tests/pi_pair_service_lifetime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-service-lifetime-test
+pi-pair-service-lifetime-test: $(BIN_DIR)/pi_pair_service_lifetime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_service_lifetime_test"
+
+$(BIN_DIR)/pi_pair_local_test: tests/pi_pair_local_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-local-test
+pi-pair-local-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test"
+
 $(BIN_DIR)/pi_managed_store_test: tests/pi_managed_store_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
@@ -2278,7 +2491,7 @@ wtp-config-client-build:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_pi_control.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/pico_usb_management_channel.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
-		wtp_integration/configuration.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
+		wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
 		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
 		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
@@ -2375,7 +2588,7 @@ wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
@@ -2539,3 +2752,23 @@ recurrence-authority-record-test: $(BIN_DIR)/recurrence_authority_record_test
 .PHONY: scheduled-launch-test
 scheduled-launch-test:
 	$(Q)$(MAKE) -C WSPR-Transmitter/src scheduled-launch-test BACKENDS=simulated SUDO=
+
+.PHONY: pi-pair-local-http-test
+pi-pair-local-http-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test" --http
+
+.PHONY: pi-pair-runtime-test
+pi-pair-runtime-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test" --runtime
+
+# Static Botan code is distributed with its upstream notice and exact pin.
+.PHONY: pairing-notices
+pairing-notices:
+	$(Q)mkdir -p "$(BIN_DIR)"
+	$(Q)cp ../docs/licenses/botan/BSD-2-Clause.txt "$(BIN_DIR)/BOTAN-LICENSE.txt"
+	$(Q)cp ../scripts/pairing_provider.json "$(BIN_DIR)/PAIRING-PROVIDER.json"
+
+.PHONY: install-pairing-notices
+install-pairing-notices: pairing-notices
+	$(Q)$(SUDO) install -d "$(PREFIX)/../share/licenses/wsprrypi"
+	$(Q)$(SUDO) install -m 644 "$(BIN_DIR)/BOTAN-LICENSE.txt" "$(PREFIX)/../share/licenses/wsprrypi/BOTAN-LICENSE.txt"

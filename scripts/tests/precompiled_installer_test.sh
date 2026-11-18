@@ -173,11 +173,18 @@ ACTION=install
 # Real file replacement in a fixture, with only service and root-ownership calls mocked.
 BINARY_INSTALL_DIR="$fixture/bin"; BINARY_STAGE="$fixture/stage"
 LOCAL_REPO_DIR="$fixture/repo"
-mkdir -p "$BINARY_INSTALL_DIR" "$BINARY_STAGE"
+mkdir -p "$BINARY_INSTALL_DIR" "$BINARY_STAGE" "$LOCAL_REPO_DIR/docs/licenses/botan"
+cp "$SCRIPT_DIR/../../docs/licenses/botan/BSD-2-Clause.txt" "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt"
 printf old > "$BINARY_INSTALL_DIR/wsprrypi"
 printf new > "$BINARY_STAGE/wsprrypi"
 systemctl() { printf '%s ' "$@" >> "$fixture/services"; printf '\n' >> "$fixture/services"; return 0; }
-install() { local args=("$@"); command cp "${args[${#args[@]}-2]}" "${args[${#args[@]}-1]}"; }
+install() {
+    local args=("$@") destination="${!#}"
+    # Notice installation stays inside this fixture too; never touch /usr/local.
+    destination="${destination//\/usr\/local\/share\/licenses\/wsprrypi/$fixture/licenses}"
+    if [[ "$1" == -d ]]; then command mkdir -p "$destination"
+    else command cp "${args[${#args[@]}-2]}" "$destination"; fi
+}
 exec_command() {
     shift
     local args=() arg
@@ -191,7 +198,12 @@ manage_exe wsprrypi
 [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old ]]
 [[ ! -e "$fixture/services" ]]
 DRY_RUN=false
+mv "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt" "$fixture/held-notice"
+expect_failure manage_exe wsprrypi
+[[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old && ! -e "$fixture/services" ]]
+mv "$fixture/held-notice" "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt"
 manage_exe wsprrypi
+cmp "$fixture/licenses/BOTAN-LICENSE.txt" "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt"
 [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == new ]]
 [[ "$WAS_RUNNING" == true ]]
 rollback_executable

@@ -10,6 +10,17 @@
 #include <string>
 
 namespace wsprrypi {
+class PiPairRemoteController;
+class WtpCatalog;
+// Constructible only by the actual authenticated observation owner. This is
+// private enrollment bookkeeping, never a browser-provided authority token.
+class RemoteManagementEnrollment {
+    friend class PiPairRemoteController;
+    friend class WtpCatalog;
+    RemoteManagementEnrollment(std::string device,nlohmann::json metadata):device_(std::move(device)),metadata_(std::move(metadata)){}
+    std::string device_;
+    nlohmann::json metadata_;
+};
 struct WtpCatalogProfile {
   std::string id, name, method, discovery_id;
   WtpSettings settings;
@@ -31,6 +42,9 @@ public:
       const std::optional<WtpSettings> &active);
   PicoManagementHistoryAuthority management_history_authority(
       const std::optional<WtpSettings> &active);
+  // Private snapshots are not included in the public WTP catalog projection.
+  nlohmann::json remote_management(const std::optional<WtpSettings> &active);
+  bool enroll_remote_management(const RemoteManagementEnrollment &,const std::optional<WtpSettings> &active);
   PiManagementAnchor pi_management_anchor(const std::string &self,
       const std::optional<WtpSettings> &active);
 private:

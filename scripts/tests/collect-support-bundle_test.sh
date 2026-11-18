@@ -93,6 +93,8 @@ EOF
 printf '    PID    PPID USER     STAT     ELAPSED   RSS    VSZ NLWP COMMAND         COMMAND\n'
 printf '   4242       1 wsprrypi Sl         01:23 12345  67890    4 wsprrypi       /usr/local/bin/wsprrypi --token process-secret\n'
 printf '   5000    1000 www-data S          00:42  2048  12000    1 php             php /var/www/worker.php\n'
+printf '%s\n' '{"tls_psk":"artificial-tls-secret","retirement_verifier":"artificial-retirement-secret","private_key":"artificial-private-secret","pairing_code":"artificial-code-secret","commit_key":"artificial-commit-secret"}'
+printf '%s\n' 'tls-psk=artificial-equals-secret --retirement-verifier artificial-cli-secret'
 EOF
   cat > "$directory/pstree" <<'EOF'
 #!/usr/bin/bash
@@ -377,6 +379,9 @@ assert_contains "$process_dir/process-tree.txt" 'journalctl'
 assert_contains "$process_dir/systemd-cgroups.txt" 'apache2.service'
 assert_not_contains "$process_dir/all-processes.txt" 'process-secret'
 assert_contains "$process_dir/all-processes.txt" '[REDACTED]'
+for secret in artificial-tls-secret artificial-retirement-secret artificial-private-secret artificial-code-secret artificial-commit-secret artificial-equals-secret artificial-cli-secret; do
+  assert_not_contains "$process_dir/all-processes.txt" "$secret"
+done
 assert_not_contains "$process_dir/wsprrypi-cmdline.txt" 'cmdline-secret'
 assert_contains "$process_dir/wsprrypi-cmdline.txt" '[REDACTED]'
 ! tar -tzf "$archive" | grep -Eq '/fd(/|$)' || fail 'FD inventory or targets were archived'

@@ -16,6 +16,10 @@ public:
         std::string kind;
         std::optional<std::string> expected_old_digest;
         std::string bytes;
+        // Optional live-owner CAS observation. It is checked before staging,
+        // then covered by the preparer's existing pre-commit observation.
+        // Not serialized: cold WAL recovery retains its version-1 meanings.
+        std::optional<std::string> expected_old_signature{};
     };
     // Paths are fixed by the owner, never supplied by a browser. This private
     // directory is exclusively owned by this coordinator. At most seven fixed
@@ -51,6 +55,13 @@ public:
     // files. Returns only a stable, bounded, owned regular no-follow input.
     // Absence is an error; callers select paths internally, never from HTTP.
     static Observation read_ini_input(const std::string &path);
+    // Single private owner-selection record, not a multi-image settings save.
+    // The owning application supplies a fixed path and holds its writer lock.
+    // Publication is an atomic rename plus file/directory sync, conditional on
+    // the complete prior observation; this never repairs or discards a WAL.
+    static std::optional<Observation> read_private_record(const std::string &path);
+    static Observation publish_private_record(const std::string &path,
+        const std::optional<Observation> &expected,const std::string &bytes);
     static std::string digest(const std::string &);
 private:
     void directory(bool create);

@@ -97,6 +97,13 @@ void addresses() {
 void contexts() {
   Member a,b('b');PicoManagementTarget first(profile(),a.fixture()),second(profile('b'),b.fixture());
   CHECK(first.connect("engineering_mtls").status==200);
+  {
+    const auto reads=a.reads,mutations=a.mutations;unsigned admitted=0;
+    const auto refusal=first.request_guarded("network","PUT",R"({"contract":"Wsprry-Control/1","enabled":false})","\"network-1\"",
+        [&]()->std::optional<PiPairMutationGuard>{++admitted;return {};});
+    CHECK(refusal.status==409&&a.reads==reads&&a.mutations==mutations&&admitted==0);
+    CHECK(first.request_guarded("network","GET","","",{}).status==409&&a.reads==reads);
+  }
   CHECK(second.connect("engineering_mtls").status==200);
   CHECK(first.binding()["device_id"]==device && second.binding()["device_id"]==std::string(32,'b'));
   CHECK(first.connect("engineering_mtls").status==409);
@@ -148,6 +155,22 @@ void network_parity() {
   Member peer;PicoManagementTarget selected(profile(),peer.fixture());
   CHECK(selected.connect("engineering_mtls").status==200);
   const auto read=selected.request("network","GET");CHECK(read.status==200&&peer.mutations==0);
+  const Json bound{{"device_id",device},{"boot_id",boot},{"profile_generation","1"},{"connection_generation","1"}};
+  CHECK(pico_management_response_valid("network","GET",read,bound));
+  auto malformed=read;auto extra=Json::parse(read.body);extra["extra"]=true;malformed.body=extra.dump();
+  CHECK(!pico_management_response_valid("network","GET",malformed,bound));
+  Json wifi{{"contract","Wsprry-Control/1"},{"schema","wifi"},{"target",target},{"generation","1"},{"pending_restart",false},{"storage_healthy",true},
+      {"wifi",{{"ssid","Fixture"},{"password",nullptr},{"time_server","pool.ntp.org"}}}};
+  const auto wifi_reply=[&]{return PicoHttpResponse{200,wifi.dump(),"\"wifi-1\""};};
+  CHECK(pico_management_response_valid("wifi","PUT",wifi_reply(),bound));
+  wifi["extra"]=true;CHECK(!pico_management_response_valid("wifi","PUT",wifi_reply(),bound));wifi.erase("extra");
+  wifi["wifi"]["password"]="must-not-enter-a-replay-record";CHECK(!pico_management_response_valid("wifi","PUT",wifi_reply(),bound));wifi["wifi"]["password"]=nullptr;
+  wifi["target"]["boot_id"]=std::string(32,'2');CHECK(!pico_management_response_valid("wifi","PUT",wifi_reply(),bound));
+  const Json udp_test{{"contract","Wsprry-Control/1"},{"schema","udp-logging-test"},{"target",target},{"accepted",true},{"receipt","unknown"}};
+  CHECK(pico_management_response_valid("udp-logging/test","POST",{200,udp_test.dump(),{}},bound));
+  auto udp_bad=udp_test;udp_bad["target"]["device_id"]=std::string(32,'b');
+  CHECK(!pico_management_response_valid("udp-logging/test","POST",{200,udp_bad.dump(),{}},bound));
+
   CHECK(selected.request("network","PUT",R"({"contract":"Wsprry-Control/1","enabled":false})","\"stale\"").status==412);
   CHECK(selected.request("network","PUT",R"({"contract":"Wsprry-Control/1","enabled":0})",read.etag).status==400);
   CHECK(selected.request("network","PUT",R"({"contract":"Wsprry-Control/1","enabled":false,"extra":0})",read.etag).status==400);

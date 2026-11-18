@@ -73,12 +73,16 @@ This is a new, independently versioned Pi management-authentication contract,
 not a WTP transport or job-protocol extension. No new requirements are imposed on
 existing WTP clients, Plain LAN, Pico pairing, or engineering TLS profiles.
 
-Use SPAKE2 with mutual key confirmation and its specified P-256/SHA-256 suite,
-through a vetted implementation and official test vectors. A PAKE authenticates
-an exchange using a shared code; the code is not itself a long-lived encryption
-key. Both Pi backends generate ephemeral key material with the OS CSPRNG; browser
-JavaScript never generates, imports, downloads, or stores device pairing keys.
-See [SPAKE2, RFC 9382](https://www.rfc-editor.org/rfc/rfc9382.html).
+The user approved D62-01 on 2026-11-17: use RFC 9383 SPAKE2+ with mutual
+confirmation and the single P-256/SHA-256/HKDF/HMAC profile. The controller is
+the prover; the target derives its own ephemeral registration record from its
+temporary code. No registration record is provisioned by an operator or exported
+for provisioning. Botan 3.14.1 is approved for PAKE-only qualification, not yet
+qualified or accepted for production. Existing OpenSSL/Mbed TLS roles remain.
+The [approved amendment](phase-6-2-decisions.md#d62-01--pake-provider-and-narrow-wire-amendment)
+and normative supplement define the exact 96-byte scrypt mapping, provider scalar
+reduction, context/role bindings, confirmations, and purpose-separated keys.
+There is one current version-1 profile and no SPAKE2/SPAKE2+ fallback.
 
 Bind the complete authenticated exchange to protocol/version/roles, both full
 stable device IDs, both boot IDs, target authorization generation, random pairing

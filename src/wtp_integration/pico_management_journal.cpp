@@ -14,10 +14,16 @@
 #include <set>
 #include <map>
 #include <tuple>
+#include <atomic>
+#include <limits>
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
 namespace wsprrypi {
+struct PicoManagementTargetState {
+    std::recursive_mutex operation;
+    std::atomic<std::uint64_t> epoch{0};
+};
 namespace {
 using Json=nlohmann::json;
 constexpr std::size_t maximum_bytes=16*1024*1024;
@@ -45,6 +51,15 @@ struct Authority {
 std::recursive_mutex recovery_mutex;
 std::map<std::string,Authority> authorities;
 std::string authority_key(const std::string &directory){return std::filesystem::weakly_canonical(directory).string();}
+std::mutex target_states_mutex;
+std::map<std::pair<std::string,std::string>,std::weak_ptr<PicoManagementTargetState>> target_states;
+std::shared_ptr<PicoManagementTargetState> target_state(const std::string &directory,const std::string &device){
+    const auto key=std::make_pair(authority_key(directory),device);std::lock_guard lock(target_states_mutex);
+    for(auto it=target_states.begin();it!=target_states.end();)if(it->second.expired())it=target_states.erase(it);else ++it;
+    if(const auto found=target_states.find(key);found!=target_states.end())if(auto existing=found->second.lock())return existing;
+    if(target_states.size()>=64*96)throw std::runtime_error("management_storage_capacity");
+    auto state=std::make_shared<PicoManagementTargetState>();target_states[key]=state;return state;
+}
 unsigned unresolved(const Json &data) {
     unsigned result=0;for(const auto &entry:data["receipts"])
         if((entry["receipt"]["state"]=="pending"||entry["receipt"]["state"]=="unknown")&&entry["reconciled_revision"].is_null())++result;
@@ -79,14 +94,29 @@ bool binding(const Json &v,const std::string &device) {
     return fields(v,{"device_id","boot_id","profile_generation","connection_generation"})&&v["device_id"]==device&&
         hex(v["boot_id"],32)&&decimal(v["profile_generation"])&&decimal(v["connection_generation"]);
 }
+bool native_management_route(const std::string &route,const std::string &device){
+    const auto prefix="/api/control/v1/targets/"+device+"/";
+    return route.starts_with(prefix)&&!route.substr(prefix.size()).starts_with("pico/");
+}
+bool native_management_method(const std::string &resource,const std::string &method){
+    return (method=="PUT"&&resource=="settings")||(method=="POST"&&
+        (resource=="enable"||resource=="disable"||resource=="stop"||resource=="migration"||resource=="migration/rollback"));
+}
 bool public_value(const Json &v,unsigned depth=0) {
     if(depth>16)return false;
     if(v.is_object())for(const auto &[key,value]:v.items()) {
-        if((key=="password"||key=="private_key"||key=="psk"||key=="pairing_code"||key=="secret")&&!value.is_null())return false;
+        if((key=="password"||key=="private_key"||key=="psk"||key=="pairing_code"||key=="tls_psk"||key=="retirement_verifier"||key=="commit_key"||key=="secret")&&!value.is_null())return false;
         if(!public_value(value,depth+1))return false;
     }
     if(v.is_array())for(const auto &value:v)if(!public_value(value,depth+1))return false;
     return true;
+}
+bool native_receipt_matches(const Json &body,const Json &reserved,const std::string &etag){
+    if(!valid_controller_document(body,"target-operation")||body["operation_id"]!=reserved["operation_id"]||
+        body["request_digest"]!=reserved["request_digest"]||body["binding"]!=reserved["binding"])return false;
+    if(body["state"]=="committed"&&(!hex(body["revision"],64)||!body["error"].is_null()))return false;
+    if(body["state"]=="pending"&&(!body["revision"].is_null()||!body["error"].is_null()))return false;
+    return etag.empty()||(body["revision"].is_string()&&etag=="\""+body["revision"].get<std::string>()+"\"");
 }
 void require(bool value) {if(!value)throw std::runtime_error("invalid_management_recovery_state");}
 bool directory(const std::string &path,bool create) {
@@ -103,6 +133,27 @@ bool directory(const std::string &path,bool create) {
     return true;
 }
 }
+PicoManagementJournal::TargetAdmission::TargetAdmission(std::shared_ptr<PicoManagementTargetState> state)
+    :state_(std::move(state)),lock_(state_->operation,std::try_to_lock){}
+std::uint64_t PicoManagementJournal::TargetAdmission::epoch()const{return state_->epoch.load();}
+void PicoManagementJournal::TargetAdmission::retire(){
+    if(!lock_.owns_lock()||epoch()==std::numeric_limits<std::uint64_t>::max())throw std::runtime_error("management_context_capacity");
+    state_->epoch.store(epoch()+1);
+}
+std::optional<PicoManagementJournal::TargetAdmission> PicoManagementJournal::target_admission(const std::string &directory,const std::string &device){
+    require(hex(device,32));TargetAdmission admission(target_state(directory,device));
+    if(!admission.lock_.owns_lock())return {};
+    return admission;
+}
+std::optional<PicoManagementJournal::TargetAdmission> PicoManagementJournal::target_admission(){
+    TargetAdmission admission(target_);if(!admission.lock_.owns_lock())return {};
+    return admission;
+}
+std::uint64_t PicoManagementJournal::target_epoch()const{return target_->epoch.load();}
+bool PicoManagementJournal::remote_enrolled(){
+    std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);(void)load();check_authority();
+    return history_.complete()&&history_.read().remote_devices.contains(device_);
+}
 std::string PicoManagementJournal::digest(const std::string &text) {
     std::array<unsigned char,SHA256_DIGEST_LENGTH> bytes{};
     SHA256(reinterpret_cast<const unsigned char *>(text.data()),text.size(),bytes.data());
@@ -112,6 +163,7 @@ PicoManagementJournal::PicoManagementJournal(std::string dir,std::string control
     PicoManagementHistoryAuthority authority)
     :directory_(std::move(dir)),controller_(std::move(controller)),device_(std::move(device)),history_(std::move(authority)) {
     require(hex(controller_,32)&&hex(device_,32));path_=directory_+"/"+device_+".json";
+    target_=target_state(directory_,device_);
     unsigned char bytes[16];require(RAND_bytes(bytes,sizeof(bytes))==1);
     for(auto b:bytes){initial_epoch_+="0123456789abcdef"[b>>4];initial_epoch_+="0123456789abcdef"[b&15];}
 }
@@ -125,11 +177,12 @@ void PicoManagementJournal::validate(const Json &data) const {
         require(hex(entry["principal_id"],32)&&decimal(entry["authorization_generation"]));
         require(entry["route"].is_string()&&entry["method"].is_string());
         const auto route=entry["route"].get<std::string>();
-        const auto prefix="/api/control/v1/targets/"+device_+"/pico/";
+        const auto prefix="/api/control/v1/targets/"+device_+"/";
         require(route.starts_with(prefix)&&route.size()<=prefix.size()+64&&route.size()>prefix.size());
-        const auto resource=route.substr(prefix.size());
-        require(resource!="management"&&resource!="pins/validate"&&entry["method"]!="GET"&&
-            controller_pico_route(resource,entry["method"].get<std::string>()));
+        const auto resource=route.substr(prefix.size());const bool native=native_management_route(route,device_);
+        if(native)require(native_management_method(resource,entry["method"].get<std::string>()));
+        else require(resource!="pico/management"&&resource!="pico/pins/validate"&&entry["method"]!="GET"&&
+            controller_pico_route(resource.substr(5),entry["method"].get<std::string>()));
         const auto &r=entry["receipt"];
         require(fields(r,{"contract","schema","binding","operation_id","request_digest","state","revision","error"})&&
             valid_controller_document(r,"target-operation")&&r["contract"]=="Wsprry-Control/1"&&r["schema"]=="target-operation"&&binding(r["binding"],device_)&&
@@ -137,18 +190,20 @@ void PicoManagementJournal::validate(const Json &data) const {
             (r["revision"].is_null()||hex(r["revision"],64)));
         const auto state=r["state"];
         require(state=="pending"||state=="unknown"||state=="committed"||state=="rejected");
-        require(r["error"].is_null()||(fields(r["error"],{"code","retryable"})&&
+        require(native||r["error"].is_null()||(fields(r["error"],{"code","retryable"})&&
             r["error"]["code"]=="operation_unknown"&&r["error"]["retryable"]==false));
         const auto &reconciled=entry["reconciled_revision"];
         require(reconciled.is_null()||(hex(reconciled,64)&&state=="unknown"));
         if((state=="pending"||state=="unknown")&&reconciled.is_null())++unresolved;else ++terminal;
         const auto &response=entry["response"];
         if(state=="committed"||state=="rejected") {
-            require(r["error"].is_null());
+            require(native||r["error"].is_null());
             require(fields(response,{"status","body","etag"})&&response["status"].is_number_unsigned()&&response["status"]>=200&&response["status"]<500&&
-                (state=="committed"?response["status"]<300:response["status"]>=400)&&
+                (state=="committed"?response["status"]<300:(response["status"]>=400||(native&&response["body"]==r)))&&
                 response["body"].is_object()&&response["body"].dump().size()<=32768&&public_value(response["body"])&&
                 response["etag"].is_string()&&response["etag"].get_ref<const std::string&>().size()<=128&&response["etag"].get_ref<const std::string&>().find_first_of("\r\n")==std::string::npos);
+            if(native)require((response["body"]==r&&native_receipt_matches(response["body"],r,response["etag"].get<std::string>()))||
+                (state=="rejected"&&r["error"].is_null()&&valid_controller_document(response["body"],"target-error")));
         } else require(response.is_null());
     }
     require(terminal<=256&&unresolved<=32);
@@ -267,6 +322,15 @@ void PicoManagementJournal::prune_retired() {
 nlohmann::json PicoManagementJournal::snapshot(){std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);auto data=load();check_authority();return data;}
 std::optional<nlohmann::json> PicoManagementJournal::reserve(const std::string &principal,const std::string &route,
     const std::string &method,const Json &bound,const std::string &authorization,const std::string &operation,const std::string &request_digest) {
+    return reserve_impl(principal,route,method,bound,authorization,operation,request_digest,false);
+}
+std::optional<nlohmann::json> PicoManagementJournal::reserve_native_stop(const std::string &principal,const Json &bound,
+    const std::string &authorization,const std::string &operation,const std::string &request_digest){
+    return reserve_impl(principal,"/api/control/v1/targets/"+device_+"/stop","POST",bound,authorization,operation,request_digest,true);
+}
+std::optional<nlohmann::json> PicoManagementJournal::reserve_impl(const std::string &principal,const std::string &route,
+    const std::string &method,const Json &bound,const std::string &authorization,const std::string &operation,const std::string &request_digest,bool native_stop) {
+    require(!native_stop||(method=="POST"&&route=="/api/control/v1/targets/"+device_+"/stop"));
     std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);auto data=load();check_authority();
     require(hex(operation,32)&&hex(request_digest,64)&&binding(bound,device_));
     for(const auto &entry:data["receipts"])if(entry["receipt"]["operation_id"]==operation) {
@@ -280,7 +344,7 @@ std::optional<nlohmann::json> PicoManagementJournal::reserve(const std::string &
     if(total>=32)throw std::runtime_error("management_operation_capacity");
     for(const auto &entry:data["receipts"]) {
         const auto state=entry["receipt"]["state"];
-        if((state=="pending"||state=="unknown")&&entry["reconciled_revision"].is_null())throw std::runtime_error("management_readback_review_required");
+        if(!native_stop&&(state=="pending"||state=="unknown")&&entry["reconciled_revision"].is_null())throw std::runtime_error("management_readback_review_required");
     }
     if(history_.complete()) {
         // Empty journal first, catalog anchor second, reservation last. No
@@ -301,6 +365,21 @@ bool PicoManagementJournal::finish(const std::string &operation,const PicoHttpRe
         require(entry["receipt"]["state"]=="pending");found=true;
         Json body;
         try {body=strict_browser_json(response.body);}catch(...){body=nullptr;}
+        if(native_management_route(entry["route"].get<std::string>(),device_)){
+            const bool public_body=body.is_object()&&body.dump().size()<=32768&&public_value(body);
+            const bool receipt=public_body&&response.status>=200&&response.status<300&&native_receipt_matches(body,entry["receipt"],response.etag);
+            if(receipt){
+                entry["receipt"]=body;
+                if(body["state"]=="committed"||body["state"]=="rejected")entry["response"]={{"status",response.status},{"body",body},{"etag",response.etag}};
+                else entry["response"]=nullptr;
+            }else if(public_body&&response.status>=400&&response.status<500&&valid_controller_document(body,"target-error")){
+                entry["receipt"]["state"]="rejected";entry["receipt"]["error"]=nullptr;
+                entry["response"]={{"status",response.status},{"body",body},{"etag",response.etag}};
+            }else{
+                entry["receipt"]["state"]="unknown";entry["receipt"]["error"]={{"code","operation_unknown"},{"retryable",false}};entry["response"]=nullptr;
+            }
+            continue;
+        }
         const bool certain=((response.status>=200&&response.status<300)||(response.status>=400&&response.status<500))&&
             body.is_object()&&body.dump().size()<=32768&&public_value(body)&&
             !(body.contains("error")&&body["error"].is_object()&&body["error"].value("code",Json(nullptr))=="management_outcome_unknown");
@@ -312,6 +391,26 @@ bool PicoManagementJournal::finish(const std::string &operation,const PicoHttpRe
     }
     require(found);const auto evicted=prune_terminal(data);save(data);return evicted;
 }
+bool PicoManagementJournal::confirm_native(const std::string &operation,const std::string &principal,
+    const std::string &authorization,const PicoHttpResponse &response) {
+    std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);auto data=load();check_authority();
+    Json body;
+    try{body=strict_browser_json(response.body);}catch(...){return false;}
+    if(response.status!=200||!body.is_object()||body.dump().size()>32768||!public_value(body))return false;
+    for(auto &entry:data["receipts"])if(entry["receipt"]["operation_id"]==operation){
+        if(entry["principal_id"]!=principal||entry["authorization_generation"]!=authorization||
+            !native_management_route(entry["route"].get<std::string>(),device_)||
+            !entry["reconciled_revision"].is_null()||!native_receipt_matches(body,entry["receipt"],response.etag))return false;
+        const auto state=entry["receipt"]["state"];
+        if(state=="committed"||state=="rejected")return entry["receipt"]==body;
+        // Readback of pending/unknown is not final evidence, and an HTTP error
+        // (including a forgotten operation) is never proof of nondelivery.
+        if(body["state"]!="committed"&&body["state"]!="rejected")return false;
+        entry["receipt"]=body;entry["response"]={{"status",response.status},{"body",body},{"etag",response.etag}};
+        (void)prune_terminal(data);save(data);return true;
+    }
+    return false;
+}
 nlohmann::json PicoManagementJournal::receipt(const std::string &operation) {
     std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);const auto data=load();check_authority();for(const auto &entry:data["receipts"])if(entry["receipt"]["operation_id"]==operation) {
         auto result=entry["receipt"];if(result["state"]=="pending"){result["state"]="unknown";result["error"]={{"code","operation_unknown"},{"retryable",false}};}return result;
@@ -319,6 +418,7 @@ nlohmann::json PicoManagementJournal::receipt(const std::string &operation) {
     return nullptr;
 }
 bool PicoManagementJournal::reconcile(const std::string &operation,const Json &bound,const std::string &revision) {
+    auto admission=target_admission();if(!admission)throw std::runtime_error("management_target_busy");
     std::lock_guard lock(mutex_);std::lock_guard recovery(recovery_mutex);auto data=load();check_authority();bool found=false;require(binding(bound,device_)&&hex(revision,64));
     for(auto &entry:data["receipts"])if(entry["receipt"]["operation_id"]==operation) {
         const auto state=entry["receipt"]["state"];require(state=="pending"||state=="unknown");
@@ -327,6 +427,6 @@ bool PicoManagementJournal::reconcile(const std::string &operation,const Json &b
         entry["receipt"]["state"]="unknown";entry["receipt"]["error"]={{"code","operation_unknown"},{"retryable",false}};
         entry["reconciled_revision"]=revision;found=true;
     }
-    require(found);const auto evicted=prune_terminal(data);save(data);return evicted;
+    require(found);const auto evicted=prune_terminal(data);admission->retire();save(data);return evicted;
 }
 } // namespace wsprrypi

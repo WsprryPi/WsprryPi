@@ -34,7 +34,7 @@
         if (node("operationLocalView")) {node("operationLocalView").hidden = true;node("operationLocalView").inert = true;}
         for (const id of ["radio-tab", "transmitter-hardware-tab", "pi-hardware-tab"]) {
             const tab = node(id);
-            if (tab && !root.SetupTargets?.managingPico) {tab.disabled = true;tab.setAttribute("aria-disabled", "true");}
+            if (tab && !root.SetupTargets?.managingPico && !root.SetupTargets?.managingPi) {tab.disabled = true;tab.setAttribute("aria-disabled", "true");}
         }
         for (const id of ["transmit", "stop_transmit", "rebootButton", "shutdownButton"]) {
             const control = node(id);

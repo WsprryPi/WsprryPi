@@ -12,7 +12,7 @@ namespace wsprrypi {
 class PiManagedStartup {
 public:
     using ConfigurationGate=std::function<void(const std::function<void()> &)>;
-    PiManagedStartup(std::string ini,std::string self);
+    PiManagedStartup(std::string ini,std::string self,std::function<void(PiPairInitializationProof)> pairing = {});
     ~PiManagedStartup();
     PiManagedStartup(const PiManagedStartup &)=delete;
     PiManagedStartup &operator=(const PiManagedStartup &)=delete;

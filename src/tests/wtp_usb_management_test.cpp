@@ -61,9 +61,25 @@ int main() {
   std::uint64_t now{}; Device device; bool cancelled=false;
   UsbManagementClient client(device,[&]{return now;},[&](unsigned n){now+=n;},[&]{return cancelled;});
   CHECK(client.hello(std::string(32,'a')));
+  CHECK(client.connection_generation()>0);
   CHECK(client.request("/api/control/v1/hostname","GET").status==200 && device.acks==1);
   CHECK(device.operations[1].at("target")==device.target && device.operations[2].at("operation")=="ack");
   CHECK(client.request("/api/usb/v1/wifi","DELETE","{}","\"r1\"").status==200 && device.mutations==1);
+  {
+    const auto operations=device.operations.size();unsigned admissions=0;
+    const auto cancelled=client.request_guarded("/api/usb/v1/wifi","DELETE","{}","\"r1\"",1000,
+      [&]()->std::optional<PiPairMutationGuard>{++admissions;return {};},[]{return true;});
+    CHECK(cancelled.status==409&&admissions==0&&device.operations.size()==operations&&device.input.empty()&&client.connected()&&!device.closed);
+    const auto refused=client.request_guarded("/api/usb/v1/wifi","DELETE","{}","\"r1\"",1000,[&]()->std::optional<PiPairMutationGuard>{++admissions;return {};});
+    CHECK(refused.status==409&&Json::parse(refused.body)["error"]["code"]=="unauthorized");
+    CHECK(admissions==1&&device.operations.size()==operations&&device.input.empty()&&device.mutations==1&&client.connected()&&!device.closed);
+    CHECK(client.request_guarded("/api/usb/v1/wifi","DELETE","{}","\"r1\"",1000,{}).status==409&&device.operations.size()==operations);
+    const auto failed=client.request_guarded("/api/usb/v1/wifi","DELETE","{}","\"r1\"",1000,[]()->std::optional<PiPairMutationGuard>{throw std::runtime_error("fixture guard unavailable");});
+    CHECK(failed.status==409&&device.operations.size()==operations&&client.connected());
+    // Read-only negotiation has no settings mutation guard or save effect.
+    CHECK(client.request_guarded("/api/control/v1/hostname","GET","","",1000,[&]()->std::optional<PiPairMutationGuard>{++admissions;return {};}).status==200);
+    CHECK(admissions==1&&device.mutations==1);
+  }
   unsigned observations{};
   CHECK(client.synchronize([&]{++observations;return HostUtcObservation{true,observations*1000000ULL,1700000000000000000ULL+observations*1000000ULL,200000};}));
   auto last=device.operations[device.operations.size()-2];auto time=Json::parse(last.at("body").get<std::string>());
@@ -203,6 +219,23 @@ int main() {
   CHECK(api.handle({"GET","/api/control/v1/member/progress",{},{},false}).status==200);
   CHECK(api.handle({"POST","/api/control/v1/member/progress/update",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==200);
   CHECK(api.handle({"POST","/api/control/v1/member/progress/apply",R"({"contract":"Wsprry-Control/1"})","\"r1\"",true}).status==409);
+  {
+    Device accepted;bool stop=false;UsbManagementClient observed(accepted,[&]{return now;},[&](unsigned n){now+=n;});
+    CHECK(observed.hello(std::string(32,'a')));
+    accepted.on_request=[&](const Json &request){if(request["operation"]=="request"&&request["method"]=="PUT")stop=true;};
+    const auto unknown=observed.request("/api/control/v1/hostname","PUT","{}","\"r1\"",1000,[&]{return stop;});
+    CHECK(unknown.status==503&&Json::parse(unknown.body)["error"]["code"]=="management_outcome_unknown");
+    CHECK(accepted.mutations==1&&accepted.acks==0&&accepted.closed&&!observed.connected());
+  }
+  {
+    Device first,second;UsbManagementClient a(first,[&]{return now;},[&](unsigned n){now+=n;});
+    CHECK(a.hello(std::string(32,'a')));const auto original=a.connection_generation();
+    // Identical device, boot and artificial Pico session must still be a new
+    // local transport establishment, including after client reconstruction.
+    CHECK(a.hello(std::string(32,'a'))&&a.connection_generation()>original);
+    UsbManagementClient b(second,[&]{return now;},[&](unsigned n){now+=n;});CHECK(b.hello(std::string(32,'a'))&&b.connection_generation()>a.connection_generation());
+    b.close();CHECK(b.connection_generation()==0);
+  }
   std::cout<<"USB management framing, ACK, identity, replay refusal, time bounds, cancellation, deadline and browser revision guards passed\n";
  } catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}
 }

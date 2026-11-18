@@ -9042,7 +9042,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9118,7 +9120,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9152,7 +9156,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9180,7 +9186,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9209,7 +9217,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9243,7 +9253,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9267,7 +9279,9 @@
           "connection_generation": "2"
         },
         "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -9301,7 +9315,9 @@
             "activation": "unsupported",
             "maximum_bytes": 32768
           }
-        ]
+        ],
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -10192,7 +10208,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -10227,7 +10245,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -10262,7 +10282,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -10297,7 +10319,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -12757,7 +12781,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -12792,7 +12818,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -12827,7 +12855,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -12880,7 +12910,8 @@
         ],
         "retirements": [],
         "jobs": [],
-        "staged_revision": null
+        "staged_revision": null,
+        "wtp_binding": null
       },
       "valid": true
     },
@@ -13251,7 +13282,8 @@
         ],
         "retirements": [],
         "jobs": [],
-        "staged_revision": null
+        "staged_revision": null,
+        "wtp_binding": null
       },
       "valid": false
     },
@@ -13286,7 +13318,8 @@
             "state": "idle"
           }
         ],
-        "staged_revision": null
+        "staged_revision": null,
+        "wtp_binding": null
       },
       "valid": false
     },
@@ -14551,7 +14584,9 @@
             "maximum_bytes": 32768
           }
         ],
-        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": null,
+        "gateway": null
       }
     },
     {
@@ -14678,6 +14713,2575 @@
         "next_start_utc_ns": "1800000000000000000",
         "forecast": "unknown",
         "prolonged_window": null
+      }
+    },
+    {
+      "name": "paired Pi context",
+      "family": "target-context",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "paired gateway context",
+      "family": "target-context",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "wrong gateway pair",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "11111111111111111111111111111111",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "wrong gateway generation",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "3",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "wrong gateway child boot",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "11111111111111111111111111111111",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "gateway self route",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "gateway WTP dispatch",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station",
+            "jobs/load"
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing current authorization closure",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "gateway": null
+      }
+    },
+    {
+      "name": "local unpaired state",
+      "family": "pairing-state",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pairing-state",
+        "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "authorization_generation": "0",
+        "state": "unpaired",
+        "manager": null,
+        "window": null
+      }
+    },
+    {
+      "name": "state cannot disclose code",
+      "family": "pairing-state",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pairing-state",
+        "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "authorization_generation": "0",
+        "state": "unpaired",
+        "manager": null,
+        "window": null,
+        "code": "2345-ABCD"
+      }
+    },
+    {
+      "name": "paired state needs manager",
+      "family": "pairing-state",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pairing-state",
+        "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "authorization_generation": "0",
+        "state": "paired",
+        "manager": null,
+        "window": null
+      }
+    },
+    {
+      "name": "current pair-window-request",
+      "family": "pair-window-request",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-window",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "action": "pair",
+        "expected_authorization_generation": "0"
+      }
+    },
+    {
+      "name": "unknown major pair-window-request",
+      "family": "pair-window-request",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "pair-window",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "action": "pair",
+        "expected_authorization_generation": "0"
+      }
+    },
+    {
+      "name": "extra key pair-window-request",
+      "family": "pair-window-request",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-window",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "action": "pair",
+        "expected_authorization_generation": "0",
+        "key": "not-a-browser-key"
+      }
+    },
+    {
+      "name": "current pair-window-response",
+      "family": "pair-window-response",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-window",
+        "window_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "boot_id": "cccccccccccccccccccccccccccccccc",
+        "authorization_generation": "0",
+        "code": "2345-ABCD",
+        "expires_in_ms": 120000
+      }
+    },
+    {
+      "name": "unknown major pair-window-response",
+      "family": "pair-window-response",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "pair-window",
+        "window_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "boot_id": "cccccccccccccccccccccccccccccccc",
+        "authorization_generation": "0",
+        "code": "2345-ABCD",
+        "expires_in_ms": 120000
+      }
+    },
+    {
+      "name": "extra key pair-window-response",
+      "family": "pair-window-response",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-window",
+        "window_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "boot_id": "cccccccccccccccccccccccccccccccc",
+        "authorization_generation": "0",
+        "code": "2345-ABCD",
+        "expires_in_ms": 120000,
+        "key": "not-a-browser-key"
+      }
+    },
+    {
+      "name": "current pair-remove",
+      "family": "pair-remove",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-remove",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_authorization_generation": "2"
+      }
+    },
+    {
+      "name": "unknown major pair-remove",
+      "family": "pair-remove",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "pair-remove",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_authorization_generation": "2"
+      }
+    },
+    {
+      "name": "extra key pair-remove",
+      "family": "pair-remove",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-remove",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_authorization_generation": "2",
+        "key": "not-a-browser-key"
+      }
+    },
+    {
+      "name": "current pair-connect",
+      "family": "pair-connect",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-connect",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "discovery_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_device_id": "cccccccccccccccccccccccccccccccc",
+        "code": "2345-ABCD"
+      }
+    },
+    {
+      "name": "unknown major pair-connect",
+      "family": "pair-connect",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "pair-connect",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "discovery_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_device_id": "cccccccccccccccccccccccccccccccc",
+        "code": "2345-ABCD"
+      }
+    },
+    {
+      "name": "extra key pair-connect",
+      "family": "pair-connect",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-connect",
+        "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "discovery_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "expected_device_id": "cccccccccccccccccccccccccccccccc",
+        "code": "2345-ABCD",
+        "key": "not-a-browser-key"
+      }
+    },
+    {
+      "name": "current bounded management discovery",
+      "family": "pair-discovery",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unavailable discovery has no observations",
+      "family": "pair-discovery",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": false,
+        "discoveries": []
+      }
+    },
+    {
+      "name": "available discovery may be empty",
+      "family": "pair-discovery",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": []
+      }
+    },
+    {
+      "name": "unavailable discovery cannot contain observations",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": false,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses host evil.local.",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "evil.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses management_port 31419",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31419,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses bootstrap_port 0",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 0,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses suite SPAKE2-P256",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2-P256",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses control_schema_digest 000000000000",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses device_id dddddddddddd",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "dddddddddddddddddddddddddddddddd",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses name xxxxxxxxxxxx",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery refuses name bad\nname",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "bad\nname",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires discovery_id",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires device_id",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires boot_id",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires name",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires host",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires bootstrap_port",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires management_port",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires suite",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery requires control_schema_digest",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery has no secret extension",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51",
+            "code": "not-public"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery bounded observations",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery unique identities",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "management discovery unique handles",
+      "family": "pair-discovery",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "pair-discovery",
+        "available": true,
+        "discoveries": [
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          },
+          {
+            "discovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "device_id": "dddddddddddddddddddddddddddddddd",
+            "boot_id": "cccccccccccccccccccccccccccccccc",
+            "name": "Transmitter Pi",
+            "host": "wsprry-management-dddddddddddddddddddddddddddddddd.local.",
+            "bootstrap_port": 8080,
+            "management_port": 31418,
+            "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+            "control_schema_digest": "faa219dcd823e9f8843005e957e95d0a16bd0f1a3d49b984356f5c6d1f555b51"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paired Pi renewal required",
+      "family": "target-context",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": true
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "gateway parent renewal required",
+      "family": "target-context",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPico",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": true
+        },
+        "gateway": {
+          "parent": {
+            "device_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "boot_id": "ffffffffffffffffffffffffffffffff",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "child": {
+            "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "profile_generation": "1",
+            "connection_generation": "2"
+          },
+          "resources": [
+            "management",
+            "station"
+          ]
+        }
+      }
+    },
+    {
+      "name": "renewal indication missing",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2"
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "renewal indication string",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": "false"
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "renewal indication null",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": null
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "renewal indication number",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": 0
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "unknown renewal metadata",
+      "family": "target-context",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-context",
+        "target": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "product": "WsprryPi",
+          "name": "Local Pi",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "capability_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "capabilities": [
+          {
+            "resource": "pi-config",
+            "schema_id": "urn:wsprry:control:1:pi-config",
+            "schema_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "read": true,
+            "write": false,
+            "activation": "unsupported",
+            "maximum_bytes": 32768
+          }
+        ],
+        "configuration_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "authorization": {
+          "pair_id": "dddddddddddddddddddddddddddddddd",
+          "authorization_generation": "2",
+          "renewal_required": false,
+          "renewal_deadline": 123
+        },
+        "gateway": null
+      }
+    },
+    {
+      "name": "target-operation-review current closed",
+      "family": "target-operation-review",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-review",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-review refuses extra",
+      "family": "target-operation-review",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-review",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "extra": true
+      }
+    },
+    {
+      "name": "target-operation-review refuses readback_revision",
+      "family": "target-operation-review",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-review",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": ""
+      }
+    },
+    {
+      "name": "target-operation-review refuses operation_id",
+      "family": "target-operation-review",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-review",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-review refuses contract",
+      "family": "target-operation-review",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "target-operation-review",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-review refuses binding",
+      "family": "target-operation-review",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-review",
+        "binding": null,
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-reviewed current closed",
+      "family": "target-operation-reviewed",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-reviewed",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-reviewed refuses extra",
+      "family": "target-operation-reviewed",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-reviewed",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "extra": true
+      }
+    },
+    {
+      "name": "target-operation-reviewed refuses readback_revision",
+      "family": "target-operation-reviewed",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-reviewed",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": ""
+      }
+    },
+    {
+      "name": "target-operation-reviewed refuses operation_id",
+      "family": "target-operation-reviewed",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-reviewed",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-reviewed refuses contract",
+      "family": "target-operation-reviewed",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/2",
+        "schema": "target-operation-reviewed",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "target-operation-reviewed refuses binding",
+      "family": "target-operation-reviewed",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-operation-reviewed",
+        "binding": null,
+        "operation_id": "cccccccccccccccccccccccccccccccc",
+        "readback_revision": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "P6216 qualified legacy binding including generation zero",
+      "family": "target-migration-read",
+      "valid": true,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": "0",
+          "wtp_port": 31417,
+          "management_port": 31415
+        }
+      }
+    },
+    {
+      "name": "P6216 refuse generation overflow",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": "18446744073709551616",
+          "wtp_port": 31417,
+          "management_port": 31415
+        }
+      }
+    },
+    {
+      "name": "P6216 refuse numeric generation",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": 0,
+          "wtp_port": 31417,
+          "management_port": 31415
+        }
+      }
+    },
+    {
+      "name": "P6216 refuse zero WTP port",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": "0",
+          "wtp_port": 0,
+          "management_port": 31415
+        }
+      }
+    },
+    {
+      "name": "P6216 refuse HTTP port overflow",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": "0",
+          "wtp_port": 31417,
+          "management_port": 65536
+        }
+      }
+    },
+    {
+      "name": "P6216 refuse missing legacy binding field",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null
+      }
+    },
+    {
+      "name": "P6216 refuse extra legacy locator",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": "1",
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null,
+        "wtp_binding": {
+          "revocation_generation": "0",
+          "wtp_port": 31417,
+          "management_port": 31415,
+          "hostname": "arbitrary.example"
+        }
       }
     }
   ],

@@ -23,7 +23,7 @@ struct PicoUsbManagementChannel {
     std::shared_ptr<void> updater_lease;
     bool matches(const WtpSettings &) const;
     bool ensure(const std::string &expected_device, bool verified_update_reconnect = false,
-        std::uint64_t operation_deadline = UINT64_MAX);
+        std::uint64_t operation_deadline = UINT64_MAX,const std::function<bool()> &operation_cancelled = {});
 private:
     static std::uint64_t now();
     WtpSettings binding_;

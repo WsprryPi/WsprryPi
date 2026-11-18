@@ -2,8 +2,8 @@
 
 Status: sequencing amendment approved by the user on 2026-11-16. The user split
 phase 6 into recurrence integration (6.1) and this security gate
-(6.2) on 2026-11-16. Neither subphase has started; each requires separate execution
-authority. Use the [phase 6.2 execution prompt](06-2-pi-security.md).
+(6.2) on 2026-11-16. Phase 6.1 is accepted; phase 6.2 execution was separately authorized on
+2026-11-17. Its software implementation and qualification gates passed on 2026-11-18; see [final acceptance](phase-6-2-final-acceptance.json). Use the [phase 6.2 execution prompt](06-2-pi-security.md).
 
 The [implementation plan](phase-6-2-implementation-plan.md) expands this gate
 without authorizing implementation or changing the approved contracts.
@@ -78,7 +78,7 @@ producers and consumers under explicit companion-repository authority.
 
 ## Required work and acceptance
 
-1. Qualify a maintained provider for the approved RFC 9382/P-256 exchange, including
+1. Qualify the D62-01-approved RFC 9383 SPAKE2+/P-256 provider/profile, including
    platform support, security evidence, licensing/provenance, upgrades, and seamless
    packaging. Any substantive contract change requires separate review.
 2. Implement target-local temporary-code Pair/Replace/Remove UI, device-only key

@@ -23,6 +23,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -55,6 +56,7 @@ namespace wsprrypi {
 static WtpExternalReconcileResult reconcile_native_external_output(const WtpManagedOutput &);
 namespace {
 std::string fixture_private_state_path;
+bool fixture_loopback_listener{};
 std::string private_state_path() {
     if(!fixture_private_state_path.empty())return fixture_private_state_path;
     const passwd* owner = getpwuid(geteuid());
@@ -78,6 +80,8 @@ public:
           selected_interface_(settings.wtp_server.interface),
           port_(settings.wtp_server_port_override.value_or(settings.wtp_server.port)),
           settings_(settings) {
+        if(fixture_loopback_listener&&settings.transmit_backend!=TransmitBackendKind::SIMULATED)
+            throw std::runtime_error("Loopback endpoint fixture requires the explicit simulated backend");
         wsprrypico::wtp::ServiceConfig caps;
 #if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
         BackendExecutionInputs inputs;
@@ -216,8 +220,8 @@ public:
         if (now < next_activation_) return;
         next_activation_ = now + std::chrono::seconds(2);
         activated_ = true;
-        const auto selected = wtp_select_station_address(
-            wtp_station_addresses(), selected_interface_);
+        const auto selected = fixture_loopback_listener?std::optional<WtpStationAddress>{{"","127.0.0.1",0}}:
+            wtp_select_station_address(wtp_station_addresses(), selected_interface_);
         if (!selected) {
             activated_ = false;
             listener_error_ = "WTP station LAN interface selection is absent or ambiguous";
@@ -237,7 +241,7 @@ public:
         // A multihomed Pi's ordinary hostname may resolve to an interface on
         // which this listener is deliberately not bound. Publish the selected
         // address under an endpoint-specific SRV target in the same group.
-        (void)publisher_.start(address_->interface_name, name, listener_->bound_port(),
+        if(!fixture_loopback_listener)(void)publisher_.start(address_->interface_name, name, listener_->bound_port(),
                                "wtp-" + device_id_ + ".local", address_->address);
     }
 
@@ -245,8 +249,8 @@ public:
         if (authority_) authority_->poll();
         std::lock_guard lock(state_mutex_);
         if (listener_ && listener_->running() && address_) {
-            const auto current = wtp_select_station_address(
-                wtp_station_addresses(), selected_interface_);
+            const auto current = fixture_loopback_listener?std::optional<WtpStationAddress>{{"","127.0.0.1",0}}:
+                wtp_select_station_address(wtp_station_addresses(), selected_interface_);
             // SO_BINDTODEVICE stores a kernel interface index. Recreating a
             // device with the same name/address still requires a fresh socket.
             if (!current || *current != *address_) {
@@ -257,6 +261,12 @@ public:
             }
         }
         if (listener_ && !listener_->running()) publisher_.stop();
+    }
+
+    std::optional<unsigned> active_port() const {
+        std::lock_guard lock(state_mutex_);
+        if(!activated_||!settings_.wtp_server.enabled||!listener_||!listener_->running())return {};
+        const auto port=listener_->bound_port();return port?std::optional<unsigned>(port):std::nullopt;
     }
 
     std::string status_json() const {
@@ -341,6 +351,9 @@ private:
     mutable std::mutex state_mutex_;
 };
 
+struct ManagementHttpListener {const void *owner{};std::string self;unsigned port{};std::function<bool()> ready;};
+std::mutex management_http_mutex;
+ManagementHttpListener management_http;
 std::mutex runtime_mutex;
 std::recursive_mutex lifecycle_mutex;
 std::shared_ptr<Runtime> runtime;
@@ -374,7 +387,13 @@ std::string private_device_state_directory(PrivateDeviceDomain domain,const std:
     if(device.size()!=32||device.find_first_not_of("0123456789abcdef")!=std::string::npos)
         throw std::runtime_error("private_device_identity_unavailable");
     std::lock_guard lifecycle(lifecycle_mutex);
-    const std::string label=domain==PrivateDeviceDomain::Recurrence?"recurrence":"controller-retirements";
+    std::string label;
+    switch(domain){
+        case PrivateDeviceDomain::Recurrence:label="recurrence";break;
+        case PrivateDeviceDomain::ControllerRetirements:label="controller-retirements";break;
+        case PrivateDeviceDomain::Pairing:label="pairing";break;
+        default:throw std::runtime_error("private_device_domain_unavailable");
+    }
     if(!fixture_private_state_path.empty())return fixture_private_state_path+"."+label+"-"+device;
     const auto owner=getpwuid(geteuid());
     if(!owner||!owner->pw_dir||!*owner->pw_dir)throw std::runtime_error("private_device_owner_unavailable");
@@ -438,6 +457,14 @@ void testing::set_wtp_pi_private_state_path(const std::string &path){
     fixture_private_state_path=path;
 }
 
+void testing::set_wtp_pi_loopback_fixture(bool enabled){
+    std::lock_guard lifecycle(lifecycle_mutex);std::lock_guard lock(runtime_mutex);
+    const auto disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+    if(runtime||pending_settings||fixture_private_state_path.empty()||!disabled||std::string_view(disabled)!="1")
+        throw std::invalid_argument("Loopback endpoint fixture requires disabled hardware and an isolated idle owner");
+    fixture_loopback_listener=enabled;
+}
+
 void poll_wtp_pi_endpoint() noexcept {
     try {
         std::lock_guard lifecycle(lifecycle_mutex);
@@ -462,6 +489,7 @@ void poll_wtp_pi_endpoint() noexcept {
 }
 
 void activate_wtp_pi_endpoint() {
+    std::lock_guard lifecycle(lifecycle_mutex);
     std::shared_ptr<Runtime> current;
     { std::lock_guard lock(runtime_mutex); current = runtime; }
     if (current) current->activate();
@@ -473,6 +501,9 @@ void stop_wtp_pi_endpoint() noexcept {
     clear_wtp_pi_control_hooks();
     std::shared_ptr<Runtime> current;
     { std::lock_guard lock(runtime_mutex); current.swap(runtime); }
+    // Read/management reservations can retain this Runtime. Withdraw its
+    // actual listener now rather than waiting for the final read reference.
+    if(current)current->withdraw();
     current.reset();
     pending_settings.reset();
 }
@@ -542,6 +573,15 @@ void wtp_pi_with_configuration(const std::function<void()>& action) {
     action();
 }
 
+void wtp_pi_publish_management_http(const void *owner,const std::string &self,unsigned port,std::function<bool()> ready){
+    if(!owner||!ready||self.size()!=32||self.find_first_not_of("0123456789abcdef")!=std::string::npos||!port||port>65535)
+        throw std::invalid_argument("actual_management_http_listener_required");
+    std::lock_guard lock(management_http_mutex);management_http={owner,self,port,std::move(ready)};
+}
+void wtp_pi_withdraw_management_http(const void *owner) noexcept{
+    try{std::lock_guard lock(management_http_mutex);if(management_http.owner==owner)management_http={};}catch(...){}
+}
+
 std::optional<PiManagementObservation> wtp_pi_management_observation(){
     std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
     if(!lifecycle.owns_lock())return {};
@@ -570,6 +610,13 @@ std::optional<PiManagementObservation> wtp_pi_management_observation(){
             // cleanup path does not save again or change scheduling.enabled.
             (void)stop_transmission_by_user_request(false);
         }};
+    if(const auto port=current->active_port();port&&!observed.first.revocation_unavailable&&!observed.first.output_unknown){
+        std::lock_guard http(management_http_mutex);
+        bool ready=false;
+        if(management_http.owner&&management_http.self==current->device_id()&&management_http.port&&management_http.ready)
+            try{ready=management_http.ready();}catch(...){/* Unavailable readiness is never a qualified binding. */}
+        if(ready)result.wtp_binding=PiWtpBinding{observed.first.revocation_generation,*port,management_http.port};
+    }
     if(current->settings().transmit_backend!=TransmitBackendKind::WTP){
         result.destination_id=current->device_id();return result;
     }

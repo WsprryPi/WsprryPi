@@ -3,6 +3,7 @@
 #include "pi_management_anchor.hpp"
 #include "pi_management_journal.hpp"
 #include "recurrence_progress.hpp"
+#include "pi_pair_initialization.hpp"
 #include <memory>
 #include <functional>
 #include <cstdint>
@@ -11,13 +12,21 @@ namespace wsprrypi {
 // Parent application owner of the complete INI/settings/receipt transaction.
 // Authorization, binding, capability and runtime admission remain the service's
 // responsibility. This class never starts work or changes execution ownership.
+class PiPairPrincipal;
+class PiPairRetiredProof;
+class PiPairResumeTargetProof;
+class PiPairResumeOutcomeProof;
+class PiPairMutationGuard;
+// Typed local crash-test checkpoints only; no operator or wire selector.
+enum class PiManagedWritePoint {BeforePrepare,Prepared,Committed,Published};
 class PiManagedStore {
 public:
     struct Operation {
         std::string principal,authorization_generation,route;
         nlohmann::json request;
     };
-    PiManagedStore(std::string ini,std::string self,PiManagementAnchor);
+    PiManagedStore(std::string ini,std::string self,PiManagementAnchor,
+        std::function<void(PiManagedWritePoint)> checkpoint = {});
     // Trusted production owner selects the fixed device-owned namespace before
     // any recovery. Standalone fixtures retain their isolated default paths.
     void bind_recurrence_storage(const std::string &path,bool previously_initialized);
@@ -27,7 +36,11 @@ public:
     void recover();
     // Explicit pre-parser boundary for absent INI or untouched installed stock.
     // Existing managed/legacy evidence is never converted into a clean install.
-    void prepare_installation(bool prior_output_history=false);
+    // The optional pairing owner receives a positive first-installation event
+    // before any API/output use. It must retain its own failure state. Pairing
+    // failure never changes this owner's recurrence safety/initialization.
+    void prepare_installation(bool prior_output_history=false,
+        const std::function<void(PiPairInitializationProof)> &pairing = {});
     bool installation_pending();
     bool migration_pending() const;
     // Explicit startup after the owning configuration validator succeeds.
@@ -44,6 +57,11 @@ public:
     // Private target-owned record. Reads never infer initialization from absence.
     nlohmann::json recurrence_authority();
     std::shared_ptr<RecurrenceProgress> recurrence_progress();
+    // Current machine principal/final admission only. Registration retains
+    // target-owned history and receipts, without changing recurrence intent,
+    // configuration generation, output permission or the physical INI.
+    nlohmann::json register_authority(const nlohmann::json &,const PiPairPrincipal &,const PiPairMutationGuard &);
+    std::optional<nlohmann::json> authority_operation(const std::string &,const PiPairPrincipal &);
     // Exact saved-candidate enable and independent drain-only disable. Never
     // changes Transmit/boot or grants manual/external execution permission.
     void persist_scheduling(const Operation &,bool enabled,const std::string &accepted_occurrence={});
@@ -55,6 +73,24 @@ public:
     // Exact retained intent, after the live owner verifies all recorded work
     // reconciled. Does not initialize an operation or write the unchanged INI.
     void complete_migration();
+    // Freeze the complete target-owned remote inventory before any callback.
+    // Signed requests are computed outside the final pairing/store locks; the
+    // complete captured record is rechecked here before the existing WAL.
+    void prepare_remote_migration(const Operation &,const nlohmann::json &captured,
+        const nlohmann::json &signed_requests,const std::optional<nlohmann::json> &pending_job = {});
+    std::optional<nlohmann::json> remote_handover();
+    // Existing committed receipt for this exact disabled candidate, independent
+    // of later metadata-only revisions. Contains no keys or configuration body.
+    std::optional<nlohmann::json> disabled_snapshot();
+    // Freeze an explicit, currently authorized handback against an actual
+    // disabled receipt. No source permission is implied until its exact ACK.
+    void prepare_remote_resume(const Operation &,const nlohmann::json &captured,
+        const PiPairResumeTargetProof &,const nlohmann::json &wtp_binding,const PiPairMutationGuard &);
+    std::optional<nlohmann::json> remote_resume(const PiPairPrincipal &);
+    nlohmann::json confirm_remote_resume(const PiPairResumeOutcomeProof &,const PiPairMutationGuard &);
+    bool handover_handoff(const nlohmann::json &request,const PiPairMutationGuard &);
+    bool confirm_handover(const PiPairRetiredProof &);
+
     // Monitor reload of our own verified INI is an observation, not a save.
     void validate_snapshot(const nlohmann::json &internal);
     std::optional<nlohmann::json> replay(const Operation &);
@@ -95,10 +131,11 @@ private:
         const std::optional<Operation> &operation = {},const std::optional<std::string> &source_revision = {});
     void publish(const nlohmann::json &candidate,const std::string &ini,
         const std::function<void()> &writer,const std::optional<Operation> &,bool authority_transition=false,
-        bool pending=false,bool write_ini=true,const std::string &complete_operation={});
+        bool pending=false,bool write_ini=true,const std::string &complete_operation={},bool metadata_only=false,const char *completion_error=nullptr);
     std::string ini_,self_,directory_,history_,source_binding_;
     PiManagementAnchor anchor_;
     PiManagementJournal journal_;
+    std::function<void(PiManagedWritePoint)> checkpoint_;
     mutable std::recursive_mutex mutex_;
     bool initialized_{},held_{true};
     bool recurrence_bound_{},require_recurrence_{};

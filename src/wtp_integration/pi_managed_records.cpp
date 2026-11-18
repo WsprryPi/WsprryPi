@@ -56,7 +56,8 @@ void validate_entries(const Json &receipts,const std::string &self,std::size_t m
     require(hex(self,32)&&receipts.is_array()&&receipts.size()<=maximum);
     std::set<std::string> ids;unsigned pending=0;
     for(const auto &entry:receipts){
-        require(fields(entry,{"principal_id","route","authorization_generation","request_digest","receipt"}));
+        auto base=entry;base.erase("disabled_snapshot");
+        require(fields(base,{"principal_id","route","authorization_generation","request_digest","receipt"}));
         require(hex(entry["principal_id"],32)&&entry["route"].is_string()&&
             !family(self,entry["route"].get<std::string>()).empty()&&decimal(entry["authorization_generation"],false)&&hex(entry["request_digest"],64));
         const auto &receipt=entry["receipt"];
@@ -65,6 +66,11 @@ void validate_entries(const Json &receipts,const std::string &self,std::size_t m
         if(unresolved(entry)){++pending;require(receipt["revision"].is_null());}
         if(receipt["state"]=="pending")require(receipt["error"].is_null());
         if(receipt["state"]=="committed")require(hex(receipt["revision"],64)&&receipt["error"].is_null());
+        if(entry.contains("disabled_snapshot")){
+            const auto &snapshot=entry["disabled_snapshot"];
+            require(fields(snapshot,{"candidate_digest","configuration_generation"})&&hex(snapshot["candidate_digest"],64)&&
+                decimal(snapshot["configuration_generation"],true)&&receipt["state"]=="committed");
+        }
     }
     require(pending<=32);
 }

@@ -1,5 +1,7 @@
 #include "wtp_integration/fleet_store.hpp"
 #include "wtp_integration/controller_retirement.hpp"
+#include "wtp_integration/controller_contract.hpp"
+#include "wtp_integration/pi_pair_contract.hpp"
 #include "wtp_integration/fleet_limits.hpp"
 #include "wtp_integration/fleet_schedule.hpp"
 #include "wtp_integration/output_lease.hpp"
@@ -171,14 +173,150 @@ void failed_manager_replacement(const std::string& ini,const std::string& self) 
     const auto fresh=wtp_fleet_api("GET","","");
     check(fresh.status==200 && Json::parse(fresh.body).at("controller_incarnation")!=previous,"corrected configuration establishes a fresh working manager");
 }
+void resume_assignment_projection(){
+    const std::string controller(32,'f'),target(32,'a');auto frozen=assignment('a');frozen["in_flight"]=true;frozen["last_start_ns"]="20";
+    auto historical=frozen;for(const auto *field:{"in_flight","last_start_ns","enabled"})historical.erase(field);
+    Json grant={{"contract","Wsprry-Pair/1"},{"schema","resume-grant"},{"operation_id",std::string(32,'1')},{"pair_id",std::string(32,'2')},
+        {"authorization_generation","3"},{"target_id",target},{"target_boot_id",std::string(32,'4')},{"controller_id",controller},
+        {"controller_incarnation",std::string(32,'5')},{"assignment_id",std::string(32,'6')},
+        {"assignment_revision",PiManagementJournal::digest(historical.dump())},{"transition_id",std::string(32,'7')},
+        {"retirement_receipt_digest",std::string(64,'8')},{"authority_generation","9"},{"disabled_revision",std::string(64,'a')},
+        {"disable_receipt_digest",std::string(64,'b')},{"candidate_digest",std::string(64,'c')},
+        {"wtp_binding",{{"revocation_generation","0"},{"wtp_port",31419},{"management_port",31416}}}};
+    const auto seal=[](Json value){value.erase("grant_digest");value["grant_digest"]=PiManagementJournal::digest(canonical_pi_management_json(value));return value;};
+    grant=seal(grant);check(valid_pi_pair_document(grant,"resume-grant"),"Current canonical grant required for pure source after-image");
+    auto live=frozen;live["last_start_ns"]="30";live["enabled"]=false;
+    const auto original_frozen=frozen,original_live=live;const auto host="wsprry-management-"+target+".local.";
+    const auto after=controller_resume_assignment(frozen,live,grant,host);
+    check(after["schedule"]==frozen["schedule"]&&after["name"]==frozen["name"]&&after["enabled"]==true&&after["in_flight"]==false&&after["last_start_ns"]=="30",
+        "Resume preserves frozen RF/schedule/enable and maximum consumed slot without reviving old in-flight work");
+    auto settings=parse_wtp_settings(after["settings"],true);check(settings.hostname==host&&settings.tcp_port==31419&&settings.transport=="network_plain"&&settings.device_id==target&&
+        after["management_port"]==31416&&after["revocation_generation"]=="0","Only approved authenticated legacy connection fields refresh, including generation zero");
+    auto expected=frozen;auto expected_settings=parse_wtp_settings(expected["settings"],true);expected_settings.hostname=host;expected_settings.tcp_port=31419;
+    expected["settings"]=wtp_settings_json(expected_settings);expected["management_port"]=31416;expected["revocation_generation"]="0";expected["in_flight"]=false;expected["last_start_ns"]="30";
+    check(after==expected&&frozen==original_frozen&&live==original_live,"Pure construction neither broadens fields nor changes historical intent");
+    auto fingerprint=after;for(const auto *field:{"in_flight","last_start_ns","enabled"})fingerprint.erase(field);
+    check(grant["assignment_revision"]!=PiManagementJournal::digest(fingerprint.dump()),"Refreshed assignment gets a fresh digest; original proof is never relabeled");
+    live["last_start_ns"]="10";check(controller_resume_assignment(frozen,live,grant,host)["last_start_ns"]=="20","Consumed frozen slot cannot move backwards");
+    auto changed=original_live;changed["schedule"]["frequency_hz"]=14097200;
+    rejects([&]{controller_resume_assignment(frozen,changed,grant,host);},"Changed RF assignment cannot consume old frozen permission");
+    changed=original_live;changed["revocation_generation"]="8";
+    rejects([&]{controller_resume_assignment(frozen,changed,grant,host);},"Unrelated connection change cannot borrow this handback");
+    changed=grant;changed["wtp_binding"]["wtp_port"]=0;changed=seal(changed);
+    rejects([&]{controller_resume_assignment(frozen,original_live,changed,host);},"Inactive binding refuses before constructing a source after-image");
+    changed=grant;changed["target_boot_id"]=std::string(32,'0');
+    rejects([&]{controller_resume_assignment(frozen,original_live,changed,host);},"Unbound changed grant digest refuses");
+    rejects([&]{controller_resume_assignment(frozen,original_live,grant,"user@arbitrary/forward");},"Connection hostname cannot supply forwarding syntax");
+}
+void resume_book_transactions(){
+    char pattern[]="/tmp/wsprrypi-resume-book-XXXXXX";const auto directory=mkdtemp(pattern);check(directory,"Private resume fixture");
+    const std::string root(directory),self(32,'f'),incarnation(32,'e'),target(32,'a');
+    struct Cleanup {std::string root;~Cleanup(){std::filesystem::remove_all(root);}} cleanup{root};
+    const auto prepare=[&](const std::string &source,const std::string &book_directory){
+        auto row=assignment('a');row["last_start_ns"]="20";row["in_flight"]=true;
+        WtpFleetStore saved(source,self);saved.update({},[&](Json &value){value["assignments"]=Json::array({row});});
+        ControllerRetirementBook book(book_directory,source,self,Json::array({row}));const auto initial=book.read(incarnation,Json::array({row}));
+        const Json command={{"contract","Wsprry-Control/1"},{"schema","controller-retirement"},{"controller_id",self},{"controller_incarnation",incarnation},
+            {"operation_id",std::string(32,'1')},{"transition_id",std::string(32,'2')},{"target_id",target},{"assignment_id",initial["assignments"][0]["assignment_id"]},
+            {"expected_assignment_revision",initial["assignments"][0]["assignment_revision"]},{"expected_retirement_generation",initial["generation"]}};
+        Json machine={{"contract","Wsprry-Pair/1"},{"schema","retirement"},{"target_id",target},{"controller_id",self},{"assignment_id",command["assignment_id"]},
+            {"transition_id",command["transition_id"]},{"assignment_revision",command["expected_assignment_revision"]},{"retirement_generation","3"},
+            {"pair_id",std::string(32,'c')},{"authorization_generation","1"},{"proof",std::string(43,'A')}};
+        book.retire(command,initial["revision"],incarnation,Json::array({row}),nullptr,machine);
+        book.confirm_idle(target,{{"device_id",target},{"boot_id",std::string(32,'d')},{"owner_id",nullptr},{"job_id",nullptr},{"output_active",false},
+            {"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}},
+            [&](const auto &request,const auto &receipt)->std::optional<Json>{auto response=request;response["schema"]="retired";
+                response["receipt_digest"]=PiManagementJournal::digest(canonical_pi_management_json(receipt));return response;});
+        const auto retired=book.read(incarnation,Json::array({row}));
+        Json grant={{"contract","Wsprry-Pair/1"},{"schema","resume-grant"},{"operation_id",std::string(32,'4')},{"pair_id",std::string(32,'c')},
+            {"authorization_generation","1"},{"target_id",target},{"target_boot_id",std::string(32,'d')},{"controller_id",self},{"controller_incarnation",incarnation},
+            {"assignment_id",command["assignment_id"]},{"assignment_revision",command["expected_assignment_revision"]},{"transition_id",command["transition_id"]},
+            {"retirement_receipt_digest",PiManagementJournal::digest(canonical_pi_management_json(retired["assignments"][0]["receipt"]))},
+            {"authority_generation","4"},{"disabled_revision",std::string(64,'a')},{"disable_receipt_digest",std::string(64,'b')},{"candidate_digest",std::string(64,'c')},
+            {"wtp_binding",{{"revocation_generation","8"},{"wtp_port",31419},{"management_port",31416}}}};
+        grant["grant_digest"]=PiManagementJournal::digest(canonical_pi_management_json(grant));return grant;
+    };
+    const auto sign=[](const auto &intent){auto ack=intent.acknowledgement();ack["proof"]=std::string(43,'A');return ack;};
+    const auto host="wsprry-management-"+target+".local.";
+    {
+        const auto source=root+"/assignments",directory=root+"/book";const auto grant=prepare(source,directory);WtpFleetStore saved(source,self);
+        const auto before=saved.snapshot();ControllerRetirementBook book(directory,source,self,before.first["assignments"]);
+        const auto old=book.read(incarnation,before.first["assignments"]);const auto intent=book.prepare_resume(grant,incarnation,before.first["assignments"],host,true);
+        check(!book.permits(target)&&!book.resume_receipt(grant)&&saved.snapshot()==before,"Planning/signing never publishes resume authority");
+        auto forged=sign(intent);forged["outcome"]="refused";
+        rejects([&]{book.publish_resume(intent,forged);},"A signer cannot substitute another outcome");
+        const auto ack=sign(intent);check(book.publish_resume(intent,ack)==ack&&book.permits(target),"One WAL decision publishes exact assignment, source disposition, anchor and receipt");
+        check(book.resume_receipt(grant)==ack,"Exact grant recovery returns its historical receipt");
+        rejects([&]{book.prepare_resume(grant,incarnation,before.first["assignments"],host,true);},"Known grant cannot be consumed twice");
+        rejects([&]{book.publish_resume(intent,ack);},"Stale publication cannot enable a second time");
+        const auto current=saved.reload();const auto expected=controller_resume_assignment(before.first["assignments"][0],before.first["assignments"][0],grant,host);
+        check(current.first["assignments"][0]==expected&&current.second!=before.second,"Trusted cache reload observes the exact refreshed source after-image");
+        const auto resumed=book.read(incarnation,current.first["assignments"]);
+        check(valid_controller_document(resumed,"controller-retirements")&&resumed["assignments"][0]["state"]=="rollback"&&
+            resumed["assignments"][0]["receipt"]==old["assignments"][0]["receipt"],"Old retirement proof remains historical beside explicit resumed disposition");
+        Json retirement={{"contract","Wsprry-Control/1"},{"schema","controller-retirement"},{"controller_id",self},{"controller_incarnation",incarnation},
+            {"operation_id",std::string(32,'5')},{"transition_id",std::string(32,'6')},{"target_id",target},{"assignment_id",grant["assignment_id"]},
+            {"expected_assignment_revision",resumed["assignments"][0]["assignment_revision"]},{"expected_retirement_generation",resumed["generation"]}};
+        auto machine=Json{{"contract","Wsprry-Pair/1"},{"schema","retirement"},{"target_id",target},{"controller_id",self},{"assignment_id",grant["assignment_id"]},
+            {"transition_id",retirement["transition_id"]},{"assignment_revision",retirement["expected_assignment_revision"]},{"retirement_generation","5"},
+            {"pair_id",std::string(32,'c')},{"authorization_generation","1"},{"proof",std::string(43,'A')}};
+        book.retire(retirement,resumed["revision"],incarnation,current.first["assignments"],nullptr,machine);
+        check(!book.permits(target)&&book.pending(target)&&book.resume_receipt(grant)==ack,"Fresh retirement closes resumed permission and retains the old grant outcome");
+        ControllerRetirementBook cold(directory,source,self,current.first["assignments"]);
+        check(!cold.permits(target)&&cold.pending(target)&&cold.resume_receipt(grant)==ack,"Current fence and historical consumed grant survive restart together");
+    }
+    for(const auto point:{RetirementWritePoint::Prepared,RetirementWritePoint::Committed,RetirementWritePoint::Published}){
+        const auto label=std::to_string(static_cast<unsigned>(point)),source=root+"/crash-source-"+label+".wtp-assignments.json",directory=root+"/crash-book-"+label;
+        const auto grant=prepare(source,directory);WtpFleetStore saved(source,self);const auto before=saved.snapshot();
+        const auto child=fork();check(child>=0,"Resume publication crash child");
+        if(!child){try{ControllerRetirementBook book(directory,source,self,before.first["assignments"],[&](auto stage){if(stage==point)_exit(77);});
+            const auto intent=book.prepare_resume(grant,incarnation,before.first["assignments"],host,true);book.publish_resume(intent,sign(intent));_exit(78);}catch(...){_exit(79);}}
+        int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==77,"Crash occurred at exact three-image decision boundary");
+        if(point==RetirementWritePoint::Committed){
+            WtpFleetTestHooks hooks;hooks.retirement_directory=directory;
+            hooks.create_target=[](auto,auto,auto)->std::unique_ptr<WtpTargetRuntime>{throw std::runtime_error("Artificial offline host; no carrier opened");};
+            hooks.revocation_status=[](auto,auto)->Json{throw std::runtime_error("Artificial offline host; no network opened");};
+            hooks.before_persist=[] {throw std::runtime_error("Preserve committed after-image during startup-order fixture");};
+            start_wtp_fleet_for_test(root+"/crash-source-"+label,self,hooks);
+            const auto actual=Json::parse(wtp_fleet_api("GET",{},{},"fleet").body);stop_wtp_fleet();
+            check(actual["assignments"].size()==1&&actual["assignments"][0]["revocation_generation"]=="8"&&actual["assignments"][0]["management_port"]==31416,
+                "Production Fleet reloads assignments changed by book recovery before creating output contexts");
+        }
+        ControllerRetirementBook recovered(directory,source,self,before.first["assignments"]);const auto current=saved.reload();const bool committed=point!=RetirementWritePoint::Prepared;
+        check(recovered.permits(target)==committed&&recovered.resume_receipt(grant).has_value()==committed,"Recovery never splits assignment permission and exact receipt");
+        check(current.first["assignments"][0]==(committed?controller_resume_assignment(before.first["assignments"][0],before.first["assignments"][0],grant,host):before.first["assignments"][0]),
+            "Prepared restores old bindings; committed/published restores the complete new after-image");
+    }
+    {
+        const auto source=root+"/replaced-source",directory=root+"/replaced-book";const auto grant=prepare(source,directory);WtpFleetStore saved(source,self);const auto before=saved.snapshot();
+        ControllerRetirementBook book(directory,source,self,before.first["assignments"]);const auto intent=book.prepare_resume(grant,incarnation,before.first["assignments"],host,true);
+        const auto image=PiManagementJournal::read_private_record(source);check(bool(image),"Capture bounded source fixture");
+        const auto replacement=source+".replacement";{std::ofstream stream(replacement);stream<<image->bytes;}check(chmod(replacement.c_str(),0600)==0&&rename(replacement.c_str(),source.c_str())==0,"Equal-byte replacement fixture");
+        rejects([&]{book.publish_resume(intent,sign(intent));},"Equal-byte file replacement cannot pass final live-owner resume CAS");
+        check(!book.permits(target)&&!book.resume_receipt(grant)&&saved.reload()==before,"CAS refusal keeps source permission and assignment unchanged");
+    }
+    {
+        const auto source=root+"/refused-source",directory=root+"/refused-book";const auto grant=prepare(source,directory);WtpFleetStore saved(source,self);const auto before=saved.snapshot();
+        ControllerRetirementBook book(directory,source,self,before.first["assignments"]);const auto intent=book.prepare_resume(grant,incarnation,before.first["assignments"],host,false);
+        check(intent.acknowledgement()["outcome"]=="refused","Positive healthy source history can durably refuse an unconsumed invalid current target view");
+        book.publish_resume(intent,sign(intent));check(!book.permits(target)&&saved.reload()==before&&book.resume_receipt(grant).has_value(),"Definite refusal preserves assignment and dispatch fence");
+    }
+}
 void controller_retirement_records() {
     char pattern[]="/tmp/wsprrypi-retirement-records-XXXXXX";const auto directory=mkdtemp(pattern);check(directory,"private retirement fixture");
     const std::string root(directory),self(32,'f'),incarnation(32,'e'),device(32,'a');
     struct Cleanup{std::string root;~Cleanup(){std::filesystem::remove_all(root);}}cleanup{root};
     auto rows=Json::array({assignment('a')});const auto source=root+"/existing-assignments";
     Json intent;
+    unsigned pairing_proofs=0;bool pairing_proof_valid=false;
+    const auto pairing=[&](PiPairInitializationProof proof){
+        ++pairing_proofs;pairing_proof_valid=proof.valid()&&proof.device_id()==self&&
+            proof.installation_id().size()==32&&proof.source()==PiPairInitializationProof::Source::ControllerEstablishment;
+        throw std::runtime_error("Artificial pairing storage failure");
+    };
     {
-        ControllerRetirementBook book(root+"/book",source,self,rows);
+        ControllerRetirementBook book(root+"/book",source,self,rows,{},pairing);
+        check(pairing_proofs==1&&pairing_proof_valid,"Positive controller establishment proof precedes use; pairing failure does not remove dispatch fences");
         const auto before=book.read(incarnation,rows);check(book.permits(device),"legacy permission established before retirement");
         const auto row=before.at("assignments").at(0);
         auto changed=rows;changed[0]["name"]="Changed saved assignment";
@@ -199,12 +337,103 @@ void controller_retirement_records() {
         auto reused=intent;reused["transition_id"]=std::string(32,'5');rejects([&]{book.retire(reused,before.at("revision"),incarnation,rows);},"operation ID reuse rejects");
     }
     {
-        ControllerRetirementBook restored(root+"/book",source,self,rows);
+        ControllerRetirementBook restored(root+"/book",source,self,rows,{},pairing);
+        check(pairing_proofs==1,"Established controller history cannot reissue fresh pairing provenance");
         check(!restored.permits(device)&&restored.pending(device),"restored enabled assignment cannot reopen retired generation");
         rejects([&]{restored.confirm_idle(device,nullptr);},"unknown completion cannot grant retirement");
         restored.confirm_idle(device,{{"device_id",device},{"boot_id",std::string(32,'1')},{"owner_id",nullptr},{"job_id",nullptr},{"output_active",false},{"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}});check(!restored.pending(device)&&!restored.permits(device),"positive idle proof keeps permanent tombstone");
     }
+    {
+        const auto directory=root+"/machine-book";auto machine_rows=rows;machine_rows.push_back(assignment('b'));
+        ControllerRetirementBook machine(directory,source,self,machine_rows);
+        const auto before=machine.read(incarnation,machine_rows);auto command=intent;
+        command["assignment_id"]=before.at("assignments").at(0).at("assignment_id");
+        command["expected_assignment_revision"]=before.at("assignments").at(0).at("assignment_revision");
+        command["expected_retirement_generation"]=before.at("generation");
+        Json request={{"contract","Wsprry-Pair/1"},{"schema","retirement"},{"controller_id",self},{"target_id",device},
+            {"assignment_id",command.at("assignment_id")},{"assignment_revision",command.at("expected_assignment_revision")},
+            {"transition_id",command.at("transition_id")},{"retirement_generation","9"},{"pair_id",std::string(32,'c')},
+            {"authorization_generation","1"},{"proof",std::string(43,'A')}};
+        check(valid_pi_pair_document(request,"retirement"),"machine retirement fixture uses current closed contract");
+        auto invalid=request;invalid["assignment_revision"]=std::string(64,'0');
+        rejects([&]{machine.retire(command,before.at("revision"),incarnation,machine_rows,nullptr,invalid);},"machine fence cannot bind another assignment digest");
+        check(machine.permits(device),"invalid machine binding refuses before fence");
+        machine.retire(command,before.at("revision"),incarnation,machine_rows,nullptr,request);
+        check(machine.machine_receipt(request)&&machine.machine_receipt(request)->at("state")=="pending","durable machine fence distinguishes pending from absence");
+        auto status=request;status["schema"]="retirement-status";status.erase("assignment_revision");status.erase("retirement_generation");
+        check(machine.machine_receipt(status)==machine.machine_receipt(request),"closed status binds retained request without unknown digest fields");
+        invalid=request;invalid["retirement_generation"]="10";
+        rejects([&]{machine.machine_receipt(invalid);},"same transition cannot change target authority generation");
+        const Json observation={{"device_id",device},{"boot_id",std::string(32,'1')},{"owner_id",nullptr},{"job_id",nullptr},
+            {"output_active",false},{"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}};
+        rejects([&]{machine.confirm_idle(device,observation);},"machine completion cannot publish without signer");
+        check(machine.pending(device),"missing signer preserves pending fence");
+        const auto signer=[&](const Json &original,const Json &receipt)->std::optional<Json>{
+            check(machine.pending(device),"signer runs outside book lock");auto response=original;response["schema"]="retired";
+            response["receipt_digest"]=PiManagementJournal::digest(canonical_pi_management_json(receipt));return response;
+        };
+        rejects([&]{machine.confirm_idle(device,observation,[&](const Json &,const Json &)->std::optional<Json>{return Json::object();});},"invalid signed response cannot commit completion");
+        check(machine.pending(device),"invalid signer result retains pending disposition");
+        rejects([&]{machine.confirm_idle(device,observation,[&](const Json &request,const Json &receipt)->std::optional<Json>{
+            const auto current=machine.read(incarnation,machine_rows);const auto other=current.at("assignments").at(1);
+            auto concurrent=command;concurrent["operation_id"]=std::string(32,'8');concurrent["transition_id"]=std::string(32,'9');
+            concurrent["target_id"]=other.at("target_id");concurrent["assignment_id"]=other.at("assignment_id");
+            concurrent["expected_assignment_revision"]=other.at("assignment_revision");concurrent["expected_retirement_generation"]=current.at("generation");
+            machine.retire(concurrent,current.at("revision"),incarnation,machine_rows);
+            return signer(request,receipt);
+        });},"changed before-image during signing refuses stale completion");
+        check(machine.pending(device)&&machine.pending(std::string(32,'b')),"concurrent valid fence survives refused stale signed publication");
+        machine.confirm_idle(device,observation,signer);
+        const auto response=machine.machine_receipt(status);check(response&&response->at("schema")=="retired"&&!machine.pending(device)&&!machine.permits(device),"idle fence and signed response publish together");
+        ControllerRetirementBook restored(directory,source,self,machine_rows);
+        check(restored.machine_receipt(status)==response&&!restored.permits(device),"machine receipt and permanent fence survive owner restart");
+    }
+    for(const auto point:{RetirementWritePoint::Prepared,RetirementWritePoint::Committed,RetirementWritePoint::Published}){
+        const auto directory=root+"/machine-completion-crash-"+std::to_string(static_cast<unsigned>(point));
+        ControllerRetirementBook initial(directory,source,self,rows);const auto before=initial.read(incarnation,rows);auto command=intent;
+        command["assignment_id"]=before.at("assignments").at(0).at("assignment_id");
+        command["expected_assignment_revision"]=before.at("assignments").at(0).at("assignment_revision");command["expected_retirement_generation"]=before.at("generation");
+        const Json request={{"contract","Wsprry-Pair/1"},{"schema","retirement"},{"controller_id",self},{"target_id",device},
+            {"assignment_id",command.at("assignment_id")},{"assignment_revision",command.at("expected_assignment_revision")},
+            {"transition_id",command.at("transition_id")},{"retirement_generation","9"},{"pair_id",std::string(32,'c')},
+            {"authorization_generation","1"},{"proof",std::string(43,'A')}};
+        initial.retire(command,before.at("revision"),incarnation,rows,nullptr,request);
+        const auto child=fork();check(child>=0,"fork machine retirement completion crash fixture");
+        if(!child){try{
+            ControllerRetirementBook interrupted(directory,source,self,rows,[&](RetirementWritePoint stage){if(stage==point)_exit(77);});
+            const Json observation={{"device_id",device},{"boot_id",std::string(32,'1')},{"owner_id",nullptr},{"job_id",nullptr},
+                {"output_active",false},{"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}};
+            interrupted.confirm_idle(device,observation,[](const Json &request,const Json &receipt)->std::optional<Json>{
+                auto response=request;response["schema"]="retired";response["receipt_digest"]=PiManagementJournal::digest(canonical_pi_management_json(receipt));return response;
+            });_exit(78);
+        }catch(...){_exit(79);}}
+        int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==77,"machine completion stops at intended WAL boundary");
+        ControllerRetirementBook recovered(directory,source,self,rows);const auto response=recovered.machine_receipt(request);
+        check(response.has_value()&&!recovered.permits(device),"completion crash never removes source dispatch fence");
+        check(point==RetirementWritePoint::Prepared?(recovered.pending(device)&&response->at("schema")=="operation"):(!recovered.pending(device)&&response->at("schema")=="retired"),
+            "signed receipt and retired disposition recover from one atomic decision");
+    }
     ControllerRetirementBook restarted(root+"/book",source,self,rows);check(!restarted.permits(device),"retirement survives restart");
+    {
+        const auto before=restarted.read(incarnation,rows);const auto old_receipt=before.at("assignments").at(0).at("receipt");
+        Json request={{"contract","Wsprry-Pair/1"},{"schema","retirement"},{"controller_id",self},{"target_id",device},
+            {"assignment_id",intent.at("assignment_id")},{"assignment_revision",intent.at("expected_assignment_revision")},
+            {"transition_id",std::string(32,'7')},{"retirement_generation","9"},{"pair_id",std::string(32,'c')},
+            {"authorization_generation","1"},{"proof",std::string(43,'A')}};
+        const auto fence=restarted.retired_fence(request);check(fence&&fence->at("receipt")==old_receipt,"existing permanent fence supplies its unchanged historical receipt");
+        auto response=request;response["schema"]="retired";response["receipt_digest"]=PiManagementJournal::digest(canonical_pi_management_json(old_receipt));
+        auto wrong=request;wrong["assignment_revision"]=std::string(64,'0');rejects([&]{restarted.retired_fence(wrong);},"old fence cannot qualify another immutable assignment digest");
+        rejects([&]{restarted.bind_retired(request,std::string(64,'0'),response);},"stale before-image cannot attach machine proof");
+        auto malformed=response;malformed["receipt_digest"]=std::string(64,'0');
+        rejects([&]{restarted.bind_retired(request,fence->at("revision"),malformed);},"machine proof cannot substitute another source receipt");
+        check(restarted.read(incarnation,rows)==before,"refused attachment leaves source authority unchanged");
+        restarted.bind_retired(request,fence->at("revision"),response);
+        const auto after=restarted.read(incarnation,rows);
+        check(restarted.machine_receipt(request)==std::optional<Json>(response)&&after.at("assignments").at(0).at("receipt")==old_receipt&&!restarted.permits(device),
+            "fresh target transition binds to the same permanent fence without replacing its old browser receipt");
+        ControllerRetirementBook recovered(root+"/book",source,self,rows);
+        check(recovered.machine_receipt(request)==std::optional<Json>(response)&&!recovered.permits(device),"attached proof survives restart with source dispatch still forbidden");
+    }
     rejects([&]{ControllerRetirementBook alternate(root+"/book",root+"/other-assignments",self,rows);},"alternate assignment source cannot reinterpret global book");
     for(const auto point:{RetirementWritePoint::Prepared,RetirementWritePoint::Committed,RetirementWritePoint::Published}) {
         const auto directory=root+"/crash-"+std::to_string(static_cast<unsigned>(point));
@@ -255,6 +484,8 @@ void controller_retirement_records() {
     rejects([&]{ControllerRetirementBook missing(root+"/book",source,self,rows);},"missing initialized history is not recreated");
 }
 int main(){
+    resume_assignment_projection();
+    resume_book_transactions();
     controller_retirement_records();
     {
         std::uint64_t controller=100000,transport=1000;

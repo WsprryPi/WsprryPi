@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "usb_management.hpp"
+#include <atomic>
+#include <limits>
 #include "browser_api.hpp"
 #include <algorithm>
 #include <array>
@@ -15,6 +17,8 @@
 namespace wsprrypi {
 namespace {
 using Json = nlohmann::json;
+struct AdmissionRefused {};
+PicoHttpResponse admission_refused(){return {409,R"({"contract":"Wsprry-Control/1","schema":"target-error","error":{"code":"unauthorized","retryable":false}})",{}};}
 bool identity(const std::string &s) {
   return s.size() == 32 && std::all_of(s.begin(),s.end(),[](char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
@@ -54,6 +58,7 @@ HostUtcObservation qualified_host_utc() noexcept {
 }
 UsbManagementClient::UsbManagementClient(wtp::ByteStream &stream, Clock now, Wait wait, std::function<bool()> cancelled)
     : stream_(stream), now_(std::move(now)), wait_(std::move(wait)), cancelled_(std::move(cancelled)) {}
+std::uint64_t UsbManagementClient::connection_generation() const {std::lock_guard lock(mutex_);return connected_?connection_generation_:0;}
 void UsbManagementClient::fail(const char *reason) {
   connected_ = false; session_.clear(); diagnostic_ = reason; stream_.close();
 }
@@ -67,7 +72,7 @@ Json UsbManagementClient::observation() const {
   std::lock_guard lock(mutex_);
   return {{"connected",connected_},{"target",target_},{"discovery",hello_},{"time",time_},{"diagnostic",diagnostic_}};
 }
-Json UsbManagementClient::exchange(const Json &request, std::uint64_t deadline) {
+Json UsbManagementClient::exchange(const Json &request, std::uint64_t deadline,const WriteAdmission &admit,const std::function<bool()> &cancelled) {
   const auto payload=request.dump();
   if (payload.size()>32768) throw std::runtime_error("request_too_large");
   std::vector<std::uint8_t> frame{'U','M','P','1',
@@ -79,10 +84,24 @@ Json UsbManagementClient::exchange(const Json &request, std::uint64_t deadline) 
     std::size_t offset=0;
     while (offset<bytes.size()) {
       const auto now=now_();
-      if (cancelled_ && cancelled_()) throw std::runtime_error("usb_cancelled");
+      if ((cancelled_&&cancelled_())||(cancelled&&cancelled())){
+        if(writing&&offset==0&&admit)throw AdmissionRefused{};
+        throw std::runtime_error("usb_cancelled");
+      }
       if (now<observed || now>=deadline) throw std::runtime_error("usb_deadline");
       observed=now;
-      auto result=writing?stream_.write(bytes.subspan(offset)):stream_.read(bytes.subspan(offset));
+      auto result=[&]{
+        // The callback may inspect current Pi authorization and exact physical
+        // Pico bindings. No observer or byte-stream wrapper can bypass this
+        // boundary in production or in the actual paired USB fixture.
+        const bool first=writing&&offset==0&&bool(admit);
+        auto guard=[&]()->std::optional<PiPairMutationGuard>{
+          if(!first)return {};
+          try{return admit();}catch(...){throw AdmissionRefused{};}
+        }();
+        if(first&&!guard)throw AdmissionRefused{};
+        return writing?stream_.write(bytes.subspan(offset)):stream_.read(bytes.subspan(offset));
+      }();
       if (result.state==wtp::IoState::WouldBlock) { wait_(1); continue; }
       if (result.state!=wtp::IoState::Progress || !result.count || result.count>bytes.size()-offset)
         throw std::runtime_error("usb_unavailable");
@@ -113,11 +132,11 @@ Json UsbManagementClient::exchange(const Json &request, std::uint64_t deadline) 
       !result.at("target").is_object()) throw std::runtime_error("invalid_usb_response");
   return result;
 }
-bool UsbManagementClient::hello(const std::string &expected_device, unsigned timeout) {
+bool UsbManagementClient::hello(const std::string &expected_device, unsigned timeout,const std::function<bool()> &cancelled) {
   std::lock_guard lock(mutex_);
   try {
     connected_=false; target_=nullptr; session_.clear(); next_id_=1;
-    auto response=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","hello"}},now_()+std::min(timeout,2000U));
+    auto response=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","hello"}},now_()+std::min(timeout,2000U),{},cancelled);
     const auto &target=response.at("target");
     if (response.at("status")!=200 || response.at("delivery_required")!=false || target.size()!=3 ||
         target.value("scope","")!="member" || !identity(target.value("device_id","")) ||
@@ -126,19 +145,23 @@ bool UsbManagementClient::hello(const std::string &expected_device, unsigned tim
     hello_=strict_browser_json(response.at("body").get<std::string>());
     if (!hello_.is_object() || hello_.value("schema","")!="usb-management-discovery/1")
       throw std::runtime_error("unsupported_usb_management");
+    static std::atomic_uint64_t generations{0};auto generation=generations.load();
+    do{if(generation==std::numeric_limits<std::uint64_t>::max())throw std::runtime_error("usb_connection_exhausted");}
+    while(!generations.compare_exchange_weak(generation,generation+1));
+    connection_generation_=generation+1;
     target_=target; session_=response.at("session"); connected_=true; diagnostic_.clear(); return true;
   } catch (const std::exception &e) { fail(e.what()); return false; }
 }
 PicoHttpResponse UsbManagementClient::request_locked(const std::string &path,const std::string &method,
     const std::string &body,const std::string &revision,unsigned timeout,
-    const std::function<void()> &response_observed) {
+    const std::function<void()> &response_observed,const WriteAdmission &admit,const std::function<bool()> &cancelled) {
   if (!connected_) return {409,R"({"error":{"code":"usb_management_required"}})",{}};
   bool mutation=method!="GET";
   try {
     if (++next_id_>2147483647U) throw std::runtime_error("usb_session_exhausted");
     const auto deadline=now_()+std::min(timeout,10000U);
     auto response=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","request"},
-      {"session",session_},{"target",target_},{"method",method},{"path",path},{"body",body},{"if_match",revision}},deadline);
+      {"session",session_},{"target",target_},{"method",method},{"path",path},{"body",body},{"if_match",revision}},deadline,mutation?admit:WriteAdmission{},cancelled);
     if (response.at("session")!=session_ || response.at("target")!=target_ || response.at("delivery_required")!=true)
       throw std::runtime_error("usb_binding_mismatch");
     PicoHttpResponse result{response.at("status").get<unsigned>(),response.at("body").get<std::string>(),response.at("etag").get<std::string>()};
@@ -146,18 +169,28 @@ PicoHttpResponse UsbManagementClient::request_locked(const std::string &path,con
     // The ACK cannot move the instant already sampled on the Pico.
     if (response_observed) response_observed();
     auto ack=exchange({{"schema","usb-management/1"},{"id",next_id_},{"operation","ack"},
-      {"session",session_},{"target",target_}},deadline);
+      {"session",session_},{"target",target_}},deadline,{},cancelled);
     if (ack.at("session")!=session_ || ack.at("target")!=target_ || ack.at("status")!=200 || ack.at("delivery_required")!=false)
       throw std::runtime_error("usb_ack_unconfirmed");
     diagnostic_.clear(); return result;
+  } catch (const AdmissionRefused &) {
+    // No request byte reached the carrier. Keep the verified physical session;
+    // this is a definite refusal, not an accepted or uncertain operation.
+    return admission_refused();
   } catch (const std::exception &e) {
     fail(e.what());
     return {503,Json{{"error",{{"code",mutation?"management_outcome_unknown":"usb_unavailable"}}},{"mutation_attempted",mutation}}.dump(),{}};
   }
 }
 PicoHttpResponse UsbManagementClient::request(const std::string &path,const std::string &method,
-    const std::string &body,const std::string &revision,unsigned timeout) {
-  std::lock_guard lock(mutex_); return request_locked(path,method,body,revision,timeout);
+    const std::string &body,const std::string &revision,unsigned timeout,const std::function<bool()> &cancelled) {
+  std::lock_guard lock(mutex_); return request_locked(path,method,body,revision,timeout,{},{},cancelled);
+}
+PicoHttpResponse UsbManagementClient::request_guarded(const std::string &path,const std::string &method,
+    const std::string &body,const std::string &revision,unsigned timeout,const WriteAdmission &admit,const std::function<bool()> &cancelled) {
+  std::lock_guard lock(mutex_);
+  if(method!="GET"&&!admit)return admission_refused();
+  return request_locked(path,method,body,revision,timeout,{},admit,cancelled);
 }
 bool UsbManagementClient::synchronize(const std::function<HostUtcObservation()> &observe) {
   std::lock_guard lock(mutex_);

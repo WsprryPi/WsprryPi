@@ -56,6 +56,17 @@ bool generation(const nlohmann::json &v){
   const auto r=std::from_chars(s.data(),s.data()+s.size(),n);
   return !s.empty()&&s[0]!='0'&&n&&r.ec==std::errc{}&&r.ptr==s.data()+s.size();
 }
+void validate_remote_management(const std::string &device,const nlohmann::json &row){
+    if(!identity(device)||!row.is_object()||row.size()!=6)throw std::runtime_error("Invalid remote management enrollment");
+    for(const auto *key:{"parent_id","profile_id","profile_generation","pair_id","authorization_generation","product"})
+      if(!row.contains(key)||!row[key].is_string())throw std::runtime_error("Invalid remote management enrollment");
+    if(!identity(row["parent_id"].get<std::string>())||!identity(row["profile_id"].get<std::string>())||!identity(row["pair_id"].get<std::string>())||
+        !generation(row["profile_generation"])||!generation(row["authorization_generation"])||
+        (row["product"]!="WsprryPi"&&row["product"]!="WsprryPico")||
+        (row["product"]=="WsprryPi"?(row["parent_id"]!=device):(row["parent_id"]==device)))
+      throw std::runtime_error("Invalid remote management binding");
+
+}
 WtpCatalogProfile parse(const nlohmann::json &value,bool private_profile=true) {
   if (!value.is_object() || value.size() != (private_profile?7:6))
     throw std::runtime_error("Invalid WTP catalog profile");
@@ -150,7 +161,7 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     if(errno!=ENOENT)throw std::runtime_error("WTP catalog is unreadable");
     guard_missing_management_catalog(path_);
     nlohmann::json fresh={{"version",2},{"generation","1"},{"profiles",nlohmann::json::array()},
-        {"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr}};
+        {"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr},{"remote_management",nlohmann::json::object()}};
     if(active) {
       WtpCatalogProfile legacy{local_id(),"Current WTP device","manual","",*active,active->device_id.empty()};
       fresh["profiles"].push_back(serialize(legacy));
@@ -185,9 +196,10 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     nlohmann::json rows=nlohmann::json::array();std::uint64_t index=0;
     for(const auto &row:value["profiles"]){auto p=parse(row,false);p.generation=std::to_string(++index);rows.push_back(serialize(p));}
     value={{"version",2},{"generation",std::to_string(std::max<std::uint64_t>(1,index))},
-        {"profiles",rows},{"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr}};
+        {"profiles",rows},{"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr},{"remote_management",nlohmann::json::object()}};
   } else {
-    if(value["version"]!=2||value.size()!=7||!value.contains("generation")||!generation(value["generation"])||
+    if(value["version"]!=2||(value.size()!=7&&value.size()!=8)||
+        (value.size()==8&&!value.contains("remote_management"))||!value.contains("generation")||!generation(value["generation"])||
         !value.contains("management_history")||!value["management_history"].is_object()||value["management_history"].size()>96||
         !value.contains("management_retired")||!value["management_retired"].is_object()||
         value["management_history"].size()+value["management_retired"].size()>96||
@@ -205,6 +217,17 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
         !identity(local["device_id"].get<std::string>())||!local.contains("history_id")||!local["history_id"].is_string()||
         !identity(local["history_id"].get<std::string>())))throw std::runtime_error("Invalid Pi management history anchor");
   }
+  // The previous current format receives an empty private projection only;
+  // its exact bytes/checksum remain unchanged until an explicit publication.
+  if(!value.contains("remote_management"))value["remote_management"]=nlohmann::json::object();
+  const auto &remote=value["remote_management"];
+  if(!remote.is_object()||remote.size()>96)throw std::runtime_error("Invalid remote management enrollment");
+  for(const auto &[device,row]:remote.items())validate_remote_management(device,row);
+  std::set<std::string> retained;
+  for(const auto &[device,epoch]:value["management_history"].items()){(void)epoch;retained.insert(device);}
+  for(const auto &[device,epoch]:value["management_retired"].items()){(void)epoch;retained.insert(device);}
+  for(const auto &[device,row]:remote.items()){(void)row;retained.insert(device);}
+  if(retained.size()>96)throw std::runtime_error("Management history capacity");
   std::set<std::string> ids;std::vector<WtpSettings> settings;
   const auto counter=value["generation"].get<std::string>();
   for(const auto &item:value["profiles"]) {
@@ -315,23 +338,28 @@ PicoManagementHistoryAuthority WtpCatalog::management_history_authority(
     for(const auto &[device,epoch]:value["management_history"].items())view.epochs.emplace(device,epoch.get<std::string>());
     for(const auto &[device,epoch]:value["management_retired"].items())view.retired_epochs.emplace(device,epoch.get<std::string>());
     for(const auto &row:value["profiles"]){const auto p=parse(row);if(identity(p.settings.device_id))view.devices.insert(p.settings.device_id);}
+    for(const auto &[device,row]:value["remote_management"].items()){(void)row;view.devices.insert(device);view.remote_devices.insert(device);}
     return view;
   };
   authority.publish=[this,active](const std::string &device,const std::string &epoch){
     if(!identity(device)||!identity(epoch))throw std::runtime_error("Invalid management history anchor");
-    std::lock_guard lock(mutex_);auto value=load(active);bool enrolled=false;
+    std::lock_guard lock(mutex_);auto value=load(active);bool enrolled=value["remote_management"].contains(device);
     for(const auto &row:value["profiles"]){const auto p=parse(row);if(p.settings.device_id==device&&!p.legacy_unverified)enrolled=true;}
     if(!enrolled)throw std::runtime_error("Management target is not enrolled");
     auto &epochs=value["management_history"];
     if(epochs.contains(device)){if(epochs[device]!=epoch)throw std::runtime_error("Management history changed");return;}
     if(value["management_retired"].contains(device))throw std::runtime_error("Management history retirement pending");
-    if(epochs.size()+value["management_retired"].size()>=96)throw std::runtime_error("Management history capacity");
+    std::set<std::string> retained;
+    for(const auto *group:{"management_history","management_retired","remote_management"})
+      for(const auto &[known,row]:value[group].items()){(void)row;retained.insert(known);}
+    retained.insert(device);if(retained.size()>96)throw std::runtime_error("Management history capacity");
     epochs[device]=epoch;save(value);
   };
   authority.retire=[this,active](const std::string &device,const std::string &epoch){
     if(!identity(device)||!identity(epoch))throw std::runtime_error("Invalid management history anchor");
     std::lock_guard lock(mutex_);auto value=load(active);
     for(const auto &row:value["profiles"])if(parse(row).settings.device_id==device)throw std::runtime_error("Management target is still enrolled");
+    if(value["remote_management"].contains(device))throw std::runtime_error("Management target is still enrolled");
     auto &epochs=value["management_history"];
     if(!epochs.contains(device)){
       if(value["management_retired"].contains(device)&&value["management_retired"][device]==epoch)return;
@@ -344,12 +372,30 @@ PicoManagementHistoryAuthority WtpCatalog::management_history_authority(
     if(!identity(device)||!identity(epoch))throw std::runtime_error("Invalid management history retirement");
     std::lock_guard lock(mutex_);auto value=load(active);
     for(const auto &row:value["profiles"])if(parse(row).settings.device_id==device)throw std::runtime_error("Management target is still enrolled");
+    if(value["remote_management"].contains(device))throw std::runtime_error("Management target is still enrolled");
     if(value["management_history"].contains(device))throw std::runtime_error("Management history is still anchored");
     auto &retired=value["management_retired"];if(!retired.contains(device))return;
     if(retired[device]!=epoch)throw std::runtime_error("Management history changed");
     retired.erase(device);save(value);
   };
   return authority;
+}
+nlohmann::json WtpCatalog::remote_management(const std::optional<WtpSettings> &active){
+  std::lock_guard lock(mutex_);return load(active)["remote_management"];
+}
+bool WtpCatalog::enroll_remote_management(const RemoteManagementEnrollment &observed,const std::optional<WtpSettings> &active){
+  validate_remote_management(observed.device_,observed.metadata_);
+  std::lock_guard lock(mutex_);auto value=load(active);
+  auto &entries=value["remote_management"];const auto previous=entries.find(observed.device_);
+  if(previous!=entries.end()){
+    if((*previous)["product"]!=observed.metadata_["product"])throw std::runtime_error("Remote target product changed");
+    if(*previous==observed.metadata_)return false;
+  }
+  std::set<std::string> retained;
+  for(const auto *group:{"management_history","management_retired","remote_management"})
+    for(const auto &[device,row]:value[group].items()){(void)row;retained.insert(device);}
+  retained.insert(observed.device_);if(retained.size()>96)throw std::runtime_error("Management history capacity");
+  entries[observed.device_]=observed.metadata_;save(value);return true;
 }
 PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
     const std::optional<WtpSettings> &active) {

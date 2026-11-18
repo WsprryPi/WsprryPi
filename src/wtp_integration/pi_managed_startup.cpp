@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_startup.hpp"
+#include "recurrence_authority.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
 #include "wtp_pi_control.hpp"
@@ -34,11 +35,12 @@ struct PiManagedStartup::State {
     std::optional<ConfigIniDraftSnapshot> draft;
     std::optional<PiManagedStore::Operation> recovery_operation;
     bool recovery_attempted{};
-    State(std::string filename,std::string identity)
+    std::function<void(PiPairInitializationProof)> pairing;
+    State(std::string filename,std::string identity,std::function<void(PiPairInitializationProof)> initialize_pairing)
         :ini(std::move(filename)),self(std::move(identity)),
          input_parent(std::filesystem::canonical(std::filesystem::path(ini).has_parent_path()?std::filesystem::path(ini).parent_path():".")),
          catalog(ini+".wtp-devices.json"),
-         store(ini,self,anchor()){}
+         store(ini,self,anchor()),pairing(std::move(initialize_pairing)){}
     PiManagementAnchor anchor(){
         return {[this]{return catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).read();},
             [this](const auto &history,const auto &commit){catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).coordinate(history,commit);}};
@@ -74,8 +76,8 @@ struct PiManagedStartup::State {
         }catch(...){return false;}
     }
 };
-PiManagedStartup::PiManagedStartup(std::string ini,std::string self)
-    :state_(std::make_shared<State>(std::move(ini),std::move(self))){}
+PiManagedStartup::PiManagedStartup(std::string ini,std::string self,std::function<void(PiPairInitializationProof)> pairing)
+    :state_(std::make_shared<State>(std::move(ini),std::move(self),std::move(pairing))){}
 PiManagedStartup::~PiManagedStartup(){
     std::lock_guard lock(config_update_mutex());
     if(installed_owner!=state_.get())return;
@@ -158,11 +160,12 @@ void PiManagedStartup::prepare(){
     const auto recurrence=prepare_pi_recurrence_storage(state->self,state->ini);
     state->store.bind_recurrence_storage(recurrence.path,true);
     state->store.recover();
-    state->store.prepare_installation(recurrence.prior_output_history);
+    state->store.prepare_installation(recurrence.prior_output_history,state->pairing);
     set_legacy_recurrence_admission([state]{
         if(!state->validated||(state->phase!=State::Phase::Bootstrapping&&state->phase!=State::Phase::Ready))return LegacyRecurrenceAdmission::Held;
         const auto authority=state->store.recurrence_authority();
         if(authority["state"]=="native")return LegacyRecurrenceAdmission::Native;
+        if(recurrence_remote_resume_active(authority))return LegacyRecurrenceAdmission::Held;
         if(authority["state"]=="unclassified"||authority["state"]=="legacy"||authority["state"]=="rollback")
             return state->store.settings()["scheduling"]["enabled"]==true?LegacyRecurrenceAdmission::Open:LegacyRecurrenceAdmission::DrainAcceptedPair;
         return authority["state"]=="retiring"?LegacyRecurrenceAdmission::DrainAcceptedPair:LegacyRecurrenceAdmission::Held;

@@ -9,6 +9,11 @@ using PicoManagementExchange = std::function<PicoHttpResponse(
 // Reuse the current closed capability/descriptor validation during management-
 // only negotiation, without constructing or inspecting an execution session.
 bool pico_management_capabilities_valid(const nlohmann::json &, const std::string &carrier);
+// Pure paired-controller response check. Uses current producer shapes and
+// exact device/boot; performs no I/O or replay of a mutating adapter.
+bool pico_management_response_valid(const std::string &resource,const std::string &method,
+    const PicoHttpResponse &,const nlohmann::json &binding,const std::string &request_body = {});
+bool pico_usb_settings_response_valid(const std::string &resource,const PicoHttpResponse &,const nlohmann::json &target);
 // Existing USB-only native resources, with closed input/readback validation.
 // No authentication, WTP ownership, or wire-format translation is introduced.
 PicoHttpResponse pico_usb_settings_request(const PicoManagementExchange &,

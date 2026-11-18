@@ -165,6 +165,25 @@ def main():
                 state = json.loads(body)
                 assert state["role"] == "controller-only"
                 assert state["local_output"] is None and not state["local_transmission_available"]
+                if arguments.production_main and arguments.private_state:
+                    # The production role's explicit stable identity must retain
+                    # its own pairing owner; it has no native transmitter host.
+                    deadline = time.monotonic() + 5
+                    while True:
+                        try:
+                            pairing_status, pairing_body = request(port, "GET", "/api/control/v1/host/pairing")
+                            if pairing_status == 200:
+                                break
+                        except (OSError, http.client.HTTPException):
+                            pass
+                        assert time.monotonic() < deadline, "Controller pairing owner unavailable"
+                        time.sleep(1.0)
+                    pairing = json.loads(pairing_body)
+                    assert pairing["schema"] == "pairing-state" and pairing["device_id"] == state["device_id"]
+                    assert pairing["state"] == "unpaired" and pairing["manager"] is None
+                    assert "code" not in pairing
+                    authority = Path(str(directory / "fixture-ledger") + ".pairing-" + state["device_id"]) / "authority.json"
+                    assert authority.is_file(), "Trusted controller establishment must initialize its selected pairing history"
                 status, body = request(port, "GET", "/version")
                 assert status == 200 and "controller host" in json.loads(body)["wspr_version"]
                 devices_path = "/api/control/v1/host/devices"

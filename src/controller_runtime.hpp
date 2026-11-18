@@ -15,4 +15,6 @@ void configure_controller_only(int argc, char *argv[]);
 // identity provider. No CLI, environment, INI, or HTTP path exposes this seam.
 bool controller_only_loop(const std::string &fixture_identity = {});
 nlohmann::json controller_only_status();
+// Process-owned management boot; unavailable until the role is established.
+std::string controller_only_process_boot();
 bool controller_http_allowed(std::string_view method, std::string_view path);

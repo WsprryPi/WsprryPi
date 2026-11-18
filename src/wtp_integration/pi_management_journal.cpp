@@ -88,7 +88,7 @@ PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::m
     std::set<std::string> unique;
     const auto storage=std::filesystem::weakly_canonical(directory_);
     for(auto &[kind,path]:destinations_){
-        require(kind=="ini"||kind=="settings"||kind=="operations"||kind=="authority"||kind=="recurrence"||kind=="retirement-anchor"||kind=="legacy"||kind=="progress"||kind=="pair");
+        require(kind=="ini"||kind=="settings"||kind=="operations"||kind=="authority"||kind=="recurrence"||kind=="retirement-anchor"||kind=="legacy"||kind=="progress"||kind=="pair"||kind=="peers"||kind=="assignments");
         require(!path.empty());
         const auto owner_directory=std::filesystem::canonical(parent(path));
         struct stat owner{};
@@ -99,6 +99,12 @@ PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::m
         require(unique.insert(canonical.string()).second);
         path=canonical.string();
     }
+    // P62-05 adds this image only to the new pairing owner. It cannot be
+    // substituted for settings/progress or mixed into a transmitter save.
+    if(destinations_.contains("peers"))require(destinations_.size()==4&&destinations_.contains("pair")&&
+        destinations_.contains("operations")&&destinations_.contains("authority")&&
+        parent(destinations_.at("peers"))==parent(destinations_.at("pair"))&&
+        parent(destinations_.at("peers"))==parent(destinations_.at("operations")));
 }
 void PiManagementJournal::sync_directory(const std::string &path) const {
     const int fd=::open(path.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(fd>=0);const auto result=::fsync(fd);::close(fd);require(!result);
@@ -136,6 +142,28 @@ PiManagementJournal::Observation PiManagementJournal::read_ini_input(const std::
     std::lock_guard lock(mutex);
     const auto file=read_file(path,false);require(file.has_value());
     return {file->bytes,file->signature};
+}
+std::optional<PiManagementJournal::Observation> PiManagementJournal::read_private_record(const std::string &path){
+    std::lock_guard lock(mutex);
+    const auto file=read_file(path,true);if(!file)return {};
+    return Observation{file->bytes,file->signature};
+}
+PiManagementJournal::Observation PiManagementJournal::publish_private_record(const std::string &path,
+    const std::optional<Observation> &expected,const std::string &bytes){
+    std::lock_guard lock(mutex);
+    const auto owner_directory=std::filesystem::canonical(parent(path));
+    struct stat owner{};
+    require(!::lstat(owner_directory.c_str(),&owner)&&S_ISDIR(owner.st_mode)&&owner.st_uid==geteuid()&&!(owner.st_mode&0022));
+    const auto name=std::filesystem::path(path).filename();require(!name.empty()&&name!="."&&name!="..");
+    const auto destination=(owner_directory/name).string();
+    const auto before=read_file(destination,true);
+    require(bool(before)==bool(expected));
+    if(before)require(before->bytes==expected->bytes&&before->signature==expected->signature);
+    write_file(destination,bytes,0600,false);
+    const auto descriptor=::open(owner_directory.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(descriptor>=0);
+    const auto synced=::fsync(descriptor),closed=::close(descriptor);require(!synced&&!closed);
+    const auto after=read_file(destination,true);require(after&&after->bytes==bytes);
+    return {after->bytes,after->signature};
 }
 void PiManagementJournal::write_decision(const Json &data){validate(data);write_file(wal_,data.dump(),0600,false);sync_directory(directory_);}
 void PiManagementJournal::clean_images(const std::optional<Json> &retained){
@@ -187,6 +215,7 @@ void PiManagementJournal::prepare(const std::vector<Image> &images,const std::op
     for(const auto &image:images){
         require(destinations_.contains(image.kind)&&kinds.insert(image.kind).second&&image.bytes.size()<=maximum_bytes);
         auto file=read_file(destinations_.at(image.kind),image.kind!="ini",true);require(hash(file)==image.expected_old_digest);
+        if(image.expected_old_signature)require(file&&file->signature==*image.expected_old_signature);
         data["records"].push_back({{"kind",image.kind},{"old_digest",file?Json(digest(file->bytes)):Json(nullptr)},{"new_digest",digest(image.bytes)},{"staged_name",fresh()}});old.push_back(std::move(file));
     }
     validate(data);require(data.dump().size()<=maximum_bytes);

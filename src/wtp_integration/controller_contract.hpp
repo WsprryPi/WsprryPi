@@ -4,6 +4,10 @@
 #include "network_http.hpp"
 #include <string_view>
 namespace wsprrypi {
+// Trusted owner-supplied closed schema only. The document never selects its
+// own schema or authority. Used by independent Pair/1 structural validation.
+bool valid_closed_contract_document(const nlohmann::json &,const nlohmann::json &rule,
+    const nlohmann::json &definitions);
 // Closed controller documents from the authoritative Pico Control/1 owner.
 // Parsing/duplicate/header/origin checks precede this shape validator.
 bool valid_controller_document(const nlohmann::json &,std::string_view name);

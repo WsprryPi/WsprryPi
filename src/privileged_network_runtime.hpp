@@ -4,6 +4,11 @@
 
 #include <optional>
 #include <string>
+#include <mutex>
+
+// Short final-admission/publication gate. Never hold across DNS, transport,
+// PAKE, service reloads or worker joins. Configuration precedes this gate.
+std::mutex &privileged_network_admission_mutex();
 
 struct PrivilegedNetworkRuntimeState {
     PrivilegedNetworkMode configured = PrivilegedNetworkMode::enforced;

@@ -12706,7 +12706,9 @@
         "binding",
         "capability_revision",
         "capabilities",
-        "configuration_revision"
+        "configuration_revision",
+        "authorization",
+        "gateway"
       ],
       "properties": {
         "contract": {
@@ -12733,6 +12735,26 @@
         },
         "configuration_revision": {
           "$ref": "#/$defs/target-digest"
+        },
+        "authorization": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pair-authorization"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gateway": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pair-gateway-binding"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -16017,7 +16039,8 @@
         "controllers",
         "retirements",
         "jobs",
-        "staged_revision"
+        "staged_revision",
+        "wtp_binding"
       ],
       "properties": {
         "contract": {
@@ -16082,6 +16105,16 @@
           "anyOf": [
             {
               "$ref": "#/$defs/target-digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wtp_binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pi-wtp-binding"
             },
             {
               "type": "null"
@@ -16271,6 +16304,481 @@
           "items": {
             "$ref": "#/$defs/controller-retirement-entry"
           }
+        }
+      }
+    },
+    "pair-authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "authorization_generation",
+        "renewal_required"
+      ],
+      "properties": {
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "renewal_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pair-gateway-resource": {
+      "enum": [
+        "amplifier-timing",
+        "ap",
+        "application",
+        "configuration",
+        "filter-selector",
+        "gpio-drive",
+        "gpio-drive-progress",
+        "gps",
+        "gray-line",
+        "hardware",
+        "hostname",
+        "logging",
+        "management",
+        "network",
+        "pins",
+        "pins/validate",
+        "progress",
+        "progress/apply",
+        "progress/update",
+        "restart",
+        "si5351",
+        "station",
+        "udp-logging",
+        "udp-logging/capabilities",
+        "udp-logging/test",
+        "udp-logging/test/capabilities",
+        "wifi"
+      ]
+    },
+    "pair-gateway-binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parent",
+        "pair_id",
+        "authorization_generation",
+        "child",
+        "resources"
+      ],
+      "properties": {
+        "parent": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "child": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "resources": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pair-gateway-resource"
+          }
+        }
+      }
+    },
+    "pair-manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "name"
+      ],
+      "properties": {
+        "device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "x-maxUtf8Bytes": 80,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+          "x-noControls": true
+        }
+      }
+    },
+    "pair-browser-window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "window_id",
+        "expires_in_ms"
+      ],
+      "properties": {
+        "window_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expires_in_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120000
+        }
+      }
+    },
+    "pairing-state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "device_id",
+        "boot_id",
+        "authorization_generation",
+        "state",
+        "manager",
+        "window"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pairing-state"
+        },
+        "device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "state": {
+          "enum": [
+            "unpaired",
+            "paired",
+            "access_recovery",
+            "unavailable"
+          ]
+        },
+        "manager": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pair-manager"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pair-browser-window"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "pair-window-request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "action",
+        "expected_authorization_generation"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pair-window"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "action": {
+          "enum": [
+            "pair",
+            "replace",
+            "recover"
+          ]
+        },
+        "expected_authorization_generation": {
+          "$ref": "#/$defs/target-counter"
+        }
+      }
+    },
+    "pair-window-response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "window_id",
+        "device_id",
+        "boot_id",
+        "authorization_generation",
+        "code",
+        "expires_in_ms"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pair-window"
+        },
+        "window_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 9,
+          "pattern": "^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{4}-?[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{4}$"
+        },
+        "expires_in_ms": {
+          "const": 120000
+        }
+      }
+    },
+    "pair-remove": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "expected_authorization_generation"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pair-remove"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        }
+      }
+    },
+    "pair-connect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "discovery_id",
+        "expected_device_id",
+        "code"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pair-connect"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "discovery_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 4096
+        }
+      }
+    },
+    "pair-discovery-entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "discovery_id",
+        "device_id",
+        "boot_id",
+        "name",
+        "host",
+        "bootstrap_port",
+        "management_port",
+        "suite",
+        "control_schema_digest"
+      ],
+      "properties": {
+        "discovery_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "x-maxUtf8Bytes": 256,
+          "x-noControls": true
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^wsprry-management-[0-9a-f]{32}\\.local\\.$",
+          "maxLength": 58
+        },
+        "bootstrap_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "management_port": {
+          "const": 31418
+        },
+        "suite": {
+          "const": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+        },
+        "control_schema_digest": {
+          "$ref": "#/$defs/target-digest"
+        }
+      }
+    },
+    "pair-discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "available",
+        "discoveries"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "pair-discovery"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "discoveries": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/pair-discovery-entry"
+          }
+        }
+      }
+    },
+    "target-operation-review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "binding",
+        "operation_id",
+        "readback_revision"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "target-operation-review"
+        },
+        "binding": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "readback_revision": {
+          "$ref": "#/$defs/target-digest"
+        }
+      }
+    },
+    "target-operation-reviewed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "binding",
+        "operation_id",
+        "readback_revision"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Control/1"
+        },
+        "schema": {
+          "const": "target-operation-reviewed"
+        },
+        "binding": {
+          "$ref": "#/$defs/target-binding"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "readback_revision": {
+          "$ref": "#/$defs/target-digest"
+        }
+      }
+    },
+    "pi-wtp-binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revocation_generation",
+        "wtp_port",
+        "management_port"
+      ],
+      "properties": {
+        "revocation_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "wtp_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "management_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
         }
       }
     }
@@ -16980,7 +17488,15 @@
       "target-migration-read",
       "controller-retirement",
       "controller-retirement-operation",
-      "controller-retirements"
+      "controller-retirements",
+      "pairing-state",
+      "pair-window-request",
+      "pair-window-response",
+      "pair-remove",
+      "pair-connect",
+      "pair-discovery",
+      "target-operation-review",
+      "target-operation-reviewed"
     ],
     "definitions": [
       "target-id",
@@ -17029,7 +17545,22 @@
       "controller-retirement",
       "controller-retirement-operation",
       "controller-retirement-entry",
-      "controller-retirements"
+      "controller-retirements",
+      "pair-authorization",
+      "pair-gateway-resource",
+      "pair-gateway-binding",
+      "pair-manager",
+      "pair-browser-window",
+      "pairing-state",
+      "pair-window-request",
+      "pair-window-response",
+      "pair-remove",
+      "pair-connect",
+      "pair-discovery-entry",
+      "pair-discovery",
+      "target-operation-review",
+      "target-operation-reviewed",
+      "pi-wtp-binding"
     ],
     "browser_session": "host/management-session",
     "reconciliation_reads": {
@@ -17056,14 +17587,20 @@
       "GET": [
         "host/readiness",
         "host/configuration-recovery",
-        "host/retirements"
+        "host/retirements",
+        "host/pairing",
+        "host/pairing/discovery",
+        "host/pairing/operations/{operation_id}"
       ],
       "PUT": [
         "host/configuration-recovery"
       ],
       "POST": [
         "host/configuration-recovery",
-        "host/retirements"
+        "host/retirements",
+        "host/pairing/window",
+        "host/pairing/remove",
+        "host/pairing/connect"
       ]
     }
   },

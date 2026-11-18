@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 #include "pico_target_controller.hpp"
+#include "pi_pair_history.hpp"
 #include "wtp_settings_json.hpp"
 #include "controller_contract.hpp"
 #include "control_contract.hpp"
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #include <array>
+#include <algorithm>
 #include <charconv>
 namespace wsprrypi {
 namespace {
@@ -25,8 +27,8 @@ PicoTargetReply failure(unsigned status,const char *code) {
 std::string carrier(const WtpSettings &s) {return s.transport=="usb"?"usb_physical":s.transport=="network"?"engineering_mtls":"consumer_station";}
 }
 std::shared_mutex &pico_management_catalog_gate(){static std::shared_mutex gate;return gate;}
-PicoTargetController::PicoTargetController(WtpCatalog &catalog,Active active,std::string directory,std::string identity,Fixtures fixtures)
-    :catalog_(catalog),active_(std::move(active)),fixtures_(std::move(fixtures)),directory_(std::move(directory)),identity_(std::move(identity)) {
+PicoTargetController::PicoTargetController(WtpCatalog &catalog,Active active,std::string directory,std::string identity,Fixtures fixtures,std::string parent_boot)
+    :catalog_(catalog),active_(std::move(active)),fixtures_(std::move(fixtures)),directory_(std::move(directory)),identity_(std::move(identity)),parent_boot_(std::move(parent_boot)) {
     if(!wsprrypi::identity(identity_))throw std::invalid_argument("Controller identity required");
 }
 std::shared_ptr<PicoTargetController::Entry> PicoTargetController::selected(const std::string &device,const std::string &profile,bool create) {
@@ -72,6 +74,37 @@ bool PicoTargetController::current(const Entry &entry) {
         return fingerprint(catalog_.profile(entry.profile.id,revision,active_()))==entry.fingerprint;
     }catch(...){return false;}
 }
+bool PicoTargetController::negotiate_attached_usb(const std::string &profile,const PiPairPrincipal &principal,PiPairHistory &history,const std::function<bool()> &cancelled){
+    try{
+        if((cancelled&&cancelled())||!identity(parent_boot_)||!identity(profile)||principal.self_id()!=identity_||!history.management_authorization(principal))return false;
+        std::shared_lock gate(pico_management_catalog_gate(),std::try_to_lock);if(!gate.owns_lock())return false;
+        if(connections_.fetch_add(1)>=4){connections_.fetch_sub(1);return false;}
+        struct Release {std::atomic<unsigned> &n;~Release(){n.fetch_sub(1);}} release{connections_};
+        const auto [snapshot,revision]=catalog_.snapshot(active_());(void)snapshot;
+        const auto candidate=catalog_.profile(profile,revision,active_());
+        if(candidate.legacy_unverified||candidate.settings.transport!="usb"||candidate.settings.device_id==identity_)return false;
+        auto target_admission=PicoManagementJournal::target_admission(directory_,candidate.settings.device_id);if(!target_admission)return false;
+        const auto entry=selected(candidate.settings.device_id,profile,true);
+        std::unique_lock operation(entry->operation,std::try_to_lock);if(!operation.owns_lock()||!current(*entry))return false;
+        auto cancellation=entry->context->scoped_cancellation(cancelled);
+        const auto &pair=principal.identity();
+        const bool same=entry->gateway_parent==principal.self_id()&&entry->gateway_pair==pair.pair_id&&entry->gateway_generation==pair.authorization_generation;
+        if(entry->enrolled.load()&&same){
+            const bool verified=entry->context->authorized()&&history.management_authorization(principal).has_value()&&
+                entry->context->management_state()["carrier"]=="usb_physical";
+            if(!verified)entry->enrolled.store(false);
+            return verified;
+        }
+        entry->enrolled.store(false);
+        if(entry->context->disconnect().status!=200)return false;
+        if(entry->context->connect("usb_physical").status!=200)return false;
+        if(!history.management_authorization(principal)||!current(*entry)){
+            entry->context->cancel();return false;
+        }
+        entry->gateway_parent=principal.self_id();entry->gateway_pair=pair.pair_id;entry->gateway_generation=pair.authorization_generation;
+        entry->enrolled.store(true);return true;
+    }catch(...){return false;}
+}
 void PicoTargetController::catalog_changed() {
     std::vector<std::shared_ptr<Entry>> retired;
     {
@@ -89,10 +122,21 @@ void PicoTargetController::catalog_changed() {
 }
 PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const std::string &profile,
     const std::string &context,const std::string &operation) {
+    return handle_impl(request,profile,context,operation,nullptr,nullptr,{});
+}
+PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const std::string &profile,
+    const std::string &context,const std::string &operation,const PiPairPrincipal &principal,PiPairHistory &history,const std::function<bool()> &cancelled) {
+    return handle_impl(request,profile,context,operation,&principal,&history,cancelled);
+}
+PicoTargetReply PicoTargetController::handle_impl(const BrowserRequest &request,const std::string &profile,
+    const std::string &context,const std::string &operation,const PiPairPrincipal *principal,PiPairHistory *history,const std::function<bool()> &cancelled) {
+    if(cancelled&&cancelled())return failure(503,"authority_pending");
+    const bool paired=principal&&history;
+    if(paired&&!history->management_authorization(*principal))return failure(403,"unauthorized");
     if(request.body.size()>32768)return failure(413,"payload_too_large");
     if((!profile.empty()&&!identity(profile))||(!context.empty()&&!identity(context))||
         (!operation.empty()&&!identity(operation))||(request.method=="GET"&&!request.body.empty()))return failure(400,"invalid_shape");
-    if(request.method!="GET"&&!request.mutation_context)return failure(403,"csrf_failed");
+    if(request.method!="GET"&&!paired&&!request.mutation_context)return failure(403,"csrf_failed");
     const std::string prefix="/api/control/v1/targets/";
     std::shared_lock binding_gate(pico_management_catalog_gate(),std::try_to_lock);
     if(!binding_gate.owns_lock())return failure(409,"profile_changed");
@@ -102,6 +146,8 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
         for(const auto &[device,entry]:entries)if(current(*entry)&&entry->enrolled.load()) {
             std::unique_lock operation_lock(entry->operation,std::try_to_lock);if(!operation_lock.owns_lock())return failure(429,"capacity");
             const auto bound=entry->context->binding();if(bound.is_null())continue;
+            if(paired&&(entry->profile.settings.transport!="usb"||entry->context->management_state()["carrier"]!="usb_physical"||entry->context->management_state()["connected"]!=true||
+                entry->gateway_parent!=principal->self_id()||entry->gateway_pair!=principal->identity().pair_id||entry->gateway_generation!=principal->identity().authorization_generation))continue;
             targets.push_back({{"device_id",device},{"product","WsprryPico"},{"name",entry->profile.name},
                 {"profile_generation",bound["profile_generation"]},{"connection_generation",bound["connection_generation"]}});
         }
@@ -113,12 +159,22 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
     const auto device=request.path.substr(prefix.size(),32);
     if(!identity(device)||request.path[prefix.size()+32]!='/')return failure(404,"unsupported_resource");
     const auto suffix=request.path.substr(prefix.size()+33);
+    auto target_admission=PicoManagementJournal::target_admission(directory_,device);if(!target_admission)return failure(409,"capacity");
     const bool management=suffix=="pico/management";
-    if(!suffix.starts_with("pico/")&&!suffix.starts_with("operations/"))return failure(404,"unsupported_resource");
+    const bool gateway_context=paired&&request.method=="GET"&&suffix=="context";
+    const bool review=paired&&request.method=="POST"&&suffix.size()==50&&suffix.starts_with("operations/")&&suffix.ends_with("/review")&&identity(suffix.substr(11,32));
+    // The paired connection cannot select a carrier, log into another Pico or
+    // turn this Pi into an arbitrary network forwarding endpoint.
+    if(!gateway_context&&!suffix.starts_with("pico/")&&!suffix.starts_with("operations/"))return failure(404,"unsupported_resource");
     if(connections_.fetch_add(1)>=4){connections_.fetch_sub(1);return failure(429,"capacity");}
     struct Release {std::atomic<unsigned> &n;~Release(){n.fetch_sub(1);}} release{connections_};
     try {
         Json action;
+        if(review){
+            action=strict_browser_json(request.body,16);
+            if(!valid_controller_document(action,"target-operation-review")||action["operation_id"]!=suffix.substr(11,32)||action["binding"]["device_id"]!=device)
+                return failure(400,"invalid_shape");
+        }
         if(management&&request.method=="POST") {
             if(request.body.size()>512)return failure(413,"payload_too_large");
             action=strict_browser_json(request.body,16);
@@ -126,6 +182,7 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
             if(!action.is_object()||action.value("contract",Json(nullptr))!="Wsprry-Control/1"||!action.contains("action")||!action["action"].is_string())return failure(400,"invalid_shape");
             action.erase("contract");
             const auto name=action["action"].get<std::string>();
+            if(paired&&name!="reconcile")return failure(404,"unsupported_resource");
             if(name=="connect") {
                 if(action.size()!=4||!action.contains("carrier")||!action["carrier"].is_string()||!action.contains("host")||!action["host"].is_string()||!action.contains("password")||!action["password"].is_string())return failure(400,"invalid_shape");
             } else if(name=="reconcile") {
@@ -135,14 +192,19 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
                 // carrier, endpoint, password, selection and proof scope types.
             } else if((name!="usb_physical"&&name!="engineering_mtls"&&name!="disconnect")||action.size()!=1)return failure(400,"invalid_shape");
         } else if(management&&request.method!="GET")return failure(405,"unsupported_resource");
-        if(management&&context.empty()&&profile.empty())return failure(428,"profile_changed");
-        const auto entry=selected(device,profile,management&&context.empty());
+        if(management&&!paired&&context.empty()&&profile.empty())return failure(428,"profile_changed");
+        const auto entry=selected(device,profile,!paired&&management&&context.empty());
         if(!entry)return failure(409,"connection_changed");
         std::unique_lock operation_lock(entry->operation,std::try_to_lock);
         if(!operation_lock.owns_lock())return failure(409,"capacity");
+        auto cancellation=entry->context->scoped_cancellation(cancelled);
         if(!current(*entry)){entry->context->cancel();return failure(409,"profile_changed");}
-        if(!context.empty()&&context!=entry->context->id())return failure(409,"connection_changed");
-        if(!management&&context.empty())return failure(428,"connection_changed");
+        if(paired&&(entry->profile.settings.transport!="usb"||!entry->enrolled.load()||entry->context->management_state()["carrier"]!="usb_physical"||entry->context->management_state()["connected"]!=true||
+            entry->gateway_parent!=principal->self_id()||entry->gateway_pair!=principal->identity().pair_id||entry->gateway_generation!=principal->identity().authorization_generation))return failure(403,"unauthorized");
+        // Fresh context observation is authorized by the actual parent pair,
+        // not by an old editor token. Ordinary resource calls still fence it.
+        if(!gateway_context&&!context.empty()&&context!=entry->context->id())return failure(409,"connection_changed");
+        if(!gateway_context&&!management&&context.empty())return failure(428,"connection_changed");
         PicoTargetReply reply;reply.context=entry->context->id();
         const auto metadata=[&](bool verified) {
             const bool connected=entry->enrolled.load()&&(verified||entry->context->authorized());
@@ -152,6 +214,31 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
                 {"connected",connected},{"host",selected_carrier=="consumer_ap"?"192.168.4.1":entry->profile.settings.hostname},
                 {"selection_id",entry->context->id()},{"session",native.is_object()?native["session"]:Json(nullptr)}}.dump(),{}};
         };
+        if(gateway_context){
+            if(!identity(parent_boot_))return failure(503,"authority_pending");
+            const auto resources=entry->context->gateway_resources();
+            if(std::find(resources.begin(),resources.end(),Json("configuration"))==resources.end())return failure(404,"unsupported_resource");
+            auto configuration=request;configuration.path=prefix+device+"/pico/configuration";
+            const auto saved=entry->context->request(configuration,entry->context->id(),{},*principal,*history);
+            if(saved.status!=200)return {saved,{},{},{},{}};
+            const auto authorization=history->management_authorization(*principal);
+            if(!authorization||!current(*entry))return failure(403,"unauthorized");
+            const auto native=entry->context->management_state(),child=entry->context->binding();
+            if(native["connected"]!=true||native["carrier"]!="usb_physical"||child.is_null())return failure(409,"connection_changed");
+            const Json parent{{"device_id",identity_},{"boot_id",parent_boot_},{"profile_generation",principal->identity().authorization_generation},{"connection_generation","1"}};
+            const Json gateway{{"parent",parent},{"pair_id",principal->identity().pair_id},{"authorization_generation",principal->identity().authorization_generation},{"child",child},{"resources",resources}};
+            const Json target{{"device_id",device},{"product","WsprryPico"},{"name",entry->profile.name},{"profile_generation",child["profile_generation"]},{"connection_generation",child["connection_generation"]}};
+            const auto capability=PicoManagementJournal::digest(canonical_pi_management_json(Json{{"native",native["capability_revision"]},{"gateway",gateway}}));
+            const auto document=strict_browser_json(saved.body);
+            const auto revision=PicoManagementJournal::digest(canonical_pi_management_json(Json{{"configuration",document.at("config")},{"native_revision",saved.etag}}));
+            const Json result{{"contract","Wsprry-Control/1"},{"schema","target-context"},{"target",target},{"binding",child},
+                {"capability_revision",capability},{"capabilities",Json::array()},{"configuration_revision",revision},{"authorization",*authorization},{"gateway",gateway}};
+            if(!valid_controller_document(result,"target-context"))return failure(503,"invalid_shape");
+            reply.response={200,result.dump(),{}};reply.context=entry->context->id();return reply;
+        }
+        if(review){
+            reply.response=entry->context->review(action,*principal,*history);reply.context=entry->context->id();return reply;
+        }
         if(management) {
             if(request.method=="GET") {
                 // Fresh establishment performs one bounded negotiation. Do not
@@ -182,7 +269,7 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
                     name=="retire_login"?action["scope"]:Json(nullptr));
                 reply.context=entry->context->id();
             } else if(name=="reconcile"){
-                reply.response=entry->context->reconcile(action["operation_id"],action["readback_revision"]);
+                reply.response=paired?entry->context->reconcile(action["operation_id"],action["readback_revision"],*principal,*history):entry->context->reconcile(action["operation_id"],action["readback_revision"]);
                 reply.context=entry->context->id();
                 if(reply.response.status==200){reply.operation=action["operation_id"];reply.location=prefix+device+"/operations/"+reply.operation;reply.recovery_resource=entry->context->receipt_resource(reply.operation);}
             }
@@ -202,12 +289,12 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
             const auto id=suffix.substr(11);if(request.method!="GET"||!identity(id))return failure(404,"unsupported_resource");
             if(!entry->context->authorized())return failure(401,"unauthenticated");
             try {
-                const auto receipt=entry->context->receipt(id);
+                const auto receipt=paired?entry->context->receipt(id,*principal,*history):entry->context->receipt(id);
                 if(!receipt.is_null()){reply.operation=id;reply.location=prefix+device+"/operations/"+id;reply.recovery_resource=entry->context->receipt_resource(id);}
                 reply.response=receipt.is_null()?failure(404,"operation_unknown").response:PicoHttpResponse{200,receipt.dump(),{}};return reply;
             } catch(...) {return failure(503,"storage_unavailable");}
         }
-        reply.response=entry->context->request(request,context,operation);
+        reply.response=paired?entry->context->request(request,context,operation,*principal,*history):entry->context->request(request,context,operation);
         reply.context=entry->context->id();
         reply.readback_revision=entry->context->readback_revision();
         if(!operation.empty()) {

@@ -147,6 +147,9 @@ void WtpFleetStore::save(const nlohmann::json& data) {
 std::pair<nlohmann::json,std::string> WtpFleetStore::snapshot() {
     std::lock_guard lock(mutex_); load(); return {data_,wtp_catalog_revision(data_)};
 }
+std::pair<nlohmann::json,std::string> WtpFleetStore::reload(){
+    std::lock_guard lock(mutex_);loaded_=false;load();return {data_,wtp_catalog_revision(data_)};
+}
 std::pair<nlohmann::json,std::string> WtpFleetStore::update(const std::string& revision,
     const std::function<void(nlohmann::json&)>& mutation) {
     std::lock_guard lock(mutex_); load();

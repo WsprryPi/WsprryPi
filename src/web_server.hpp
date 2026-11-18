@@ -31,6 +31,7 @@
 
 #include "support_request_guard.hpp"
 #include <condition_variable>
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -42,7 +43,7 @@
 class SupportBundleJobManager;
 class PrivilegedNetworkAdmin;
 namespace httplib { class Server; struct Response; }
-namespace wsprrypi { class Rp1GpclkRouteService; }
+namespace wsprrypi { class Rp1GpclkRouteService; class PiPairRuntime; }
 
 /**
  * @class WebServer
@@ -115,6 +116,12 @@ public:
 private:
     friend class WebServerNetworkLifecycleTest;
 
+    void start_pairing_supervisor();
+    void stop_pairing_supervisor() noexcept;
+    std::mutex pairing_mutex_;
+    std::shared_ptr<wsprrypi::PiPairRuntime> pairing_runtime_;
+    std::thread pairing_thread_;
+    std::atomic_bool pairing_stopping_{true};
     int port_;                         ///< Port on which the server listens.
     bool loopback_fixture_{};
     // Declared before svr so route captures are destroyed before the manager.

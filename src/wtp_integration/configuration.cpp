@@ -6,6 +6,7 @@
 #include "consumer_radio.hpp"
 #include "browser_api.hpp"
 #include "control_contract.hpp"
+#include "controller_contract.hpp"
 #include "../WTP-Client/include/wtp/codec.hpp"
 #include <algorithm>
 #include <set>
@@ -669,9 +670,7 @@ void shared_application(const Json &j, const Json &target, bool usb = false) {
     for (unsigned slot=fa;slot<86400;slot+=pa) require(slot < fb || (slot-fb)%pb != 0,"invalid_remote_resource");
   }
 }
-void pin_choices(const Json &j) {
-  require(fields(j,{"choices","active"}) && plan_valid(j["active"]), "invalid_remote_pins");
-  const auto &c = j["choices"];
+void pin_choice_values(const Json &c) {
   require(fields(c,{"schema","numbering","eligible_gps","i2c_pairs","indicator_choices","activation_supported","adapter_support"}) &&
       c["schema"] == "pins" && c["numbering"] == "pico_gp" && c["eligible_gps"] == eligible &&
       c["indicator_choices"] == Json::array({"onboard_led","external","disabled"}) && c["activation_supported"] == true &&
@@ -685,6 +684,10 @@ void pin_choices(const Json &j) {
     require(p == Json{{"id",i},{"controller",pairs[i][0]},{"sda_gp",pairs[i][1]},{"scl_gp",pairs[i][2]}}, "unsupported_pin_capabilities",409);
   }
   for (const auto &gp : c["eligible_gps"]) require(gp.is_number_integer(),"invalid_remote_pins");
+}
+void pin_choices(const Json &j) {
+  require(fields(j,{"choices","active"}) && plan_valid(j["active"]), "invalid_remote_pins");
+  pin_choice_values(j["choices"]);
 }
 }
 namespace {
@@ -1395,5 +1398,67 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
   } catch (...) {
     return {502,Json{{"error",{{"code",attempted ? "management_outcome_unknown" : "invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};
   }
+}
+bool pico_management_response_valid(const std::string &resource,const std::string &method,const PicoHttpResponse &response,
+    const Json &binding,const std::string &request_body){
+    try{
+        static const auto controller_definitions=Json::parse(controller_document_definitions());
+        require(valid_closed_contract_document(binding,controller_definitions["target-binding"],controller_definitions)&&response.body.size()<=32768);
+        const auto device=binding["device_id"].get<std::string>(),boot=binding["boot_id"].get<std::string>();
+        const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+        if(resource=="wifi"||resource=="hostname"||resource=="logging"||resource=="restart"||resource=="ap")
+            return pico_usb_settings_response_valid(resource,response,target);
+        require(response.status==200);const auto document=strict_browser_json(response.body,16);
+        require(document.is_object()&&document.value("contract",Json(nullptr))=="Wsprry-Control/1");
+        if(resource=="network")return etag(response.etag)&&valid_pico_network_observation(document);
+        auto value=document;value.erase("contract");
+        if(method=="GET"&&(resource=="application"||resource=="station"||resource=="hardware"||resource=="pins")){
+            require(etag(response.etag)&&fields(value,{"schema","target","carrier","profile_generation","profile_owned_station","application","pin_choices","control_capabilities","member_context"})&&
+                value["schema"]=="member-resources"&&value["target"]==target&&value["carrier"]=="usb_physical"&&value["profile_generation"].is_null()&&value["profile_owned_station"]==false);
+            const auto member=value["member_context"].get<std::string>();
+            require(member.size()>=34&&member.size()<=53&&member[32]==':'&&member.substr(0,32).find_first_not_of("0123456789abcdef")==std::string::npos&&
+                member[33]!='0'&&decimal(member.substr(33)));
+            shared_application(value["application"],target,true);pin_choice_values(value["pin_choices"]);
+            const auto &caps=value["control_capabilities"];require(caps.is_object()&&caps.size()<=6);
+            for(const auto &[name,descriptor]:caps.items()){
+                require(name=="gpio_drive"||name=="amplifier_enable"||name=="amplifier_timing"||name=="filter_selector"||name=="si5351"||name=="gps");
+                require(supported_descriptor(descriptor,name));
+            }
+            return true;
+        }
+        if(resource=="configuration"){
+            return etag(response.etag)&&fields(value,{"schema","target","config","update_strategy","configuration_updates","application","reboot_required"})&&
+                value["schema"]=="pico-settings"&&value["target"]==target&&(value["config"].is_null()||shape(value["config"],false,true))&&
+                value["update_strategy"]=="merge"&&supported_descriptor(value["configuration_updates"],"configuration_updates")&&
+                (value["application"].is_null()||application_shape(value["application"],target,true))&&
+                (value["reboot_required"].is_null()||value["reboot_required"].is_boolean());
+        }
+        if(resource=="progress"||resource=="progress/update"||resource=="gpio-drive-progress"){
+            (void)progress_readback(response,target,resource=="progress/update"||(resource=="gpio-drive-progress"&&method=="PUT"));
+            return true;
+        }
+        if(resource=="progress/apply")return etag(response.etag)&&fields(value,{"config"},{"reboot_required"})&&shape(value["config"],false,true)&&
+            (!value.contains("reboot_required")||value["reboot_required"].is_boolean());
+        if(resource=="pins"){pin_choices(value);return true;}
+        if(resource=="pins/validate"){
+            const auto input=control_document(request_body),expected=review_plan(normalized_plan(input));
+            return value==expected;
+        }
+        static const auto definitions=Json::parse(pico_management_response_definitions());
+        Json rule;
+        if(resource=="station"||resource=="hardware"||resource=="application")rule=definitions["application"]["$defs"][resource+"_read"];
+        else if(resource=="gpio-drive")rule=definitions["gpio-drive"]["$defs"]["read"];
+        else if(resource=="amplifier-timing")rule=definitions["amplifier-timing-resource"];
+        else if(resource=="filter-selector")rule=definitions["filter-selector-resource"];
+        else if(resource=="gps"||resource=="si5351"||resource=="gray-line"||resource=="udp-logging/capabilities"||resource=="udp-logging/test/capabilities"){
+            const auto family=resource=="udp-logging/capabilities"?"udp-logging-capabilities":resource=="udp-logging/test/capabilities"?"udp-logging-test-capabilities":resource;
+            rule=definitions[family];
+        }else if(resource=="udp-logging")rule=definitions["udp-logging"]["oneOf"][0];
+        else if(resource=="udp-logging/test")rule=definitions["udp-logging-test"]["oneOf"][1];
+        else return false;
+        if(resource!="pins"&&document.value("target",Json(nullptr))!=target)return false;
+        return (resource=="udp-logging/test"||resource.ends_with("/capabilities")||etag(response.etag))&&
+            valid_closed_contract_document(document,rule,definitions);
+    }catch(...){return false;}
 }
 } // namespace wsprrypi

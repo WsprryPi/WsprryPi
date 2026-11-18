@@ -11,6 +11,8 @@ struct PicoManagementHistoryView {
     std::map<std::string,std::string> epochs;
     std::map<std::string,std::string> retired_epochs;
     std::set<std::string> devices;
+    // Existing private remote index membership, never browser authority.
+    std::set<std::string> remote_devices{};
 };
 struct PicoManagementHistoryAuthority {
     std::function<PicoManagementHistoryView()> read;

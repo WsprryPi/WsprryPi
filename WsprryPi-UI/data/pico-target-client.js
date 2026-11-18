@@ -2,6 +2,7 @@
 (function (root) {
     'use strict';
     const registry = root.WsprryControl || (typeof require === 'function' ? require('./control-contract.js') : null);
+    const documents = root.ConfigurationRecoveryClient || (typeof require === 'function' ? require('./configuration-recovery-client.js') : null);
     const identity = value => typeof value === 'string' && /^[0-9a-f]{32}$/.test(value);
     const generation = value => typeof value === 'string' && /^[1-9][0-9]{0,19}$/.test(value) && BigInt(value) <= 18446744073709551615n;
     const session = (value,device) => value === null || value !== null && typeof value === 'object' && !Array.isArray(value) &&
@@ -57,25 +58,39 @@
         }
         async function open(profile) {
             if (!profile || !identity(profile.id) || !identity(profile.settings?.['Device ID'])) throw new TargetRequestError('saved_profile_required');
-            const device = profile.settings['Device ID'], profileId = profile.id;
+            const device = profile.settings['Device ID'], profileId = profile.id, managed = profile.managed === true;
             const prefix = base + '/targets/' + device;
-            const response = await fetch(prefix + '/pico/management', {credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'X-WsprryPi-Profile-ID':profileId}});
+            const profileHeaders = managed ? {} : {'X-WsprryPi-Profile-ID':profileId};
+            let binding = null, scope = profileId, parentDevice = null;
+            const initialHeaders = {...profileHeaders};
+            if (managed) {
+                const reply = await fetch(prefix + '/context',{credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});
+                const context = await documents.readControllerDocument(reply,'target-context');
+                const token = reply.headers.get('X-WsprryPi-Target-Context');
+                if (!identity(token) || context.target.product !== 'WsprryPico' || context.binding.device_id !== device ||
+                    context.authorization === null || context.gateway === null || context.capabilities.length !== 0) throw new TargetRequestError('target_context_unavailable');
+                binding = structuredClone(context.binding);parentDevice = context.gateway.parent.device_id;
+                scope = JSON.stringify([context.gateway.parent.device_id,context.authorization.pair_id,context.authorization.authorization_generation]);
+                initialHeaders['X-WsprryPi-Target-Context'] = token;
+            }
+            const response = await fetch(prefix + '/pico/management', {credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000),headers:initialHeaders});
             let state = await response.json();
             const initial = response.headers.get('X-WsprryPi-Target-Context');
-            if (!response.ok || !management(state,initial,device)) throw new TargetRequestError('target_context_unavailable');
+            if (!response.ok || !management(state,initial,device) || managed && (!state.connected || state.carrier !== 'usb_physical')) throw new TargetRequestError('target_context_unavailable');
             let context = initial, retired = false;
             const handle = {
-                device, profileId,
+                device, profileId, managed, scope, parentDevice,
                 get state() {return state;},
                 get context() {return context;},
                 retire() {retired = true;},
                 async request(resource, {method = 'GET',body,revision = '',memberContext = ''} = {}) {
                     if (retired) throw new TargetRequestError('connection_changed');
                     if (!registry.controllerAdapter.pico_routes[method]?.includes(resource)) throw new TargetRequestError('unsupported_resource');
+                    if (managed && resource === 'management' && method !== 'GET') throw new TargetRequestError('unsupported_resource');
                     const mutation = method !== 'GET', settingsWrite = mutation && !['management','pins/validate'].includes(resource);
                     if (settingsWrite && !revision) throw new TargetRequestError('revision_required');
                     const captured = context, operation = settingsWrite ? id() : '';
-                    const headers = {'X-WsprryPi-Profile-ID':profileId,'X-WsprryPi-Target-Context':captured};
+                    const headers = {...profileHeaders,'X-WsprryPi-Target-Context':captured};
                     if (mutation) {
                         headers['X-WsprryPi-CSRF'] = await browserSession();
                         headers['Content-Type'] = 'application/json'; headers['X-WsprryPico-Request'] = '1';
@@ -94,6 +109,7 @@
                             ...(mutation ? {body:JSON.stringify({...body,contract:registry.contract})} : {})
                         });
                         const value = await reply.json(), hint = recovery(reply,device);
+                        if (settingsWrite && reply.ok && reply.headers.get('X-WsprryPi-Operation-ID') !== operation) throw new TargetRequestError('invalid_operation_metadata');
                         const next = reply.headers.get('X-WsprryPi-Target-Context');
                         if (next !== null && !identity(next)) throw new TargetRequestError('invalid_context_metadata');
                         // A superseded in-flight reply can still resolve its own
@@ -135,9 +151,26 @@
                     if (retired || captured !== context || !checked.response.ok || !state.connected) throw new TargetRequestError('connection_changed');
                     return target.profile_generation;
                 },
+                async review(operation,readback) {
+                    if (!managed || retired || !binding || !identity(operation) || !/^[0-9a-f]{64}$/.test(readback)) throw new TargetRequestError('connection_changed');
+                    const captured = context, token = await browserSession();
+                    if (retired || context !== captured) throw new TargetRequestError('connection_changed');
+                    const reply = await fetch(prefix + '/operations/' + operation + '/review',{
+                        method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000),
+                        headers:{'Content-Type':'application/json','X-WsprryPico-Request':'1','X-WsprryPi-CSRF':token,'X-WsprryPi-Target-Context':captured},
+                        body:JSON.stringify({contract:registry.contract,schema:'target-operation-review',binding,operation_id:operation,readback_revision:readback})
+                    });
+                    let data;
+                    try {data = await documents.readControllerDocument(reply,'target-operation-reviewed');}
+                    catch (error) {if (error.code === 'csrf_failed') csrf = '';throw error;}
+                    if (data.operation_id !== operation || data.readback_revision !== readback || data.binding.device_id !== device ||
+                        data.binding.boot_id !== binding.boot_id || data.binding.profile_generation !== binding.profile_generation ||
+                        data.binding.connection_generation === binding.connection_generation) throw new TargetRequestError('invalid_response');
+                    retired = true;return {response:reply,data};
+                },
                 async lookup(operation) {
                     if (retired || !identity(operation)) throw new TargetRequestError('connection_changed');
-                    const reply = await fetch(prefix + '/operations/' + operation,{credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'X-WsprryPi-Profile-ID':profileId,'X-WsprryPi-Target-Context':context}});
+                    const reply = await fetch(prefix + '/operations/' + operation,{credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000),headers:{...profileHeaders,'X-WsprryPi-Target-Context':context}});
                     const data = await reply.json();
                     if (!reply.ok || !registry.validControllerDocument(data,'target-operation') || data.operation_id !== operation || data.binding.device_id !== device) throw new TargetRequestError('receipt_unavailable',{status:reply.status});
                     const hint = recovery(reply,device), prior = operations.get(device+':'+operation);

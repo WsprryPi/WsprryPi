@@ -4,9 +4,16 @@
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
 #include "version.hpp"
+#include "recurrence_authority.hpp"
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/pi_managed_store.hpp"
 #include "wtp_integration/pi_managed_records.hpp"
+#include "wtp_integration/pi_pair_history.hpp"
+#include "wtp_integration/controller_retirement.hpp"
+#include "wtp_integration/pi_pair_records.hpp"
+#include "wtp_integration/pi_pair_operations.hpp"
+#include "wtp_integration/pi_pair_peers.hpp"
+#include "wtp_integration/pi_pair_history_record.hpp"
 #include "wtp_integration/controller_contract.hpp"
 #include <filesystem>
 #include <fstream>
@@ -16,6 +23,7 @@
 #include <unistd.h>
 using namespace wsprrypi;
 namespace {
+using Json=nlohmann::json;
 void check(bool value,const char *message){if(!value)throw std::runtime_error(message);}
 template<class F>void refuses(F action){bool held=false;try{action();}catch(...){held=true;}check(held,"Expected refusal");}
 std::string bytes(const std::string &path){std::ifstream file(path,std::ios::binary);return {(std::istreambuf_iterator<char>(file)),{}};}
@@ -23,6 +31,31 @@ void put(const std::string &path,const std::string &value){std::ofstream file(pa
 }
 int main(int argc,char **argv){
  try{
+  if(argc==4&&std::string(argv[1])=="--pair-authority-crash"){
+      const std::string self(32,'a');const int selected=std::stoi(argv[3]);
+      PiPairHistory owner(argv[2],self,[&](auto point){if(static_cast<int>(point)==selected)_exit(73);});
+      const auto before=owner.snapshot();auto pair=parse_pi_pair_catalog(before.catalog.bytes,self);pair["authorization_generation"]="1";
+      Json entry{{"scope","device"},{"principal_id",self},{"target_id",std::string(32,'b')},{"pair_id",std::string(32,'c')},{"authorization_generation","7"},
+          {"operation_id",std::string(32,'b')},{"request_digest",std::string(64,'c')},{"state","unknown"},{"result_digest",nullptr},
+          {"unresolved",true},{"receipt",nullptr},{"continuation",nullptr}};
+      const Json pending{{"schema","pi-management-pair/1"},{"self_id",self},{"peer_id",std::string(32,'b')},{"pair_id",std::string(32,'c')},
+          {"authorization_generation","7"},{"role","manager"},{"state","pending"},{"current",nullptr},{"previous",nullptr},
+          {"pending",{{"epoch","1"},{"tls_psk",std::string(43,'A')},{"service_ms","0"},{"connections","0"}}},
+          {"receipt",nullptr},{"retirement_verifier",std::string(42,'A')+"E"}};
+      auto peers=empty_pi_pair_peers(self);peers["profiles"].push_back({{"profile_id",std::string(32,'f')},{"profile_generation","1"},
+          {"target_id",std::string(32,'b')},{"endpoint",{{"host","target.local"},{"port",31418}}},{"pair",pending},{"stage","awaiting_commit"},
+          {"initial_operation_id",std::string(32,'b')},{"initial_request_digest",std::string(64,'d')}});
+      owner.publish(before,pair,pi_pair_operations(self,Json::array({entry})).document,peers);return 3;
+  }
+  if(argc==5&&std::string(argv[1])=="--pair-init-crash"){
+      const std::string initial=argv[2],pair_root=argv[3],self(32,'a');const int selected=std::stoi(argv[4]);
+      WtpCatalog catalog(initial+".wtp-devices.json");PiManagedStore store(initial,self,catalog.pi_management_anchor(self,{}));
+      store.recover();store.prepare_installation(false,[&](PiPairInitializationProof proof){
+          (void)PiPairHistory::initialize(pair_root,std::move(proof),[&](bool space,auto point){
+              if((space?5:0)+static_cast<int>(point)==selected)_exit(73);
+          });
+      });return 3;
+  }
   if(argc==3&&std::string(argv[1])=="--recover-initial"){
       const std::string ini=argv[2],self(32,'a');WtpCatalog catalog(ini+".wtp-devices.json");
       PiManagedStore store(ini,self,catalog.pi_management_anchor(self,{}));store.recover();
@@ -279,6 +312,58 @@ int main(int argc,char **argv){
   // A first installation records its boundary before a protected setup save.
   // Test both a missing INI and the untouched template installed by the normal
   // installer. Neither is a claim about the hardware's earlier lifetime.
+  for(const auto stage:{PiPairCatalogWritePoint::Prepared,PiPairCatalogWritePoint::Committed,PiPairCatalogWritePoint::Published}){
+      const unsigned copies=stage==PiPairCatalogWritePoint::Committed?5:1;
+      for(unsigned prefix=0;prefix<copies;++prefix){
+          const auto initial=root+"/four-image-"+std::to_string(static_cast<int>(stage))+"-"+std::to_string(prefix)+".ini",pair_root=initial+".pairs";
+          WtpCatalog catalog(initial+".wtp-devices.json");PiManagedStore first(initial,self,catalog.pi_management_anchor(self,{}));
+          std::unique_ptr<PiPairHistory> history;
+          first.recover();first.prepare_installation(false,[&](PiPairInitializationProof proof){history=PiPairHistory::initialize(pair_root,std::move(proof));});
+          check(history&&history->available(),"Trusted complete four-image fixture");history.reset();
+          const auto selected=Json::parse(PiManagementJournal::read_private_record(pair_root+"/authority.json")->bytes)["namespace_id"].get<std::string>();
+          const auto ns=pair_root+".ns-"+selected;
+          const auto child=fork();check(child>=0,"Fork authoritative pairing transaction");
+          if(!child){const auto point=std::to_string(static_cast<int>(stage));execl(argv[0],argv[0],"--pair-authority-crash",pair_root.c_str(),point.c_str(),nullptr);_exit(127);}
+          int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==73,"Reached authoritative pairing WAL boundary");
+          if(stage==PiPairCatalogWritePoint::Committed){
+              const auto wal=Json::parse(PiManagementJournal::read_private_record(ns+"/transactions/transaction.json")->bytes);
+              check(wal["records"].size()==4,"Incoming/outgoing catalogs, private operations and authoritative selector share one decision");
+              const std::map<std::string,std::string> paths{{"pair",ns+"/authority.json"},{"operations",ns+"/operations.json"},{"peers",ns+"/peers.json"},{"authority",pair_root+"/authority.json"}};
+              for(unsigned i=0;i<prefix;++i){const auto &row=wal["records"][i];
+                  put(paths.at(row["kind"].get<std::string>()),PiManagementJournal::read_private_record(ns+"/transactions/"+row["staged_name"].get<std::string>()+".new")->bytes);
+              }
+          }
+          PiPairHistory recovered(pair_root,self);check(recovered.available(),"Cold owner recovers complete authoritative projections before access");
+          const auto saved=recovered.snapshot();check(saved.peers.has_value(),"Outgoing catalog is part of the authoritative snapshot");
+          const auto pair=parse_pi_pair_catalog(saved.catalog.bytes,self),operations=parse_pi_pair_operations(saved.operations.bytes,self),peers=parse_pi_pair_peers(saved.peers->bytes,self);
+          const auto metadata=parse_pi_pair_history_record(saved.authority->bytes,self);const auto committed=stage!=PiPairCatalogWritePoint::Prepared;
+          check(pair["authorization_generation"]==(committed?"1":"0")&&operations["entries"].size()==(committed?1U:0U)&&
+              metadata["authorization_generation"]==pair["authorization_generation"]&&metadata["catalog_digest"]==PiManagementJournal::digest(saved.catalog.bytes)&&
+              metadata["operations_digest"]==PiManagementJournal::digest(saved.operations.bytes)&&metadata["peers_digest"]==PiManagementJournal::digest(saved.peers->bytes)&&
+              peers["profiles"].size()==(committed?1U:0U),"Cold recovery never exposes a mixed selector, counter, incoming/outgoing catalog or receipt book");
+          if(committed)check(peers["profiles"][0]["pair"]["authorization_generation"]=="7","Remote target generation is independent of this device's incoming generation");
+          check(std::filesystem::is_empty(ns+"/transactions"),"Only a fully verified complete decision retires old secret-bearing images");
+      }
+  }
+  for(int point=0;point<10;++point){
+      const auto initial=root+"/pair-init-"+std::to_string(point)+".ini",pair_root=initial+".pair-history";
+      const auto binding=PiManagementJournal::digest((std::filesystem::canonical(root)/std::filesystem::path(initial).filename()).string());
+      put(initial+".recurrence-authority.json",recurrence_bootstrap_record(self,binding,std::string(32,'e')).dump());
+      const auto child=fork();check(child>=0,"Fork pairing initialization crash");
+      if(!child){const auto selected=std::to_string(point);execl(argv[0],argv[0],"--pair-init-crash",initial.c_str(),pair_root.c_str(),selected.c_str(),nullptr);_exit(127);}
+      int status{};check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==73,"Reached exact first-initialization publication boundary");
+      WtpCatalog catalog(initial+".wtp-devices.json");PiManagedStore restarted(initial,self,catalog.pi_management_anchor(self,{}));
+      std::unique_ptr<PiPairHistory> history;unsigned attempts=0;
+      restarted.recover();restarted.prepare_installation(false,[&](PiPairInitializationProof proof){++attempts;history=PiPairHistory::initialize(pair_root,std::move(proof));});
+      check(attempts==1&&history&&history->available()&&restarted.installation_pending(),"Actual trusted positive boundary retries interrupted empty history without changing recurrence or granting a manager");
+      check(Json::parse(history->snapshot().catalog.bytes)["active"].is_null(),"Interrupted initialization never grants a manager");
+  }
+  {
+      const auto previous=root+"/prior-output.ini";WtpCatalog prior_catalog(previous+".wtp-devices.json");
+      PiManagedStore prior(previous,self,prior_catalog.pi_management_anchor(self,{}));unsigned proofs=0;
+      prior.recover();prior.prepare_installation(true,[&](PiPairInitializationProof){++proofs;});
+      check(proofs==0&&!prior.installation_pending(),"Prior output evidence cannot issue fresh pairing provenance from absent pairing files");
+  }
   for(const auto *kind:{"absent","stock"}){
       const auto initial=root+"/installation-"+kind+".ini";
       auto internal=jConfig;internal["Meta"]["INI Filename"]=initial;
@@ -288,10 +373,73 @@ int main(int argc,char **argv){
           put(initial,stock);put(initial+".stock",stock);
       }
       WtpCatalog catalog(initial+".wtp-devices.json");PiManagedStore first(initial,self,catalog.pi_management_anchor(self,{}));
-      first.recover();first.prepare_installation();check(first.installation_pending(),"Explicit startup establishes pending installation before use");
+      unsigned proofs=0;bool proof_valid=false;std::string pairing_installation;
+      const auto pair_root=root+"/pair-history-"+kind;std::unique_ptr<PiPairHistory> pair_history;
+      const auto pairing=[&](PiPairInitializationProof proof){
+          auto moved=std::move(proof);++proofs;pairing_installation=moved.installation_id();
+          proof_valid=!proof.valid()&&moved.valid()&&moved.device_id()==self&&moved.source()==PiPairInitializationProof::Source::TransmitterInstallation;
+          pair_history=PiPairHistory::initialize(pair_root,std::move(moved));
+          throw std::runtime_error("Artificial pairing storage failure");
+      };
+      first.recover();first.prepare_installation(false,pairing);check(first.installation_pending(),"Explicit startup establishes pending installation before use");
+      check(proofs==1&&proof_valid&&!pairing_installation.empty(),"Only the trusted first boundary issues a move-only pairing proof; pairing failure leaves recurrence initialization intact");
+      check(pair_history&&pair_history->available()&&Json::parse(pair_history->snapshot().catalog.bytes)["authorization_generation"]=="0",
+          "Positive event publishes selected empty pairing history without granting a manager");
+      refuses([&]{PiPairHistory duplicate(pair_root,self);});
+      const auto selector_before=PiManagementJournal::read_private_record(pair_root+"/authority.json")->bytes;
+      const auto selected_before=Json::parse(selector_before)["namespace_id"].get<std::string>();
+      const auto pair_file=pair_root+".ns-"+selected_before+"/authority.json",operation_file=pair_root+".ns-"+selected_before+"/operations.json";
+      const auto pair_before=PiManagementJournal::read_private_record(pair_file)->bytes;
+      const auto operations_before=PiManagementJournal::read_private_record(operation_file)->bytes;pair_history.reset();
+      const auto peers_file=pair_root+".ns-"+selected_before+"/peers.json",peers_before=PiManagementJournal::read_private_record(peers_file)->bytes;
+      put(peers_file,peers_before+"\n");
+      {PiPairHistory corrupted(pair_root,self);check(!corrupted.available(),"Cold startup binds the exact outgoing catalog after-image as well as incoming state");}
+      put(peers_file,peers_before);
+      auto valid_but_changed=Json::parse(pair_before);valid_but_changed["authorization_generation"]="1";put(pair_file,valid_but_changed.dump());
+      {PiPairHistory corrupted(pair_root,self);check(!corrupted.available(),"Cold startup refuses well-shaped catalog corruption against authoritative counter/digest");}
+      put(pair_file,pair_before);auto altered_operations=Json::parse(operations_before);altered_operations["entries"]=Json::array();
+      put(operation_file,altered_operations.dump()+"\n");
+      {PiPairHistory corrupted(pair_root,self);check(!corrupted.available(),"Cold startup binds exact operation after-image bytes, including external reformatting");}
+      put(operation_file,operations_before);auto altered_selector=Json::parse(selector_before);altered_selector["authorization_generation"]="1";
+      put(pair_root+"/authority.json",altered_selector.dump());
+      {PiPairHistory corrupted(pair_root,self);check(!corrupted.available(),"Cold startup rejects a changed selector before following its namespace");}
+      put(pair_root+"/authority.json",selector_before);pair_history=std::make_unique<PiPairHistory>(pair_root,self);
+      check(pair_history->available()&&!pair_history->unclean_start(),"Restored exact authoritative images retain a clean first boundary");
+      pair_history->begin_service();const auto started=pair_history->snapshot();pair_history->begin_service();
+      check(started.authority&&pair_history->snapshot().authority->signature==started.authority->signature,
+          "Running checkpoint is idempotent and never a poll/per-connection write");
+      pair_history.reset();pair_history=std::make_unique<PiPairHistory>(pair_root,self);
+      check(pair_history->available()&&pair_history->unclean_start(),"Abrupt owner loss retains the durable renewal-due proof independently of recurrence");
+      pair_history->begin_service();pair_history->finish_service();const auto finished=pair_history->snapshot();pair_history->finish_service();
+      check(pair_history->snapshot().authority->signature==finished.authority->signature,"Orderly final checkpoint is idempotent");
+      pair_history.reset();pair_history=std::make_unique<PiPairHistory>(pair_root,self);
+      check(pair_history->available()&&!pair_history->unclean_start(),"Verified orderly shutdown clears only the restart marker");
+      first.prepare_installation(false,pairing);check(proofs==1,"Repeated preparation cannot issue another first-use proof");
       refuses([&]{first.settings();});refuses([&]{first.initialize(internal);});
       const auto record=bytes(initial+".recurrence-authority.json");
-      PiManagedStore cold(initial,self,catalog.pi_management_anchor(self,{}));cold.recover();cold.prepare_installation();
+      PiManagedStore cold(initial,self,catalog.pi_management_anchor(self,{}));cold.recover();cold.prepare_installation(false,pairing);
+      check(proofs==1,"Persisted clean provenance is not a new pairing initialization event after restart");
+      const auto selection=PiManagementJournal::read_private_record(pair_root+"/authority.json")->bytes;
+      const auto selected=Json::parse(selection)["namespace_id"].get<std::string>();
+      const auto private_catalog=pair_root+".ns-"+selected+"/authority.json";
+      check(!unlink(private_catalog.c_str())&&!pair_history->available(),"Lost selected pairing catalog holds access independently of recurrence");
+      pair_history.reset();
+      const auto sibling=pair_root+".ns-"+(selected==std::string(32,'f')?std::string(32,'e'):std::string(32,'f'));
+      check(!mkdir(sibling.c_str(),0700),"Artificial unselected history fixture");
+      put(sibling+"/authority.json",Json{{"schema","pi-management-pairs/1"},{"self_id",self},{"authorization_generation","0"},
+          {"active",nullptr},{"retired",Json::array()}}.dump());
+      {
+          PiPairHistory missing_pairing(pair_root,self);
+          check(!missing_pairing.available()&&!std::filesystem::exists(private_catalog)&&
+              PiManagementJournal::read_private_record(pair_root+"/authority.json")->bytes==selection,
+              "Restart neither recreates missing selected history nor scans a valid sibling into authority");
+      }
+      std::unique_ptr<PiPairHistory> other_event;
+      ControllerRetirementBook new_controller(pair_root+".controller",initial+".assignments",self,Json::array(),{},
+          [&](PiPairInitializationProof proof){other_event=PiPairHistory::initialize(pair_root,std::move(proof));});
+      check(other_event&&!other_event->available()&&!std::filesystem::exists(private_catalog)&&
+          PiManagementJournal::read_private_record(pair_root+"/authority.json")->bytes==selection,
+          "A fresh event from another trusted role cannot reset existing lost pairing authority");
       check(cold.installation_pending()&&bytes(initial+".recurrence-authority.json")==record,"Restart retains original installation identity without enabling output");
       auto setup=recovery_operation;setup.request["expected_revision"]=cold.recovery_revision();setup.request["operation_id"]=std::string(32,'7');
       setup.request["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
@@ -303,8 +451,10 @@ int main(int argc,char **argv){
       check(!cold.installation_pending()&&cold.settings()["scheduling"]["enabled"]==false&&
           cold.recurrence_authority()["state"]=="staged"&&cold.recurrence_authority()["staged_revision"]==cold.settings()["revision"]&&
           cold.replay(setup).has_value(),"Setup atomically stages disabled settings, authority and receipt");
+      const auto disabled=cold.disabled_snapshot();check(disabled&&(*disabled)["receipt"]==*cold.replay(setup)&&(*disabled)["candidate_digest"]==cold.settings()["candidate_digest"],
+          "Actual committed disabled setup retains its exact historical receipt and candidate without keys or a circular revision");
       PiManagedStore restarted(initial,self,catalog.pi_management_anchor(self,{}));restarted.recover();
-      check(restarted.replay(setup)==cold.replay(setup)&&restarted.recurrence_authority()==cold.recurrence_authority(),"Cold readback retains exact setup receipt and authority");
+      check(restarted.replay(setup)==cold.replay(setup)&&restarted.recurrence_authority()==cold.recurrence_authority()&&restarted.disabled_snapshot()==disabled,"Cold readback retains exact setup receipt, disabled snapshot and authority");
       check(!unlink((initial+".recurrence-authority.json").c_str()),"Delete authority fixture");
       PiManagedStore missing(initial,self,catalog.pi_management_anchor(self,{}));refuses([&]{missing.recover();});
   }

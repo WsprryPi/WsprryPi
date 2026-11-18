@@ -28,9 +28,12 @@ nlohmann::json strict_browser_json(const std::string &body, unsigned maximum_dep
   });
 }
 PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &request) {
+  return handle_impl(request,false);
+}
+PicoHttpResponse WtpBrowserApi::handle_impl(const BrowserRequest &request,bool paired) {
   if (!request.path.starts_with("/api/control/v1/")) return error(404,"not_found");
   if (request.body.size() > 32768) return error(413,"body_too_large");
-  if (request.method != "GET" && !request.mutation_context) return error(403,"origin_or_content_type");
+  if (request.method != "GET" && !paired && !request.mutation_context) return error(403,"origin_or_content_type");
   auto selected = request;
   if (request.method != "GET" &&
       request.path != "/api/control/v1/member/firmware") {
@@ -45,7 +48,7 @@ PicoHttpResponse WtpBrowserApi::handle(const BrowserRequest &request) {
       }
     } catch (...) { return error(400,"invalid_json"); }
   }
-  auto result = handle_control(selected);
+  auto result = handle_control(selected,paired);
   try {
     auto value = strict_browser_json(result.body);
     if (!value.is_object()) return error(502,"invalid_control_response");
@@ -59,9 +62,9 @@ void WtpBrowserApi::retire_management_reads() {
   usb_resource_reads_.clear();member_context_.clear();member_revision_.clear();member_selection_.clear();
   legacy_read_required_=true;alias_reads_required_={"network"};legacy_selection_.clear();alias_selections_.clear();
 }
-PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r) {
+PicoHttpResponse WtpBrowserApi::handle_control(const BrowserRequest &r,bool paired) {
   if (r.body.size() > 32768) return error(413, "body_too_large");
-  if (r.method != "GET" && !r.mutation_context) return error(403, "origin_or_content_type");
+  if (r.method != "GET" && !paired && !r.mutation_context) return error(403, "origin_or_content_type");
   if (r.method == "GET" && (r.path == "/api/control/v1/status" || r.path == "/api/control/v1/jobs")) {
     const auto host = status_();
     return {200, nlohmann::json{{"job", host.value("remote", nlohmann::json(nullptr))},

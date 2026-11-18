@@ -24,6 +24,8 @@ elif name == 'make':
     p = pathlib.Path('src/build/bin/wsprrypi')
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text('fixture executable - never execute')
+    (p.parent / 'BOTAN-LICENSE.txt').write_text('fixture upstream notice')
+    (p.parent / 'PAIRING-PROVIDER.json').write_text('{}')
     metadata = pathlib.Path('src/build/generated/build_metadata.hpp')
     metadata.parent.mkdir(parents=True, exist_ok=True)
     metadata.write_text('fixture metadata')

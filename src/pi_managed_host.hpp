@@ -10,7 +10,7 @@ namespace wsprrypi {
 class PiManagedHost {
 public:
     PiManagedHost(std::string ini,std::string self,std::string process_boot,
-        PiLocalManagementService::Observe);
+        PiLocalManagementService::Observe,std::function<void(PiPairInitializationProof)> pairing = {});
     void prepare();
     void parsed();
     bool retry_saved_configuration();
@@ -25,7 +25,11 @@ public:
     PiHostReadiness state();
     PicoHttpResponse recovery(const BrowserRequest &,bool authorized);
     PicoHttpResponse management(const BrowserRequest &,bool authorized);
+    PicoHttpResponse management(const BrowserRequest &,const PiPairPrincipal &,PiPairHistory &,std::string *readback_revision=nullptr);
+    PicoHttpResponse management(const BrowserRequest &,const LocalBrowserPrincipal &,PiPairHistory &);
     void advance_migration() noexcept;
+    void reclaim_pairing_retirements(PiPairHistory &) noexcept;
+    void advance_remote_handover(PiPairRetirementClient &,const std::function<bool()> &) noexcept;
     nlohmann::json target();
     WtpCatalog &catalog();
     const std::string &device_id() const noexcept;

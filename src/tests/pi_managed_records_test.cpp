@@ -82,6 +82,14 @@ int main(int argc,char **argv){
   check(pruned.evicted&&pruned.document["receipts"].size()==288&&pruned.document["receipts"].front()==entries[1],"Only the oldest terminal receipt is evicted");
   unsigned pending=0;for(const auto &row:pruned.document["receipts"])if(row["receipt"]["state"]=="pending")++pending;
   check(pending==32&&valid_pi_operations_record(pruned.document,self),"No unresolved receipt eviction");
+  auto disabled=entry(2000,false);disabled["disabled_snapshot"]={{"candidate_digest",saved["candidate_digest"]},{"configuration_generation","1"}};
+  const auto proof=pi_operations_record(self,Json::array({disabled}));check(valid_pi_operations_record(proof.document,self),"Closed committed disabled-snapshot metadata has no self-referential receipt hash");
+  corrupt=proof.document;corrupt["receipts"][0]["disabled_snapshot"]["configuration_generation"]="0";
+  check(!valid_pi_operations_record(corrupt,self),"Disabled snapshot requires a positive canonical settings generation");
+  corrupt=proof.document;corrupt["receipts"][0]["disabled_snapshot"]["configuration"]={};
+  check(!valid_pi_operations_record(corrupt,self),"Disabled snapshot does not retain a request/configuration body or arbitrary private fields");
+  corrupt=proof.document;corrupt["receipts"][0]["receipt"]["state"]="pending";corrupt["receipts"][0]["receipt"]["revision"]=nullptr;
+  check(!valid_pi_operations_record(corrupt,self),"Pending receipt cannot prove a committed disabled snapshot");
   auto too_many=full.document["receipts"];too_many.push_back(entry(1000,true));const auto before=too_many;
   refuses([&]{(void)pi_operations_record(self,too_many);});check(too_many==before,"Capacity refusal changes no input");
   auto duplicate=Json::array({entry(1,false),entry(1,false)});refuses([&]{(void)pi_operations_record(self,duplicate);});

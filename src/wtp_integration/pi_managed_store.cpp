@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_store.hpp"
+#include "pi_pair_contract.hpp"
+#include "pi_pair_history.hpp"
+#include "pi_pair_policy_admission.hpp"
+#include "pi_pair_records.hpp"
+#include "pi_pair_peers.hpp"
+#include "pi_pair_operations.hpp"
+#include "pi_pair_tls.hpp"
+#include "pi_pair_retirement.hpp"
+#include "pi_pair_mutation_guard.hpp"
 #include "solar_configuration.hpp"
 #include "pi_managed_records.hpp"
 #include "recurrence_authority.hpp"
@@ -20,6 +29,21 @@ namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
 void require(bool condition){if(!condition)throw std::runtime_error("pi_management_storage_hold");}
+void validate_resume_integrity(const Json &authority){
+    if(!authority.contains("management"))return;
+    const auto validate=[](const Json &value){
+        if(value.is_null())return;
+        require(valid_pi_pair_document(value["grant"],"resume-grant")&&
+            valid_controller_document(value["disabled_snapshot"]["receipt"],"target-operation")&&
+            value["grant"]["disable_receipt_digest"]==PiManagementJournal::digest(canonical_pi_management_json(value["disabled_snapshot"]["receipt"])));
+    };
+    const auto &managed=authority["management"];
+    if(managed.contains("resume"))validate(managed["resume"]);
+    if(managed.contains("handover"))validate(managed["handover"]["resume_basis"]);
+}
+bool pending_remote_resume(const Json &authority){
+    return authority.contains("management")&&authority["management"].contains("resume")&&authority["management"]["resume"]["state"]=="pending";
+}
 std::string recovery_source_revision(const std::string &self,std::uint64_t epoch,const Json &managed,
     const std::optional<PiManagementJournal::Observation> &ini){
     return PiManagementJournal::digest(canonical_pi_management_json(Json{
@@ -101,11 +125,11 @@ std::string installation_binding(const std::string &self,const std::string &inst
         {"ini",ini?Json(ini->bytes):Json(nullptr)}})).substr(0,32);
 }
 }
-PiManagedStore::PiManagedStore(std::string ini,std::string self,PiManagementAnchor anchor)
+PiManagedStore::PiManagedStore(std::string ini,std::string self,PiManagementAnchor anchor,std::function<void(PiManagedWritePoint)> checkpoint)
     :ini_(std::move(ini)),self_(std::move(self)),directory_(ini_+".pi-management"),anchor_(std::move(anchor)),
      journal_(directory_,self_,{{"ini",ini_},{"settings",ini_+".managed-settings.json"},
         {"operations",ini_+".management-operations.json"},{"authority",ini_+".wtp-devices.json"},
-        {"recurrence",ini_+".recurrence-authority.json"},{"legacy",ini_+".legacy-recurrence.json"},{"progress",ini_+".recurrence-progress-initialization.json"}}){
+        {"recurrence",ini_+".recurrence-authority.json"},{"legacy",ini_+".legacy-recurrence.json"},{"progress",ini_+".recurrence-progress-initialization.json"}}),checkpoint_(std::move(checkpoint)){
     require(anchor_.complete());
     const auto parent=std::filesystem::canonical(std::filesystem::path(ini_).has_parent_path()?std::filesystem::path(ini_).parent_path():".");
     source_binding_=PiManagementJournal::digest((parent/std::filesystem::path(ini_).filename()).string());
@@ -131,6 +155,7 @@ void PiManagedStore::load(){
         observations_.emplace("recurrence",*stored);
     }
     const bool authority=!recurrence_.is_null();
+    if(authority)validate_resume_integrity(recurrence_);
     const auto legacy=journal_.inspect("legacy");
     legacy_=legacy?parse_legacy(legacy->bytes,self_):Json(nullptr);
     if(legacy)observations_.emplace("legacy",*legacy);
@@ -144,7 +169,8 @@ void PiManagedStore::load(){
     if(!authority)require(!legacy);
     if(authority&&recurrence_["state"]=="staged")require(recurrence_["staged_revision"]==settings_["revision"]);
     validate_stored_solar(settings_["scheduling"]);
-    if(settings_["scheduling"]["solar"]["enabled"]==true)require(recurrence_["state"]=="staged"||recurrence_["state"]=="native");
+    if(settings_["scheduling"]["solar"]["enabled"]==true)require(recurrence_["state"]=="staged"||recurrence_["state"]=="native"||
+        (settings_["scheduling"]["enabled"]==false&&pending_remote_resume(recurrence_)));
     if(recurrence_["state"]=="native"){
         require(recurrence_["jobs"].empty()&&(!recurrence_["controllers"].empty()||!recurrence_["clean_proof"].is_null()));
         for(const auto &controller:recurrence_["controllers"]){
@@ -159,6 +185,8 @@ void PiManagedStore::load(){
         RecurrenceListDigests empty;empty.fill(PiManagementJournal::digest(""));progress_->recover(false,empty);
     }
     operations_=parse_pi_operations_record(observations_.at("operations").bytes,self_);
+    for(const auto &row:operations_["receipts"])if(row.contains("disabled_snapshot"))
+        require(std::stoull(row["disabled_snapshot"]["configuration_generation"].get<std::string>())<=std::stoull(settings_["configuration_generation"].get<std::string>()));
     initialized_=true;
 }
 void PiManagedStore::recover(){
@@ -228,7 +256,8 @@ void PiManagedStore::recover(){
             observations_.at("ini").bytes,[]{},{});
     }
 }
-void PiManagedStore::prepare_installation(bool prior_output_history){
+void PiManagedStore::prepare_installation(bool prior_output_history,
+    const std::function<void(PiPairInitializationProof)> &pairing){
     std::lock_guard lock(mutex_);require(!held_);
     if(initialized_||!history_.empty())return;
     const auto ini=journal_.inspect("ini");
@@ -273,6 +302,10 @@ void PiManagedStore::prepare_installation(bool prior_output_history){
         {"attestation_id",installation_binding(self_,installation,ini)}};
     history_=random.new_boot_id();
     try{
+        if(clean&&pairing){
+            try{pairing(PiPairInitializationProof(self_,installation,PiPairInitializationProof::Source::TransmitterInstallation));}
+            catch(...){/* Pairing owner retains unavailable/recovery state independently. */}
+        }
         anchor_.coordinate(history_,[&](const auto &before,const auto &after){
             const auto current=journal_.inspect("ini");
             const auto stored=journal_.inspect("recurrence");
@@ -397,12 +430,91 @@ std::uint64_t PiManagedStore::context_epoch() const {std::lock_guard lock(mutex_
 Json PiManagedStore::settings(){std::lock_guard lock(mutex_);check();return settings_;}
 Json PiManagedStore::recurrence_authority(){std::lock_guard lock(mutex_);check();return recurrence_;}
 std::shared_ptr<RecurrenceProgress> PiManagedStore::recurrence_progress(){std::lock_guard lock(mutex_);check();require(recurrence_["state"]=="native"&&bool(progress_));return progress_;}
+std::optional<Json> PiManagedStore::authority_operation(const std::string &operation,const PiPairPrincipal &principal){
+    std::lock_guard lock(mutex_);check();
+    require(principal.self_id()==self_&&principal.identity().purpose==PiPairTlsPurpose::Management);
+    if(!recurrence_.contains("management"))return {};
+    if(recurrence_["management"].contains("resume")){
+        const auto &saved=recurrence_["management"]["resume"];
+        if(saved["grant"]["operation_id"]==operation&&saved["grant"]["controller_id"]==principal.peer_id()){
+            const bool pending=saved["state"]=="pending";
+            const auto digest=pending?saved["grant"]["grant_digest"].get<std::string>():PiManagementJournal::digest(canonical_pi_management_json(saved["acknowledgement"]));
+            return Json{{"contract","Wsprry-Pair/1"},{"schema","operation"},{"operation_id",operation},
+                {"pair_id",principal.identity().pair_id},{"authorization_generation",principal.identity().authorization_generation},
+                {"request_digest",digest},{"state",pending?"pending":"committed"},{"result_digest",pending?Json(nullptr):Json(digest)}};
+        }
+    }
+    for(const auto &row:recurrence_["management"]["operations"]){const auto &receipt=row["receipt"];
+        if(receipt["operation_id"]==operation){
+            if(row["controller_id"]!=principal.peer_id()||receipt["pair_id"]!=principal.identity().pair_id||
+                receipt["authorization_generation"]!=principal.identity().authorization_generation)return {};
+            return receipt;
+        }
+    }return {};
+}
+std::size_t PiPairHistory::reclaim_native_retired(PiManagedStore &native){
+    PiPairPolicyAdmission policy;if(!policy.allowed())return 0;
+    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return 0;
+    try{
+        require(running_marked_&&service_permits()&&native.device_id()==self_);verify_selection();const auto before=store_->snapshot();
+        auto catalog=parse_pi_pair_catalog(before.catalog.bytes,self_);const auto operations=parse_pi_pair_operations(before.operations.bytes,self_);
+        // Root -> native owner; no peer wait. Revoked scopes cannot register a
+        // new assignment or grant while their complete native duties are read.
+        const auto authority=native.recurrence_authority();const auto count=catalog["retired"].size();
+        Json retained=Json::array();
+        for(const auto &pair:catalog["retired"]){
+            bool unknown=false;for(const auto &entry:operations["entries"])if(entry["pair_id"]==pair["pair_id"]&&
+                entry["authorization_generation"]==pair["authorization_generation"]&&(entry["unresolved"]==true||!entry["continuation"].is_null()))unknown=true;
+            if(unknown||!recurrence_retirement_scope_closed(authority,pair["pair_id"].get<std::string>(),pair["authorization_generation"].get<std::string>()))retained.push_back(pair);
+        }
+        if(retained.size()==count)return 0;
+        catalog["retired"]=std::move(retained);auto peers=parse_pi_pair_peers(before.peers->bytes,self_);
+        require(publish_outgoing(before,catalog,operations,peers));return count-catalog["retired"].size();
+    }catch(...){return 0;}
+}
+Json PiManagedStore::register_authority(const Json &request,const PiPairPrincipal &principal,const PiPairMutationGuard &){
+    std::lock_guard lock(mutex_);check();
+    require(valid_pi_pair_document(request,"authority-register")&&principal.identity().purpose==PiPairTlsPurpose::Management&&principal.self_id()==self_&&
+        request["target_id"]==self_&&request["controller_id"]==principal.peer_id()&&request["pair_id"]==principal.identity().pair_id&&
+        request["authorization_generation"]==principal.identity().authorization_generation);
+    if(recurrence_.contains("management")&&recurrence_["management"].contains("resume")&&
+        recurrence_["management"]["resume"]["grant"]["operation_id"]==request["operation_id"])throw std::runtime_error("request_id_reuse");
+    const auto digest=PiManagementJournal::digest(canonical_pi_management_json(request));
+    if(recurrence_.contains("management"))for(const auto &row:recurrence_["management"]["operations"])if(row["receipt"]["operation_id"]==request["operation_id"]){
+        const auto retained=authority_operation(request["operation_id"].get<std::string>(),principal);
+        if(!retained||(*retained)["request_digest"]!=digest)throw std::runtime_error("request_id_reuse");
+        return *retained;
+    }
+    const Json receipt{{"contract","Wsprry-Pair/1"},{"schema","operation"},{"operation_id",request["operation_id"]},
+        {"pair_id",request["pair_id"]},{"authorization_generation",request["authorization_generation"]},{"request_digest",digest},
+        {"state","committed"},{"result_digest",digest}};
+    const auto previous=recurrence_;
+    const bool eviction=recurrence_.contains("management")&&recurrence_["management"]["operations"].size()==256;
+    require(!eviction||context_epoch_<std::numeric_limits<std::uint64_t>::max());
+    recurrence_=recurrence_authority_registration(recurrence_,request,receipt,history_);
+    const Json candidate{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
+    try{publish(candidate,observations_.at("ini").bytes,[]{},{},false,false,false,{},true);}
+    catch(...){if(!held_)recurrence_=previous;throw;}
+    if(eviction)++context_epoch_;
+    return receipt;
+}
+
 void PiManagedStore::persist_scheduling(const Operation &operation,bool enabled,const std::string &accepted_occurrence){
     std::lock_guard lock(mutex_);check();
     require(valid_controller_document(operation.request,enabled?"target-enable":"target-action")&&
         operation.route=="/api/control/v1/targets/"+self_+(enabled?"/enable":"/disable")&&!replay(operation));
     if(operation.request["expected_revision"]!=settings_["revision"])throw std::runtime_error("revision_conflict");
     if(enabled){
+        if(recurrence_.contains("management"))for(const auto &authority:recurrence_["management"]["authorities"])for(const auto &assignment:authority["assignments"]){
+            const auto controller=authority["registration"]["controller_id"];bool known=false,retired=false;
+            for(const auto &row:recurrence_["controllers"])if(row["controller_id"]==controller&&row["assignment_id"]==assignment["assignment_id"]&&row["assignment_revision"]==assignment["assignment_revision"])known=true;
+            for(const auto &row:recurrence_["retirements"])if(row["controller_id"]==controller&&row["assignment_id"]==assignment["assignment_id"])retired=true;
+            if(!known&&recurrence_["management"].contains("handover"))for(const auto &proof:recurrence_["management"]["handover"]["requests"])
+                if(proof["state"]=="confirmed"&&proof["request"]["controller_id"]==controller&&proof["request"]["assignment_id"]==assignment["assignment_id"])
+                    for(const auto &scope:proof["covered"])if(scope["pair_id"]==authority["registration"]["pair_id"]&&
+                        scope["authorization_generation"]==authority["registration"]["authorization_generation"]&&scope["assignment_revision"]==assignment["assignment_revision"])known=true;
+            require(known&&retired);
+        }
         require(operation.request["candidate_digest"]==settings_["candidate_digest"]&&
             (recurrence_["state"]=="staged"||recurrence_["state"]=="native")&&recurrence_["jobs"].empty());
         for(const auto &controller:recurrence_["controllers"]){
@@ -495,14 +607,226 @@ void PiManagedStore::persist_migration(const Json &internal,const std::function<
             before["state"]=="retiring"?before["transition_id"].get<std::string>():std::string{});
     }catch(...){if(!held_){recurrence_=before;legacy_=previous;}throw;}
 }
+void PiManagedStore::prepare_remote_migration(const Operation &operation,const Json &captured,const Json &signed_requests,const std::optional<Json> &pending_job){
+    std::lock_guard lock(mutex_);check();const auto &request=operation.request;
+    require(valid_controller_document(request,"target-migration")&&operation.route=="/api/control/v1/targets/"+self_+"/migration"&&
+        !replay(operation)&&captured==recurrence_&&request["expected_revision"]==settings_["revision"]&&
+        request["expected_authority_generation"]==recurrence_["generation"]&&recurrence_["jobs"].empty()&&
+        (recurrence_["state"]=="legacy"||recurrence_["state"]=="rollback"||recurrence_["state"]=="staged"));
+    const auto plan=recurrence_retirement_plan(captured,request["operation_id"].get<std::string>());
+    require(!plan["requests"].empty()&&request["controllers"]==plan["controllers"]&&signed_requests.is_array()&&signed_requests.size()==plan["requests"].size());
+    auto rows=plan["requests"];Json retained_fences=Json::array();
+    for(std::size_t index=0;index<rows.size();++index){
+        require(valid_pi_pair_document(signed_requests[index],"retirement"));auto body=signed_requests[index];body.erase("proof");
+        const auto prior=recurrence_reusable_retirement(captured,rows[index]["request"]);
+        if(!prior.is_null()&&prior["request"]==signed_requests[index]){
+            rows[index]["request"]=prior["request"];rows[index]["state"]="confirmed";rows[index]["response"]=prior["response"];
+            const auto &response=prior["response"];retained_fences.push_back({{"controller_id",response["controller_id"]},{"assignment_id",response["assignment_id"]},
+                {"transition_id",response["transition_id"]},{"retirement_generation",response["retirement_generation"]},{"receipt_digest",response["receipt_digest"]}});
+        }else{
+            require(body==rows[index]["request"]);rows[index]["request"]=signed_requests[index];rows[index]["state"]="prepared";rows[index]["response"]=nullptr;
+        }
+    }
+    const auto before=recurrence_,previous=legacy_;const Json candidate{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
+    try{
+        for(const auto &controller:plan["controllers"])if(controller["controller_id"]==self_){
+            require(controller["assignment_revision"]==PiManagementJournal::digest(canonical_pi_management_json(candidate)));
+            legacy_={{"schema","pi-legacy-recurrence/1"},{"device_id",self_},{"assignment_id",controller["assignment_id"]},
+                {"candidate",candidate},{"ini_hex",encode_bytes(observations_.at("ini").bytes)}};
+            (void)parse_legacy(legacy_.dump(),self_);
+        }
+        recurrence_["generation"]=plan["generation"];recurrence_["transition_id"]=request["operation_id"];recurrence_["state"]="retiring";
+        recurrence_["controllers"]=plan["controllers"];recurrence_["retirements"]=retained_fences;recurrence_["jobs"]=Json::array();
+        if(pending_job)recurrence_["jobs"].push_back(*pending_job);
+        recurrence_["management"]["handover"]={{"schema","pi-remote-handover/1"},{"generation",plan["generation"]},
+            {"transition_id",request["operation_id"]},{"candidate_digest",settings_["candidate_digest"]},
+            {"inventory",captured["management"]["authorities"]},{"operations",captured["management"]["operations"]},{"resume_basis",recurrence_retirement_basis(captured)},
+            {"controllers",plan["controllers"]},{"requests",rows}};
+        publish(candidate,observations_.at("ini").bytes,[]{},operation,true,true,false);
+    }catch(...){if(!held_){recurrence_=before;legacy_=previous;}throw;}
+}
+std::optional<Json> PiManagedStore::remote_handover(){
+    std::lock_guard lock(mutex_);check();
+    if(recurrence_["state"]!="retiring"||!recurrence_.contains("management")||!recurrence_["management"].contains("handover"))return {};
+    return recurrence_["management"]["handover"];
+}
+std::optional<Json> PiManagedStore::disabled_snapshot(){
+    std::lock_guard lock(mutex_);check();
+    if(settings_["scheduling"]["enabled"]!=false||settings_["configuration"]["Operation"]["Transmit"]!=false)return {};
+    for(auto it=operations_["receipts"].rbegin();it!=operations_["receipts"].rend();++it)if(it->contains("disabled_snapshot")){
+        const auto &snapshot=(*it)["disabled_snapshot"];
+        require(std::stoull(snapshot["configuration_generation"].get<std::string>())<=std::stoull(settings_["configuration_generation"].get<std::string>()));
+        if(snapshot["candidate_digest"]==settings_["candidate_digest"])
+            return Json{{"candidate_digest",snapshot["candidate_digest"]},{"configuration_generation",snapshot["configuration_generation"]},{"receipt",(*it)["receipt"]}};
+    }
+    return {};
+}
+void PiManagedStore::prepare_remote_resume(const Operation &operation,const Json &captured,
+    const PiPairResumeTargetProof &proof,const Json &wtp_binding,const PiPairMutationGuard &){
+    std::lock_guard lock(mutex_);check();const auto &request=operation.request;
+    require(valid_controller_document(request,"target-migration-rollback")&&captured==recurrence_&&
+        operation.route=="/api/control/v1/targets/"+self_+"/migration/rollback"&&!replay(operation)&&
+        proof.body_digest()==PiManagementJournal::digest(canonical_pi_management_json(request))&&
+        proof.scope()["controller_id"]==request["resume_controller_id"]&&
+        request["expected_revision"]==settings_["revision"]&&request["expected_authority_generation"]==recurrence_["generation"]&&
+        (recurrence_["state"]=="staged"||recurrence_["state"]=="native")&&recurrence_["jobs"].empty()&&
+        recurrence_.contains("management")&&recurrence_["management"]["complete"]==true&&recurrence_["management"].contains("handover"));
+    for(const auto &row:recurrence_["management"]["operations"])require(row["receipt"]["operation_id"]!=request["operation_id"]);
+    if(recurrence_["management"].contains("resume")){
+        const auto &previous=recurrence_["management"]["resume"];require(previous["state"]!="pending");
+        const auto digest=PiManagementJournal::digest(canonical_pi_management_json(previous["acknowledgement"]));bool retained=false;
+        for(const auto &row:recurrence_["management"]["operations"])if(row["controller_id"]==previous["grant"]["controller_id"]&&
+            row["receipt"]["operation_id"]==previous["grant"]["operation_id"]&&row["receipt"]["request_digest"]==digest&&row["receipt"]["result_digest"]==digest)retained=true;
+        require(retained);
+        if(previous["state"]=="resumed"){
+            // Current staged/native validity requires fresh permanent fencing;
+            // keep the consumed lineage frozen in this handover as well.
+            require(recurrence_["management"]["handover"]["resume_basis"]==previous);
+            bool fresh=false;for(const auto &row:recurrence_["retirements"])if(row["controller_id"]==previous["grant"]["controller_id"]&&
+                row["assignment_id"]==previous["grant"]["assignment_id"]&&std::stoull(row["retirement_generation"].get<std::string>())>
+                std::stoull(previous["grant"]["authority_generation"].get<std::string>()))fresh=true;
+            require(fresh);
+        }
+    }
+    const auto disabled=disabled_snapshot();require(disabled.has_value());
+    if(recurrence_["state"]=="native")require(progress_&&!progress_->held()&&progress_->snapshot()["in_flight"].is_null());
+    Json retirement=nullptr;
+    for(const auto &row:recurrence_["management"]["handover"]["requests"]) {
+        require(row["state"]=="confirmed");
+        if(row["request"]["controller_id"]==request["resume_controller_id"]&&row["request"]["assignment_id"]==request["resume_assignment_id"])
+            retirement=Json{{"request",row["request"]},{"response",row["response"]}};
+    }
+    require(!retirement.is_null());Json incarnation=nullptr;
+    for(const auto &row:recurrence_["management"]["authorities"]){const auto &registered=row["registration"];
+        if(registered["controller_id"]==proof.scope()["controller_id"]&&registered["pair_id"]==proof.scope()["pair_id"]&&
+            registered["authorization_generation"]==proof.scope()["authorization_generation"])
+            for(const auto &assignment:row["assignments"])if(assignment["assignment_id"]==request["resume_assignment_id"])incarnation=registered["controller_incarnation"];
+    }
+    require(!incarnation.is_null());
+    Json grant={{"contract","Wsprry-Pair/1"},{"schema","resume-grant"},{"operation_id",request["operation_id"]},
+        {"pair_id",proof.scope()["pair_id"]},{"authorization_generation",proof.scope()["authorization_generation"]},
+        {"target_id",self_},{"target_boot_id",request["binding"]["boot_id"]},{"controller_id",request["resume_controller_id"]},
+        {"controller_incarnation",incarnation},{"assignment_id",request["resume_assignment_id"]},
+        {"assignment_revision",retirement["request"]["assignment_revision"]},{"transition_id",retirement["request"]["transition_id"]},
+        {"retirement_receipt_digest",retirement["response"]["receipt_digest"]},{"authority_generation",next(recurrence_["generation"])},
+        {"disabled_revision",(*disabled)["receipt"]["revision"]},{"disable_receipt_digest",PiManagementJournal::digest(canonical_pi_management_json((*disabled)["receipt"]))},
+        {"candidate_digest",settings_["candidate_digest"]},{"wtp_binding",wtp_binding}};
+    grant["grant_digest"]=PiManagementJournal::digest(canonical_pi_management_json(grant));require(valid_pi_pair_document(grant,"resume-grant"));
+    const auto before=recurrence_;const Json candidate{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
+    try{
+        recurrence_["generation"]=grant["authority_generation"];recurrence_["transition_id"]=request["operation_id"];
+        recurrence_["state"]="reconciling";recurrence_["staged_revision"]=nullptr;
+        recurrence_["management"]["resume"]={{"schema","pi-remote-resume/1"},{"grant",grant},{"disabled_snapshot",*disabled},
+            {"retirement",retirement},{"state","pending"},{"acknowledgement",nullptr},{"transport",nullptr},{"registered",nullptr}};
+        publish(candidate,observations_.at("ini").bytes,[]{},operation,true,true,false);
+    }catch(...){if(!held_)recurrence_=before;throw;}
+}
+std::optional<Json> PiManagedStore::remote_resume(const PiPairPrincipal &principal){
+    std::lock_guard lock(mutex_);check();require(principal.self_id()==self_&&principal.identity().purpose==PiPairTlsPurpose::Management);
+    if(!recurrence_.contains("management")||!recurrence_["management"].contains("resume"))return {};
+    const auto &resume=recurrence_["management"]["resume"];
+    return resume["grant"]["controller_id"]==principal.peer_id()?std::optional<Json>(resume["grant"]):std::nullopt;
+}
+Json PiManagedStore::confirm_remote_resume(const PiPairResumeOutcomeProof &proof,const PiPairMutationGuard &){
+    std::lock_guard lock(mutex_);check();const auto &response=proof.document();const auto &transport=proof.transport();
+    require(valid_pi_pair_document(response,"resume-ack")&&transport.self_id()==self_&&transport.identity().purpose==PiPairTlsPurpose::Management&&
+        response["target_id"]==self_&&response["controller_id"]==transport.peer_id()&&recurrence_.contains("management")&&recurrence_["management"].contains("resume"));
+    const auto digest=PiManagementJournal::digest(canonical_pi_management_json(response));
+    const Json receipt{{"contract","Wsprry-Pair/1"},{"schema","operation"},{"operation_id",response["operation_id"]},
+        {"pair_id",transport.identity().pair_id},{"authorization_generation",transport.identity().authorization_generation},
+        {"request_digest",digest},{"state","committed"},{"result_digest",digest}};
+    const auto &saved=recurrence_["management"]["resume"],&grant=saved["grant"];
+    if(response["operation_id"]!=grant["operation_id"]){
+        for(const auto &row:recurrence_["management"]["operations"])if(row["controller_id"]==transport.peer_id()&&row["receipt"]["operation_id"]==response["operation_id"]){
+            require(row["receipt"]["request_digest"]==digest&&row["receipt"]["result_digest"]==digest&&row["receipt"]["state"]=="committed");return receipt;
+        }
+        throw std::runtime_error("request_id_reuse");
+    }
+    for(const auto *field:{"operation_id","pair_id","authorization_generation","target_id","controller_id","assignment_id","grant_digest"})require(response[field]==grant[field]);
+    if(saved["state"]!="pending"){
+        require(saved["acknowledgement"]==response);
+        const Json current_scope{{"pair_id",transport.identity().pair_id},{"authorization_generation",transport.identity().authorization_generation}};
+        if(recurrence_remote_resume_active(recurrence_)&&saved["transport"]!=current_scope){
+            const auto before=recurrence_;
+            try{
+                recurrence_["management"]["resume"]["transport"]=current_scope;recurrence_["management"]["resume"]["registered"]=nullptr;
+                publish(Json{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}},observations_.at("ini").bytes,[]{},{},false,false,false,{},true);
+            }catch(...){if(!held_)recurrence_=before;throw;}
+        }
+        return receipt;
+    }
+    require(recurrence_["state"]=="reconciling"&&recurrence_["transition_id"]==grant["operation_id"]);
+    const auto before=recurrence_;const auto operation=grant["operation_id"].get<std::string>();
+    const Json candidate{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
+    require(candidate["scheduling"]["enabled"]==false&&candidate["configuration"]["Operation"]["Transmit"]==false);
+    const bool eviction=recurrence_["management"]["operations"].size()==256;
+    require(!eviction||context_epoch_<std::numeric_limits<std::uint64_t>::max());
+    try{
+        auto stored_receipt=receipt;stored_receipt["pair_id"]=grant["pair_id"];stored_receipt["authorization_generation"]=grant["authorization_generation"];
+        auto &operations=recurrence_["management"]["operations"];
+        for(const auto &row:operations)require(row["receipt"]["operation_id"]!=operation);
+        operations.push_back({{"controller_id",response["controller_id"]},{"receipt",stored_receipt}});if(eviction)operations.erase(operations.begin());
+        auto &current=recurrence_["management"]["resume"];current["state"]=response["outcome"];current["acknowledgement"]=response;
+        current["transport"]={{"pair_id",transport.identity().pair_id},{"authorization_generation",transport.identity().authorization_generation}};
+        recurrence_["state"]=response["outcome"]=="resumed"?"rollback":"staged";
+        recurrence_["generation"]=next(recurrence_["generation"]);
+        publish(candidate,observations_.at("ini").bytes,[]{},{},true,false,false,operation,false,response["outcome"]=="refused"?"authority_pending":nullptr);
+    }catch(...){if(!held_)recurrence_=before;throw;}
+    if(eviction)++context_epoch_;
+    return receipt;
+}
+bool PiManagedStore::handover_handoff(const Json &request,const PiPairMutationGuard &){
+    std::lock_guard lock(mutex_);check();const auto saved=remote_handover();if(!saved)return false;
+    for(std::size_t index=0;index<(*saved)["requests"].size();++index){const auto &row=(*saved)["requests"][index];
+        if(row["request"]!=request)continue;
+        if(row["state"]!="prepared")return false;
+        const auto before=recurrence_;
+        try{recurrence_["management"]["handover"]["requests"][index]["state"]="awaiting_receipt";
+            publish(Json{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}},observations_.at("ini").bytes,[]{},{},false,false,false,{},true);
+            return true;
+        }catch(...){if(!held_)recurrence_=before;throw;}
+    }
+    return false;
+}
+bool PiManagedStore::confirm_handover(const PiPairRetiredProof &proof){
+    std::lock_guard lock(mutex_);check();const auto saved=remote_handover();if(!saved)return false;
+    const auto &response=proof.document();require(valid_pi_pair_document(response,"retired"));
+    for(std::size_t index=0;index<(*saved)["requests"].size();++index){const auto &row=(*saved)["requests"][index];
+        auto expected=row["request"];expected.erase("proof");expected["schema"]="retired";auto received=response;received.erase("proof");received.erase("receipt_digest");
+        if(expected!=received)continue;
+        if(row["state"]=="confirmed")return row["response"]==response;
+        if(row["state"]!="awaiting_receipt")return false;
+        const auto before=recurrence_;
+        try{auto &current=recurrence_["management"]["handover"]["requests"][index];current["state"]="confirmed";current["response"]=response;
+            recurrence_["generation"]=next(recurrence_["generation"]);
+            recurrence_["retirements"].push_back({{"controller_id",response["controller_id"]},{"assignment_id",response["assignment_id"]},
+                {"transition_id",response["transition_id"]},{"retirement_generation",response["retirement_generation"]},{"receipt_digest",response["receipt_digest"]}});
+            publish(Json{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}},observations_.at("ini").bytes,[]{},{},true,false,false);
+            return true;
+        }catch(...){if(!held_)recurrence_=before;throw;}
+    }
+    return false;
+}
 void PiManagedStore::complete_migration(){
     std::lock_guard lock(mutex_);check();
-    require(recurrence_["state"]=="retiring"&&!legacy_.is_null()&&recurrence_["controllers"].size()==1&&
-        recurrence_["controllers"][0]["controller_id"]==self_);
+    require(recurrence_["state"]=="retiring");
+    if(const auto handover=remote_handover()){
+        for(const auto &row:(*handover)["requests"])require(row["state"]=="confirmed");
+        // New history, even another pair for the same logical assignment, is
+        // never silently omitted from the frozen retirement coverage.
+        for(const auto &authority:recurrence_["management"]["authorities"])for(const auto &assignment:authority["assignments"]){
+            bool covered=false;for(const auto &row:(*handover)["requests"])if(row["request"]["controller_id"]==authority["registration"]["controller_id"]&&
+                row["request"]["assignment_id"]==assignment["assignment_id"])for(const auto &scope:row["covered"])
+                    if(scope["pair_id"]==authority["registration"]["pair_id"]&&scope["authorization_generation"]==authority["registration"]["authorization_generation"]&&
+                        scope["assignment_revision"]==assignment["assignment_revision"])covered=true;
+            require(covered);
+        }
+    }else require(!legacy_.is_null()&&recurrence_["controllers"].size()==1&&recurrence_["controllers"][0]["controller_id"]==self_);
     const auto before=recurrence_;auto candidate=Json{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
     try{
         recurrence_["generation"]=next(recurrence_["generation"]);recurrence_["jobs"]=Json::array();recurrence_["state"]="staged";
-        const auto assignment=recurrence_["controllers"][0]["assignment_id"];
+        for(const auto &controller:recurrence_["controllers"])if(controller["controller_id"]==self_){
+        require(!legacy_.is_null());const auto assignment=controller["assignment_id"];
         auto &retirements=recurrence_["retirements"];
         for(auto it=retirements.begin();it!=retirements.end();){
             if((*it)["controller_id"]==self_&&(*it)["assignment_id"]==assignment)it=retirements.erase(it);else ++it;
@@ -511,6 +835,7 @@ void PiManagedStore::complete_migration(){
             {"retirement_generation",recurrence_["generation"]},{"receipt_digest",PiManagementJournal::digest(canonical_pi_management_json(Json{
                 {"schema","local-recurrence-retirement/1"},{"device_id",self_},{"assignment_id",assignment},
                 {"transition_id",recurrence_["transition_id"]},{"generation",recurrence_["generation"]},{"disposition","retired"}}))}});
+        }
         candidate["scheduling"]["enabled"]=false;
         publish(candidate,observations_.at("ini").bytes,[]{},{},true,false,false,before["transition_id"].get<std::string>());
     }catch(...){if(!held_)recurrence_=before;throw;}
@@ -603,28 +928,46 @@ void PiManagedStore::persist_recovery(const Json &internal,const std::function<v
     if(!initialized_){initialize_transaction(internal,ini,writer,operation,request["expected_revision"].get<std::string>());return;}
     publish(Json{{"configuration",configuration},{"scheduling",settings_["scheduling"]}},ini,writer,operation);
 }
-void PiManagedStore::publish(const Json &candidate,const std::string &ini,const std::function<void()> &writer,const std::optional<Operation> &operation,bool authority_transition,bool pending,bool write_ini,const std::string &complete_operation){
+void PiManagedStore::publish(const Json &candidate,const std::string &ini,const std::function<void()> &writer,const std::optional<Operation> &operation,bool authority_transition,bool pending,bool write_ini,const std::string &complete_operation,bool metadata_only,const char *completion_error){
     require(valid_pi_candidate_shape(candidate));
     validate_stored_solar(candidate.at("scheduling"));
     if(candidate.at("scheduling").at("solar").at("enabled")==true)
-        require(recurrence_["state"]=="staged"||recurrence_["state"]=="native");
+        require(recurrence_["state"]=="staged"||recurrence_["state"]=="native"||
+            (candidate["scheduling"]["enabled"]==false&&pending_remote_resume(recurrence_)));
     if(initialized_&&!authority_transition)require(candidate.at("scheduling").at("enabled")==settings_.at("scheduling").at("enabled"));
     require(valid_recurrence_authority_record(recurrence_,self_));
+    validate_resume_integrity(recurrence_);
     auto next_authority=recurrence_;
-    if(next_authority["state"]=="legacy"||next_authority["state"]=="rollback"){
+    if(next_authority["state"]=="legacy"||(next_authority["state"]=="rollback"&&!recurrence_remote_resume_active(next_authority))){
         const auto digest=PiManagementJournal::digest(canonical_pi_management_json(candidate));
         for(auto &row:next_authority["controllers"])if(row["controller_id"]==self_&&row["assignment_revision"]!=digest){
             row["assignment_revision"]=digest;next_authority["generation"]=next(next_authority["generation"]);
         }
     }
-    const auto saved=pi_managed_settings_record(self_,initialized_?next(settings_["configuration_generation"]):"1",candidate,private_digest(ini,next_authority,legacy_,progress_initialization_));
+    if(metadata_only){
+        require(initialized_&&!operation&&!authority_transition&&!pending&&!write_ini&&complete_operation.empty()&&
+            candidate==Json({{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}}));
+        auto previous=parse_recurrence_authority_record(observations_.at("recurrence").bytes,self_),current=next_authority;
+        previous.erase("management");current.erase("management");require(previous==current);
+        require(ini==observations_.at("ini").bytes&&
+            legacy_==(observations_.contains("legacy")?parse_legacy(observations_.at("legacy").bytes,self_):Json(nullptr))&&
+            progress_initialization_==(observations_.contains("progress")?parse_progress_initialization(observations_.at("progress").bytes,self_):Json(nullptr)));
+    }
+    const auto generation=initialized_?(metadata_only?settings_["configuration_generation"].get<std::string>():next(settings_["configuration_generation"])):"1";
+    const auto saved=pi_managed_settings_record(self_,generation,candidate,private_digest(ini,next_authority,legacy_,progress_initialization_));
     if(next_authority["state"]=="staged")next_authority["staged_revision"]=saved["revision"];
     auto receipts=initialized_?operations_["receipts"]:Json::array();
+    const auto retain_disabled=[&](Json &entry){
+        if(candidate["scheduling"]["enabled"]==false&&candidate["configuration"]["Operation"]["Transmit"]==false&&entry["receipt"]["state"]=="committed")
+            entry["disabled_snapshot"]={{"candidate_digest",saved["candidate_digest"]},{"configuration_generation",generation}};
+    };
     if(!complete_operation.empty()){
         bool found=false;
         for(auto &entry:receipts)if(entry["receipt"]["operation_id"]==complete_operation){
             require(entry["receipt"]["state"]=="pending");entry["receipt"]["state"]="committed";
-            entry["receipt"]["revision"]=saved["revision"];found=true;
+            entry["receipt"]["revision"]=saved["revision"];
+            if(completion_error){entry["receipt"]["state"]="rejected";entry["receipt"]["revision"]=nullptr;entry["receipt"]["error"]={{"code",completion_error},{"retryable",false}};}
+            retain_disabled(entry);found=true;
         }
         require(found);
     }
@@ -633,7 +976,7 @@ void PiManagedStore::publish(const Json &candidate,const std::string &ini,const 
         const Json receipt{{"contract","Wsprry-Control/1"},{"schema","target-operation"},{"binding",operation->request.at("binding")},
             {"operation_id",operation->request.at("operation_id")},{"request_digest",digest},{"state",pending?"pending":"committed"},{"revision",pending?Json(nullptr):saved["revision"]},{"error",nullptr}};
         receipts.push_back({{"principal_id",operation->principal},{"route",operation->route},{"authorization_generation",operation->authorization_generation},
-            {"request_digest",digest},{"receipt",receipt}});
+            {"request_digest",digest},{"receipt",receipt}});retain_disabled(receipts.back());
     }
     const auto retained=pi_operations_record(self_,receipts);
     require(!retained.evicted||context_epoch_<std::numeric_limits<std::uint64_t>::max());
@@ -661,8 +1004,14 @@ void PiManagedStore::publish(const Json &candidate,const std::string &ini,const 
             else require(before_files.at("ini")&&before_files.at("ini")->bytes==ini);
             if(!legacy_.is_null())images.push_back({"legacy",expected("legacy"),legacy_.dump()});
             if(!progress_initialization_.is_null()&&!before_files.at("progress"))images.push_back({"progress",std::nullopt,progress_initialization_.dump()});
+            if(checkpoint_)checkpoint_(PiManagedWritePoint::BeforePrepare);
             journal_.prepare(images,initial_rollback_);
-            journal_.commit();if(write_ini)writer();journal_.recover();
+            if(checkpoint_)checkpoint_(PiManagedWritePoint::Prepared);
+            journal_.commit();
+            if(checkpoint_)checkpoint_(PiManagedWritePoint::Committed);
+            if(write_ini)writer();
+            journal_.recover();
+            if(checkpoint_)checkpoint_(PiManagedWritePoint::Published);
         });
         load();require(settings_==saved&&operations_==operations);
         if(retained.evicted)++context_epoch_;

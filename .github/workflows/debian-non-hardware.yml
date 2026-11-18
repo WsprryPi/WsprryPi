@@ -135,7 +135,7 @@ jobs:
       matrix:
         runner: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
@@ -158,6 +158,15 @@ jobs:
           python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi mcp2221a-hid
       - name: Check native cached inventory and unsupported machine-power admission
         run: make -C src si5351-inventory-isolation-test websocket-lifecycle-test controller-only-test wtp-pi-identity-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
+
+      - name: Qualify pairing and controller roles without hardware on both Mac architectures
+        run: |
+          make -C src pairing-provider-test pi-pair-contract-test pi-pair-crypto-test pi-pair-tls-test pi-pair-machine-service-test pi-pair-resume-refusal-test pi-wtp-binding-test pi-pair-runtime-test pi-pair-local-http-test pi-pair-service-lifetime-test pi-pair-outgoing-rotation-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          python3 scripts/tests/pairing_provider_build_test.py
+          python3 scripts/tests/pairing_support_redaction_test.py
+          python3 scripts/tests/copy_exe_notice_test.py
+          cmp docs/licenses/botan/BSD-2-Clause.txt src/build/bin/BOTAN-LICENSE.txt
+          cmp scripts/pairing_provider.json src/build/bin/PAIRING-PROVIDER.json
 
   wtp-network-loopback:
     needs: change_scope

@@ -43,6 +43,9 @@ PicoManagementTarget::~PicoManagementTarget() {
     std::lock_guard lock(mutex_);
     if (consumer_) consumer_->clear();
 }
+bool PicoManagementTarget::cancel_requested() const noexcept{
+    try{return cancelled_->load()||(operation_cancelled_&&operation_cancelled_());}catch(...){return true;}
+}
 void PicoManagementTarget::cancel() noexcept {cancelled_->store(true);tls_.cancel();}
 void PicoManagementTarget::mutation_gate(MutationGate gate) {
     std::lock_guard lock(mutex_);mutation_gate_=std::move(gate);
@@ -50,24 +53,54 @@ void PicoManagementTarget::mutation_gate(MutationGate gate) {
 nlohmann::json PicoManagementTarget::binding() const {
     std::lock_guard lock(mutex_);
     return {{"device_id",settings_.device_id},{"boot_id",boot_},{"carrier",carrier_},
-        {"authorization_generation",generation_},{"connected",connected_ && !cancelled_->load()},
+        {"authorization_generation",generation_},{"connected",connected_ && !cancel_requested()},
         {"session",consumer_?consumer_->lost_session():nlohmann::json(nullptr)},
         {"capability_revision",PicoManagementJournal::digest(capabilities_+"\n"+management_)}};
 }
+nlohmann::json PicoManagementTarget::gateway_resources() const {
+    std::lock_guard lock(mutex_);nlohmann::json result=nlohmann::json::array();
+    if(!connected_||cancel_requested()||carrier_!="usb_physical")return result;
+    const auto caps=strict_browser_json(capabilities_,16);
+    if(!pico_management_capabilities_valid(caps,carrier_))return result;
+    const auto feature=[&](const char *name){return caps["features"].contains(name)&&caps["features"][name]==true;};
+    const auto add=[&](const char *resource,bool supported){if(supported)result.push_back(resource);};
+    add("management",true);add("configuration",feature("config")&&caps.contains("configuration_updates"));
+    add("application",feature("application"));add("station",feature("station"));add("hardware",feature("hardware"));
+    add("pins",feature("hardware"));add("pins/validate",feature("hardware"));
+    for(const auto &[descriptor,resource]:std::initializer_list<std::pair<const char *,const char *>>{
+        {"gpio_drive","gpio-drive"},{"amplifier_timing","amplifier-timing"},{"filter_selector","filter-selector"},
+        {"si5351","si5351"},{"gps","gps"},{"gray_line","gray-line"}})add(resource,caps.contains(descriptor));
+    add("gpio-drive-progress",caps.contains("gpio_drive")&&caps.contains("saved_progress"));
+    for(const auto *resource:{"progress","progress/update","progress/apply"})add(resource,caps.contains("saved_progress"));
+    for(const auto *resource:{"udp-logging","udp-logging/capabilities","udp-logging/test","udp-logging/test/capabilities"})add(resource,true);
+    for(const auto *resource:{"network","wifi","hostname"})add(resource,feature("network"));
+    add("ap",feature("softap"));add("restart",feature("restart"));add("logging",caps.contains("logging"));
+    return result;
+}
 PicoHttpResponse PicoManagementTarget::exchange(const std::string &resource,const std::string &method,
-    const std::string &body,const std::string &revision) {
-    if (cancelled_->load() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
+    const std::string &body,const std::string &revision,const UsbManagementClient::WriteAdmission &admit,bool guarded) {
+    if (cancel_requested() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
     if (method!="GET" && resource!="pins/validate" && mutation_gate_)
         if (auto refusal=mutation_gate_()) return *refusal;
-    if(cancelled_->load()||now()>=deadline_)return refusal(503,"management_deadline_or_cancelled");
+    if(cancel_requested()||now()>=deadline_)return refusal(503,"management_deadline_or_cancelled");
     if (carrier_=="usb_physical") {
         usb_->cancellation=cancelled_;
-        if (!usb_->ensure(settings_.device_id,false,deadline_)) return refusal(503,"usb_management_unavailable");
+        if (!usb_->ensure(settings_.device_id,false,deadline_,[this]{return cancel_requested();})) return refusal(503,"usb_management_unavailable");
+        if(guarded&&method!="GET"&&(usb_->client->device()!=settings_.device_id||usb_->client->boot()!=boot_||
+            !usb_connection_||usb_->client->connection_generation()!=usb_connection_)){
+            // ensure may have reopened the shared physical channel after a
+            // disconnect. Resource aliases such as network have no boot in
+            // their native body, so never rebase an old edit onto that boot.
+            connected_=false;return refusal(409,"management_context_changed");
+        }
         const auto current=now();
         if (current>=deadline_) return refusal(503,"management_deadline_or_cancelled");
-        return usb_->client->request(resource.starts_with('/') ? resource : "/api/control/v1/"+resource,method,body,revision,
-            static_cast<unsigned>(std::min<std::uint64_t>(10000,deadline_-current)));
+        const auto path=resource.starts_with('/') ? resource : "/api/control/v1/"+resource;
+        const auto timeout=static_cast<unsigned>(std::min<std::uint64_t>(10000,deadline_-current));
+        return guarded?usb_->client->request_guarded(path,method,body,revision,timeout,admit,[this]{return cancel_requested();}):
+            usb_->client->request(path,method,body,revision,timeout,[this]{return cancel_requested();});
     }
+    if(guarded)return refusal(409,"unauthorized");
     if (carrier_=="consumer_station" || carrier_=="consumer_ap")
         return consumer_ ? consumer_->request(resource,method,body,revision) : refusal(401,"consumer_login_required");
     if (carrier_!="engineering_mtls") return refusal(401,"management_carrier_required");
@@ -97,7 +130,11 @@ bool PicoManagementTarget::negotiate(bool initial) {
     if (!initial && capability_snapshot!=capabilities_) return false;
     const auto gen=value["profile_generation"].is_null() ? std::string{} : value["profile_generation"].get<std::string>();
     if (!initial && gen!=generation_) return false;
-    if (carrier_=="usb_physical" && (usb_->client->device()!=settings_.device_id || usb_->client->boot()!=boot)) return false;
+    if (carrier_=="usb_physical"){
+        const auto connection=usb_->client->connection_generation();
+        if(usb_->client->device()!=settings_.device_id||usb_->client->boot()!=boot||!connection||(!initial&&connection!=usb_connection_))return false;
+        usb_connection_=connection;
+    }
     boot_=boot;generation_=gen;capabilities_=capability_snapshot;management_=value.dump();
     return true;
 }
@@ -123,7 +160,7 @@ PicoHttpResponse PicoManagementTarget::connect(const std::string &carrier,std::s
             if (host.empty() || (carrier=="consumer_station" && host=="192.168.4.1")) return refusal(400,"invalid_consumer_endpoint");
             consumer_=std::make_unique<ConsumerRadioClient>([this,host](const auto &path,const auto &verb,const auto &payload,const auto &media) {
                 if (fixtures_.consumer) return fixtures_.consumer(path,verb,payload,media);
-                if (cancelled_->load() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
+                if (cancel_requested() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
                 return consumer_http_request(tcp_,now,host,path,verb,payload,media,deadline_);
             },now);
             auto login=consumer_->login(settings_.device_id,carrier,password);
@@ -132,7 +169,7 @@ PicoHttpResponse PicoManagementTarget::connect(const std::string &carrier,std::s
         std::unique_lock<std::recursive_mutex> usb_lock(usb_->mutex,std::defer_lock);
         if (carrier=="usb_physical") {
             while (!usb_lock.try_lock()) {
-                if (cancelled_->load() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
+                if (cancel_requested() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
         }
@@ -152,10 +189,10 @@ PicoHttpResponse PicoManagementTarget::disconnect() {
 bool PicoManagementTarget::refresh() {
     std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return false;
     deadline_=now()+24000;
-    if(carrier_.empty()||cancelled_->load()||(consumer_&&!consumer_->active()))return false;
+    if(carrier_.empty()||cancel_requested()||(consumer_&&!consumer_->active()))return false;
     std::unique_lock<std::recursive_mutex> usb_lock(usb_->mutex,std::defer_lock);
     if(carrier_=="usb_physical")while(!usb_lock.try_lock()) {
-        if(cancelled_->load()||now()>=deadline_)return false;
+        if(cancel_requested()||now()>=deadline_)return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     try {connected_=negotiate(true);}catch(...){connected_=false;}
@@ -177,7 +214,7 @@ PicoHttpResponse PicoManagementTarget::recovery(const std::string &carrier,std::
                 consumer_->clear();connected_=false;
             }
         }
-        if(cancelled_->load()||now()>=deadline_)return refusal(503,"management_deadline_or_cancelled");
+        if(cancel_requested()||now()>=deadline_)return refusal(503,"management_deadline_or_cancelled");
         if(fixtures_.consumer)return fixtures_.consumer(path,verb,body,media);
         return consumer_http_request(tcp_,now,host,path,verb,body,media,deadline_);
     },now);
@@ -185,22 +222,31 @@ PicoHttpResponse PicoManagementTarget::recovery(const std::string &carrier,std::
 }
 PicoHttpResponse PicoManagementTarget::request(const std::string &resource,const std::string &method,
     const std::string &body,const std::string &revision) {
+    return request_impl(resource,method,body,revision,{},false);
+}
+PicoHttpResponse PicoManagementTarget::request_guarded(const std::string &resource,const std::string &method,
+    const std::string &body,const std::string &revision,const UsbManagementClient::WriteAdmission &admit) {
+    return request_impl(resource,method,body,revision,admit,true);
+}
+PicoHttpResponse PicoManagementTarget::request_impl(const std::string &resource,const std::string &method,
+    const std::string &body,const std::string &revision,const UsbManagementClient::WriteAdmission &admit,bool guarded) {
     std::unique_lock lock(mutex_,std::try_to_lock);
     if (!lock.owns_lock()) return refusal(409,"management_busy");
+    if(guarded&&(carrier_!="usb_physical"||(method!="GET"&&!admit)))return refusal(409,"unauthorized");
     deadline_=now()+24000;
-    if (!connected_ || cancelled_->load()) return refusal(409,"management_context_read_required");
+    if (!connected_ || cancel_requested()) return refusal(409,"management_context_read_required");
     if (body.size()>32768) return refusal(413,"body_too_large");
     std::unique_lock<std::recursive_mutex> usb_lock(usb_->mutex,std::defer_lock);
     if (carrier_=="usb_physical") {
         while (!usb_lock.try_lock()) {
-            if (cancelled_->load() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
+            if (cancel_requested() || now()>=deadline_) return refusal(503,"management_deadline_or_cancelled");
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
     }
     try {
         if (!negotiate(false)) {connected_=false;return refusal(409,"management_context_changed");}
         if(resource=="management"&&method=="GET")return {200,management_,{}};
-        const auto io=[this](const auto &path,const auto &verb,const auto &payload,const auto &etag) {return exchange(path,verb,payload,etag);};
+        const auto io=[this,&admit,guarded](const auto &path,const auto &verb,const auto &payload,const auto &etag) {return exchange(path,verb,payload,etag,admit,guarded);};
         const auto generation=consumer_ ? consumer_->generation() : std::string{};
         const auto result=[&]() -> PicoHttpResponse {
         if(resource=="network") {
@@ -229,7 +275,7 @@ PicoHttpResponse PicoManagementTarget::request(const std::string &resource,const
             if(!negotiate(false)){connected_=false;return refusal(409,"management_context_changed");}
             if(method=="GET")return current;
             if(current.etag!=revision)return refusal(412,"revision_conflict");
-            const auto changed=exchange(resource,method,body,revision);
+            const auto changed=exchange(resource,method,body,revision,admit,guarded);
             if(changed.status>=400&&changed.status<500)
                 return refusal(changed.status,changed.status==412?"revision_conflict":"network_change_refused");
             if(!valid(changed))return refusal(503,"management_outcome_unknown");

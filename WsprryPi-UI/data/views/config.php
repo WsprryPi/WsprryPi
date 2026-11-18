@@ -1281,6 +1281,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                         </div>
                     </div>
                 </form>
+                <?php require __DIR__ . '/pi-target-settings.php'; ?>
                 <div id="setup-pico-workspace" data-independent-wtp hidden>
                     <?php require __DIR__ . '/pico-target-settings.php'; ?>
                 </div>

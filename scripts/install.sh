@@ -7463,6 +7463,12 @@ manage_exe() {
             return 0
         fi
         [[ -f "$source_path" ]] || { logE "Executable is missing: $source_path"; return 1; }
+        # Install required attribution before replacing any executable. A
+        # missing notice refuses publication while the old binary stays intact.
+        local notice="${LOCAL_REPO_DIR}/docs/licenses/botan/BSD-2-Clause.txt"
+        [[ -f "$notice" && ! -L "$notice" && -s "$notice" ]] || { logE "Required Botan license notice is missing or unsafe."; return 1; }
+        exec_command "Create application license directory" install -d -m 755 /usr/local/share/licenses/wsprrypi "$debug" || return 1
+        exec_command "Install Botan license notice" install -m 644 "$notice" /usr/local/share/licenses/wsprrypi/BOTAN-LICENSE.txt "$debug" || return 1
         local pending
         pending=$(mktemp "${exe_path}.new.XXXXXXXX") || return 1
         if ! exec_command "Stage executable for $exe_path" \

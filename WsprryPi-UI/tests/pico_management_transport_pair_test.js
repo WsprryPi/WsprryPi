@@ -70,7 +70,11 @@ function lines(child) {
         const fresh=await call({resource:'configuration',method:'GET'});assert.equal(fresh.body.config.station.callsign,'K2ABC');
         const reviewed=await call({control:'reconcile',operation_id:lostRequest.operation_id,readback_revision:fresh.readback_revision});
         assert.equal(reviewed.status,200);assert.equal(reviewed.body.state,'unknown');assert.equal(reviewed.mutations,lost.mutations);
-        const afterReview=await call({resource:'configuration',method:'POST',body:JSON.stringify({...settings,config:{station:{callsign:'W3AW'}}}),revision:fresh.etag});
+        assert.notEqual(reviewed.context,fresh.context,'Review always retires the previous editor context');
+        const delayed=await call({resource:'configuration',method:'POST',context:fresh.context,body:JSON.stringify({...settings,config:{station:{callsign:'Delayed-after-review'}}}),revision:fresh.etag});
+        assert.equal(delayed.status,409);assert.equal(delayed.mutations,lost.mutations);
+        const current=await call({resource:'configuration',method:'GET'});assert.equal(current.status,200);
+        const afterReview=await call({resource:'configuration',method:'POST',body:JSON.stringify({...settings,config:{station:{callsign:'W3AW'}}}),revision:current.etag});
         assert.equal(afterReview.status,200);assert.equal(afterReview.mutations,lost.mutations+1);
         client.stdin.write(JSON.stringify({control:'seed_terminal_capacity'})+'\n');assert.deepEqual(JSON.parse(await clientLine(240000)),{});
         let capacityRead=await call({resource:'configuration',method:'GET'});

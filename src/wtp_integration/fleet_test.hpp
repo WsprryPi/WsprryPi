@@ -14,6 +14,9 @@ struct WtpFleetTestHooks {
     std::function<std::unique_ptr<WtpTargetRuntime>(WtpSettings,
         std::function<bool()>, std::shared_ptr<void>)> create_target;
     std::function<nlohmann::json(const WtpSettings&, unsigned)> revocation_status;
+    // Actual isolated pairing history for multi-owner process fixtures. The
+    // production owner always resolves its process-selected pairing history.
+    std::function<std::optional<nlohmann::json>(const nlohmann::json &,const nlohmann::json &)> retirement_signer;
     // Deterministic blocked-filesystem tests; never runs under HTTP/publication locks.
     std::function<void()> before_persist;
     // Hold a fenced retirement before any durable decision exists.

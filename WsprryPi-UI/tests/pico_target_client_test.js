@@ -13,7 +13,7 @@ const error=code=>({contract:'Wsprry-Control/1',schema:'target-error',error:{cod
   if(url.endsWith('/targets'))return reply({contract:'Wsprry-Control/1',schema:'targets',targets:['a','b'].map(id=>({device_id:id.repeat(32),product:'WsprryPico',name:'Pico '+id,profile_generation:'1',connection_generation:'1'}))});
   const device=url.includes('a'.repeat(32))?'a':'b';
   if(url.endsWith('/management'))return reply({contract:'Wsprry-Control/1',carrier:'usb_physical',host:'',session:metadataSession,connected:true,selection_id:device.repeat(32),...(metadataFault?{unexpected:true}:{})},200,{'X-WsprryPi-Target-Context':device.repeat(32)});
-  if(options.method==='POST')return new Promise(resolve=>pending.push(()=>resolve(hold?reply(error('recovery_required'),503,{'Location':'/api/control/v1/targets/'+device.repeat(32)+'/operations/'+'9'.repeat(32),'X-WsprryPi-Recovery-Resource':badHint?'https://untrusted.invalid/':'restart'}):reply({contract:'Wsprry-Control/1',saved:true},200))));
+  if(options.method==='POST')return new Promise(resolve=>pending.push(()=>resolve(hold?reply(error('recovery_required'),503,{'Location':'/api/control/v1/targets/'+device.repeat(32)+'/operations/'+'9'.repeat(32),'X-WsprryPi-Recovery-Resource':badHint?'https://untrusted.invalid/':'restart'}):reply({contract:'Wsprry-Control/1',saved:true},200,{'X-WsprryPi-Operation-ID':options.headers['X-WsprryPi-Operation-ID']}))));
   return reply({contract:'Wsprry-Control/1',schema:'pico-settings'},200);
  }});
  await assert.rejects(client.open({id:'bad'}),/saved_profile_required/);
@@ -58,7 +58,7 @@ const error=code=>({contract:'Wsprry-Control/1',schema:'target-error',error:{cod
   if(url.endsWith('/management'))return reply({contract:'Wsprry-Control/1',carrier:'usb_physical',host:'',session:null,connected:true,selection_id:'a'.repeat(32)},200,{'X-WsprryPi-Target-Context':'a'.repeat(32)});
   if(url.endsWith('/host/management-session'))return reply({contract:'Wsprry-Control/1',schema:'controller-browser-session'},200,{'X-WsprryPi-CSRF':'c'.repeat(64)});
   if(drop){drop=false;firstOperation=options.headers['X-WsprryPi-Operation-ID'];throw Error('Lost reply');}
-  return reply({contract:'Wsprry-Control/1',saved:true});
+  return reply({contract:'Wsprry-Control/1',saved:true},200,{'X-WsprryPi-Operation-ID':options.headers['X-WsprryPi-Operation-ID']});
  }}),boundedTarget=await bounded.open(profiles.a);
  await assert.rejects(boundedTarget.request('configuration',{method:'POST',revision:'"1"',body:{}}),/request_unconfirmed/);
  for(let i=0;i<270;i++)await boundedTarget.request('configuration',{method:'POST',revision:'"1"',body:{}});
@@ -77,5 +77,12 @@ const error=code=>({contract:'Wsprry-Control/1',schema:'target-error',error:{cod
   assert.equal(ambiguous.operations().find(item=>item.operation===result.operation).state,'unconfirmed',code+' can follow an accepted browser-internal PUT retry');
  }
  assert.equal(sessions,2,'A CSRF refusal renews browser protection before another explicit operation');
+ const mismatched=create({crypto,fetch:async(url)=>{
+  if(url.endsWith('/management'))return reply({contract:'Wsprry-Control/1',carrier:'usb_physical',host:'',session:null,connected:true,selection_id:'a'.repeat(32)},200,{'X-WsprryPi-Target-Context':'a'.repeat(32)});
+  if(url.endsWith('/host/management-session'))return reply({contract:'Wsprry-Control/1',schema:'controller-browser-session'},200,{'X-WsprryPi-CSRF':'c'.repeat(64)});
+  return reply({contract:'Wsprry-Control/1',saved:true},200,{'X-WsprryPi-Operation-ID':'0'.repeat(32)});
+ }}),mismatchedTarget=await mismatched.open(profiles.a);
+ await assert.rejects(mismatchedTarget.request('hostname',{method:'PUT',revision:'"1"',body:{hostname:'draft'}}),error=>error.code==='request_unconfirmed'&&error.cause.code==='invalid_operation_metadata');
+ assert.equal(mismatched.operations()[0].state,'unconfirmed','A success for another operation cannot confirm this save');
  console.log('PASS: captured target contexts, concurrent accepted-write tracking, one CSRF bootstrap, no secret records, explicit recovery metadata, retired handles, and no mutation retries');
 })().catch(error=>{console.error(error);process.exitCode=1;});

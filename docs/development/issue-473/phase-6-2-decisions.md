@@ -1,23 +1,53 @@
-# Phase 6.2: researched recommendations for approval
+# Phase 6.2: approved decisions
 
-Status: all five decisions proposed, awaiting user approval. Researched
-2026-11-16. This records recommendations, not implementation authority or provider
-qualification. No approved normative contract is amended by this document alone.
-See the [implementation plan](phase-6-2-implementation-plan.md).
+Status: D62-01–D62-05 approved by the user on 2026-11-17. Researched
+2026-11-16. Approval adopts the listed contract/workflow amendments; provider
+qualification and implementation acceptance remain required. Phase-6.2 execution
+and required Pico companion changes were separately authorized on 2026-11-17.
+Implementation and software acceptance completed on 2026-11-18; see [final evidence](phase-6-2-final-acceptance.json). Intermediate approval checkpoints below retain their original research-time qualification statements. See the [implementation plan](phase-6-2-implementation-plan.md).
 
 | Decision | Recommendation | Approval effect |
 | --- | --- | --- |
 | D62-01 | Qualify Botan 3.14.1 for PAKE only and explicitly amend unreleased Pi pairing to SPAKE2+; retain OpenSSL/Mbed TLS for existing TLS roles. | Allows the specified protocol amendment and candidate qualification, not automatic production acceptance. |
-| D62-02 | Reuse USB-local Pico management, automatically negotiate attached Pico management through the managed Pi connection, and retain existing network Pico login. | The attached-Pico workflow follows the user's clarification; the other proposed Pico dispositions still await approval. |
+| D62-02 | Reuse USB-local Pico management, automatically negotiate attached Pico management through the managed Pi connection, and retain existing network Pico login. | All three Pico dispositions are approved; attached-Pico negotiation follows the user's clarification. |
 | D62-03 | Keep the phase-5 assignment digest and use the context ETag only for current HTTP preconditions. | Clarifies retirement revision semantics; does not reinterpret old receipts. |
 | D62-04 | Use a durable target-issued resume grant, consumed only by a currently paired old controller. | Defines remote rollback; revoked retirement-only credentials cannot resume schedules. |
 | D62-05 | Keep target-owned authenticated history and explicit completeness; use a separate retirement-only TLS purpose for callbacks. | Defines registration/reachability and the honest eligibility boundary under unchanged WTP. |
+
+## Approved execution closures
+
+The user approved all fourteen additional concrete definitions, P62-01 through P62-14, on 2026-11-17. None is awaiting approval. Their full shapes and retention rules are recorded in [phase-6.2 progress](phase-6-2-progress.md); approval does not replace implementation and acceptance checks.
+
+| Decision | Approved definition |
+| --- | --- |
+| P62-01 | Protected redacted `GET /api/control/v1/host/pairing`; required nullable authorization and gateway metadata on the current target context. Codes remain confined to the initiating window POST. |
+| P62-02 | Privately retain the controller's fresh temporary P-256 rotation key before prepare dispatch; atomically erase it when the derived next TLS key and exact recovery continuation are durable. Preserve the existing operation bounds and WAL version 1. |
+| P62-03 | Rotation HKDF info is the existing prefix followed by canonical JSON `[rotate-prepare request, rotate-prepared response]`, in that order with all existing fields. Algorithms, salt, shared-secret encoding and messages remain unchanged. |
+| P62-04 | Retirement transport salt hashes the exact canonical closed object `{purpose:"Wsprry-Pair/1/retirement-tls",target_id,controller_id,pair_id,authorization_generation,client_role:"target",server_role:"controller"}`; retain the approved verifier IKM, HKDF info, TLS purpose and version 1. |
+| P62-05 | Add the bounded private outgoing `pi-management-peers/1` index and pairing-only `peers` WAL image, stage pending keys before commit, bind the index digest in the selector, and retain version 1 and the six-image bound. Enroll only after authenticated commit readback. |
+| P62-06 | Separate bounded LAN management DNS-SD record with the actual bootstrap web port, fixed TLS port and public identity/boot/suite/schema bindings; protected closed `pair-discovery` projection, with 64 observations and 30-second expiry. Discovery grants no authority and preserves WTP discovery. |
+| P62-07 | Correct the service type to `_wsprry-mgmt._tcp.local.` to meet DNS-SD's 15-character service-name limit; retain P62-06's host, fields, ports, policies and workflow. |
+| P62-08 | Require nullable `action` in the current public Pair/1 window: the exact protected local Pair/Replace/Recover action while open, otherwise null; copy it into the existing hello without guessing or another operator step. |
+| P62-09 | Add the bounded private uncertain outgoing-pair recovery entries, preserving one current profile per target, combined 32 recovery rows, exact unresolved operation bindings and recovery-only key use. |
+| P62-10 | Add required read-only `renewal_required:boolean` to nonnull paired target-context authorization, computed by the target and inherited by attached-Pico contexts; automatically renew before settings mutation while preserving refusal/replay safeguards. |
+| P62-11 | Protected local pairing receipt GET, with its distinct server-owned local pairing binding; retain recovery after Remove without revoked TLS authority or a borrowed transmitter context. |
+| P62-12 | Distinct actual parent Pi/runtime-boot gateway binding, current incoming authorization generation as profile generation and connection generation `1`; no additional child grant. |
+| P62-13 | Bounded private remote-target enrollment index and shared existing per-target journals/epoch anchors; preserve unknown-write barriers across restart, replacement and moved Picos with unchanged storage versions/limits. |
+| P62-14 | Protected fixed unknown-operation review, 30-second current authenticated read token, and target-context retirement before clearing the controller/gateway barrier; retain historical unknown and old-pair receipt privacy. |
+
+The user explicitly approved P62-06 on 2026-11-17. See the concrete shapes, address policy and expiration rules in [phase-6.2 progress](phase-6-2-progress.md). Its implementation and validation remain required.
+
+The user explicitly approved P62-07 on 2026-11-17. The corrected service type is `_wsprry-mgmt._tcp.local.`; P62-06's host, fields, ports, policies and workflow remain approved. Native browser/publisher sources now exist behind the hardware-access guard, with intermediate native/Linux checks; production startup wiring and runtime discovery acceptance remain unfinished. See [phase-6.2 progress](phase-6-2-progress.md).
+
+The user explicitly approved P62-08 on 2026-11-17. Its required nullable `action` field is implemented in the current Pair/1 schema, strict validator, target window producer and controller fixtures. Intermediate contract/window/bootstrap checks pass. The production outgoing coordinator and final integration remain unfinished. See [phase-6.2 progress](phase-6-2-progress.md).
+
+The user explicitly approved P62-09 on 2026-11-17: a bounded private `uncertain` outgoing-pair array so an explicit new pairing attempt can stage its keys while retaining an earlier unknown initial commit for exact recovery. Current profiles remain limited to 64; retired plus uncertain recovery rows remain limited to 32, with the existing operation bounds, one current profile per target, version 1, four-image publication and six-image WAL limit. See the precise scope and non-authority rules in [phase-6.2 progress](phase-6-2-progress.md). Implementation and validation of this approved boundary are in progress.
 
 ## D62-01 — PAKE provider and narrow wire amendment
 
 ### Evidence
 
-The approved RFC 9382 SPAKE2 suite must not be confused with RFC 9383 SPAKE2+.
+The original phase-1 RFC 9382 SPAKE2 suite must not be confused with RFC 9383 SPAKE2+.
 They have different registration, transcript, and confirmation behavior; a provider
 for one is not a drop-in implementation of the other.
 [RFC 9382](https://www.rfc-editor.org/rfc/rfc9382.html),
@@ -163,7 +193,7 @@ authority; direct Pico network requests still cannot request USB-local authority
 
 Tradeoff: automatic management negotiation over the connection already used for
 the Pi, with no extra operator grant workflow. The separate proposal to exclude
-a new Pico network PAKE protocol from 6.2 still awaits approval.
+a new Pico network PAKE protocol from 6.2 was approved on 2026-11-17.
 
 ## D62-03 — Distinguish assignment identity from HTTP concurrency
 
@@ -344,7 +374,7 @@ credential, approve a dedicated retirement-only TLS purpose on the same bounded
   `Wsprry-Pair/1/retirement-tls-psk`; identity is
   `Wsprry-Retirement/1/{pair_id}/{authorization_generation}`. Store no additional
   long-lived transport key. Standard PSK guidance calls for identity and purpose
-  separation; these exact application bindings are the proposed amendment.
+  separation; these exact application bindings are the amendment approved on 2026-11-17.
   [External PSK guidance](https://www.rfc-editor.org/rfc/rfc9257.html).
 - Permit only the two existing retirement/status POST messages under that
   principal, still checking their body MACs, pair, IDs, transition, and generation.
@@ -373,7 +403,7 @@ an arbitrary fresh Plain-LAN WTP client.
 
 ## Approval, validation, and documentation boundaries
 
-All five decisions remain **proposed**. Approval adopts their specific behavior
+All five decisions are **approved** as of 2026-11-17. Approval adopts their specific behavior
 and listed prerelease contract amendments; it does not certify Botan, bypass
 phase 6.1, authorize Pico edits, implement code, or authorize Git/hardware actions.
 After approval, update owning normative definitions, one-current schemas,
@@ -398,9 +428,36 @@ The recommendations retain their gates and
 safe pending states. Required implementation evidence remains
 outstanding; this is a decision proposal, not a completed security milestone.
 
-Final full reassessment found no further actionable recommendation defects after
-those corrections. All five approval states remain pending; provider security/
-packaging qualification and implementation tests are deliberately not claimed.
+The original proposal reassessment found no further actionable recommendation defects after those corrections. The user subsequently approved all five recommendations, as recorded at the start of this document. That approval does not establish provider packaging qualification or implementation acceptance.
 Documentation Impact: this decision record and the linked implementation plan
 are updated; operator guides, firmware, application code, dependencies, and phase
 indicators are unchanged. No implementation, staging, commit, or push occurred.
+
+The user explicitly approved P62-10 on 2026-11-17: add read-only `renewal_required:boolean` to nonnull current target-context authorization metadata so the controller can automatically honor target-local renewal before mutation. See the exact shape, admission and replay limits in [phase-6.2 progress](phase-6-2-progress.md#p62-10--approved-automatic-target-side-renewal-indication). Implementation and coordinated validation are now authorized and remain required.
+
+## Approved execution closure P62-11
+
+The user approved P62-11 on 2026-11-17: add protected read-only host-pairing operation receipt retrieval and clarify the existing ordinary receipt binding for local pairing commands, including controller-only roles. The exact route, binding, invariants and validation are in [phase-6.2 progress](phase-6-2-progress.md#p62-11--approved-local-pairing-receipt-recovery). Implementation and coordinated validation are authorized. Version 1 and WTP/browser transport scope remain unchanged.
+
+## Approved execution closure P62-12
+
+The user approved P62-12 on 2026-11-17: use a distinct server-owned parent management binding for the already approved attached-Pico gateway contexts, with actual parent/runtime boot, current incoming authorization generation as profile generation and connection generation `1`. It never supplies native Pi settings/migration or local pairing receipt authority. The exact binding, invalidation rules and tests are in [phase-6.2 progress](phase-6-2-progress.md#p62-12--approved-parent-management-binding-for-attached-pico-contexts). No new field, storage counter, operator grant, pairing step or WTP change is authorized. Implementation and coordinated validation are required.
+
+
+## Additional approved persistence boundary
+
+P62-13, approved by the user on 2026-11-17, adds a bounded private remote-management enrollment index and reuse of the existing anchored per-target journals for remote Pi and attached-Pico accepted writes. The exact representation, existing limits, unknown-outcome/replacement safeguards, compatibility boundary and required tests are recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-13--approved-remote-management-journal-enrollment-boundary). Its implementation and validation remain unfinished; current remote-read foundations grant no remote-write authority.
+
+
+## Approved execution closure P62-14
+
+P62-14, approved by the user on 2026-11-17, adds an explicit fenced unknown-operation review interface for native Pi and attached-Pico management, preserving historical unknown receipts and old-pair receipt privacy. Its exact closed messages, current-context readback token, context retirement ordering and refusal cases are recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-14--approved-explicit-unknown-operation-review-boundary). Implementation and coordinated validation remain required. Existing P62-13 index and exact receipt-recovery work continues independently.
+
+
+P62-15 was approved by the user on 2026-11-18: [resume-outcome recovery after re-pairing](phase-6-2-progress.md#p62-15--approved-resume-outcome-recovery-after-re-pairing) adds an original-pair proof to the current `resume-ack` only for resolving an existing grant over a fresh current pair with the same controller. It does not permit new consumption under another pair or broaden retirement TLS. Apply the exact approved cryptographic encoding and scope; the strict-hold alternative was not selected. Implementation and full validation remain required.
+
+P62-16 was approved by the user on 2026-11-18: [authenticated WTP binding for legacy resumption](phase-6-2-progress.md#p62-16--approved-authenticated-wtp-binding-for-legacy-resumption). It carries the existing actual WTP generation and listener ports in the management migration view and one-use grant, then refreshes only verified source connection/admission metadata during atomic consumption. WTP behavior, frozen historical digests and version 1 stay unchanged. This closes an otherwise stale-assignment rollback failure; apply the approved schema and atomic resume-consumption changes with coordinated validation.
+
+## Implementation disposition
+
+D62-01 through D62-05 and P62-01 through P62-16 are implemented and software-accepted for the retained final source pair. No decision remains open. Botan 3.14.1 passed the approved narrow provider/maintenance/package gates; OpenSSL and Mbed TLS retain their existing roles. Future dependency updates must repeat the documented review and matrix. WTP and browser-hop security remain separate backlog work. This disposition authorizes neither phase 7 nor hardware operation.

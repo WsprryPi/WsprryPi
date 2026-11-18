@@ -36,13 +36,18 @@ bool match(const Json &value,const Json &rule,const Json &definitions,unsigned d
     if(depth>16||!rule.is_object())return false;
     if(rule.contains("$ref")) {
         const auto ref=rule["$ref"].get<std::string>();const std::string prefix="#/$defs/";
-        if(!ref.starts_with(prefix)||!definitions.contains(ref.substr(prefix.size())))return false;
-        return match(value,definitions[ref.substr(prefix.size())],definitions,depth+1);
+        if(!ref.starts_with(prefix))return false;
+        return match(value,definitions.at(Json::json_pointer(ref.substr(prefix.size()-1))),definitions,depth+1);
     }
     for(const auto *key:{"allOf","anyOf","oneOf"})if(rule.contains(key)) {
         unsigned count=0;for(const auto &branch:rule[key])if(match(value,branch,definitions,depth+1))++count;
         if((std::string_view(key)=="allOf"&&count!=rule[key].size())||(std::string_view(key)=="anyOf"&&!count)||
             (std::string_view(key)=="oneOf"&&count!=1))return false;
+    }
+    if(rule.contains("not")&&match(value,rule["not"],definitions,depth+1))return false;
+    if(rule.contains("if")){
+        const auto branch=match(value,rule["if"],definitions,depth+1)?"then":"else";
+        if(rule.contains(branch)&&!match(value,rule[branch],definitions,depth+1))return false;
     }
     if(rule.contains("const")&&value!=rule["const"])return false;
     if(rule.contains("enum")&&std::find(rule["enum"].begin(),rule["enum"].end(),value)==rule["enum"].end())return false;
@@ -92,6 +97,9 @@ bool match(const Json &value,const Json &rule,const Json &definitions,unsigned d
     return true;
 }
 }
+bool valid_closed_contract_document(const Json &value,const Json &rule,const Json &definitions) {
+    try{return match(value,rule,definitions,0);}catch(...){return false;}
+}
 bool valid_controller_document(const nlohmann::json &value,std::string_view name) {
     try {
         static const auto adapter=Json::parse(controller_adapter_contract());
@@ -118,6 +126,15 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
             }
         }
         if(name=="targets") {std::set<std::string> ids;for(const auto &target:value["targets"])if(!ids.insert(target["device_id"]).second)return false;}
+        if(name=="pair-discovery") {
+            if(value["available"]==false&&!value["discoveries"].empty())return false;
+            std::set<std::string> handles,devices;
+            for(const auto &entry:value["discoveries"]){
+                if(!handles.insert(entry["discovery_id"].get<std::string>()).second||!devices.insert(entry["device_id"].get<std::string>()).second||
+                    entry["host"]!="wsprry-management-"+entry["device_id"].get<std::string>()+".local."||
+                    entry["control_schema_digest"]!=control_schema_sha256)return false;
+            }
+        }
         if(name=="target-context") {
             for(const auto *field:{"device_id","profile_generation","connection_generation"})
                 if(value["target"][field]!=value["binding"][field])return false;
@@ -125,6 +142,19 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
             for(const auto &capability:value["capabilities"])
                 if(!resources.insert(capability["resource"].get<std::string>()).second||
                     (capability["activation"]=="unsupported"&&capability["write"]==true))return false;
+            const auto &authorization=value["authorization"],&gateway=value["gateway"];
+            if(!gateway.is_null()) {
+                if(value["target"]["product"]!="WsprryPico"||authorization.is_null()||gateway["child"]!=value["binding"]||
+                    gateway["parent"]["device_id"]==gateway["child"]["device_id"]||gateway["pair_id"]!=authorization["pair_id"]||
+                    gateway["authorization_generation"]!=authorization["authorization_generation"])return false;
+            }else if(!authorization.is_null()&&value["target"]["product"]!="WsprryPi")return false;
+        }
+        if(name=="pairing-state") {
+            const auto state=value["state"].get<std::string>();
+            if(state=="paired"&&(value["manager"].is_null()||value["authorization_generation"]=="0"))return false;
+            if((state=="unpaired"||state=="access_recovery")&&!value["manager"].is_null())return false;
+            if((state=="access_recovery"||state=="unavailable")&&!value["window"].is_null())return false;
+            if(!value["manager"].is_null()&&value["manager"]["device_id"]==value["device_id"])return false;
         }
         if(name=="target-status"&&value["execution_owner"]!=value["binding"]["device_id"])return false;
         if(name=="host-readiness"){

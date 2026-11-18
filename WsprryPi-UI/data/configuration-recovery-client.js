@@ -148,6 +148,7 @@
                 if (captured !== revision) throw new RecoveryError('draft_changed');
                 return accept(value);
             },
+            async targets() {return document(await request(base+'/targets'),'targets');},
             async readiness() {
                 const value = await document(await request(base + '/host/readiness'),'host-readiness');
                 if (current?.binding && (value.device_id !== current.binding.device_id || value.boot_id !== current.binding.boot_id))
@@ -165,24 +166,35 @@
                 try{return {data:await document(response,body?'controller-retirement-operation':'controller-retirements'),etag:response.headers.get('ETag'),status:response.status};}
                 catch(error){if(error.code==='csrf_failed')token='';throw error;}
             },
-            // Current native-target migration only. Closed routes and families
+            // Current native-target resources only. Closed routes and families
             // share the same bounded parser and protected browser session.
             async targetRequest(device,resource,{method='GET',body=null} = {}) {
                 if(!/^[0-9a-f]{32}$/.test(device)) throw new RecoveryError('target_mismatch');
-                const read = {context:'target-context',settings:'target-settings',migration:'target-migration-read'};
+                const read = {context:'target-context',settings:'target-settings',status:'target-status',migration:'target-migration-read'};
                 const operation = /^operations\/[0-9a-f]{32}$/.test(resource);
-                const write = method === 'POST' && ['migration','migration/rollback'].includes(resource);
+                const review = /^operations\/[0-9a-f]{32}\/review$/.test(resource) && method === 'POST';
+                const write = review || method === 'POST' && ['migration','migration/rollback','stop','disable'].includes(resource) || method === 'PUT' && resource === 'settings';
                 if(!(method === 'GET' && (own(read,resource) || operation)) && !write) throw new RecoveryError('unsupported_resource');
-                const family = write ? resource.endsWith('/rollback') ? 'target-migration-rollback' : 'target-migration' : operation ? 'target-operation' : read[resource];
+                const family = review ? 'target-operation-review' : write ? ({settings:'target-save',stop:'target-stop',disable:'target-action',migration:'target-migration','migration/rollback':'target-migration-rollback'})[resource] : operation ? 'target-operation' : read[resource];
                 const headers = {};
                 if(write) {
-                    if(!control.validControllerDocument(body,family) || body.binding.device_id !== device) throw new RecoveryError('candidate_invalid');
+                    if(!control.validControllerDocument(body,family) || body.binding.device_id !== device || review && resource !== 'operations/'+body.operation_id+'/review') throw new RecoveryError('candidate_invalid');
                     headers['Content-Type']='application/json';headers['X-WsprryPico-Request']='1';
-                    headers['X-WsprryPi-CSRF']=await session();headers['If-Match']='"'+body.expected_revision+'"';
+                    token=''; // Read a fresh protected lease after automatic key/session retirement.
+                    headers['X-WsprryPi-CSRF']=await session();if(!review)headers['If-Match']='"'+body.expected_revision+'"';
                 }
                 const response=await request(base+'/targets/'+device+'/'+resource,{method,headers,...(write?{body:JSON.stringify(body)}:{})});
-                try {return {data:await document(response,write?'target-operation':family),status:response.status,etag:response.headers.get('ETag')};}
-                catch(error) {if(error.code==='csrf_failed') token='';throw error;}
+                try {return {data:await document(response,review?'target-operation-reviewed':write?'target-operation':family),status:response.status,etag:response.headers.get('ETag'),readbackRevision:response.headers.get('X-WsprryPi-Readback-Revision')};}
+                catch(error) {
+                    if(error.code==='csrf_failed')token='';
+                    const location=response.headers.get('Location'),start=base+'/targets/'+device+'/operations/';
+                    if(error.code==='recovery_required'&&location?.startsWith(start)&&/^[0-9a-f]{32}$/.test(location.slice(start.length))) {
+                        error.operation=location.slice(start.length);
+                        const recovery=response.headers.get('X-WsprryPi-Recovery-Resource');
+                        if(['settings','status','migration'].includes(recovery))error.resource=recovery;
+                    }
+                    throw error;
+                }
             },
             set(section,key,value) {
                 if (!draft || !own(draft,section) || !own(draft[section],key) || section === 'WTP' && privateKeys.has(key))
@@ -206,7 +218,7 @@
             retry:dispatch
         });
     }
-    const api = Object.freeze({create,RecoveryError});
+    const api = Object.freeze({create,RecoveryError,readControllerDocument:document});
     root.ConfigurationRecoveryClient = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window === 'undefined' ? globalThis : window);

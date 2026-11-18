@@ -7,6 +7,7 @@
 #include "wtp_integration/controller_contract.hpp"
 #include "wtp_integration/control_contract.hpp"
 #include "wtp_integration/pi_configuration_recovery.hpp"
+#include "wtp_integration/pi_pair_owner.hpp"
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
@@ -36,11 +37,15 @@ std::shared_ptr<PiManagedHost> prepare_pi_managed_host(const std::string &ini){
     WtpPiBootIdentity identity;registry.boot=identity.new_boot_id();
     try{registry.self=wtp_pi_device_id();}catch(...){return {};}
     try{
-        auto host=std::make_shared<PiManagedHost>(ini,registry.self,registry.boot,wtp_pi_management_observation);
+        std::function<void(PiPairInitializationProof)> pairing;
+        try{const auto owner=prepare_pi_pair_owner(registry.self);pairing=[owner](PiPairInitializationProof proof){owner->provision(std::move(proof));};}
+        catch(...){/* Pairing-only failure cannot change native startup or role. */}
+        auto host=std::make_shared<PiManagedHost>(ini,registry.self,registry.boot,wtp_pi_management_observation,std::move(pairing));
         host->prepare();registry.host=host;return host;
     }catch(...){return {};}
 }
 std::shared_ptr<PiManagedHost> pi_managed_host(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.host.lock();}
+std::string pi_managed_host_process_boot(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.boot;}
 void poll_pi_managed_migration() noexcept {try{if(const auto host=pi_managed_host())host->advance_migration();}catch(...){}}
 bool pi_managed_host_selected(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.selected;}
 bool pi_managed_host_protected_recovery_path(std::string_view path){

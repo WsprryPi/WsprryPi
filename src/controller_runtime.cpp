@@ -11,6 +11,8 @@
 #include "web_socket.hpp"
 #include "wtp_endpoint/identity.hpp"
 #include "wtp_integration/catalog.hpp"
+#include "wtp_integration/pi_pair_local_routes.hpp"
+#include "wtp_integration/pi_pair_owner.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/pico_management_journal.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
@@ -24,7 +26,7 @@
 
 namespace {
 std::atomic_bool controller_role{false}, controller_ready{false};
-std::string controller_identity;
+std::string controller_identity,controller_boot;
 
 int port_number(const std::string &value) {
     int port{};
@@ -110,6 +112,8 @@ void configure_controller_only(int argc, char *argv[]) {
     controller_role.store(true, std::memory_order_release);
 }
 
+std::string controller_only_process_boot(){return controller_ready.load(std::memory_order_acquire)?controller_boot:std::string{};}
+
 nlohmann::json controller_only_status() {
     return {{"role", "controller-only"}, {"controller_ready", controller_ready.load()},
         {"device_id", controller_identity}, {"local_output", nullptr},
@@ -121,6 +125,8 @@ bool controller_http_allowed(std::string_view method, std::string_view path) {
     if (method == "GET" && (path == "/" || path == "/version" || path == "/status" ||
         path == "/api/control/v1/status")) return true;
     if (!controller_ready.load(std::memory_order_acquire)) return false;
+    if((method=="GET"&&wsprrypi::local_pairing_read_path(path))||
+        (method=="POST"&&wsprrypi::local_pairing_mutation_path(path))||wsprrypi::pi_pair_bootstrap_path(method,path))return true;
     if(path=="/api/control/v1/targets"||path.starts_with("/api/control/v1/targets/"))
         return method=="GET"||method=="PUT"||method=="POST"||method=="DELETE";
     if(path=="/api/control/v1/host/management-session")return method=="POST";
@@ -134,11 +140,16 @@ bool controller_http_allowed(std::string_view method, std::string_view path) {
 bool controller_only_loop(const std::string &fixture_identity) {
     if (!controller_only_mode()) throw std::logic_error("Controller role was not selected");
     bool result = false;
+    std::shared_ptr<wsprrypi::PiPairOwner> pairing_owner;
     const char *stage = "identity";
     try {
         controller_identity = fixture_identity.empty() ? wsprrypi::wtp_pi_device_id() : fixture_identity;
         if (controller_identity.size() != 32 || controller_identity.find_first_not_of("0123456789abcdef") != std::string::npos)
             throw std::runtime_error("Controller identity is invalid");
+        if(controller_boot.empty()){wsprrypi::WtpPiBootIdentity boot;controller_boot=boot.new_boot_id();}
+        // Retain the real production role's private owner through web/Fleet
+        // shutdown. Explicit-identity fixtures never select host private state.
+        if(fixture_identity.empty())try{pairing_owner=wsprrypi::prepare_pi_pair_owner(controller_identity);}catch(...){/* Independent pairing hold. */}
         stage = "catalog";
         wsprrypi::WtpCatalog catalog(config.ini_filename + ".wtp-devices.json");
         (void)catalog.snapshot({});

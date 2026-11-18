@@ -65,6 +65,17 @@ void readback(const Json &v,const std::string &resource,const Json &target){
     }
 }
 }
+bool pico_usb_settings_response_valid(const std::string &resource,const PicoHttpResponse &response,const Json &target){
+    try{
+        const auto value=document(response);require(etag(response.etag));
+        if(resource=="restart"||resource=="ap"){
+            const auto key=resource=="restart"?"restart_requested":"requested";
+            return response.status==202&&fields(value,{key})&&value[key]==true;
+        }
+        if(resource!="wifi"&&resource!="hostname"&&resource!="logging")return false;
+        require(response.status==200);readback(value,resource,target);return true;
+    }catch(...){return false;}
+}
 PicoHttpResponse pico_usb_settings_request(const PicoManagementExchange &exchange,const std::string &device,const std::string &boot,const std::string &resource,const std::string &method,const std::string &body,const std::string &revision){
     bool attempted=false;
     try{

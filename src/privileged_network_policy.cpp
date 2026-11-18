@@ -1,4 +1,5 @@
 #include "privileged_network_policy.hpp"
+#include "wtp_integration/pi_pair_local_routes.hpp"
 #include "wtp_integration/control_contract.hpp"
 
 #include <algorithm>
@@ -91,6 +92,9 @@ PrivilegedOperationClass classify_privileged_http_operation(
     }
 
     if (path.starts_with("/api/control/v1/")) {
+        if((wsprrypi::local_pairing_read_path(path)&&method=="GET")||
+            (wsprrypi::local_pairing_mutation_path(path)&&method=="POST"))
+            return PrivilegedOperationClass::protected_operation;
         if((path=="/api/control/v1/host/readiness"&&method=="GET")||
             (path=="/api/control/v1/host/retirements"&&(method=="GET"||method=="POST"))||
             (path=="/api/control/v1/host/configuration-recovery"&&(method=="GET"||method=="PUT"||method=="POST")))

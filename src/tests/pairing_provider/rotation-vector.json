@@ -1,0 +1,11 @@
+{
+  "schema": "constructed-rotation-fixture/1",
+  "controller_private": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE",
+  "target_private": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI",
+  "current_psk": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+  "next_psk": "gvFpEK9NkMXABg47bNGZ5SqvBe0M31ihFsYKuU3EXCE",
+  "shared_x_hex": "7cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978",
+  "prepare_json": "{\"contract\":\"Wsprry-Pair/1\",\"expected_epoch\":\"7\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"operation_id\":\"dddddddddddddddddddddddddddddddd\",\"pA\":\"BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU\",\"pair_id\":\"cccccccccccccccccccccccccccccccc\",\"schema\":\"rotate-prepare\"}",
+  "prepared_json": "{\"contract\":\"Wsprry-Pair/1\",\"next_epoch\":\"8\",\"nonce\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\",\"operation_id\":\"dddddddddddddddddddddddddddddddd\",\"pB\":\"BHzyexiNA09-ilI4AwS1GsPAiWnid_IbNaYLSPxHZpl4B3dVENuO0EApPZrGn3Qw27p9reY86YIpngS3nSJ4c9E\",\"schema\":\"rotate-prepared\"}",
+  "info_utf8": "Wsprry-Pair/1/rotation/[{\"contract\":\"Wsprry-Pair/1\",\"expected_epoch\":\"7\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8\",\"operation_id\":\"dddddddddddddddddddddddddddddddd\",\"pA\":\"BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU\",\"pair_id\":\"cccccccccccccccccccccccccccccccc\",\"schema\":\"rotate-prepare\"},{\"contract\":\"Wsprry-Pair/1\",\"next_epoch\":\"8\",\"nonce\":\"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\",\"operation_id\":\"dddddddddddddddddddddddddddddddd\",\"pB\":\"BHzyexiNA09-ilI4AwS1GsPAiWnid_IbNaYLSPxHZpl4B3dVENuO0EApPZrGn3Qw27p9reY86YIpngS3nSJ4c9E\",\"schema\":\"rotate-prepared\"}]"
+}

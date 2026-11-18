@@ -1,6 +1,7 @@
 # Phase 6.2 implementation plan: automatic Pi security and remote management
 
-Status: planning complete; implementation not started. Prepared 2026-11-16.
+Status: phase-6.2 execution authorized on 2026-11-17; software acceptance completed on 2026-11-18. See the [final evidence](phase-6-2-final-acceptance.json).
+Prepared 2026-11-16. See [execution progress](phase-6-2-progress.md).
 This plan does not authorize implementation, companion edits, hardware operation,
 staging, commits, pushes, merging, publication, or phase 7. It expands the
 [6.2 execution prompt](06-2-pi-security.md), the [security gate](deferred-pi-security.md),
@@ -8,10 +9,10 @@ and approved [pairing](phase-1-pairing.md), [decisions](phase-1-decisions.md), a
 [normative contracts](phase-1-contract-details.md); it does not supersede them.
 
 Research update (2026-11-16): the five previously open questions now have concrete
-[D62-01–D62-05 recommendations](phase-6-2-decisions.md), all awaiting approval.
+[D62-01–D62-05 recommendations](phase-6-2-decisions.md), approved by the user on 2026-11-17.
 They include a conditional PAKE-provider/profile amendment, explicit Pico scope,
 revision clarification, current-pair rollback, and target-owned authority history.
-Approved contracts remain binding until the user accepts the relevant amendment.
+The approved amendments now govern their owning contracts.
 Approving a recommendation does not itself qualify a provider or authorize execution.
 
 ## Outcome and boundaries
@@ -27,8 +28,7 @@ durable authority rather than discovery, silence, or pairing alone.
 Included: provider qualification; automatic Pi pairing/TLS and recovery;
 authenticated remote Pi management; deferred target/editor integration;
 authenticated known-controller retirement and guarded rollback; coordinated
-contracts, tests, packaging support, and documentation. Resolve the recorded
-Pico/USB pairing proposals before implementing any affected flow.
+contracts, tests, packaging support, and documentation. Apply the approved D62-02 Pico/USB dispositions when implementing each affected flow.
 
 Excluded: phase-6.1 recurrence development, phase-7 Scheduling UI, new Pico
 scheduling, multiple simultaneous management owners, a new human-login system,
@@ -47,9 +47,9 @@ planning edits, including the 6.1/6.2 subdivision and recorded pairing proposals
 preserve them and the unrelated SQLite prompt. Reinspect all sources and dirty
 changes at execution; these revisions are observations, not permanent pins.
 
-Phases 1–5 are accepted. Phase 6.1 is not started, so 6.2 implementation cannot
-start under its saved prerequisite gate. Planning does not change either phase
-indicator. Later execution requires accepted 6.1 evidence and explicit authority.
+Phases 1–6.1 are accepted. Phase-6.2 execution and its required Pico companion
+scope were authorized on 2026-11-17. The dated planning baseline above is
+historical; the execution record identifies the current accepted sources.
 Required Pico changes need fresh, phase-6.2 companion authority; phase-5 permission
 does not carry forward. Operator-docs work follows the plan's cross-repository
 authority and that repository's instructions. Reusable component changes require
@@ -77,7 +77,7 @@ bounded engineering deliverable within those approved behaviors.
 
 | Gate | Required resolution and evidence |
 | --- | --- |
-| PAKE provider | Maintained, auditable RFC 9382 SPAKE2 P-256/SHA-256 implementation, official vectors, exact point/transcript/confirmation behavior, license and notices, reviewable security evidence, dated upstream maintenance/advisory history, and an identified update source and maintainer-owned update process. Tests alone are not a security qualification. Do not hand-roll PAKE arithmetic or substitute a similarly named exchange. |
+| PAKE provider | Maintained, auditable approved RFC 9383 SPAKE2+ P-256/SHA-256 implementation, official vectors, exact amended point/transcript/confirmation behavior, license and notices, reviewable security evidence, dated upstream maintenance/advisory history, and an identified update source and maintainer-owned update process. Tests alone are not a security qualification. Do not hand-roll PAKE arithmetic or substitute a similarly named exchange. |
 | Packaging/platforms | Demonstrate reproducible ordinary builds, dependency resolution, packaged runtime loading, and one routine dependency-update rehearsal on the supported Linux architectures and production macOS roles. Use existing build/container recipes and isolated package roots. No manual operator downloads, toolchain repair, keys, or files. Retain OpenSSL/Mbed TLS; BoringSSL remains held and is rejected for pairing if regular maintenance or seamless packaging cannot be demonstrated. |
 | Pi authentication boundary | Define a typed authenticated principal containing self/peer identity, pair namespace, authorization generation, epoch, and role. Specify where current authorization is checked and locked through commit. Browser cookies/local booleans are not machine credentials; never call the local service with fabricated local authority. |
 | Retirement revision and rollback | Reconcile the normative old-store-ETag wording with phase 5's immutable per-assignment digest and separate public context ETag. Preserve persistent assignment IDs, frozen intent, and exact replay. Close the authenticated old-controller resume/rollback command and its disabled-target proof before adding a resume path; the current retirement book has no unretire API. Obtain approval for a protocol-facing clarification or new command rather than reinterpret existing receipts. |
@@ -116,6 +116,8 @@ Reject unsupported versions, duplicate/missing/extra fields, invalid UTF-8 and
 encodings, malformed points, changed limits, and identity/boot/profile/generation
 mismatches before secret work or mutation. Pairing discovery advertises only
 availability and approved public fields. It never enrolls or grants capability.
+
+Apply approved P62-06/P62-07's exact separate management DNS-SD locator and bounded protected discovery projection, and P62-08's nullable public-window action binding, as specified in the [normative supplement](phase-1-contract-details.md). Preserve the actual configurable bootstrap web port, current schema digest and private-address/self checks; a controller copies the target's explicit window action rather than guessing or adding an operator step. Native publication must match the actual listener address families and readiness.
 
 Keep route trust distinct: protected browser commands require existing session/
 CSRF controls; LAN public bootstrap has only its bounded operator-opened PAKE
@@ -282,7 +284,7 @@ Enable the existing remote Pi target editors only after their security gate pass
 Do not add the phase-7 Scheduling editor. Explicit remote Stop uses existing
 observation/reservation/receipt semantics; no management operation gains RF ownership.
 
-If D62-02 is approved, direct USB Pico management reuses existing physical/local
+Under approved D62-02, direct USB Pico management reuses existing physical/local
 authority without adding a PAKE bond; network Pico login remains unchanged.
 
 The user's attached-Pico clarification requires automatic management negotiation
@@ -291,8 +293,8 @@ child-scope approval, or additional pairing prompt. Use verified typed gateway
 contexts and the existing resource allowlist. Normal Pi replacement automatically
 negotiates fresh child contexts; revocation closes the old manager's path. No direct
 network selection of Pico USB authority, raw tunnel, firmware updater, or WTP
-dispatch is granted. The other D62-02 dispositions remain proposed; no new Pico
-IP-code pairing is claimed or implicitly approved.
+dispatch is granted. The approved D62-02 dispositions retain existing Pico IP login and exclude a new
+Pico IP-code pairing protocol.
 
 Exit: a zero-output controller and two separate simulated target processes prove
 isolated persistence, direct-API refusal, independent drafts/receipts, late-reply
@@ -305,7 +307,7 @@ contracts using the resolved revision mapping and authenticated peer registry.
 The target orchestrates only its verified complete prior-authority inventory;
 the browser cannot submit retirement proof or redefine that inventory. Use the
 pair-specific retirement verifier and exact target/controller/assignment/transition/
-generation bindings. A retirement-only verifier grants no TLS/settings authority.
+generation bindings. A retirement-only verifier grants no ordinary management TLS or settings authority; its separately approved retirement-only TLS purpose is confined to retirement/status.
 
 Persist dispatch inhibition before retirement acknowledgement. Preserve accepted
 complete work and unresolved jobs; reconcile with fresh target evidence before
@@ -328,7 +330,7 @@ no generic clear-fence endpoint or automatic resume. A lost reply stays pending.
 Preserve ordinary fresh Plain-LAN WTP claims under existing Transmit-off rules;
 no claim-lane closure or permanent exclusion promise is added.
 
-Proposed D62-04 uses a target-issued resume grant over the old controller's current
+Approved D62-04 uses a target-issued resume grant over the old controller's current
 paired TLS connection. Revoked managers must first be paired again through normal
 UI; retirement-only keys cannot resume. Persist the target's native/local-legacy
 hold before releasing the grant, then atomically publish the old controller's
@@ -336,7 +338,7 @@ resumed disposition, assignment, anchor, and receipt before dispatch. Unknown
 delivery retains the hold; returning to native requires fresh retirement of the
 resumed generation. The decision register specifies route and context bindings.
 
-D62-05 proposes authenticated registration into the target-owned authority image,
+Approved D62-05 requires authenticated registration into the target-owned authority image,
 preserved across replacement/reset. It does not infer complete preexisting history
 from one paired controller or a browser assertion. Unknown legacy installations
 can remain in existing valid legacy mode with native migration unavailable.
@@ -344,11 +346,11 @@ This limit is necessary under unchanged WTP; ordinary WTP/manual work gains no
 registration requirement. D62-03 keeps assignment digests separate from HTTP ETags
 and controller-versus-target generation counters.
 
-D62-05 also proposes a separately scoped retirement-only TLS purpose on the same
+Approved D62-05 also requires a separately scoped retirement-only TLS purpose on the same
 bounded listener, deriving a purpose-specific transport key from retained
 retirement-verifier material. It accepts retirement/status only, never ordinary
-management or resume; revoked normal TLS keys stay erased. This additional ALPN/
-purpose amendment requires approval and coordinated exact validation. No plaintext
+management or resume; revoked normal TLS keys stay erased. This ALPN/purpose amendment was approved on 2026-11-17 and requires
+coordinated exact validation. No plaintext
 retirement callback or transport fallback is introduced.
 
 Exit: actual authenticated multi-process handover/rollback, offline old manager,

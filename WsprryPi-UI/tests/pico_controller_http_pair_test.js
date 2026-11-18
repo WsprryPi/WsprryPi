@@ -58,11 +58,14 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   for(const name of ['X-WsprryPi-Profile-ID','X-WsprryPi-Target-Context','X-WsprryPi-Operation-ID','X-WsprryPi-CSRF']) {
    await pause(110);
    const selected={Host:`127.0.0.1:${httpPort}`,Origin:origin,'Content-Type':'application/json','X-WsprryPico-Request':'1',Cookie:cookie,'X-WsprryPi-CSRF':csrf,...rejectedHeaders()};
+   // Exercise duplicated authorization metadata with valid bounded framing.
+   // Node otherwise emits chunked framing, refused before the HTTP adapter.
+   const body=JSON.stringify(payload('a','W1AW'));selected['Content-Length']=Buffer.byteLength(body);selected.Connection='close';
    const raw=Object.entries(selected).flat();raw.push(name,selected[name]);
    const denied=await new Promise((resolve,reject)=>{
     const request=http.request({hostname:'127.0.0.1',port:httpPort,path:target('a')+'configuration',method:'POST',headers:raw},response=>{
      let text='';response.on('data',part=>text+=part);response.on('end',()=>{try{resolve({status:response.statusCode,body:JSON.parse(text)});}catch(error){reject(error);}});
-    });request.on('error',reject);request.end(JSON.stringify(payload('a','W1AW')));
+    });request.on('error',reject);request.end(body);
    });assert.equal(denied.status,400);assert.equal(denied.body.schema,'target-error');
   }
   for(const override of [{'X-WsprryPi-CSRF':''},{'X-WsprryPi-CSRF':'0'.repeat(64)},{Cookie:''},{Origin:'http://untrusted.invalid'}]) {
@@ -119,9 +122,15 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   assert(!heldHistory.receipts.some(entry=>entry.receipt.operation_id===newId),'A held action must not reserve another receipt');
   const earlierReceipt=await call(earlier,'GET',undefined,headers.a);assert.equal(earlierReceipt.body.state,'unknown');
   assert.equal(earlierReceipt.response.headers.get('X-WsprryPi-Recovery-Resource'),'configuration');
+  const staleReview=await call(target('a')+'management','POST',{contract:'Wsprry-Control/1',action:'reconcile',operation_id:uncertainId,readback_revision:snapshots.a.response.headers.get('X-WsprryPi-Readback-Revision')},headers.a);
+  assert.equal(staleReview.status,409,'A later attempted mutation invalidates its earlier read token');
+  snapshots.a=await call(target('a')+'configuration','GET',undefined,headers.a);assert.equal(snapshots.a.status,200);
   const reviewed=await call(target('a')+'management','POST',{contract:'Wsprry-Control/1',action:'reconcile',operation_id:uncertainId,readback_revision:snapshots.a.response.headers.get('X-WsprryPi-Readback-Revision')},headers.a);
   assert.equal(reviewed.status,200,JSON.stringify(reviewed.body));assert.equal(reviewed.body.state,'unknown');
   assert.equal(reviewed.response.headers.get('X-WsprryPi-Recovery-Resource'),'configuration');
+  assert.notEqual(reviewed.context,headers.a['X-WsprryPi-Target-Context']);
+  headers.a['X-WsprryPi-Target-Context']=reviewed.context;
+  snapshots.a=await call(target('a')+'configuration','GET',undefined,headers.a);assert.equal(snapshots.a.status,200);
   const explicitSave=await call(target('a')+'configuration','POST',payload('a','W3AW'),operationHeaders('a',crypto.randomBytes(16).toString('hex'),snapshots.a.etag));assert.equal(explicitSave.status,200,JSON.stringify(explicitSave.body));
   afterA=await dump(a,lineA);assert.equal(afterA.config.station.callsign,'W3AW');
   // Exercise the browser's target client against the same real service pair.

@@ -10,12 +10,19 @@
 #include "native_recurrence.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_endpoint/identity.hpp"
+#include "pi_pair_history.hpp"
+#include "local_browser_principal.hpp"
+#include "pi_pair_owner.hpp"
+#include "recurrence_authority.hpp"
+#include "pi_pair_contract.hpp"
+#include "privileged_network_runtime.hpp"
 #include <openssl/rand.h>
 #include <limits>
 #include <charconv>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
+class PairedAdmissionHeld final:public std::runtime_error {public:PairedAdmissionHeld():std::runtime_error("paired_admission_held"){};};
 bool identity(const std::string &value){return value.size()==32&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
 std::string connection(){std::uint64_t value{};do{if(RAND_bytes(reinterpret_cast<unsigned char *>(&value),sizeof(value))!=1)throw std::runtime_error("management_entropy_unavailable");}while(!value);return std::to_string(value);}
 PicoHttpResponse document(const Json &value,const std::string &family,const std::string &revision={}){
@@ -29,6 +36,17 @@ bool writable(const PiManagementObservation &observation){
     return !state.remote.owner_id&&!state.remote.output_active&&!state.output_unknown&&!state.stop_reserved&&
         !state.revocation_unavailable&&!state.finishing_remote_job&&
         bool(observation.reserve_configuration)&&bool(observation.release_configuration);
+}
+bool local_migration_inventory(const Json &authority,const std::string &self){
+    if(authority.contains("management")){
+        if(!authority["management"]["complete"].get<bool>())return false;
+        for(const auto &row:authority["management"]["authorities"])if(!row["assignments"].empty())return false;
+    }
+    return authority["controllers"].size()==1&&authority["controllers"][0]["controller_id"]==self;
+}
+std::optional<Json> remote_migration_plan(const Json &authority,const std::string &transition){
+    try{auto plan=recurrence_retirement_plan(authority,transition);if(!plan["requests"].empty())return plan;}catch(...){}
+    return {};
 }
 bool migration_idle(const PiManagementObservation &state){
     return writable(state)&&!state.authority.local_work_active&&!state.output.owner_id&&!state.output.job_id&&
@@ -88,7 +106,7 @@ Json PiLocalManagementService::capabilities(const PiManagementObservation &state
             try{native_rollback=!store_.recurrence_progress()->held()&&store_.recurrence_progress()->snapshot()["in_flight"].is_null();}catch(...){}
         }
         const bool migratable=migration&&writable(state)&&(authority["jobs"].empty()||authority["state"]=="retiring")&&
-            authority["controllers"].size()==1&&authority["controllers"][0]["controller_id"]==self_&&
+            (local_migration_inventory(authority,self_)||remote_migration_plan(authority,std::string(32,'0')).has_value()||store_.remote_handover().has_value())&&
             (authority["state"]=="legacy"||authority["state"]=="rollback"||authority["state"]=="staged"||authority["state"]=="retiring"||native_rollback);
         const bool scheduling=std::string_view(resource)=="pi-scheduling";
         capability.update({{"resource",resource},{"read",!stop},{"write",(config&&writable(state))||scheduling||cancellable||migratable},
@@ -99,10 +117,70 @@ Json PiLocalManagementService::capabilities(const PiManagementObservation &state
     return result;
 }
 PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,bool authorized_local){
+    if(!authorized_local)return controller_target_error(403,"unauthorized");
+    if(request.method!="GET"&&!request.mutation_context)return controller_target_error(403,"csrf_failed");
+    return handle_authorized(request,{self_,"1",nullptr,nullptr,nullptr});
+}
+PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,const LocalBrowserPrincipal &principal,PiPairHistory &history){
+    if(!principal.matches(request))return controller_target_error(403,"unauthorized");
+    return handle_authorized(request,{self_,"1",&history,nullptr,nullptr,&principal});
+}
+PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,const PiPairPrincipal &principal,PiPairHistory &history,std::string *readback_revision){
+    if(readback_revision)readback_revision->clear();
+    if(request.body.size()>32768)return controller_target_error(413,"payload_too_large");
+    std::optional<Json> metadata;
+    {
+        std::lock_guard admission(privileged_network_admission_mutex());const auto policy=privileged_network_runtime_state();
+        if(!policy.active_known||policy.active!=PrivilegedNetworkMode::enforced||policy.configured!=PrivilegedNetworkMode::enforced)
+            return controller_target_error(403,"unauthorized");
+        metadata=history.management_authorization(principal);
+    }
+    if(!metadata)return controller_target_error(403,"unauthorized");
+    if(request.path.starts_with("/api/pair/v1/"))return handle_pair(request,principal,history);
+    return handle_authorized(request,{principal.identity().pair_id,principal.identity().authorization_generation,&history,&principal,*metadata},readback_revision);
+}
+PicoHttpResponse PiLocalManagementService::handle_pair(const BrowserRequest &request,const PiPairPrincipal &principal,PiPairHistory &history){
+    const auto refuse=[&](unsigned status,const char *code){return PicoHttpResponse{status,Json{{"contract","Wsprry-Pair/1"},{"schema","result"},
+        {"pair_id",principal.identity().pair_id},{"state","rejected"},{"code",code},{"retryable",false}}.dump(),{}};};
+    std::unique_lock operation(mutex_,std::try_to_lock);if(!operation.owns_lock())return refuse(409,"busy");
+    std::unique_lock configuration(config_update_mutex(),std::try_to_lock);if(!configuration.owns_lock())return refuse(409,"busy");
+    try{
+        if(!history.management_authorization(principal)||principal.self_id()!=self_)return refuse(403,"invalid_proof");
+        constexpr std::string_view prefix="/api/pair/v1/operations/";
+        if(request.method=="GET"&&request.path.starts_with(prefix)&&request.body.empty()){
+            const auto id=request.path.substr(prefix.size());if(!identity(id))return refuse(400,"invalid_shape");
+            const auto receipt=store_.authority_operation(id,principal);
+            return receipt?PicoHttpResponse{200,receipt->dump(),{}}:refuse(404,"operation_unknown");
+        }
+        if(request.method=="GET"&&request.path=="/api/pair/v1/resume"&&request.body.empty()){
+            const auto grant=store_.remote_resume(principal);
+            return grant?PicoHttpResponse{200,grant->dump(),{}}:refuse(404,"operation_unknown");
+        }
+        if(request.method=="POST"&&request.path=="/api/pair/v1/resume/ack"){
+            const auto body=parse_pi_pair_document(request.body,"resume-ack");
+            const auto proof=history.resume_outcome_proof(principal,body);if(!proof)return refuse(403,"invalid_proof");
+            auto admission=history.admit_resume_outcome(*proof);if(!admission)return refuse(409,"busy");
+            return {200,store_.confirm_remote_resume(*proof,*admission).dump(),{}};
+        }
+        if(request.method!="POST"||request.path!="/api/pair/v1/authorities/register")return refuse(404,"invalid_shape");
+        const auto body=parse_pi_pair_document(request.body,"authority-register");
+        if(body["target_id"]!=self_||body["controller_id"]!=principal.peer_id()||body["pair_id"]!=principal.identity().pair_id||
+            body["authorization_generation"]!=principal.identity().authorization_generation)return refuse(403,"invalid_proof");
+        if(history.pair_operation(principal,body["operation_id"].get<std::string>()))return refuse(409,"request_id_reuse");
+        // Final pairing revocation/renewal admission spans only this bounded
+        // local WAL. No DNS, network wait or output action is inside the guard.
+        auto admission=history.admit_mutation(principal);if(!admission)return refuse(409,"busy");
+        const auto receipt=store_.register_authority(body,principal,*admission);
+        return {200,receipt.dump(),{}};
+    }catch(const std::invalid_argument &){return refuse(400,"invalid_shape");}
+    catch(const std::exception &error){
+        if(std::string(error.what())=="request_id_reuse")return refuse(409,"request_id_reuse");
+        return refuse(503,"storage_unavailable");
+    }
+}
+PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserRequest &request,const Authorization &authorization,std::string *readback_revision){
     const auto refuse=[](unsigned status,const char *code){return controller_target_error(status,code);};
-    if(!authorized_local)return refuse(403,"unauthorized");
     if(request.body.size()>32768)return refuse(413,"payload_too_large");
-    if(request.method!="GET"&&!request.mutation_context)return refuse(403,"csrf_failed");
     if(request.method=="GET"&&!request.body.empty())return refuse(400,"invalid_shape");
     const auto prefix="/api/control/v1/targets/"+self_+"/";
     if(!request.path.starts_with(prefix))return refuse(404,"target_mismatch");
@@ -113,16 +191,73 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
     if(!tone.owns_lock())return refuse(409,"capacity");
     std::unique_lock configuration(config_update_mutex(),std::try_to_lock);
     if(!configuration.owns_lock())return refuse(409,"capacity");
+    const bool reviewing=request.method=="POST"&&resource.size()==50&&resource.starts_with("operations/")&&resource.ends_with("/review")&&identity(resource.substr(11,32));
+    const auto prior_read=readback_;
+    readback_.reset();
+    const auto admit=[&](){
+        auto guard=authorization.paired?authorization.history->admit_mutation(*authorization.paired):std::optional<PiPairMutationGuard>{};
+        if(authorization.paired&&!guard)throw PairedAdmissionHeld();
+        return guard;
+    };
     try{
+        if(authorization.paired){
+            const auto scope=authorization.principal+"/"+authorization.generation;
+            if(paired_context_!=scope){
+                // Reuse the existing server-owned connection retirement domain.
+                // A pre-pair/replaced-manager draft cannot acquire fresh TLS
+                // authority merely by retaining the same settings revision.
+                std::uint64_t current{};
+                const auto parsed=std::from_chars(connection_.data(),connection_.data()+connection_.size(),current);
+                if(parsed.ec!=std::errc{}||parsed.ptr!=connection_.data()+connection_.size()||current==std::numeric_limits<std::uint64_t>::max())
+                    throw std::runtime_error("management_context_capacity");
+                connection_=std::to_string(current+1);paired_context_=scope;
+            }
+        }
         const auto saved=store_.settings();
         if(request.method=="GET"&&resource.starts_with("operations/")&&identity(resource.substr(11))){
-            const auto receipt=store_.receipt(self_,"1",resource.substr(11));
+            const auto receipt=store_.receipt(authorization.principal,authorization.generation,resource.substr(11));
             return receipt?document(*receipt,"target-operation"):refuse(404,"operation_unknown");
         }
         const auto state=observe();if(!state)return refuse(503,"authority_pending");
         const auto bound=binding(*state),caps=capabilities(*state);
         const auto capability_revision=PiManagementJournal::digest(canonical_pi_management_json(caps));
         const auto revision=saved["revision"].get<std::string>();
+        const auto readback=[&](PicoHttpResponse response){
+            if(authorization.paired&&response.status==200){
+                const auto content=PiManagementJournal::digest(Json{{"scope",authorization.principal+"/"+authorization.generation},
+                    {"binding",bound},{"resource",resource},{"capability_revision",capability_revision},
+                    {"etag",response.etag},{"document",strict_browser_json(response.body)}}.dump());
+                if(read_sequence_==std::numeric_limits<std::uint64_t>::max())return refuse(503,"capacity");
+                const auto token=PiManagementJournal::digest(Json{{"content",content},{"sequence",std::to_string(++read_sequence_)}}.dump());
+                readback_=Readback{token,content,resource,authorization.principal+"/"+authorization.generation,bound,std::chrono::steady_clock::now()};
+                if(readback_revision)*readback_revision=token;
+            }
+            return response;
+        };
+        if(reviewing){
+            const auto authority=store_.recurrence_authority();
+            if(authority.contains("management")&&authority["management"].contains("resume")&&authority["management"]["resume"]["state"]=="pending")return refuse(409,"authority_pending");
+            if(!authorization.paired||!prior_read)return refuse(409,"recovery_required");
+            Json body;try{body=strict_browser_json(request.body,16);}catch(...){return refuse(400,"invalid_json");}
+            if(!valid_controller_document(body,"target-operation-review")||body["operation_id"]!=resource.substr(11,32))return refuse(400,"invalid_shape");
+            if(body["binding"]!=bound||prior_read->binding!=bound||body["readback_revision"]!=prior_read->token||
+                prior_read->scope!=authorization.principal+"/"+authorization.generation||
+                std::chrono::steady_clock::now()-prior_read->at>std::chrono::seconds(30)||
+                state->authority.output_unknown||state->authority.stop_reserved)return refuse(409,"recovery_required");
+            if(const auto retained=store_.receipt(authorization.principal,authorization.generation,body["operation_id"].get<std::string>());
+                retained&&((*retained)["state"]=="pending"||(*retained)["state"]=="unknown"))return refuse(409,"recovery_required");
+            // Refresh the exact fixed resource under the same native operation,
+            // configuration and output locks. A changed document cannot pass.
+            BrowserRequest fresh{"GET",prefix+prior_read->resource,{},{}};
+            const auto current_read=handle_authorized(fresh,authorization);
+            if(current_read.status!=200||!readback_||readback_->content!=prior_read->content){readback_.reset();return refuse(409,"recovery_required");}
+            auto admission=admit();
+            std::uint64_t current{};const auto parsed=std::from_chars(connection_.data(),connection_.data()+connection_.size(),current);
+            if(parsed.ec!=std::errc{}||parsed.ptr!=connection_.data()+connection_.size()||current==std::numeric_limits<std::uint64_t>::max())return refuse(503,"capacity");
+            connection_=std::to_string(current+1);readback_.reset();
+            return document({{"contract","Wsprry-Control/1"},{"schema","target-operation-reviewed"},{"binding",binding(*state)},
+                {"operation_id",body["operation_id"]},{"readback_revision",prior_read->token}},"target-operation-reviewed");
+        }
         const auto settings_document=[&](const Json &record){
             auto result=Json{{"contract","Wsprry-Control/1"},{"schema","target-settings"},{"binding",bound},
                 {"capability_revision",capability_revision},{"revision",record["revision"]},{"candidate_digest",record["candidate_digest"]},
@@ -140,15 +275,23 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         };
         if(request.method=="GET"&&resource=="context")
             return document({{"contract","Wsprry-Control/1"},{"schema","target-context"},{"target",target()},
-                {"binding",bound},{"capability_revision",capability_revision},{"capabilities",caps},{"configuration_revision",revision}},"target-context");
+                {"binding",bound},{"capability_revision",capability_revision},{"capabilities",caps},{"configuration_revision",revision},
+                {"authorization",authorization.metadata},{"gateway",nullptr}},"target-context");
         if(request.method=="GET"&&resource=="settings")
-            return document(settings_document(saved),"target-settings",revision);
+            return readback(document(settings_document(saved),"target-settings",revision));
         if(request.method=="GET"&&resource=="migration"){
-            const auto authority=store_.recurrence_authority();
-            return document({{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",bound},
+            const auto authority=store_.recurrence_authority();Json wtp_binding=nullptr,controllers=authority["controllers"];
+            if(!store_.remote_handover())if(const auto plan=remote_migration_plan(authority,std::string(32,'0')))controllers=(*plan)["controllers"];
+            if(state->wtp_binding&&!state->authority.revocation_unavailable&&!state->authority.output_unknown){const auto &actual=*state->wtp_binding;
+                if(actual.revocation_generation==state->authority.revocation_generation&&actual.wtp_port&&actual.wtp_port<=65535&&
+                    actual.management_port&&actual.management_port<=65535)
+                    wtp_binding={{"revocation_generation",std::to_string(actual.revocation_generation)},
+                        {"wtp_port",actual.wtp_port},{"management_port",actual.management_port}};
+            }
+            return readback(document({{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",bound},
                 {"authority_generation",authority["generation"]},{"transition_id",authority["transition_id"]},{"state",authority["state"]},
-                {"controllers",authority["controllers"]},{"retirements",authority["retirements"]},{"jobs",authority["jobs"]},
-                {"staged_revision",authority["staged_revision"]}},"target-migration-read",revision);
+                {"controllers",controllers},{"retirements",authority["retirements"]},{"jobs",authority["jobs"]},
+                {"staged_revision",authority["staged_revision"]},{"wtp_binding",wtp_binding}},"target-migration-read",revision));
         }
         if(request.method=="GET"&&resource=="status"){
             Json result{{"contract","Wsprry-Control/1"},{"schema","target-status"},{"binding",bound},{"revision",revision},
@@ -167,7 +310,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
                 else if(transmitter_state()==WsprTransmitState::TRANSMITTING)result["phase"]="running";
             }else if(saved["scheduling"]["enabled"]==false){result["phase"]="waiting";result["waiting_reason"]="disabled";}
             else if(!state->authority.effective_local_enable){result["phase"]="waiting";result["waiting_reason"]="transmit_off";}
-            return document(result,"target-status",revision);
+            return readback(document(result,"target-status",revision));
         }
         const bool stopping=resource=="stop"&&request.method=="POST";
         const bool enabling=resource=="enable"&&request.method=="POST";
@@ -181,7 +324,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         if(body["binding"]["device_id"]!=self_)return refuse(409,"target_mismatch");
         if(request.revision.empty())return refuse(428,"revision_required");
         if(request.revision!="\""+body["expected_revision"].get<std::string>()+"\"")return refuse(412,"revision_conflict");
-        const PiManagedStore::Operation operation{self_,"1",request.path,body};
+        const PiManagedStore::Operation operation{authorization.principal,authorization.generation,request.path,body};
         // Exact retained replies grant no new mutation. The accepted write may
         // itself retire the connection context through bounded receipt eviction.
         // Absent/reused operations still require all current bindings below.
@@ -208,8 +351,8 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
                     const auto progress=store_.recurrence_progress()->snapshot();
                     if(!progress["in_flight"].is_null()&&(!accepted||!accepted->accepted||progress["in_flight"]["occurrence_id"]!=accepted->id))return refuse(409,"recovery_required");
                 }
-                store_.persist_scheduling(operation,true,accepted&&accepted->accepted?accepted->id:std::string{});
-            }else store_.persist_scheduling(operation,false);
+                auto admission=admit();store_.persist_scheduling(operation,true,accepted&&accepted->accepted?accepted->id:std::string{});
+            }else {auto admission=admit();store_.persist_scheduling(operation,false);}
             const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
             return operation_document(*receipt);
         }
@@ -218,7 +361,50 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
             if(body["expected_authority_generation"]!=authority["generation"])return refuse(412,"revision_conflict");
             const bool draining=!rollback&&authority["state"]!="retiring"&&writable(*state)&&legacy_recurrence_has_accepted_work();
             if((!migration_idle(*state)&&!draining)||(!authority["jobs"].empty()&&authority["state"]!="retiring"))return refuse(409,"authority_pending");
-            if(authority["controllers"].size()!=1||authority["controllers"][0]["controller_id"]!=self_)return refuse(409,"authority_pending");
+            if(!rollback)if(const auto plan=remote_migration_plan(authority,body["operation_id"].get<std::string>())){
+                if(authority["state"]!="legacy"&&authority["state"]!="rollback"&&authority["state"]!="staged")return refuse(409,"authority_pending");
+                if(!authority["jobs"].empty()||body["controllers"]!=(*plan)["controllers"])return refuse(409,"authority_pending");
+                // The local browser and paired editor use this target's actual
+                // owner. Neither supplies keys, callback endpoints or proofs.
+                const auto selected=authorization.history?std::shared_ptr<PiPairOwner>{}:pi_pair_owner();
+                auto retained=selected?selected->history():std::shared_ptr<PiPairHistory>{};
+                auto *history=authorization.history?authorization.history:retained.get();
+                if(!history)return refuse(409,"authority_pending");
+                Json signed_requests=Json::array();
+                for(const auto &row:(*plan)["requests"]){
+                    const auto retained=recurrence_reusable_retirement(authority,row["request"]);
+                    if(!retained.is_null()){signed_requests.push_back(retained["request"]);continue;}
+                    const auto signed_request=history->retirement_request(row["request"]);
+                    if(!signed_request)return refuse(409,"authority_pending");
+                    signed_requests.push_back(*signed_request);}
+                if(!state->reserve_configuration())return refuse(409,"authority_pending");
+                struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
+                const auto current=observe();if(!current||binding(*current)!=bound||
+                    (!migration_idle(*current)&&!(draining&&writable(*current)&&legacy_recurrence_has_accepted_work())))return refuse(409,"authority_pending");
+                std::optional<Json> job;if(!migration_idle(*current))job=Json{{"controller_id",self_},
+                    {"job_id",current->output.job_id.value_or(WtpPiBootIdentity{}.new_boot_id())},{"boot_id",bound["boot_id"]},{"state","accepted"}};
+                auto admission=admit();store_.prepare_remote_migration(operation,authority,signed_requests,job);
+                const auto receipt=store_.replay(operation);return receipt?operation_document(*receipt):refuse(503,"recovery_required");
+            }
+            if(rollback&&body["resume_controller_id"]!=self_){
+                if(!authorization.history)return refuse(409,"authority_pending");
+                const auto proof=authorization.paired?authorization.history->incoming_resume_target(request,*authorization.paired):
+                    authorization.local?authorization.history->incoming_resume_target(request,*authorization.local):std::optional<PiPairResumeTargetProof>{};
+                if(!proof||saved["scheduling"]["enabled"]!=false||saved["configuration"]["Operation"]["Transmit"]!=false)return refuse(409,"authority_pending");
+                if(!state->reserve_configuration())return refuse(409,"authority_pending");
+                struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
+                const auto current=observe();
+                if(!current||binding(*current)!=bound||!migration_idle(*current)||!current->wtp_binding||
+                    current->authority.revocation_unavailable||current->authority.output_unknown)return refuse(409,"authority_pending");
+                const auto &actual=*current->wtp_binding;
+                if(actual.revocation_generation!=current->authority.revocation_generation||!actual.wtp_port||!actual.management_port)return refuse(409,"authority_pending");
+                const Json actual_binding{{"revocation_generation",std::to_string(actual.revocation_generation)},
+                    {"wtp_port",actual.wtp_port},{"management_port",actual.management_port}};
+                auto admission=authorization.history->admit_resume_target(*proof);if(!admission)return refuse(409,"authority_pending");
+                store_.prepare_remote_resume(operation,authority,*proof,actual_binding,*admission);
+                const auto receipt=store_.replay(operation);return receipt?operation_document(*receipt):refuse(503,"recovery_required");
+            }
+            if(!local_migration_inventory(authority,self_))return refuse(409,"authority_pending");
             if(!rollback&&body["controllers"]!=authority["controllers"])return refuse(409,"authority_pending");
             if(rollback&&(body["resume_controller_id"]!=self_||body["resume_assignment_id"]!=authority["controllers"][0]["assignment_id"]))return refuse(409,"authority_pending");
             if(rollback&&authority["state"]=="native"&&(saved["scheduling"]["enabled"]!=false||native_occurrence_active()||
@@ -232,7 +418,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
                 std::optional<Json> job;
                 if(!migration_idle(*current))job=Json{{"controller_id",self_},{"job_id",current->output.job_id.value_or(WtpPiBootIdentity{}.new_boot_id())},
                     {"boot_id",bound["boot_id"]},{"state","accepted"}};
-                store_.persist_migration(jConfig,[]{},operation,false,job);
+                auto admission=admit();store_.persist_migration(jConfig,[]{},operation,false,job);
                 const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
                 return operation_document(*receipt);
             }
@@ -240,6 +426,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
             const auto legacy=get_public_config_snapshot();configuration.unlock();tone.unlock();
             patch_config_with_persistence_coordinator(candidate,legacy.second,[&](const auto &internal,const auto &writer){
                 if(!legacy_recurrence_transition_idle())throw std::runtime_error("authority_pending");
+                auto admission=admit();
                 store_.persist_migration(internal,writer,operation,rollback);
             });
             const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
@@ -254,6 +441,7 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
             // before cancellation. A lost reply can never dispatch Stop again
             // against a later occurrence, even if the process dies here.
             if(!persist_owned_transmit_disabled([&](const auto &internal,const auto &writer){
+                auto admission=admit();
                 store_.persist_stop(internal,writer,operation);
             }))return refuse(503,"storage_unavailable");
             const auto receipt=store_.replay(operation);
@@ -305,9 +493,10 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
                     readback["pending_application"]="unknown";
                     if(readback.dump().size()>32768)
                         throw std::runtime_error("candidate_exceeds_settings_capacity");
-                    store_.persist(internal,persist,operation);
+                    auto admission=admit();store_.persist(internal,persist,operation);
                 });
-        }catch(const ConfigValidationError &){return refuse(400,"candidate_invalid");}
+        }catch(const PairedAdmissionHeld &){return refuse(409,"authority_pending");}
+        catch(const ConfigValidationError &){return refuse(400,"candidate_invalid");}
         catch(const std::exception &error){
             if(std::string(error.what())=="revision_conflict")return refuse(412,"revision_conflict");
             // A committed operation can outlive runtime-application failure.
@@ -317,10 +506,40 @@ PicoHttpResponse PiLocalManagementService::handle(const BrowserRequest &request,
         const auto receipt=store_.replay(operation);
         if(!receipt)return refuse(503,"recovery_required");
         return document(*receipt,"target-operation",(*receipt)["revision"]);
-    }catch(const std::exception &error){
+    }catch(const PairedAdmissionHeld &){return refuse(409,"authority_pending");}
+    catch(const std::exception &error){
         if(std::string(error.what())=="request_id_reuse")return refuse(409,"request_id_reuse");
         return refuse(503,"storage_unavailable");
     }
+}
+void PiLocalManagementService::advance_remote_handover(PiPairRetirementClient &client,const std::function<bool()> &cancelled) noexcept {
+    // Called only by the dedicated pairing network supervisor, never the RF
+    // scheduler. No request/configuration/store lock spans peer I/O.
+    std::unique_lock worker(remote_worker_,std::try_to_lock);if(!worker.owns_lock()||!cancelled||cancelled())return;
+    try{
+        const auto saved=store_.remote_handover();if(!saved)return;
+        const auto &requests=(*saved)["requests"];if(requests.empty()||requests.size()>32)return;
+        if(remote_transition_!=(*saved)["transition_id"].get<std::string>()){remote_transition_=(*saved)["transition_id"].get<std::string>();remote_cursor_=0;remote_backoff_.assign(requests.size(),{});}
+        if(remote_backoff_.size()!=requests.size())return;
+        const auto now=std::chrono::steady_clock::now();
+        for(std::size_t visited=0;visited<requests.size();++visited){
+            const auto index=remote_cursor_++%requests.size();const auto &row=requests[index];auto &backoff=remote_backoff_[index];
+            if(row["state"]=="confirmed"||now<backoff.next)continue;
+            if(cancelled())return;
+            bool handed=false;
+            const PiPairEndpoint endpoint{row["endpoint"]["host"].get<std::string>(),row["endpoint"]["port"].get<unsigned>()};
+            const auto result=client.exchange(endpoint,row["request"],row["state"]=="prepared"?PiPairRetirementClient::Mode::Request:PiPairRetirementClient::Mode::Status,
+                [&](const auto &guard){if(cancelled())return false;if(handed)return true;handed=store_.handover_handoff(row["request"],guard);return handed;},cancelled);
+            bool confirmed=false;
+            if(!cancelled()&&result.proof){
+                std::unique_lock configuration(config_update_mutex(),std::try_to_lock);
+                if(configuration.owns_lock())confirmed=store_.confirm_handover(*result.proof);
+            }
+            backoff.failures=confirmed?0:std::min(backoff.failures+1,6U);
+            backoff.next=std::chrono::steady_clock::now()+std::chrono::seconds(confirmed?1U:1U<<(backoff.failures-1));
+            return; // At most one bounded exchange per fair supervisor turn.
+        }
+    }catch(...){/* Storage and absent/unverified outcomes retain the target hold. */}
 }
 void PiLocalManagementService::advance_migration() noexcept {
     try{

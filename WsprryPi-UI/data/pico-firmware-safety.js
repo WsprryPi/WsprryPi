@@ -6,6 +6,11 @@
     const held = new Map();
     const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle"]);
     function allowed(control) {
+        if(control.closest('#controllerAccess')) {
+            // Pairing/removal has its own protected host owner and cannot
+            // dispatch Pico settings, firmware, WTP or output work.
+            held.delete(control);return true;
+        }
         if(root.ConfigurationRecovery?.active && control.closest('#configurationRecoveryPanel')) {
             // Native startup recovery has its own protected owner. Keep the
             // Pico hold intact without retaining/restoring its controls.

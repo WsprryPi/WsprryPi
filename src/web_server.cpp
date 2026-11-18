@@ -30,8 +30,12 @@
 #include "privileged_network_managed_ini.hpp"
 #include "controller_runtime.hpp"
 #include "pi_managed_host_runtime.hpp"
+#include "wtp_endpoint/runtime.hpp"
 
 #include "web_server_routes.hpp"
+#include "wtp_integration/pi_pair_guarded_http.hpp"
+#include "wtp_integration/pi_pair_runtime.hpp"
+#include "wtp_integration/pi_pair_machine_backend.hpp"
 
 #include "config_handler.hpp"
 #include "httplib.hpp"
@@ -135,7 +139,7 @@ void WebServer::start(int port)
         port_ = port;
         if (!svr)
         {
-            svr = std::make_unique<httplib::Server>();
+            svr = std::make_unique<wsprrypi::PiPairGuardedHttpServer>(wsprrypi::pi_pair_admission());
         }
         if (controller_only_mode()) {
             // Match the shared browser adapter's complete-request body bound.
@@ -183,7 +187,15 @@ void WebServer::start(int port)
             setCORSHeaders(response);
         };
     web_server_routes::register_config(*svr, set_cors_headers);
-    web_server_routes::register_control(*svr, set_cors_headers);
+    // Exact pairing routes must precede the broad Control/1 dispatcher.
+    web_server_routes::register_pairing(*svr,[this]{
+        std::lock_guard lock(pairing_mutex_);
+        return pairing_runtime_?pairing_runtime_->local_service():nullptr;
+    },network_snapshot_provider_);
+    web_server_routes::register_control(*svr, set_cors_headers,[this]{
+        std::lock_guard lock(pairing_mutex_);return pairing_runtime_?pairing_runtime_->local_service():nullptr;
+    },network_snapshot_provider_);
+    try{start_pairing_supervisor();}catch(...){pairing_stopping_.store(true);/* Pairing remains unavailable. */}
     web_server_routes::register_privileged_admin(
         *svr, *privilegedNetworkAdmin_, *rp1GpclkRouteService_);
     web_server_routes::register_version(*svr, set_cors_headers);
@@ -224,6 +236,10 @@ void WebServer::start(int port)
  */
 void WebServer::stop()
 {
+    // Cancel admission before joining HTTP handlers. The supervisor performs
+    // network/maintenance joins and waits for accepted handler leases itself.
+    pairing_stopping_.store(true);
+    {std::lock_guard lock(pairing_mutex_);if(pairing_runtime_)pairing_runtime_->request_stop();}
     bool was_running = false;
     {
         std::lock_guard<std::mutex> lock(mtx);
@@ -242,6 +258,8 @@ void WebServer::stop()
         serverThread.join();
     }
 
+    stop_pairing_supervisor();
+
     if (supportBundleJobManager_)
     {
         supportBundleJobManager_->shutdown();
@@ -252,6 +270,57 @@ void WebServer::stop()
     svr.reset();
     supportBundleJobManager_.reset();
     supportBundleRoutesRegistered_ = false;
+}
+
+void WebServer::start_pairing_supervisor(){
+    if(pairing_thread_.joinable())throw std::logic_error("pairing_supervisor_already_started");
+    pairing_stopping_.store(false);
+    pairing_thread_=std::thread([this]{
+        while(!pairing_stopping_.load()){
+            try{
+                const auto owner=wsprrypi::pi_pair_owner();
+                const auto boot=controller_only_mode()?controller_only_process_boot():wsprrypi::pi_managed_host_process_boot();
+                if(owner&&!boot.empty()&&isListening()){
+                    wsprrypi::wtp_pi_publish_management_http(this,owner->self(),static_cast<unsigned>(port_),[this]{return !pairing_stopping_.load()&&isListening();});
+                    const auto backend=web_server_routes::pairing_machine_backend();
+                    const std::function<bool()> web_ready=[this]{return !pairing_stopping_.load()&&isListening()&&
+                        (controller_only_mode()?controller_only_status().value("controller_ready",false):!wsprrypi::pi_managed_host_held());};
+                    const wsprrypi::PiPairMachineService::Targets targets=[backend](const auto &principal,const auto &cancelled){return backend->targets(principal,cancelled);};
+                    const wsprrypi::PiPairMachineService::Target target=[backend](const auto &principal,const auto &request,const auto &cancelled){return backend->request(principal,request,cancelled);};
+                    // The existing explicit web-fixture seam also isolates its
+                    // management listener: loopback/ephemeral, no native DNS-SD.
+                    const wsprrypi::PiPairRuntime::RemoteFactory remote=[](auto history){return web_server_routes::pairing_remote_controller(std::move(history));};
+                    const wsprrypi::PiPairRuntime::Handover handover=[](auto &history,const auto &cancelled){
+                        if(const auto host=wsprrypi::pi_managed_host()){
+                            wsprrypi::PiPairRetirementClient client(history,wsprrypi::pi_pair_admission());
+                            host->advance_remote_handover(client,cancelled);
+                            if(!cancelled())host->reclaim_pairing_retirements(history);
+                        }
+                    };
+                    auto runtime=loopback_fixture_?
+                        std::make_shared<wsprrypi::PiPairRuntime>(owner,boot,static_cast<unsigned>(port_),web_ready,targets,target,wsprrypi::PiPairRuntime::LoopbackTest{},remote,handover):
+                        std::make_shared<wsprrypi::PiPairRuntime>(owner,boot,static_cast<unsigned>(port_),web_ready,targets,target,remote,handover);
+                    {
+                        std::lock_guard lock(pairing_mutex_);
+                        if(pairing_stopping_.load())break;
+                        pairing_runtime_=runtime;
+                        if(!runtime->start()){pairing_runtime_.reset();throw std::runtime_error("pairing_supervisor_unavailable");}
+                    }
+                    while(!pairing_stopping_.load())std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    runtime->stop();
+                    break;
+                }
+            }catch(...){/* Pairing holds never select another role or output owner. */}
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    });
+}
+void WebServer::stop_pairing_supervisor() noexcept{
+    pairing_stopping_.store(true);
+    {std::lock_guard lock(pairing_mutex_);if(pairing_runtime_)pairing_runtime_->request_stop();}
+    if(pairing_thread_.joinable())pairing_thread_.join();
+    wsprrypi::wtp_pi_withdraw_management_http(this);
+    std::lock_guard lock(pairing_mutex_);pairing_runtime_.reset();
 }
 
 /**

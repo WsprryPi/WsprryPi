@@ -28,6 +28,9 @@
 #include "pi_managed_host_runtime.hpp"
 #include "wtp_endpoint/identity.hpp"
 #include "wtp_integration/pico_target_controller.hpp"
+#include "wtp_integration/pi_pair_machine_backend.hpp"
+#include "wtp_integration/pi_pair_local_service.hpp"
+#include "wtp_integration/pi_pair_owner.hpp"
 #include "wtp_integration/controller_contract.hpp"
 #include "wtp_integration/management_browser_session.hpp"
 #include "privileged_network_runtime.hpp"
@@ -60,7 +63,8 @@ std::shared_ptr<wsprrypi::PicoTargetController> target_controller() {
     if(!slot.production) {
         const auto identity=controller_only_mode()?controller_only_status().at("device_id").get<std::string>():wsprrypi::wtp_pi_device_id();
         slot.production=std::make_shared<wsprrypi::PicoTargetController>(catalog(),selected_wtp,
-            config.ini_filename+".management",identity);
+            config.ini_filename+".management",identity,wsprrypi::PicoTargetController::Fixtures{},
+            controller_only_mode()?controller_only_process_boot():wsprrypi::pi_managed_host_process_boot());
     }
     return slot.production;
 }
@@ -251,13 +255,29 @@ void wsprrypi::testing::set_pico_target_controller(std::shared_ptr<PicoTargetCon
 
 namespace web_server_routes
 {
+std::shared_ptr<wsprrypi::PiPairMachineBackend> pairing_machine_backend(){
+    const auto owner=wsprrypi::pi_pair_owner();
+    if(!owner)throw std::runtime_error("pairing_owner_unavailable");
+    const auto host=wsprrypi::pi_managed_host();
+    if(!controller_only_mode()&&!host)throw std::runtime_error("pairing_native_owner_unavailable");
+    return std::make_shared<wsprrypi::PiPairMachineBackend>([owner]{return owner->history();},catalog(),target_controller(),selected_wtp,host);
+}
+std::shared_ptr<wsprrypi::PiPairRemoteController> pairing_remote_controller(std::shared_ptr<wsprrypi::PiPairHistory> history){
+    const auto owner=wsprrypi::pi_pair_owner();if(!owner||!history)throw std::runtime_error("pairing_owner_unavailable");
+    auto remote=std::make_shared<wsprrypi::PiPairRemoteController>([history]{return history;},wsprrypi::pi_pair_admission(),
+        owner->self(),catalog(),config.ini_filename+".management",selected_wtp);
+    remote->authority_source([]{return wsprrypi::wtp_fleet_api("GET",{},{},"retirements");});
+    return remote;
+}
 void retire_control_management(){
     std::shared_ptr<wsprrypi::PicoTargetController> retiring;
     {auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);retiring=std::move(slot.production);}
 }
 void register_control(
     httplib::Server &server,
-    CorsHeaderSetter set_cors_headers)
+    CorsHeaderSetter set_cors_headers,
+    std::function<std::shared_ptr<wsprrypi::PiPairLocalService>()> pairing,
+    NetworkSnapshotProvider snapshot)
 {
     server.Get("/status", [](const httplib::Request &, httplib::Response &response) {
         if (!controller_only_mode()) { response.status = 404; return; }
@@ -274,7 +294,7 @@ void register_control(
                 result.ok ? R"({"cleanup_ok":true})" :
                     nlohmann::json{{"error", {{"code", "not_owner_or_cleanup_unresolved"}}}}.dump(), {}};
         });
-    const auto shared = [](const httplib::Request &request, httplib::Response &response) {
+    const auto shared = [pairing=std::move(pairing),snapshot=std::move(snapshot)](const httplib::Request &request, httplib::Response &response) {
         const auto browser_request = wsprrypi::wtp_browser_http_request(request);
         if (!browser_request) {
             response.status = 400;
@@ -287,7 +307,7 @@ void register_control(
         const bool context = browser_request->mutation_context;
         wsprrypi::PicoHttpResponse result;
         if(request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")) {
-            static wsprrypi::ManagementBrowserSessions sessions;
+            auto &sessions=wsprrypi::management_browser_sessions();
             const auto failure=[](unsigned status,const char *code){return wsprrypi::controller_target_error(status,code);};
             std::size_t header_bytes=0;for(const auto &[name,value]:request.headers)header_bytes+=name.size()+value.size()+4;
             if(active_privileged_network_mode()!=PrivilegedNetworkMode::enforced&&
@@ -308,10 +328,30 @@ void register_control(
             else if(wsprrypi::pi_managed_host_target_path(request.path)){
                 if(!request.get_header_value("X-WsprryPi-Profile-ID").empty()||!request.get_header_value("X-WsprryPi-Target-Context").empty()||
                     !request.get_header_value("X-WsprryPi-Operation-ID").empty())result=failure(400,"invalid_shape");
-                else if(const auto host=wsprrypi::pi_managed_host())result=host->management(*browser_request,true);
+                else if(const auto host=wsprrypi::pi_managed_host()){
+                    const auto principal=request.method!="GET"&&snapshot?sessions.authorize_local_mutation(request,snapshot()):std::optional<wsprrypi::LocalBrowserPrincipal>{};
+                    const auto service=pairing?pairing():nullptr;
+                    if(principal&&service)result=service->native(*browser_request,*principal,*host);
+                    else result=host->management(*browser_request,true);
+                }
                 else result=failure(503,"storage_unavailable");
             }
             else try {
+                std::optional<wsprrypi::PiPairHttpReply> remote;
+                if(pairing&&snapshot)if(const auto owner=pairing())remote=owner->remote(request,snapshot());
+                // A selected remote failure is final. It cannot fall through
+                // into a local host or independently held Pico context.
+                if(remote&&request.path!="/api/control/v1/targets"){
+                    response.status=static_cast<int>(remote->payload.status);
+                    response.set_header("Cache-Control","no-store");
+                    if(!remote->payload.etag.empty())response.set_header("ETag",remote->payload.etag);
+                    if(!remote->context.empty())response.set_header("X-WsprryPi-Target-Context",remote->context);
+                    if(!remote->operation.empty())response.set_header("X-WsprryPi-Operation-ID",remote->operation);
+                    if(!remote->location.empty())response.set_header("Location",remote->location);
+                    if(!remote->readback_revision.empty())response.set_header("X-WsprryPi-Readback-Revision",remote->readback_revision);
+                    if(!remote->recovery_resource.empty())response.set_header("X-WsprryPi-Recovery-Resource",remote->recovery_resource);
+                    response.set_content(remote->payload.body,"application/json");return;
+                }
                 const auto reply=target_controller()->handle(*browser_request,request.get_header_value("X-WsprryPi-Profile-ID"),
                     request.get_header_value("X-WsprryPi-Target-Context"),request.get_header_value("X-WsprryPi-Operation-ID"));
                 result=wsprrypi::normalize_controller_error(reply.response);
@@ -325,6 +365,16 @@ void register_control(
                         targets["targets"].push_back(local);
                         result=wsprrypi::valid_controller_document(targets,"targets")&&targets.dump().size()<=32768
                             ?wsprrypi::PicoHttpResponse{200,targets.dump(),{}}:failure(429,"capacity");
+                    }
+                }
+                if(remote&&request.method=="GET"&&request.path=="/api/control/v1/targets"){
+                    if(remote->payload.status!=200)result=remote->payload;
+                    else if(result.status==200){
+                        auto combined=wsprrypi::strict_browser_json(result.body),extra=wsprrypi::strict_browser_json(remote->payload.body);
+                        if(!wsprrypi::valid_controller_document(combined,"targets")||!wsprrypi::valid_controller_document(extra,"targets"))throw std::runtime_error("invalid_targets");
+                        for(const auto &row:extra["targets"])combined["targets"].push_back(row);
+                        result=wsprrypi::valid_controller_document(combined,"targets")&&combined.dump().size()<=32768?
+                            wsprrypi::PicoHttpResponse{200,combined.dump(),{}}:failure(409,"target_mismatch");
                     }
                 }
                 if(!reply.context.empty())response.set_header("X-WsprryPi-Target-Context",reply.context);
