@@ -1419,3 +1419,20 @@ legend {
 
 /* Keep retirement consent readable within the existing Fleet editor. */
 .fleet-editor #controllerRetirement .form-check { max-inline-size: 75ch; }
+
+/* Scheduling shares the existing instrument-panel observations and spacing. */
+.scheduling-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1rem; }
+.scheduling-summary dd { margin-bottom: .25rem; }
+#setup-scheduling > p { max-width: 70ch; }
+@media (min-width: 768px) { .scheduling-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.scheduling-review { white-space: pre-wrap; }
+
+.scheduling-field-error { color: var(--bs-danger-text-emphasis); }
+
+#setup-scheduling .btn-outline-secondary,
+#setup-pi-workspace .btn-outline-secondary,
+#setup-pico-scheduling .btn-outline-secondary {
+    --bs-btn-disabled-color: var(--bs-body-color);
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+}

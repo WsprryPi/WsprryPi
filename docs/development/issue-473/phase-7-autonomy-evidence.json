@@ -1,0 +1,891 @@
+{
+  "reconnect_reservations": {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+      "authority_generation": "3",
+      "clock_generation": "1",
+      "configuration_generation": "4",
+      "consumed_through_utc_ns": "1795035520000000000",
+      "cursors": {
+        "day": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "evening": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "morning": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "night": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "ordinary": {
+          "index": 0,
+          "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+        }
+      },
+      "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "in_flight": {
+        "first_start_ns": "1795035520000000000",
+        "intent_digest": "c897052173c80c1083fa9fdb55831f9204004c48ad7ffd31a1c11f1e4b812641",
+        "last_start_ns": "1795035520000000000",
+        "occurrence_id": "38862c957dc99d50f7297ff1e6f12549",
+        "state": "reserved",
+        "successor_cursors": {
+          "day": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "evening": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "morning": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "night": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "ordinary": {
+            "index": 0,
+            "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+          }
+        }
+      },
+      "schema": "pi-recurrence-progress/1"
+    },
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+      "authority_generation": "3",
+      "clock_generation": "1",
+      "configuration_generation": "4",
+      "consumed_through_utc_ns": "1795035526000000000",
+      "cursors": {
+        "day": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "evening": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "morning": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "night": {
+          "index": 0,
+          "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        "ordinary": {
+          "index": 0,
+          "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+        }
+      },
+      "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "in_flight": {
+        "first_start_ns": "1795035526000000000",
+        "intent_digest": "ce0946e75ceb2ed9140a11d20e23971d5cdfc7d4c61c48db35f6c8b6d4dbf23f",
+        "last_start_ns": "1795035526000000000",
+        "occurrence_id": "4b79159f3bd000762f496d369cd9fa0f",
+        "state": "reserved",
+        "successor_cursors": {
+          "day": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "evening": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "morning": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "night": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "ordinary": {
+            "index": 0,
+            "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+          }
+        }
+      },
+      "schema": "pi-recurrence-progress/1"
+    }
+  },
+  "reconnect_plan_ids": {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 2,
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2
+  },
+  "schema": "issue473-phase7-autonomy/1",
+  "controller_absent_since_utc_ns": "1795035388147512000",
+  "controller_before": {
+    "controller_location": "QF56OB",
+    "observations": [
+      {
+        "active_revision": "6a737991d340f4d071f4c5a110f89855b1c67fe8fe9d283cfffe69e694fa23ba",
+        "authority_state": "native",
+        "binding": {
+          "boot_id": "322ac3186c7ae369926dae993dedc4d4",
+          "connection_generation": "5097073302799809315",
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "profile_generation": "1"
+        },
+        "clock": {
+          "generation": "1",
+          "holdover_age_ns": "0",
+          "state": "synchronized",
+          "uncertainty_ns": "1000"
+        },
+        "contract": "Wsprry-Control/1",
+        "destination_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "execution_owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "forecast": "known",
+        "next_start_utc_ns": "1795035400000000000",
+        "observation_age_ms": 5968,
+        "observed_output": {
+          "generation": "2",
+          "job_id": null,
+          "owner_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "phase": "accepted",
+        "prolonged_window": false,
+        "revision": "6a737991d340f4d071f4c5a110f89855b1c67fe8fe9d283cfffe69e694fa23ba",
+        "schedule_enabled": true,
+        "schema": "target-status",
+        "selected_frequencies_hz": [
+          "14097000"
+        ],
+        "selection": "day",
+        "solar_enabled": true,
+        "transmit_effective": true,
+        "waiting_reason": "none"
+      },
+      {
+        "active_revision": "9bae46ce145e821c5d8b67fda5d97b07bbaed54fcb46331e1f7e7f16ff0bbb32",
+        "authority_state": "native",
+        "binding": {
+          "boot_id": "0574372556a529d691e2528f41451d08",
+          "connection_generation": "7179975127948476573",
+          "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1"
+        },
+        "clock": {
+          "generation": "1",
+          "holdover_age_ns": "0",
+          "state": "synchronized",
+          "uncertainty_ns": "1000"
+        },
+        "contract": "Wsprry-Control/1",
+        "destination_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "execution_owner": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "forecast": "known",
+        "next_start_utc_ns": "1795035406000000000",
+        "observation_age_ms": 139,
+        "observed_output": {
+          "generation": "2",
+          "job_id": null,
+          "owner_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "phase": "accepted",
+        "prolonged_window": false,
+        "revision": "9bae46ce145e821c5d8b67fda5d97b07bbaed54fcb46331e1f7e7f16ff0bbb32",
+        "schedule_enabled": true,
+        "schema": "target-status",
+        "selected_frequencies_hz": [
+          "10140000"
+        ],
+        "selection": "night",
+        "solar_enabled": true,
+        "transmit_effective": true,
+        "waiting_reason": "none"
+      }
+    ]
+  },
+  "controller_after": {
+    "controller_location": "QF56OB",
+    "observations": [
+      {
+        "active_revision": "6a737991d340f4d071f4c5a110f89855b1c67fe8fe9d283cfffe69e694fa23ba",
+        "authority_state": "native",
+        "binding": {
+          "boot_id": "322ac3186c7ae369926dae993dedc4d4",
+          "connection_generation": "5097073302799809315",
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "profile_generation": "1"
+        },
+        "clock": {
+          "generation": "1",
+          "holdover_age_ns": "0",
+          "state": "synchronized",
+          "uncertainty_ns": "1000"
+        },
+        "contract": "Wsprry-Control/1",
+        "destination_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "execution_owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "forecast": "known",
+        "next_start_utc_ns": "1795035520000000000",
+        "observation_age_ms": 6105,
+        "observed_output": {
+          "generation": "6",
+          "job_id": null,
+          "owner_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "phase": "accepted",
+        "prolonged_window": false,
+        "revision": "6a737991d340f4d071f4c5a110f89855b1c67fe8fe9d283cfffe69e694fa23ba",
+        "schedule_enabled": true,
+        "schema": "target-status",
+        "selected_frequencies_hz": [
+          "14097000"
+        ],
+        "selection": "day",
+        "solar_enabled": true,
+        "transmit_effective": true,
+        "waiting_reason": "none"
+      },
+      {
+        "active_revision": "9bae46ce145e821c5d8b67fda5d97b07bbaed54fcb46331e1f7e7f16ff0bbb32",
+        "authority_state": "native",
+        "binding": {
+          "boot_id": "0574372556a529d691e2528f41451d08",
+          "connection_generation": "7179975127948476573",
+          "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1"
+        },
+        "clock": {
+          "generation": "1",
+          "holdover_age_ns": "0",
+          "state": "synchronized",
+          "uncertainty_ns": "1000"
+        },
+        "contract": "Wsprry-Control/1",
+        "destination_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "execution_owner": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "forecast": "known",
+        "next_start_utc_ns": "1795035526000000000",
+        "observation_age_ms": 111,
+        "observed_output": {
+          "generation": "6",
+          "job_id": null,
+          "owner_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "phase": "accepted",
+        "prolonged_window": false,
+        "revision": "9bae46ce145e821c5d8b67fda5d97b07bbaed54fcb46331e1f7e7f16ff0bbb32",
+        "schedule_enabled": true,
+        "schema": "target-status",
+        "selected_frequencies_hz": [
+          "10140000"
+        ],
+        "selection": "night",
+        "solar_enabled": true,
+        "transmit_effective": true,
+        "waiting_reason": "none"
+      }
+    ]
+  },
+  "targets": [
+    {
+      "device": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "EM18IG",
+      "command": [
+        "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase7/native-pi/src/build/bin/scheduling_autonomy_fixture",
+        "/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc0000gn/T/scheduling-autonomy-xwf7h5uv/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ledger",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--backend",
+        "simulated",
+        "-i",
+        "/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc0000gn/T/scheduling-autonomy-xwf7h5uv/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/native.ini",
+        "--socket-loopback-only",
+        "--socket-loopback-family",
+        "ipv4",
+        "--no-offset",
+        "--no-system-clock-frequency-estimate"
+      ],
+      "admissions": {
+        "86a706aa4ec281f44808b501286c2de2": {
+          "observed_at_utc_ns": "1795035388147723000",
+          "record": {
+            "first_start_ns": "1795035400000000000",
+            "intent_digest": "c897052173c80c1083fa9fdb55831f9204004c48ad7ffd31a1c11f1e4b812641",
+            "last_start_ns": "1795035400000000000",
+            "occurrence_id": "86a706aa4ec281f44808b501286c2de2",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        },
+        "8e3de3d224963ae802dffebb876179f1": {
+          "observed_at_utc_ns": "1795035400048038000",
+          "record": {
+            "first_start_ns": "1795035460000000000",
+            "intent_digest": "c897052173c80c1083fa9fdb55831f9204004c48ad7ffd31a1c11f1e4b812641",
+            "last_start_ns": "1795035460000000000",
+            "occurrence_id": "8e3de3d224963ae802dffebb876179f1",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        },
+        "38862c957dc99d50f7297ff1e6f12549": {
+          "observed_at_utc_ns": "1795035460043328000",
+          "record": {
+            "first_start_ns": "1795035520000000000",
+            "intent_digest": "c897052173c80c1083fa9fdb55831f9204004c48ad7ffd31a1c11f1e4b812641",
+            "last_start_ns": "1795035520000000000",
+            "occurrence_id": "38862c957dc99d50f7297ff1e6f12549",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        }
+      },
+      "executions": {
+        "1": {
+          "observed_at_utc_ns": "1795035400048074000",
+          "trace": {
+            "schema_version": 1,
+            "backend": "simulated",
+            "mode": "QRSS",
+            "plan_id": 1,
+            "request_id": 1,
+            "events": [
+              {
+                "kind": "configure",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "configured",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "execution_start",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "event",
+                "event_index": 0,
+                "logical_ns": 0,
+                "frequency_hz": 14097000,
+                "rf_on": true,
+                "detail": ""
+              },
+              {
+                "kind": "complete",
+                "event_index": -1,
+                "logical_ns": 20000000,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "cleanup",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              }
+            ]
+          }
+        },
+        "2": {
+          "observed_at_utc_ns": "1795035460043364000",
+          "trace": {
+            "schema_version": 1,
+            "backend": "simulated",
+            "mode": "QRSS",
+            "plan_id": 2,
+            "request_id": 1,
+            "events": [
+              {
+                "kind": "configure",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "configured",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "execution_start",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 14097002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "event",
+                "event_index": 0,
+                "logical_ns": 0,
+                "frequency_hz": 14097000,
+                "rf_on": true,
+                "detail": ""
+              },
+              {
+                "kind": "complete",
+                "event_index": -1,
+                "logical_ns": 20000000,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "cleanup",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              }
+            ]
+          }
+        }
+      },
+      "final_progress": {
+        "authority_generation": "3",
+        "clock_generation": "1",
+        "configuration_generation": "4",
+        "consumed_through_utc_ns": "1795035520000000000",
+        "cursors": {
+          "day": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "evening": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "morning": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "night": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "ordinary": {
+            "index": 0,
+            "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+          }
+        },
+        "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "in_flight": {
+          "first_start_ns": "1795035520000000000",
+          "intent_digest": "c897052173c80c1083fa9fdb55831f9204004c48ad7ffd31a1c11f1e4b812641",
+          "last_start_ns": "1795035520000000000",
+          "occurrence_id": "38862c957dc99d50f7297ff1e6f12549",
+          "state": "reserved",
+          "successor_cursors": {
+            "day": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "evening": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "morning": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "night": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "ordinary": {
+              "index": 0,
+              "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+            }
+          }
+        },
+        "schema": "pi-recurrence-progress/1"
+      }
+    },
+    {
+      "device": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "locator": "MK88IG",
+      "command": [
+        "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase7/native-pi/src/build/bin/scheduling_autonomy_fixture",
+        "/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc0000gn/T/scheduling-autonomy-xwf7h5uv/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/ledger",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--backend",
+        "simulated",
+        "-i",
+        "/var/folders/0f/yql6nmgj0v1gw2fs4hkpjbzc0000gn/T/scheduling-autonomy-xwf7h5uv/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/native.ini",
+        "--socket-loopback-only",
+        "--socket-loopback-family",
+        "ipv4",
+        "--no-offset",
+        "--no-system-clock-frequency-estimate"
+      ],
+      "admissions": {
+        "432a8b52e755401265273d152f8301fe": {
+          "observed_at_utc_ns": "1795035388147841000",
+          "record": {
+            "first_start_ns": "1795035406000000000",
+            "intent_digest": "ce0946e75ceb2ed9140a11d20e23971d5cdfc7d4c61c48db35f6c8b6d4dbf23f",
+            "last_start_ns": "1795035406000000000",
+            "occurrence_id": "432a8b52e755401265273d152f8301fe",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        },
+        "92219906ea4b62a0ab2225d8b07969ca": {
+          "observed_at_utc_ns": "1795035406046658000",
+          "record": {
+            "first_start_ns": "1795035466000000000",
+            "intent_digest": "ce0946e75ceb2ed9140a11d20e23971d5cdfc7d4c61c48db35f6c8b6d4dbf23f",
+            "last_start_ns": "1795035466000000000",
+            "occurrence_id": "92219906ea4b62a0ab2225d8b07969ca",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        },
+        "4b79159f3bd000762f496d369cd9fa0f": {
+          "observed_at_utc_ns": "1795035466026430000",
+          "record": {
+            "first_start_ns": "1795035526000000000",
+            "intent_digest": "ce0946e75ceb2ed9140a11d20e23971d5cdfc7d4c61c48db35f6c8b6d4dbf23f",
+            "last_start_ns": "1795035526000000000",
+            "occurrence_id": "4b79159f3bd000762f496d369cd9fa0f",
+            "state": "reserved",
+            "successor_cursors": {
+              "day": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "evening": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "morning": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "night": {
+                "index": 0,
+                "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+              },
+              "ordinary": {
+                "index": 0,
+                "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+              }
+            }
+          }
+        }
+      },
+      "executions": {
+        "1": {
+          "observed_at_utc_ns": "1795035406046682000",
+          "trace": {
+            "schema_version": 1,
+            "backend": "simulated",
+            "mode": "QRSS",
+            "plan_id": 1,
+            "request_id": 1,
+            "events": [
+              {
+                "kind": "configure",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "configured",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "execution_start",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "event",
+                "event_index": 0,
+                "logical_ns": 0,
+                "frequency_hz": 10140000,
+                "rf_on": true,
+                "detail": ""
+              },
+              {
+                "kind": "complete",
+                "event_index": -1,
+                "logical_ns": 20000000,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "cleanup",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              }
+            ]
+          }
+        },
+        "2": {
+          "observed_at_utc_ns": "1795035466026455000",
+          "trace": {
+            "schema_version": 1,
+            "backend": "simulated",
+            "mode": "QRSS",
+            "plan_id": 2,
+            "request_id": 1,
+            "events": [
+              {
+                "kind": "configure",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "configured",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "execution_start",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 10140002.1972656,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "event",
+                "event_index": 0,
+                "logical_ns": 0,
+                "frequency_hz": 10140000,
+                "rf_on": true,
+                "detail": ""
+              },
+              {
+                "kind": "complete",
+                "event_index": -1,
+                "logical_ns": 20000000,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              },
+              {
+                "kind": "cleanup",
+                "event_index": -1,
+                "logical_ns": 0,
+                "frequency_hz": 0,
+                "rf_on": false,
+                "detail": ""
+              }
+            ]
+          }
+        }
+      },
+      "final_progress": {
+        "authority_generation": "3",
+        "clock_generation": "1",
+        "configuration_generation": "4",
+        "consumed_through_utc_ns": "1795035526000000000",
+        "cursors": {
+          "day": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "evening": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "morning": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "night": {
+            "index": 0,
+            "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "ordinary": {
+            "index": 0,
+            "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+          }
+        },
+        "device_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "in_flight": {
+          "first_start_ns": "1795035526000000000",
+          "intent_digest": "ce0946e75ceb2ed9140a11d20e23971d5cdfc7d4c61c48db35f6c8b6d4dbf23f",
+          "last_start_ns": "1795035526000000000",
+          "occurrence_id": "4b79159f3bd000762f496d369cd9fa0f",
+          "state": "reserved",
+          "successor_cursors": {
+            "day": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "evening": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "morning": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "night": {
+              "index": 0,
+              "list_digest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+            },
+            "ordinary": {
+              "index": 0,
+              "list_digest": "cc9bfd0c961ba13ac7ebc115ba42e00f7c19d92304253daa4206c688da1216ba"
+            }
+          }
+        },
+        "schema": "pi-recurrence-progress/1"
+      }
+    }
+  ],
+  "limits": "Actual main, protected APIs, native recurrence, journals and simulated execution; fixture-only independent identities and target-local healthy clock samples. No physical hardware, LAN, services or RF."
+}

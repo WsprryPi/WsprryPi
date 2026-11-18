@@ -173,9 +173,9 @@
                 const read = {context:'target-context',settings:'target-settings',status:'target-status',migration:'target-migration-read'};
                 const operation = /^operations\/[0-9a-f]{32}$/.test(resource);
                 const review = /^operations\/[0-9a-f]{32}\/review$/.test(resource) && method === 'POST';
-                const write = review || method === 'POST' && ['migration','migration/rollback','stop','disable'].includes(resource) || method === 'PUT' && resource === 'settings';
+                const write = review || method === 'POST' && ['migration','migration/rollback','stop','disable','enable'].includes(resource) || method === 'PUT' && resource === 'settings';
                 if(!(method === 'GET' && (own(read,resource) || operation)) && !write) throw new RecoveryError('unsupported_resource');
-                const family = review ? 'target-operation-review' : write ? ({settings:'target-save',stop:'target-stop',disable:'target-action',migration:'target-migration','migration/rollback':'target-migration-rollback'})[resource] : operation ? 'target-operation' : read[resource];
+                const family = review ? 'target-operation-review' : write ? ({settings:'target-save',stop:'target-stop',disable:'target-action',enable:'target-enable',migration:'target-migration','migration/rollback':'target-migration-rollback'})[resource] : operation ? 'target-operation' : read[resource];
                 const headers = {};
                 if(write) {
                     if(!control.validControllerDocument(body,family) || body.binding.device_id !== device || review && resource !== 'operations/'+body.operation_id+'/review') throw new RecoveryError('candidate_invalid');

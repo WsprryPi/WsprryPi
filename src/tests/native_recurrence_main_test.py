@@ -9,7 +9,19 @@ import secrets
 import subprocess
 import tempfile
 import time
-from controller_only_test import free_port, request
+from controller_only_test import free_port, request as raw_request
+
+
+_last_request = {}
+
+def request(port, *args, **kwargs):
+    # Honor the real protected API's ten-requests/second budget. This fixture
+    # paces initial setup too; it never relaxes production rate or CSRF policy.
+    delay = .12 - (time.monotonic() - _last_request.get(port, 0))
+    if delay > 0:
+        time.sleep(delay)
+    _last_request[port] = time.monotonic()
+    return raw_request(port, *args, **kwargs)
 
 
 def main():
@@ -64,8 +76,12 @@ def main():
                 time.sleep(.04)
 
         def read(path):
-            status, body = request(port, 'GET', path)
-            return json.loads(body) if status == 200 else None
+            for attempt in range(20):
+                status, body = request(port, 'GET', path)
+                if status != 409 or json.loads(body).get('error', {}).get('code') != 'capacity':
+                    return json.loads(body) if status == 200 else None
+                time.sleep(0.025)
+            raise AssertionError(('read stayed busy', path, status, body))
 
         def session():
             status, reply, values = request(port, 'POST', '/api/control/v1/host/management-session',
@@ -74,6 +90,7 @@ def main():
             headers.update({'Cookie': values['Set-Cookie'].split(';')[0], 'X-WsprryPi-CSRF': values['X-WsprryPi-CSRF']})
 
         def mutate(path, method, body):
+            session()
             status, reply = request(port, method, path, json.dumps(body), {**headers, 'If-Match': '"' + body['expected_revision'] + '"'})
             assert status == 200, (status, reply, (root / 'service.log').read_text()[-6000:])
             return json.loads(reply)

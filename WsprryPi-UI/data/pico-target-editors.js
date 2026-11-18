@@ -28,7 +28,9 @@
                         if (['button','submit','hidden'].includes(field.type) || field.type === 'radio' && !field.checked) continue;
                         const label = (field.id ? entry.panel.querySelector(`label[for="${host.CSS.escape(field.id)}"]`) : null) || field.closest('label');
                         const term = host.document.createElement('dt'),detail = host.document.createElement('dd');
-                        term.textContent = label?.textContent.trim().slice(0,160) || field.getAttribute('aria-label') ||
+                        const labelContent = label?.cloneNode(true);
+                        labelContent?.querySelectorAll('input,select,textarea,button,option').forEach(control => control.remove());
+                        term.textContent = labelContent?.textContent.trim().slice(0,160) || field.getAttribute('aria-label') ||
                             field.id.replace(/^wtp-(?:remote-|member-|usb-)?/,'').replaceAll('-',' ') || field.name || 'Setting';
                         detail.textContent = field.type === 'password' ? field.value ? 'A password entry is retained but is not displayed. Enter it again in a current editor if needed.' : 'No password entry.'
                             : field.type === 'checkbox' ? field.checked ? 'Yes' : 'No'
@@ -160,6 +162,7 @@
                 section.append(title);return section;
             };
             const signal = pane('signal','Signal Setup','radio-tab'), transmitter = pane('transmitter','Transmitter','transmitter-hardware-tab'), io = pane('io','Device I/O','pi-hardware-tab');
+            const scheduling=pane('scheduling','Scheduling','scheduling-tab');
             const common = host.document.createElement('div');common.className = 'setup-pico-observations';
             const member = find('wtp-member-heading').closest('section');
             const heading = find('wtp-member-heading'),intro = heading.nextElementSibling;
@@ -180,9 +183,11 @@
             const networkTitle = host.document.createElement('h4');networkTitle.className = 'cw-control-section__title';networkTitle.textContent = 'Wi-Fi radio';
             const feedback = find('wtp-network-feedback'),explanation = feedback.nextElementSibling;
             network.append(networkTitle,find('wtp-network-load'),find('wtp-network-disable'),feedback,explanation);io.append(network);
-            signal.append(member,find('wtp-combined-settings'));
-            const unavailable = host.document.createElement('p');unavailable.className = 'form-text';unavailable.textContent = 'Pi CW profiles are unavailable on this Pico. Its existing standalone controls below retain their own scheduling and save semantics.';signal.prepend(unavailable);
-            const panes = host.document.createElement('div');panes.className = 'tab-content';panes.append(signal,transmitter,io);
+            scheduling.append(find('wtp-gray-line-controls').parentElement,find('wtp-combined-settings'));
+            const limits=host.document.createElement('p');limits.className='form-text';limits.textContent='WSPR recurrence and keyed-message recurrence are separate. The WSPR control below is not an atomic master. Keyed-message enable/pause state and editing are unavailable through this verified adapter; use the Pico’s own controls. Independent Pi day/night frequency profiles are unavailable; no controller sunrise writes are performed.';scheduling.prepend(limits);
+            signal.append(member);
+            const unavailable = host.document.createElement('p');unavailable.className = 'form-text';unavailable.textContent = 'Pi CW profiles are unavailable on this Pico. Its station controls retain their separate save and apply actions. WSPR recurrence and gray-line controls are in Scheduling.';signal.prepend(unavailable);
+            const panes = host.document.createElement('div');panes.className = 'tab-content';panes.append(signal,scheduling,transmitter,io);
             panel.append(common,panes);
         }
         function mount(profile, handle, key) {

@@ -215,7 +215,7 @@
             </section>
             <details id="wtp-combined-settings" class="mt-4">
             <summary>Standalone schedules and combined settings</summary>
-            <p class="form-text mt-2">For station edits, use saved progress above; for USB name and Wi-Fi, use USB name and Wi-Fi. This form also supports network management and firmware without those separate editors. Save schedules only changes recurrence; Save combined settings can also change station, Wi-Fi, expiry, and standalone Enable.</p>
+            <p class="form-text mt-2">For station edits, use saved progress in Signal Setup; USB name and Wi-Fi controls are in Device I/O. This form also supports network management and firmware without those separate editors. Save schedules only changes recurrence; Save combined settings can also change station, Wi-Fi, expiry, and WSPR recurrence.</p>
             <button type="button" class="btn btn-outline-primary" id="wtp-remote-load">Load saved Pico settings</button>
             <p class="form-text">Loading replaces the standalone draft below. After a conflicting or unconfirmed save, loading reads saved values and keeps your draft for review. Status polling preserves it.</p>
             <div class="row gx-3 gy-3" id="wtp-remote-fields">
@@ -255,11 +255,11 @@
                     <div class="form-text" id="wtp-remote-expiry-hint">0 means no expiry. Existing values are preserved until you change them.</div>
                 </div>
                 <div class="col-12">
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="wtp-remote-enabled" data-wtp-remote disabled><label class="form-check-label" for="wtp-remote-enabled">Enable Pico standalone schedule</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="wtp-remote-enabled" data-wtp-remote disabled><label class="form-check-label" for="wtp-remote-enabled">Enable Pico WSPR recurrence</label></div>
                     <div class="form-text" id="wtp-remote-enabled-hint"></div>
                 </div>
                 <div class="col-12 config-stacked-field">
-                    <label class="form-label" for="wtp-remote-schedules">Standalone schedule periods and phases (seconds)</label>
+                    <label class="form-label" for="wtp-remote-schedules">WSPR schedule periods and phases (seconds)</label>
                     <textarea class="form-control" id="wtp-remote-schedules" rows="3" data-wtp-remote disabled aria-describedby="wtp-remote-schedules-hint"></textarea>
                     <div class="form-text" id="wtp-remote-schedules-hint">One period and phase per line, separated by a space. Example: 120 0. Up to eight nonoverlapping schedules; values must be multiples of 120 seconds.</div>
                 </div>

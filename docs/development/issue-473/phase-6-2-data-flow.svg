@@ -87,6 +87,6 @@
 <text x="1122" y="1036" text-anchor="start" font-size="15" font-weight="normal" fill="#6c4ab6">Restore over paired TLS</text>
 <text x="65" y="1075" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Discovery (mDNS) and the code-authenticated PAKE bootstrap use open transport. PAKE protects its secret exchange.</text>
 <text x="65" y="1103" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Existing Pico network engineering TLS stays unchanged. Browser-hop and WTP security reviews remain backlogged.</text>
-<text x="45" y="1164" text-anchor="start" font-size="15" font-weight="normal" fill="#526276">Implemented software-qualified paths. Logical roles may share a host. No phase 7 or RF qualification.</text>
+<text x="45" y="1164" text-anchor="start" font-size="15" font-weight="normal" fill="#526276">Implemented software-qualified paths. Logical roles may share a host. Scheduling UI uses these paths; no RF qualification.</text>
 </g>
 </svg>

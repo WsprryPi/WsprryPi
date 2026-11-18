@@ -39,18 +39,25 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
    await waitFor(()=>run(`document.getElementById('pico-target-identity').textContent.includes('${id.repeat(32)}') && document.getElementById('wtp-remote-load') && !document.getElementById('wtp-remote-load').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'`),'bound '+id+' editor',30000);
    assert.equal(await run("document.activeElement.id"),'setup-device','Device selection preserves keyboard focus');
   };
-  const load=async()=>{await run("document.getElementById('wtp-combined-settings').open=true;document.getElementById('wtp-remote-load').click()");await waitFor(()=>run("!document.getElementById('wtp-remote-save').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'"),'saved target settings',30000);};
+  const load=async()=>{await run("document.getElementById('scheduling-tab').click();document.getElementById('wtp-combined-settings').open=true;document.getElementById('wtp-remote-load').click()");await waitFor(()=>run("!document.getElementById('wtp-remote-save').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'"),'saved target settings',30000);};
   const draft=async value=>run(`document.getElementById('wtp-remote-callsign').value='${value}';document.getElementById('wtp-remote-callsign').dispatchEvent(new Event('input',{bubbles:true}));`);
   await navigate();await manage('a');await load();await draft('K1ABC');
   assert.equal(await run("document.getElementById('setup-device').closest('form,[role=tablist]')"),null);
   assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('form')"),null);
-  assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('[role=tabpanel]').id"),'setup-pico-signal');
+  assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('[role=tabpanel]').id"),'setup-pico-scheduling');
   assert.equal(await run("document.getElementById('wtp-member-rf').closest('[role=tabpanel]').id"),'setup-pico-io');
   assert.equal(await run("document.getElementById('gpio-drive-select').closest('[role=tabpanel]').id"),'setup-pico-transmitter');
   assert.equal(await run("document.getElementById('pi-hardware-tab').textContent.trim()"),'Device I/O');
   assert.equal(await run("document.getElementById('fleet-pane').contains(document.getElementById('wtp-management'))"),false);
-  assert.equal(await run("document.querySelectorAll('#configTabs [role=tab]').length"),4,'No future Scheduling placeholder');
+  assert.equal(await run("document.querySelectorAll('#configTabs [role=tab]').length"),5,'Scheduling joins the existing Setup tabs');
 
+  assert.equal(await run("document.getElementById('setup-pico-scheduling').textContent.includes('Keyed-message')"),true);
+  assert.equal(await run("document.getElementById('wtp-gray-line-controls').closest('[role=tabpanel]').id"),'setup-pico-scheduling');
+  for(const theme of ['light','dark'])for(const width of [1440,390]){
+   await client.send('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:width<768});
+   await run(`applyThemePreference('${theme}');document.getElementById('setup-pico-scheduling').scrollIntoView({behavior:'instant'});window.scrollBy(0,-120)`);await client.settleRendering();
+   assert(await run('document.documentElement.scrollWidth<=innerWidth'),'Pico scheduling fits viewport');const shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,`scheduling-${theme}-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
   assert.equal(await run("WtpUi.selected()"),false);
   assert.equal(await run("document.getElementById('wtp_use').disabled"),true);
   await manage('b');await load();assert.notEqual(await run("document.getElementById('wtp-remote-callsign').value"),'K1ABC');await draft('K2ABC');
@@ -95,6 +102,7 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
   const mutationsBeforeReview=requests.filter(item=>item.method!=='GET').length;
   await run(`document.getElementById('pico-target-retained').open=true;document.querySelector('[data-retained-device="${'a'.repeat(32)}"]').open=true;`);
   await waitFor(()=>run("document.getElementById('pico-target-retained-list').textContent.includes('K5ABC')"),'inspect old-generation draft');
+  assert.equal(await run("[...document.querySelectorAll('#pico-target-retained-list dt')].some(n=>n.textContent==='Schedule location')"),true,'Retained labels exclude selector option contents');
   assert(!await run("document.getElementById('pico-target-retained-list').textContent.includes('do-not-display-retained-password')"),'Read-only draft inspection must not reveal passwords');
   assert.equal(requests.filter(item=>item.method!=='GET').length,mutationsBeforeReview,'Viewing an old draft cannot connect or save');
   for(const theme of ['light','dark'])for(const width of [1440,390]){

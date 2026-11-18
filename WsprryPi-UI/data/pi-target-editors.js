@@ -114,7 +114,10 @@
         async select(target){
             const captured=++sequence;if(selected)selected.client.pause();
             let item=entries.get(target.device_id);
-            if(!item){if(entries.size>=64)throw Error('capacity');item={target:structuredClone(target),client:root.PiTargetClient.create({device:target.device_id,base:root.WSPRRYPI_PATHS?.sharedApiPath||'/api/control/v1'}),panel:element('div'),busy:false,output:null,review:null};entries.set(target.device_id,item);}
+            if(!item){if(entries.size>=64){
+                selected=null;node('fields').replaceChildren();node('identity').textContent=target.name+' · '+target.device_id+' · unavailable';node('output').textContent='';node('review-values').replaceChildren();node('discard-confirmation').hidden=true;
+                tell('Settings draft limit reached for this page. All 64 target entries are retained. Return to a retained target to resolve or copy needed drafts before reloading. No settings were sent.');render();return;
+            }item={target:structuredClone(target),client:root.PiTargetClient.create({device:target.device_id,base:root.WSPRRYPI_PATHS?.sharedApiPath||'/api/control/v1'}),panel:element('div'),busy:false,output:null,review:null};entries.set(target.device_id,item);}
             selected=item;node('fields').replaceChildren(item.panel);node('identity').textContent=target.name+' · '+target.device_id;node('review-values').replaceChildren();node('output').textContent='';node('discard-confirmation').hidden=true;
             if(!available.has(target.device_id)){item.client.pause();tell('This paired Pi is unavailable. Its draft is retained.');render();return;}
             await run(async current=>{await refresh(current);if(captured!==sequence)current.client.pause();});

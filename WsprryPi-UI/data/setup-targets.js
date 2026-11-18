@@ -3,9 +3,10 @@
     'use strict';
     if (!root.document) return;
     const node = id => root.document.getElementById(id);
-    const tabs = ['radio-tab','transmitter-hardware-tab','pi-hardware-tab'];
-    const localPanes = ['radio-pane','transmitter-hardware-pane','pi-hardware-pane'];
-    const picoPanes = ['setup-pico-signal','setup-pico-transmitter','setup-pico-io'];
+    const tabs = ['radio-tab','scheduling-tab','transmitter-hardware-tab','pi-hardware-tab'];
+    const localPanes = ['radio-pane','setup-scheduling','transmitter-hardware-pane','pi-hardware-pane'];
+    const picoPanes = ['setup-pico-signal','setup-pico-scheduling','setup-pico-transmitter','setup-pico-io'];
+    let schedulingKey=null;
     const identity = value => typeof value === 'string' && /^[0-9a-f]{32}$/.test(value);
     let choice = 'local', profiles = [], managedProfiles = [], managedPis = [], candidates = [], current = null, local = null;
     let inventoryReading = false, inventoryTimer = null, closed = false;
@@ -13,6 +14,7 @@
     const availableProfiles = () => [...profiles,...managedProfiles];
     let localDraft = false, sequence = 0, lastTab = tabs[0], loading = false, initialized = false, localReady = false;
     function activeTab() {return tabs.find(id => node(id)?.classList.contains('active'));}
+    function retainedPis() {return [...(root.PiTargetEditors?.retainedTargets?.()||[]),...(root.SchedulingEditor?.retainedTargets?.({remoteOnly:true})||[])];}
     function options() {
         const select = node('setup-device');if (!select) return;
         const focused = root.document.activeElement === select;
@@ -23,7 +25,7 @@
         for (const profile of root.PicoTargetEditors?.retainedProfiles?.() || [])
             if (!values.some(([id]) => id === selectionValue(profile))) values.push([selectionValue(profile),`${profile.name} · unavailable source · retained draft`]);
         for (const target of managedPis) values.push(['pi:'+target.device_id,`${target.name} · paired Pi`]);
-        for (const target of root.PiTargetEditors?.retainedTargets?.() || [])
+        for (const target of retainedPis())
             if (!values.some(([id]) => id === 'pi:'+target.device_id)) values.push(['pi:'+target.device_id,`${target.name} · unavailable Pi · retained draft`]);
         for (const candidate of candidates) if (typeof candidate.id === 'string')
             values.push(['nearby:'+candidate.id,`${candidate.instance || 'Nearby device'} · ${candidate.binding || 'USB'} · not enrolled`]);
@@ -43,22 +45,22 @@
         options();
         const recovery = root.ConfigurationRecovery?.active === true, locked = root.PicoFirmwareSafety?.locked === true;
         const pico = choice.startsWith('known:') || choice.startsWith('managed:'), pi = choice.startsWith('pi:'), own = choice === 'local' && !root.ControllerMode?.active;
-        const fleet = node('fleet-tab')?.classList.contains('active');
+        const fleet = node('fleet-tab')?.classList.contains('active'), scheduling=node('scheduling-tab')?.classList.contains('active');
         const state = pi ? root.PiTargetEditors?.state : root.PicoTargetEditors?.state;
         node('setup-device').disabled = recovery || locked || !root.WtpUi?.catalogReady && !managedPis.length && !managedProfiles.length;
-        node('wsprform').hidden = !own;node('wsprform').inert = !own || !localReady || recovery || locked;
+        node('wsprform').hidden = !own || scheduling;node('wsprform').inert = !own || !localReady || recovery || locked;
         node('setup-pico-workspace').hidden = !pico || fleet || recovery;
         node('setup-pico-workspace').inert = locked || recovery;
-        if(node('setup-pi-workspace')){node('setup-pi-workspace').hidden=!pi||fleet||recovery;node('setup-pi-workspace').inert=locked||recovery;}
+        if(node('setup-pi-workspace')){node('setup-pi-workspace').hidden=!pi||scheduling||fleet||recovery;node('setup-pi-workspace').inert=locked||recovery;}
         if (node('setup-local-output')) {node('setup-local-output').hidden = !own;node('setup-local-output').inert = !own || locked || recovery;}
         if (node('setup-controller-output-fields')) node('setup-controller-output-fields').inert = !own || !localReady || locked || recovery;
-        node('setup-local-draft').hidden = !own || !localDraft || recovery;
+        node('setup-local-draft').hidden = !own || !localDraft || scheduling || recovery;
         node('setup-local-resume').disabled = locked || recovery;
         node('setup-device-reconnect').hidden = !(pico || pi) || loading || !!state && !state.paused;
         node('setup-device-reconnect').disabled = locked || recovery || !!state?.pending || !(pi?managedPis.some(item=>item.device_id===current?.device_id):availableProfiles().some(item => item.id === current?.id && Boolean(item.managed) === Boolean(current?.managed)));
         for (let i=0;i<tabs.length;++i) {
             const tab = node(tabs[i]);if (!tab) continue;
-            const pane = pi ? 'setup-pi-workspace' : pico ? picoPanes[i] : localPanes[i];
+            const pane = pi ? (i===1?'setup-scheduling':'setup-pi-workspace') : pico ? picoPanes[i] : localPanes[i];
             tab.setAttribute('data-bs-target','#'+pane);tab.setAttribute('aria-controls',pane);
             const unavailable = recovery || !(own || pi || pico && state?.profile === current?.id);
             tab.disabled = unavailable;tab.setAttribute('aria-disabled',String(unavailable));
@@ -91,12 +93,23 @@
                 : root.ControllerMode?.active ? 'Choose a saved Pico to manage its settings. Paired Pis are available from the Device selector.'
                 : !localReady ? 'Reading this Pi’s saved settings. Editing remains unavailable until they load.' : 'Local settings keep their existing save behavior. Selecting another device never changes this Pi’s output.';
         }
-        if(pi){root.PiTargetEditors?.showTab?.(Math.max(0,tabs.indexOf(activeTab())));node('setup-pi-workspace')?.setAttribute('aria-labelledby',activeTab()||tabs[0]);}
+        if(pi&&!scheduling){root.PiTargetEditors?.showTab?.([0,-1,1,2][Math.max(0,tabs.indexOf(activeTab()))]);node('setup-pi-workspace')?.setAttribute('aria-labelledby',activeTab()||tabs[0]);}
+        const schedulePanel=node('setup-scheduling');
+        if(schedulePanel){
+            schedulePanel.hidden=!scheduling||!(own||pi)||fleet||recovery;
+            schedulePanel.classList.toggle('active',!schedulePanel.hidden);schedulePanel.classList.toggle('show',!schedulePanel.hidden);
+            schedulePanel.inert=locked||recovery;
+            const target=own?local:pi?current:null,key=!schedulePanel.hidden&&target?(own?'local:':'pi:')+target.device_id:null;
+            if(key!==schedulingKey){schedulingKey=key;root.SchedulingEditor?.leave?.();
+                if(key){if(own)retainLocal();void root.SchedulingEditor?.select?.(target,own);}
+                else if(own&&!localDraft)root.suspendConfigAutosave?.(false);
+            }
+        }
         const title = node('configPageTitle');
         if (title && !recovery) title.textContent = fleet ? 'Fleet' : (node(activeTab())?.textContent.trim() || 'Setup');
         for (const id of ['configSaveStatus','configSaveStatusHint','configSaveStatusDetail']) {
             const item = node(id);if (!item || recovery) continue;
-            if (id !== 'configSaveStatusDetail') item.hidden = !own || fleet;
+            if (id !== 'configSaveStatusDetail') item.hidden = !own || scheduling || fleet;
             if (id === 'configSaveStatusHint' && own) item.textContent = localDraft
                 ? 'Autosave is paused. Review the retained local draft before saving it.'
                 : !localReady ? 'Reading saved settings before allowing local edits.'
@@ -137,7 +150,7 @@
     async function select(value) {
         if (root.ConfigurationRecovery?.active || root.PicoFirmwareSafety?.locked) {render();return;}
         if(value.startsWith('pi:')) {
-            const id=value.slice(3),target=managedPis.find(item=>item.device_id===id)||root.PiTargetEditors?.retainedTargets?.().find(item=>item.device_id===id);
+            const id=value.slice(3),target=managedPis.find(item=>item.device_id===id)||retainedPis().find(item=>item.device_id===id);
             if(!target)return;retainLocal();root.PicoTargetEditors.leave();current=structuredClone(target);choice=value;const captured=++sequence;loading=true;render();
             try{await root.PiTargetEditors.select(target);}finally{if(captured===sequence){loading=false;render();if(node('fleet-tab')?.classList.contains('active'))showTab(lastTab);}}return;
         }
@@ -167,6 +180,9 @@
             if(closed)return;
             local=value.targets.find(target=>target.device_id===host.device_id&&target.product==='WsprryPi')||null;
             managedPis=value.targets.filter(target=>target.product==='WsprryPi'&&target.device_id!==host.device_id);
+            // Native-editor rendering can select local Scheduling immediately.
+            // Publish its availability first so that selection uses this snapshot.
+            root.SchedulingEditor?.targetsChanged?.([...(local?[local]:[]),...managedPis]);
             root.PiTargetEditors?.targetsChanged?.(managedPis);
             managedProfiles=value.targets.filter(target=>target.product==='WsprryPico'&&!profiles.some(profile=>profile.settings['Device ID']===target.device_id))
                 .map(target=>({id:target.device_id,name:target.name,managed:true,settings:{'Device ID':target.device_id,Transport:'usb'}}));
@@ -174,7 +190,7 @@
         } catch (_) {
             // Discovery/absence cannot authorize an alternate owner. Retain
             // drafts, withdraw these paired observations, and await fresh data.
-            managedPis=[];root.PiTargetEditors?.targetsChanged?.([]);
+            managedPis=[];root.PiTargetEditors?.targetsChanged?.([]);root.SchedulingEditor?.targetsChanged?.([]);
             managedProfiles=[];root.PicoTargetEditors?.managedTargetsChanged?.([]);
         } finally {
             inventoryReading=false;render();root.clearTimeout(inventoryTimer);

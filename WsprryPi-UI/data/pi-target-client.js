@@ -12,7 +12,7 @@
     };
     const failure=code=>new transport.RecoveryError(code);
     const privateKeys=new Set(['TLS CA File','TLS Client Certificate','TLS Client Key','TLS Server Identity']);
-    function create({device,fetch=root.fetch?.bind(root),crypto=root.crypto,base='/api/control/v1'}={}) {
+    function create({device,local=false,fetch=root.fetch?.bind(root),crypto=root.crypto,base='/api/control/v1'}={}) {
         if(!/^[0-9a-f]{32}$/.test(device||''))throw failure('target_mismatch');
         const api=transport.create({fetch,crypto,base});
         let context=null,saved=null,draft=null,pending=null,suspended=null,stopRead=null,confirmed=null,evidence=null,reviewed=null,paused=true,busy=false,edit=0;
@@ -22,7 +22,7 @@
         const capability=resource=>context?.capabilities.find(item=>item.resource===resource);
         function checkContext(value) {
             if(!control.validControllerDocument(value,'target-context')||value.target.product!=='WsprryPi'||value.target.device_id!==device||
-                value.binding.device_id!==device||value.gateway!==null||!value.authorization||!value.capabilities.every(control.supportedPiResource))throw failure('target_context_unavailable');
+                value.binding.device_id!==device||value.gateway!==null||(local?value.authorization!==null:!value.authorization)||!value.capabilities.every(control.supportedPiResource))throw failure('target_context_unavailable');
         }
         function checkSettings(value,current) {
             if(!control.validControllerDocument(value,'target-settings')||!equal(value.binding,current.binding)||
@@ -85,12 +85,16 @@
                         try{checkSettings(value,next);break;}
                         catch(error){if(error.code!=='connection_changed'||attempt===2)throw error;}
                     }
-                    const accepted=confirmed&&confirmed.receipt?.revision===value.revision&&context&&equal(scope(context),scope(next)) ||
-                        reviewed&&equal(reviewed.binding,next.binding)&&reviewed.revision===value.revision&&equal(authorization(reviewed.authorization),authorization(next.authorization));
                     const sameIdentity=context&&equal(context.binding,next.binding)&&equal(authorization(context.authorization),authorization(next.authorization));
+                    // An explicit enable/disable can legitimately change the
+                    // capability digest. Its exact receipt and current binding
+                    // prove readback; the new context grants future writes.
+                    const accepted=confirmed&&confirmed.receipt?.revision===value.revision&&sameIdentity&&equal(confirmed.body.binding,next.binding) ||
+                        reviewed&&equal(reviewed.binding,next.binding)&&reviewed.revision===value.revision&&equal(authorization(reviewed.authorization),authorization(next.authorization));
                     const metadataRefresh=sameIdentity&&saved&&(equal(value.saved,saved.saved)||equal(value.saved,draft));
                     if(context&&(!equal(scope(context),scope(next))||saved&&saved.revision!==value.revision)&&draft&&!equal(draft,saved.saved)&&!accepted&&!metadataRefresh)throw failure('revision_conflict');
                     if(!draft||!saved||equal(draft,saved.saved))draft=clone(value.saved);
+                    if(accepted&&['enable','disable'].includes(confirmed?.resource)&&draft)draft.scheduling.enabled=value.saved.scheduling.enabled;
                     context=clone(next);saved=clone(value);confirmed=null;reviewed=null;paused=!!pending;return clone(saved);
                 } finally {busy=false;}
             },
@@ -100,6 +104,20 @@
                 const check={...intent('target-save'),candidate:next};
                 if(!control.validControllerDocument(check,'target-save'))throw failure('candidate_invalid');
                 draft=next;++edit;
+            },
+            setSolar(value) {
+                const next=clone(draft);if(!next)throw failure('connection_changed');
+                next.scheduling.solar=clone(value);
+                if(!control.validControllerDocument({...intent('target-save'),candidate:next},'target-save'))throw failure('candidate_invalid');
+                draft=next;++edit;
+            },
+            enable() {
+                if(!capability('pi-scheduling')?.write||!saved||!equal(draft,saved.saved)||saved.saved.scheduling.enabled)throw failure('unsaved_schedule');
+                return dispatch('enable','POST',{...intent('target-enable'),candidate_digest:saved.candidate_digest});
+            },
+            disable() {
+                if(!capability('pi-scheduling')?.write)throw failure('unsupported_resource');
+                return dispatch('disable','POST',intent('target-action'));
             },
             save() {
                 if(!capability('pi-config')?.write)throw failure('unsupported_resource');

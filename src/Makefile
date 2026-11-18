@@ -2176,6 +2176,16 @@ $(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_
 $(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+# Two isolated actual-main targets with independent identity and approved typed
+# clock-health fixtures; production identity itself is exercised elsewhere.
+$(BIN_DIR)/scheduling_autonomy_fixture: tests/scheduling_autonomy_fixture.cpp main.cpp $(filter-out %/wtp_endpoint/identity.o,$(SEMANTICS_TEST_DEPS))
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter-out main.cpp,$^) -o $@ $(LDFLAGS)
+
+.PHONY: scheduling-autonomy-test
+scheduling-autonomy-test: $(BIN_DIR)/scheduling_autonomy_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/scheduling_autonomy_test.py --fixture "$(abspath $(BIN_DIR)/scheduling_autonomy_fixture)" --output "$(abspath ../build/scheduling-autonomy)"
+
 pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture"
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --network-safety-off

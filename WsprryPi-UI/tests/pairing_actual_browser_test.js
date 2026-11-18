@@ -8,7 +8,7 @@ const {waitForExit}=require('./browser_fixture_process.js');
 (async()=>{
  const binary=process.argv[2];assert(binary&&path.isAbsolute(binary),'Explicit compiled private-state pairing fixture required');
  const ui=path.resolve(__dirname,'..'),phpPort=await freePort(),id=c=>c.repeat(32);
- let actor,php,proxy,browser,client,profile,failure,selected,drop=false,dropSave=false,dropMigration=false,withhold=false;
+ let actor,php,proxy,browser,client,profile,failure,selected,drop=false,dropSave=false,dropMigration=false,dropEnable=false,withhold=false;
  const requests=[];
  try{
   actor=spawnFixtureChild(binary,[],{stdio:['pipe','pipe','inherit']});await waitForSpawn(actor);
@@ -36,6 +36,7 @@ const {waitForExit}=require('./browser_fixture_process.js');
     if(dropMigration&&request.method==='POST'&&route.endsWith('/migration')&&[200,202].includes(incoming.statusCode)){
      dropMigration=false;incoming.resume();incoming.once('end',()=>{response.writeHead(503,{'Content-Type':'application/json'});response.end(JSON.stringify({contract:'Wsprry-Control/1',schema:'target-error',error:{code:'transport_unavailable',retryable:true}}));});return;
     }
+    if(dropEnable&&request.method==='POST'&&route.endsWith('/enable')&&incoming.statusCode===200){dropEnable=false;incoming.resume();incoming.once('end',()=>{response.writeHead(503,{'Content-Type':'application/json'});response.end(JSON.stringify({contract:'Wsprry-Control/1',schema:'target-error',error:{code:'transport_unavailable',retryable:true}}));});return;}
     if(dropSave&&request.method==='PUT'&&route.endsWith('/settings')&&incoming.statusCode===200){dropSave=false;incoming.resume();incoming.once('end',()=>{response.writeHead(503,{'Content-Type':'application/json'});response.end(JSON.stringify({contract:'Wsprry-Control/1',schema:'target-error',error:{code:'transport_unavailable',retryable:true}}));});return;}
     response.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(response);
    });outgoing.on('error',()=>{response.writeHead(503);response.end();});request.pipe(outgoing);
@@ -74,8 +75,11 @@ const {waitForExit}=require('./browser_fixture_process.js');
   const beforeSave=requests.filter(item=>item.method==='PUT'&&item.path.endsWith('/settings')).length;
   dropSave=true;await run("document.getElementById('pi-target-save').click()");
   await waitFor(()=>run("PiTargetEditors.state.pending&&!document.getElementById('pi-target-check').disabled"),'actual native Pi lost accepted save',15000);
-  await run("document.getElementById('pi-target-check').click()");
-  await waitFor(()=>run("!PiTargetEditors.state.pending&&document.getElementById('pi-target-feedback').textContent.includes('confirmed')"),'actual native Pi receipt recovery',15000);
+  assert.equal(dropSave,false,'The lost response must follow an accepted actual settings save');
+  let lastRecovery=0;
+  await waitFor(async()=>{if(await run("!PiTargetEditors.state.pending&&document.getElementById('pi-target-feedback').textContent.includes('confirmed')"))return true;
+   if(Date.now()-lastRecovery>=500&&await run("!document.getElementById('pi-target-check').disabled")){lastRecovery=Date.now();await run("document.getElementById('pi-target-check').click()");}return false;
+  },'actual native Pi receipt recovery',15000);
   assert.equal(requests.filter(item=>item.method==='PUT'&&item.path.endsWith('/settings')).length,beforeSave+1,'Actual receipt recovery must not resend settings');
   await run("document.getElementById('pi-target-refresh').click()");
   await waitFor(()=>run("!PiTargetEditors.state.paused&&!document.getElementById('pi-target-refresh').disabled"),'actual native Pi saved readback',15000);
@@ -92,6 +96,41 @@ const {waitForExit}=require('./browser_fixture_process.js');
   await waitFor(()=>run("document.getElementById('recurrenceMigrationRetry').hidden&&document.getElementById('recurrenceMigrationState').textContent.includes('saved and disabled')"),'actual native atomic disabled staging and receipt recovery',15000);
   assert.equal(requests.filter(item=>item.method==='POST'&&item.path.endsWith('/migration')).length,migrationPosts+1,'Migration recovery never repeats the accepted command');
   console.log('PASS actual paired Maintenance migration: protected browser, current normal TLS, native configuration/authority/WAL, interrupted accepted reply, explicit progress reconciliation and receipt-only disabled staging');
+  selected=ports.controller_port;await client.send('Page.navigate',{url:origin+'/index.php?page=config'});
+  await waitFor(()=>run("!!document.querySelector('#setup-device option[value=\"pi:'+ 'a'.repeat(32)+'\"]')&&!document.getElementById('setup-device').disabled"),'actual Scheduling inventory');
+  await run("document.getElementById('setup-device').value='pi:'+'a'.repeat(32);document.getElementById('setup-device').dispatchEvent(new Event('change'))");
+  await waitFor(()=>run("PiTargetEditors.state&&!PiTargetEditors.state.paused"),'actual selected Pi');
+  await run("document.getElementById('scheduling-tab').click()");
+  await waitFor(()=>run("SchedulingEditor.state&&!SchedulingEditor.state.paused&&!!document.querySelector('#schedule-fields fieldset')"),'actual Scheduling read');
+  const policyWrites=requests.filter(item=>item.method==='PUT'&&item.path.endsWith('/settings')).length;
+  await run("document.getElementById('schedule-enabled').click();(()=>{const label=[...document.querySelectorAll('#schedule-fields label')].find(n=>n.textContent==='Target-site locator');const input=document.getElementById(label.htmlFor);input.value='EM18IG';input.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  assert.equal(await run("document.getElementById('schedule-enable').disabled"),true,'Actual unsaved policy cannot enable');
+  dropSave=true;await run("document.getElementById('schedule-save').click()");
+  await waitFor(()=>run("SchedulingEditor.state.pending&&!document.getElementById('schedule-check').disabled"),'actual lost policy save');
+  await waitFor(async()=>{
+   const state=await run("({pending:SchedulingEditor.state.pending,paused:SchedulingEditor.state.paused,check:!document.getElementById('schedule-check').disabled,read:!document.getElementById('schedule-read').disabled})");
+   if(Date.now()-lastRecovery<500)return false;lastRecovery=Date.now();
+   if(state.pending&&state.check)await run("document.getElementById('schedule-check').click()");
+   else if(!state.pending&&state.paused&&state.read)await run("document.getElementById('schedule-read').click()");
+   return !state.pending&&!state.paused;
+  },'actual policy receipt-only recovery',15000);
+  assert.equal(requests.filter(item=>item.method==='PUT'&&item.path.endsWith('/settings')).length,policyWrites+1);
+  // Receipt recovery preserves an unconfirmed raw draft until explicit reread.
+  await run("document.getElementById('schedule-read').click()");
+  await waitFor(()=>run("!document.getElementById('schedule-read').disabled"),'actual saved policy read');
+  await waitFor(()=>run("!document.getElementById('schedule-enable').disabled"),'actual disabled policy verified');
+  const enables=requests.filter(item=>item.method==='POST'&&item.path.endsWith('/enable')).length;
+  dropEnable=true;await run("document.getElementById('schedule-enable').click()");
+  await waitFor(()=>run("SchedulingEditor.state.pending&&!document.getElementById('schedule-check').disabled"),'actual lost enable');
+  await waitFor(async()=>{
+   const state=await run("({pending:SchedulingEditor.state.pending,paused:SchedulingEditor.state.paused,check:!document.getElementById('schedule-check').disabled,read:!document.getElementById('schedule-read').disabled})");
+   if(Date.now()-lastRecovery<500)return false;lastRecovery=Date.now();
+   if(state.pending&&state.check)await run("document.getElementById('schedule-check').click()");
+   else if(!state.pending&&state.paused&&state.read)await run("document.getElementById('schedule-read').click()");
+   return !state.pending&&!state.paused;
+  },'actual enable receipt recovery',15000);
+  assert.equal(requests.filter(item=>item.method==='POST'&&item.path.endsWith('/enable')).length,enables+1);
+  console.log('PASS actual Scheduling: protected browser, paired TLS, native policy/WAL, disabled save/readback and explicit enable; lost policy and enable replies recover through receipts without replay');
   await navigate(ports.target_port,true);assert((await run("document.getElementById('pairingState').textContent")).includes(id('b')));
   actor.stdin.write('STOP_OLD\n');assert.equal(await line(),'ACK');
   code=await open();await navigate(ports.replacement_port);await connect(code);code='';
@@ -102,7 +141,7 @@ const {waitForExit}=require('./browser_fixture_process.js');
   assert.equal(await run("JSON.stringify(localStorage).includes('code')"),false,'No code field is persisted');
   console.log('PASS actual Maintenance workflow: protected window, PAKE/TLS, durable lost-reply readback after reload, replacement with old controller offline, removal and code confinement; no hardware or RF');
  }catch(error){
-  if(client)try{console.error('Actual pairing UI state:',await client.evaluate("({state:document.getElementById('pairingState')?.textContent,local:document.getElementById('pairingLocalFeedback')?.textContent,connect:document.getElementById('pairingConnectFeedback')?.textContent,disabled:document.getElementById('pairingWindow')?.disabled,migration:document.getElementById('recurrenceMigrationState')?.textContent,migrationFeedback:document.getElementById('recurrenceMigrationFeedback')?.textContent,migrationHidden:document.getElementById('recurrenceMigration')?.hidden,device:document.getElementById('recurrenceMigrationDevice')?.textContent,recovery:window.ConfigurationRecovery?.active,piFeedback:document.getElementById('pi-target-feedback')?.textContent,piPaused:window.PiTargetEditors?.state?.paused})"));}catch(_){}
+  if(client)try{console.error('Actual pairing UI state:',await client.evaluate("({state:document.getElementById('pairingState')?.textContent,local:document.getElementById('pairingLocalFeedback')?.textContent,connect:document.getElementById('pairingConnectFeedback')?.textContent,disabled:document.getElementById('pairingWindow')?.disabled,migration:document.getElementById('recurrenceMigrationState')?.textContent,migrationFeedback:document.getElementById('recurrenceMigrationFeedback')?.textContent,migrationHidden:document.getElementById('recurrenceMigration')?.hidden,device:document.getElementById('recurrenceMigrationDevice')?.textContent,recovery:window.ConfigurationRecovery?.active,piFeedback:document.getElementById('pi-target-feedback')?.textContent,piPaused:window.PiTargetEditors?.state?.paused,scheduling:window.SchedulingEditor?.state,scheduleFeedback:document.getElementById('schedule-feedback')?.textContent})"));}catch(_){}
   failure=error;
  }finally{await finishFixture({failure,client,browser,php,profile,cleanups:[async()=>{if(proxy)await closeServer(proxy);},async()=>{if(actor){if(actor.exitCode===null&&!actor.signalCode){actor.stdin.write('QUIT\n');if(!await waitForExit(actor,5000))await stopChild(actor);}assert.equal(actor.exitCode,0,'Pairing fixture must drain and remove its private histories cleanly');}}]});}
 })().catch(error=>{console.error(error);process.exitCode=1;});
