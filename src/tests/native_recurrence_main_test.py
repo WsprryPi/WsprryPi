@@ -48,8 +48,10 @@ def main():
         stock = Path(str(ini) + '.stock')
         stock.write_bytes(ini.read_bytes())
         stock.chmod(0o600)
+        # Keep realtime start diagnostics in the captured failure log; hosted
+        # runners can refuse an occurrence at the strict launch boundary.
         command = [str(Path(args.fixture).resolve()), str(ledger), '--backend', 'simulated', '-i', str(ini),
-            '--socket-loopback-only', '--socket-loopback-family', 'ipv4']
+            '--socket-loopback-only', '--socket-loopback-family', 'ipv4', '--debug-logging']
         process, log = None, (root / 'service.log').open('w')
         headers = {'Origin': f'http://127.0.0.1:{port}', 'Content-Type': 'application/json', 'X-WsprryPico-Request': '1'}
 
