@@ -55,9 +55,13 @@ bool PiManagedHost::retry_saved_configuration(){
     try{
     {
         std::unique_lock tone(test_tone_lifecycle_mutex(),std::try_to_lock);
-        if(!tone.owns_lock())return false;
+        // A consumed notification still owes owning-parser readback when a
+        // concurrent request holds a gate. Retain it for the recovery loop's
+        // next bounded poll; no input was inspected or adopted in this case.
+        if(!tone.owns_lock()){signal_saved_configuration();return false;}
         std::unique_lock lock(config_update_mutex(),std::try_to_lock);
-        if(!lock.owns_lock()||state()!=PiHostReadiness::ConfigurationRecovery||iniFile.hasPendingChanges())return false;
+        if(!lock.owns_lock()){signal_saved_configuration();return false;}
+        if(state()!=PiHostReadiness::ConfigurationRecovery||iniFile.hasPendingChanges())return false;
         const auto revision=owner_.store().recovery_revision();
         if(revision==last_attempt_)return false;
         last_attempt_=revision;

@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 #include <sys/stat.h>
 #include <unistd.h>
 using namespace wsprrypi;
@@ -69,6 +70,17 @@ int main(){
         const auto response=host.recovery(request,true);check(response.status==200&&get_public_config_snapshot()==before&&!wtp_pi_management_ready(),
             "Explicit recovery save persists without activating runtime or output");
         check(host.consume_configuration_signal()&&!host.consume_configuration_signal(),"Accepted recovery signals one saved readback without polling");
+        const auto saved_bytes=bytes(ini);
+        for(auto *gate:{&test_tone_lifecycle_mutex(),&config_update_mutex()}){
+            std::unique_lock held(*gate);
+            bool adopted=true;
+            std::thread retry([&]{adopted=host.retry_saved_configuration();});retry.join();
+            held.unlock();
+            check(!adopted&&host.state()==PiHostReadiness::ConfigurationRecovery&&!wtp_pi_management_ready()&&bytes(ini)==saved_bytes,
+                "Contended automatic readback neither adopts nor writes saved configuration");
+            check(host.consume_configuration_signal()&&!host.consume_configuration_signal(),
+                "Each contended readback retains exactly one notification for the next recovery poll");
+        }
         check(host.retry_saved_configuration()&&host.state()==PiHostReadiness::Starting&&!wtp_pi_management_ready(),
             "One new saved revision automatically passes owning-parser readback while native admission stays closed");
         check(!host.retry_saved_configuration(),"Saved readback is not a poll-write or repeated startup loop");

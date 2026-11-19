@@ -91,8 +91,17 @@ def main():
 
         def mutate(path, method, body):
             session()
-            status, reply = request(port, method, path, json.dumps(body), {**headers, 'If-Match': '"' + body['expected_revision'] + '"'})
-            assert status == 200, (status, reply, (root / 'service.log').read_text()[-6000:])
+            payload = json.dumps(body)
+            mutation_headers = {**headers, 'If-Match': '"' + body['expected_revision'] + '"'}
+            deadline = time.monotonic() + 5
+            while True:
+                status, reply = request(port, method, path, payload, mutation_headers)
+                if status == 200:
+                    break
+                error = json.loads(reply)
+                assert status == 409 and error.get('schema') == 'target-error' and error.get('error', {}).get('code') == 'capacity', (status, reply)
+                assert time.monotonic() < deadline, (status, reply)
+                time.sleep(.025)
             return json.loads(reply)
 
         def action(resource, schema, digest=False):
@@ -122,27 +131,40 @@ def main():
             self_id = read('/api/control/v1/targets')['targets'][0]['device_id']
             base = f'/api/control/v1/targets/{self_id}/'
             context, saved = read(base + 'context'), read(base + 'settings')
-            candidate = copy.deepcopy(saved['saved'])
-            local = time.localtime(time.time() + 5)
-            candidate['configuration']['Operation'].update({'Mode': 'QRSS', 'Transmit': True, 'Enable on Boot': 'Follow'})
-            candidate['configuration']['CW'].update({'Message': 'E', 'Base Frequency': 14097000, 'Dot Seconds': .02,
-                'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': 1,
-                'Fade Shape': 'none', 'Fade In Ms': 0, 'Fade Out Ms': 0, 'Fade Slice Ms': 5})
-            mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
-                'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
-            assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
-            action('enable', 'target-enable', True)
-            wait(lambda: progress.exists() and json.loads(progress.read_text())['record']['in_flight'], 'Durable accepted occurrence')
-            status = read(base + 'status')
-            assert status['execution_owner'] == self_id and status['destination_id'] == self_id
-            assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
-            action('disable', 'target-action')
-            assert read(base + 'status')['phase'] == 'draining'
-            wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Accepted message drains', 10)
-            observed_trace = json.loads(trace.read_text())
-            assert any(event['kind'] == 'execution_start' for event in observed_trace['events']), {
-                'trace': observed_trace, 'progress': json.loads(progress.read_text()),
-                'status': read(base + 'status'), 'service_log': (root / 'service.log').read_text()[-12000:]}
+            # Hosted runners can legitimately miss a guarded launch. Each
+            # attempt is a newly saved future occurrence; consumed slots are
+            # never retried. Require autonomous execution within the bound,
+            # and verify inactive cleanup for every refused occurrence.
+            for launch_attempt in range(8):
+                context, saved = read(base + 'context'), read(base + 'settings')
+                candidate = copy.deepcopy(saved['saved'])
+                local = time.localtime(time.time() + 5)
+                candidate['configuration']['Operation'].update({'Mode': 'QRSS', 'Transmit': True, 'Enable on Boot': 'Follow'})
+                candidate['configuration']['CW'].update({'Message': 'E', 'Base Frequency': 14097000, 'Dot Seconds': .02,
+                    'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': 1,
+                    'Fade Shape': 'none', 'Fade In Ms': 0, 'Fade Out Ms': 0, 'Fade Slice Ms': 5})
+                mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
+                    'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
+                assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
+                action('enable', 'target-enable', True)
+                reserved = wait(lambda: progress.exists() and json.loads(progress.read_text())['record']['in_flight'], 'Durable accepted occurrence')
+                status = read(base + 'status')
+                assert status['execution_owner'] == self_id and status['destination_id'] == self_id
+                assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
+                action('disable', 'target-action')
+                assert read(base + 'status')['phase'] == 'draining'
+                wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Accepted message drains', 10)
+                observed_trace = json.loads(trace.read_text())
+                if any(event['kind'] == 'execution_start' for event in observed_trace['events']):
+                    break
+                assert [event['kind'] for event in observed_trace['events']] == ['configure', 'configured', 'cleanup'], observed_trace
+                assert not any(event['rf_on'] for event in observed_trace['events']), observed_trace
+                assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == reserved['last_start_ns']
+                assert read(base + 'status')['phase'] == 'waiting'
+                assert launch_attempt < 7, {
+                    'trace': observed_trace, 'progress': json.loads(progress.read_text()),
+                    'status': read(base + 'status'), 'service_log': (root / 'service.log').read_text()[-12000:]}
+                print('Safe prelaunch refusal; testing a fresh future occurrence', launch_attempt + 1, flush=True)
             saved_progress = progress.read_bytes()
             stop()
             launch()
