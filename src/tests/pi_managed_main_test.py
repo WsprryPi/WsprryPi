@@ -205,8 +205,19 @@ def main():
                     status, stop_receipt = request(port, "POST", stop_path, stop_command, stop_headers)
                     assert status == 200 and json.loads(stop_receipt)["state"] == "committed", stop_receipt
                     stop_bytes = ini.read_bytes()
-                    status, retry_stop = request(port, "POST", stop_path, stop_command, stop_headers)
-                    assert status == 200 and retry_stop == stop_receipt and ini.read_bytes() == stop_bytes
+                    replay_deadline = time.monotonic() + 5
+                    while True:
+                        status, retry_stop = request(port, "POST", stop_path, stop_command, stop_headers)
+                        if status == 200:
+                            break
+                        # The owning-parser readback can briefly reserve the
+                        # configuration gate. Retry only this exact accepted
+                        # operation, never a fresh STOP or a changed payload.
+                        error = json.loads(retry_stop)
+                        assert status == 409 and error.get("schema") == "target-error" and error.get("error", {}).get("code") == "capacity", (status, retry_stop)
+                        assert time.monotonic() < replay_deadline, (status, retry_stop)
+                        time.sleep(0.02)
+                    assert retry_stop == stop_receipt and ini.read_bytes() == stop_bytes, (status, retry_stop, stop_receipt, ini.read_bytes() == stop_bytes)
                 before_stop = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
                 status, stopped = request(port, "POST", "/control/stop", json.dumps({"command": "stop"}), context)
                 assert status == 200 and json.loads(stopped)["persisted"] is True, stopped
