@@ -42,8 +42,12 @@ jobs:
       - name: Inspect the complete Git comparison
         id: classify
         run: python3 -B scripts/ci/change_scope.py
-      - name: Install workflow validation dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3-yaml build-essential pkg-config libssl-dev
+      - name: Verify image-provided workflow validation tools
+        run: |
+          python3 -c 'import yaml'
+          c++ --version
+          make --version
+          pkg-config --modversion openssl
       - name: Verify execution owners and source-selection refusals
         run: python3 -B scripts/tests/ci_execution_graph_test.py
       - name: Verify incremental compilation and build failure recovery
@@ -180,7 +184,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install host-only TLS and UI test dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
+        run: |
+          sudo sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
@@ -338,6 +345,7 @@ jobs:
     steps:
       - name: Install build dependencies without libgpiod
         run: |
+          sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential ca-certificates git libssl-dev libavahi-client-dev libsystemd-dev pkg-config \
@@ -371,6 +379,7 @@ jobs:
     steps:
       - name: Install release-build dependencies
         run: |
+          sudo sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential git libgpiod-dev libssl-dev libavahi-client-dev libsystemd-dev pkg-config python3
