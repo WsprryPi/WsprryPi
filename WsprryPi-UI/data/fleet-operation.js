@@ -33,40 +33,41 @@
     }
     function render(state = latest) {
         if (!state) return;latest = state;
-        const selector = el("operationDevice"), data = state.data;
-        if (data) {
-            const names = new Map();for (const row of data.assignments) names.set(row.name, (names.get(row.name) || 0) + 1);
+        const selector = el("operationDevice"), data = state.data, target = root.TargetOperation?.selected;
+        if (data || root.TargetOperation) {
+            const names = new Map();for (const row of data?.assignments || []) names.set(row.name, (names.get(row.name) || 0) + 1);
             const options = [{id: "", label: root.ControllerMode?.active ? "Controller (no local output)" : "This Pi (controller)"}];
-            for (const [id, output] of Object.entries(data.outputs)) {
+            options.push(...(root.TargetOperation?.options() || []));
+            for (const [id, output] of Object.entries(data?.outputs || {})) {
                 const row = data.assignments.find(r => r.device_id === id);
                 const name = row?.name || output.retained_name || id;
-                options.push({id: id + ":" + output.assignment_generation, label: name + (names.get(name) > 1 ? ` · ${row?.product || "output"} ${id.slice(0, 8)}` : "") + (output.revoked ? " (removed)" : "")});
+                options.push({id: id + ":" + output.assignment_generation, label: name + (names.get(name) > 1 ? ` · ${row?.product || "output"} ${id.slice(0, 8)}` : "") + " · legacy history" + (output.revoked ? " (removed)" : "")});
             }
             if (selected && !options.some(o => o.id === selected.key)) options.push({id: selected.key, label: selected.name + " (removed)"});
+            if (target && !options.some(o => o.id === 'target:'+target.target.device_id)) options.push({id:'target:'+target.target.device_id,label:target.target.name+' (unavailable)'});
             const next = options.map(o => [o.id, o.label]);
             if (JSON.stringify([...selector.options].map(o => [o.value, o.textContent])) !== JSON.stringify(next)) {
                 selector.replaceChildren(...options.map(o => {const n = root.document.createElement("option");n.value = o.id;n.textContent = o.label;return n;}));
             }
-            selector.value = selected?.key || "";
+            selector.value = target ? 'target:'+target.target.device_id : selected?.key || "";
             el("operationDeviceField").hidden = options.length === 1 && !root.ControllerMode?.active;
         }
-        selector.disabled = frozen || state.busy;
-        const remote = !!selected;
+        selector.disabled = frozen || state.busy || !!root.TargetOperation?.busy;
+        const remote = !!selected || !!target;
         const noLocalOutput = root.ControllerMode?.active === true;
         setHidden("operationLocalView", remote || noLocalOutput);el("operationLocalView").inert = remote || noLocalOutput;
-        setHidden("operationFleetView", !remote);root.document.body.classList.toggle("fleet-remote-selected", remote || noLocalOutput);
+        setHidden("operationFleetView", !selected);root.document.body.classList.toggle("fleet-remote-selected", remote || noLocalOutput);
         const controllerView = el("operationControllerView");
         if (controllerView) {
             controllerView.hidden = !noLocalOutput || remote;
-            text("operationControllerHeading", !state.valid ? "Fleet status unavailable"
-                : data && Object.keys(data.outputs).length ? "Select an assigned output" : "No assigned outputs");
-            text("operationControllerDetail", !state.valid ? "Read current Fleet status before choosing an output. This controller has no local transmitter."
-                : "This controller has no local transmitter. Choose an assigned output above or manage outputs in Fleet.");
+            text("operationControllerHeading", root.TargetOperation?.options().length ? "Select a device" : "No managed devices");
+            text("operationControllerDetail", "This controller has no local transmitter. Choose a managed device above, or add a device in Setup. Legacy entries show migration history only.");
         }
         for (const label of root.document.querySelectorAll(".times-wrapper .time-label")) {
             const original = label.dataset.localLabel || label.textContent;label.dataset.localLabel = original;
             label.textContent = remote || noLocalOutput ? "Controller " + original : original;
         }
+        if (target) return;
         if (!remote) {
             const backend = typeof selectedRuntimeTransmitBackend === "function" ? selectedRuntimeTransmitBackend() : "";
             const hint = el("operationLocalRoute");
@@ -113,7 +114,9 @@
     }
     function choose() {
         const value = el("operationDevice").value;
-        if (frozen || latest?.busy) {render();return;}
+        if (frozen || latest?.busy || root.TargetOperation?.busy) {render();return;}
+        if (value.startsWith('target:')) {selected=null;void root.TargetOperation.select(value.slice(7));render();return;}
+        root.TargetOperation?.leave();
         if (!value) selected = null;
         else {
             const [id, generation] = value.split(":");
@@ -135,7 +138,7 @@
         root.FleetClient.subscribe(render);restoreReturnFocus();
         root.addEventListener("pageshow", restoreReturnFocus);
         el("operationDevice").addEventListener("change", choose);
-        el("operationControllerRefresh")?.addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
+        el("operationControllerRefresh")?.addEventListener("click", () => {void root.TargetOperation?.refresh();root.FleetClient.refresh().catch(() => {});});
         el("operationFleetReturn").addEventListener("click", () => {el("operationDevice").value = "";choose();el("operationDevice").focus();});
         el("operationFleetRefresh").addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
         el("operationFleetReview").addEventListener("click", () => {try {root.FleetClient.review(selected.id);} catch (e) {text("operationFleetFeedback", e.message);}});
@@ -145,6 +148,6 @@
             } catch (e) {text("operationFleetFeedback", e.message);}
         });
     }
-    root.FleetOperation = {remote: () => !!selected, model, refresh: () => render()};
+    root.FleetOperation = {remote: () => !!selected || !!root.TargetOperation?.selected, model, refresh: () => render()};
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init);else init();
 })(window);

@@ -358,14 +358,24 @@
 .fleet-remote-selected .machine-power-group .icons-wrapper,
 .fleet-remote-selected #machine-power-status { display: none !important; }
 #operationFleetView .operation-hero__controls { gap: .5rem; }
-#operationFleetView .btn:disabled {
+#operationFleetView .btn:disabled,
+#operationTargetView .btn:disabled {
     color: var(--bs-body-color);
     background-color: var(--bs-secondary-bg);
     border-color: var(--bs-border-color);
     opacity: 1;
 }
 #operationFleetView .operation-panel__value { overflow-wrap: anywhere; }
+#operationTargetView .operation-hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-areas: "state controls";
+}
+#operationTargetReviewValues { white-space: pre-wrap; }
 @media (max-width: 767.98px) {
+    #operationTargetView .operation-hero {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "state" "controls";
+    }
     .operation-device-selector { flex-basis: 100%; max-width: 100%; margin: .75rem 0; }
     .operation-device-selector select { flex: 1; }
 }
