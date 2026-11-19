@@ -153,11 +153,11 @@ void real_message(bool virtual_time,bool reject){
     WsprTransmitter::SimulatedRuntimeConfig sim;sim.virtual_time=virtual_time;sim.trace_path=f.root+"/trace.json";
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);
     set_scheduler_execution_suppressed_for_test(false);
-    std::mutex mutex;std::condition_variable cv;bool done=false,started=false;
+    std::mutex mutex;std::condition_variable cv;bool done=false,started=false;std::string terminal;
     transmitter_set_callbacks([&](auto event,auto level,const auto &message,double value){
         if(event==WsprTransmissionCallbackEvent::STARTING)started=true;
         transmitter_cb(event,level,message,value);
-        if(event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED){std::lock_guard lock(mutex);done=true;cv.notify_all();}
+        if(event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
     });
     const auto start=utc()+300'000'000ULL;const std::array<std::uint64_t,1> starts{start};
     const auto plan=prepare_native_occurrence(config,starts);assert(plan->evaluation.outcome==SolarOutcome::Allowed);
@@ -166,9 +166,15 @@ void real_message(bool virtual_time,bool reject){
     const auto when=std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(start)));
     const auto before=std::chrono::steady_clock::now();
     assert(start_non_wspr_transmission_now(config,when,plan)&&plan->accepted);
-    f.snapshot.policy.schedule_enabled=false;
-    if(reject){f.snapshot.intent_revision=std::string(64,'f');}
+    {std::lock_guard lock(config_update_mutex());
+        f.snapshot.policy.schedule_enabled=false;
+        if(reject)f.snapshot.intent_revision=std::string(64,'f');
+    }
     {std::unique_lock lock(mutex);assert(cv.wait_for(lock,std::chrono::seconds(4),[&]{return done;}));}
+    if(started==reject||native_occurrence_active())
+        std::cerr<<"Native message result: virtual="<<virtual_time<<" reject="<<reject
+                 <<" started="<<started<<" active="<<native_occurrence_active()
+                 <<" terminal="<<terminal<<" observation="<<native_recurrence_observation(f.self).dump()<<'\n';
     assert(started!=reject&&!native_occurrence_active());
     const auto elapsed=std::chrono::steady_clock::now()-before;
     assert(elapsed>=std::chrono::milliseconds(200)&&elapsed<std::chrono::seconds(4));
