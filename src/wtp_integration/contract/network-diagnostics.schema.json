@@ -1,0 +1,1141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pico network diagnostics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ntp_observations",
+    "ntp_rate",
+    "ntp_learning",
+    "ntp_pool",
+    "initialized",
+    "enabled",
+    "link_status",
+    "ipv4",
+    "softap_netif",
+    "requested_enabled",
+    "withdrawal_pending",
+    "resume_after_withdrawal",
+    "control_configured",
+    "control_listening",
+    "consumer_web_ready",
+    "consumer_web_port",
+    "deployment_identity_matches",
+    "station_mac",
+    "stable_hostname",
+    "configured_hostname",
+    "advertised_hostname",
+    "mdns_state",
+    "mdns_reason",
+    "mdns_registrations",
+    "mdns_conflicts",
+    "mdns_failures",
+    "mdns_address_changes",
+    "mdns_goodbye_attempts",
+    "mdns_goodbye_failures",
+    "mdns_rejected_packets",
+    "power_save",
+    "packets",
+    "memory",
+    "ntp_server",
+    "ntp_address",
+    "ntp_resolution",
+    "ntp_resolution_failures",
+    "queries",
+    "accepted",
+    "rejected",
+    "last_rtt_ns",
+    "last_sample_uncertainty_ns"
+  ],
+  "properties": {
+    "ntp_observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "packet_accepted",
+        "arbiter_accepted_this_packet",
+        "last_accepted_measurement"
+      ],
+      "properties": {
+        "source": {
+          "const": "microchrony"
+        },
+        "packet_accepted": {
+          "type": "boolean"
+        },
+        "arbiter_accepted_this_packet": {
+          "type": "boolean"
+        },
+        "last_accepted_measurement": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "clock_epoch",
+                "send_raw_ns",
+                "receive_raw_ns",
+                "reference_utc_ns",
+                "uncertainty_ns",
+                "rtt_ns",
+                "server_reference_ns",
+                "server_receive_ns",
+                "server_send_ns",
+                "root_delay_16_16",
+                "root_dispersion_16_16",
+                "stratum",
+                "leap",
+                "precision"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "clock_epoch": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "send_raw_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "receive_raw_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "reference_utc_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "uncertainty_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "rtt_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "server_reference_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "server_receive_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "server_send_ns": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,19})$",
+                  "x-maximum": "18446744073709551615"
+                },
+                "root_delay_16_16": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "root_dispersion_16_16": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "stratum": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "leap": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "precision": {
+                  "type": "integer",
+                  "minimum": -128,
+                  "maximum": 127
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ntp_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qualified",
+        "utc_rate_ppb",
+        "uncertainty_ppb",
+        "generation",
+        "sampled_raw_ns",
+        "span_ns",
+        "samples",
+        "reason"
+      ],
+      "properties": {
+        "qualified": {
+          "type": "boolean"
+        },
+        "utc_rate_ppb": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "uncertainty_ppb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "x-maximum": "18446744073709551615"
+        },
+        "sampled_raw_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "x-maximum": "18446744073709551615"
+        },
+        "span_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "x-maximum": "18446744073709551615"
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "ntp_learning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "synchronized",
+        "phase_settled",
+        "rate_settled",
+        "utc_frequency_ppb",
+        "skew_ppb",
+        "remaining_correction_ns",
+        "clock_error_ns",
+        "rate_ppb",
+        "rf_candidate"
+      ],
+      "properties": {
+        "schema": {
+          "const": "microchrony-status/1"
+        },
+        "synchronized": {
+          "type": "boolean"
+        },
+        "phase_settled": {
+          "type": "boolean"
+        },
+        "rate_settled": {
+          "type": "boolean"
+        },
+        "utc_frequency_ppb": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "skew_ppb": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "remaining_correction_ns": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]{0,18})$"
+        },
+        "clock_error_ns": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,19})$",
+          "x-maximum": "18446744073709551615"
+        },
+        "rate_ppb": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "rf_candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "qualified",
+            "utc_rate_ppb",
+            "uncertainty_ppb",
+            "generation",
+            "sampled_raw_ns",
+            "span_ns",
+            "samples",
+            "reason"
+          ],
+          "properties": {
+            "qualified": {
+              "type": "boolean"
+            },
+            "utc_rate_ppb": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "uncertainty_ppb": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "generation": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "x-maximum": "18446744073709551615"
+            },
+            "sampled_raw_ns": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "x-maximum": "18446744073709551615"
+            },
+            "span_ns": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,19})$",
+              "x-maximum": "18446744073709551615"
+            },
+            "samples": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "ntp_pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "enabled",
+        "selected_slot",
+        "combined_sources",
+        "utc_updates",
+        "peers"
+      ],
+      "properties": {
+        "schema": {
+          "const": "microchrony-sources/1"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "selected_slot": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "combined_sources": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "utc_updates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        "peers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "slot",
+              "hostname",
+              "endpoint",
+              "queries",
+              "accepted",
+              "rejected",
+              "selection_score_milli",
+              "reach",
+              "max_process_us",
+              "poll_seconds",
+              "selected",
+              "combined",
+              "reason"
+            ],
+            "properties": {
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "hostname": {
+                "type": "string",
+                "maxLength": 253
+              },
+              "endpoint": {
+                "type": "string",
+                "maxLength": 15,
+                "pattern": "^(?:(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|)$"
+              },
+              "queries": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              },
+              "accepted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              },
+              "rejected": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 18446744073709551615
+              },
+              "selection_score_milli": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000000
+              },
+              "reach": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "max_process_us": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "poll_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "selected": {
+                "type": "boolean"
+              },
+              "combined": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    "initialized": {
+      "type": "boolean"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "link_status": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "ipv4": {
+      "type": "string",
+      "maxLength": 15,
+      "pattern": "^(?:(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|)$"
+    },
+    "softap_netif": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "up",
+        "link_up",
+        "ipv4"
+      ],
+      "properties": {
+        "up": {
+          "type": "boolean"
+        },
+        "link_up": {
+          "type": "boolean"
+        },
+        "ipv4": {
+          "type": "string",
+          "maxLength": 15,
+          "pattern": "^(?:(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|)$"
+        }
+      }
+    },
+    "requested_enabled": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "withdrawal_pending": {
+      "type": "boolean"
+    },
+    "resume_after_withdrawal": {
+      "type": "boolean"
+    },
+    "control_configured": {
+      "type": "boolean"
+    },
+    "control_listening": {
+      "type": "boolean"
+    },
+    "consumer_web_ready": {
+      "type": "boolean"
+    },
+    "consumer_web_port": {
+      "const": 80
+    },
+    "deployment_identity_matches": {
+      "type": "boolean"
+    },
+    "station_mac": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{2}(?::[0-9a-f]{2}){5})?$(?![\\s\\S])"
+    },
+    "stable_hostname": {
+      "type": "string",
+      "maxLength": 69,
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.local)?$(?![\\s\\S])"
+    },
+    "configured_hostname": {
+      "type": "string",
+      "maxLength": 69,
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.local)?$(?![\\s\\S])"
+    },
+    "advertised_hostname": {
+      "type": "string",
+      "maxLength": 69,
+      "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.local)?$(?![\\s\\S])"
+    },
+    "mdns_state": {
+      "enum": [
+        "unconfigured",
+        "waiting_address",
+        "probing",
+        "active",
+        "withdrawing",
+        "conflict",
+        "failed"
+      ]
+    },
+    "mdns_reason": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "mdns_registrations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_conflicts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_failures": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_address_changes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_goodbye_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_goodbye_failures": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "mdns_rejected_packets": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "power_save": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "packets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arp",
+        "ipv4",
+        "tcp",
+        "udp"
+      ],
+      "properties": {
+        "arp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "received",
+            "sent",
+            "dropped"
+          ],
+          "properties": {
+            "received": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "sent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "dropped": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        "ipv4": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "received",
+            "sent",
+            "dropped"
+          ],
+          "properties": {
+            "received": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "sent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "dropped": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        "tcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "received",
+            "sent",
+            "dropped"
+          ],
+          "properties": {
+            "received": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "sent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "dropped": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        },
+        "udp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "received",
+            "sent",
+            "dropped"
+          ],
+          "properties": {
+            "received": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "sent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "dropped": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statistics_enabled",
+        "heap",
+        "tcp_pcbs",
+        "tcp_listeners",
+        "udp_pcbs",
+        "timeouts",
+        "igmp_groups",
+        "tcp_segments",
+        "packet_pool"
+      ],
+      "properties": {
+        "statistics_enabled": {
+          "const": true
+        },
+        "heap": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tcp_pcbs": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tcp_listeners": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "udp_pcbs": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timeouts": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "igmp_groups": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tcp_segments": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "packet_pool": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "used",
+                "capacity",
+                "peak",
+                "errors"
+              ],
+              "properties": {
+                "used": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "capacity": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "peak": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "tx_credit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "waits",
+        "preserved",
+        "timeouts"
+      ],
+      "properties": {
+        "waits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "preserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "timeouts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "ntp_server": {
+      "type": "string",
+      "maxLength": 253
+    },
+    "ntp_address": {
+      "type": "string",
+      "maxLength": 15,
+      "pattern": "^(?:(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|)$"
+    },
+    "ntp_resolution": {
+      "enum": [
+        "literal",
+        "resolving",
+        "resolved",
+        "unresolved"
+      ]
+    },
+    "ntp_resolution_failures": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "queries": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "accepted": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "rejected": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "last_rtt_ns": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "last_sample_uncertainty_ns": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18446744073709551615
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

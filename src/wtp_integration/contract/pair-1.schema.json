@@ -1,0 +1,1195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:wsprry:pair:1",
+  "title": "Current Pi-only pairing and machine-authentication documents",
+  "contract": "Wsprry-Pair/1",
+  "namespace": "/api/pair/v1/",
+  "maximum_body_bytes": 4096,
+  "maximum_nesting": 8,
+  "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
+  "documents": [
+    "window",
+    "hello",
+    "challenge",
+    "exchange-request",
+    "exchange-response",
+    "confirm",
+    "confirmed",
+    "commit",
+    "committed",
+    "result",
+    "rotate-prepare",
+    "rotate-prepared",
+    "rotate-commit",
+    "rotate-committed",
+    "operation",
+    "retirement",
+    "retired",
+    "retirement-status",
+    "authority-register",
+    "resume-grant",
+    "resume-ack"
+  ],
+  "routes": {
+    "bootstrap": {
+      "GET": [
+        "window"
+      ],
+      "POST": [
+        "hello",
+        "exchange",
+        "confirm",
+        "commit"
+      ]
+    },
+    "management": {
+      "GET": [
+        "operations/{operation_id}",
+        "resume"
+      ],
+      "POST": [
+        "rotate/prepare",
+        "rotate/commit",
+        "authorities/register",
+        "resume/ack"
+      ]
+    },
+    "retirement": {
+      "POST": [
+        "retirement",
+        "retirement/status"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/window"
+    },
+    {
+      "$ref": "#/$defs/hello"
+    },
+    {
+      "$ref": "#/$defs/challenge"
+    },
+    {
+      "$ref": "#/$defs/exchange-request"
+    },
+    {
+      "$ref": "#/$defs/exchange-response"
+    },
+    {
+      "$ref": "#/$defs/confirm"
+    },
+    {
+      "$ref": "#/$defs/confirmed"
+    },
+    {
+      "$ref": "#/$defs/commit"
+    },
+    {
+      "$ref": "#/$defs/committed"
+    },
+    {
+      "$ref": "#/$defs/result"
+    },
+    {
+      "$ref": "#/$defs/rotate-prepare"
+    },
+    {
+      "$ref": "#/$defs/rotate-prepared"
+    },
+    {
+      "$ref": "#/$defs/rotate-commit"
+    },
+    {
+      "$ref": "#/$defs/rotate-committed"
+    },
+    {
+      "$ref": "#/$defs/operation"
+    },
+    {
+      "$ref": "#/$defs/retirement"
+    },
+    {
+      "$ref": "#/$defs/retired"
+    },
+    {
+      "$ref": "#/$defs/retirement-status"
+    },
+    {
+      "$ref": "#/$defs/authority-register"
+    },
+    {
+      "$ref": "#/$defs/resume-grant"
+    },
+    {
+      "$ref": "#/$defs/resume-ack"
+    }
+  ],
+  "$defs": {
+    "target-id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "target-digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "target-generation": {
+      "type": "string",
+      "pattern": "^(?:[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "maxLength": 20,
+      "x-maximum": "18446744073709551615"
+    },
+    "target-counter": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|18446744073709550[0-9]{3}|18446744073709551[0-5][0-9]{2}|1844674407370955160[0-9]{1}|1844674407370955161[0-4]|18446744073709551615)$",
+      "maxLength": 20,
+      "x-maximum": "18446744073709551615"
+    },
+    "bytes32": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 43,
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "p256-point": {
+      "type": "string",
+      "minLength": 87,
+      "maxLength": 87,
+      "pattern": "^[A-Za-z0-9_-]{87}$"
+    },
+    "suite": {
+      "const": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "suite",
+        "device_id",
+        "boot_id",
+        "open",
+        "window_id",
+        "pair_id",
+        "authorization_generation",
+        "action"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "window"
+        },
+        "suite": {
+          "const": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+        },
+        "device_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "window_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pair_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "enum": [
+                "pair",
+                "replace",
+                "recover"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "suite",
+        "window_id",
+        "pair_id",
+        "action",
+        "controller_id",
+        "controller_boot_id",
+        "target_id",
+        "target_boot_id",
+        "authorization_generation",
+        "controller_nonce"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "hello"
+        },
+        "suite": {
+          "const": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+        },
+        "window_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "action": {
+          "enum": [
+            "pair",
+            "replace",
+            "recover"
+          ]
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "controller_nonce": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "suite",
+        "pair_id",
+        "target_nonce"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "challenge"
+        },
+        "suite": {
+          "const": "SPAKE2+-P256-SHA256-HKDF-HMAC"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_nonce": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "exchange-request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "pA"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "exchange"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pA": {
+          "type": "string",
+          "minLength": 87,
+          "maxLength": 87,
+          "pattern": "^[A-Za-z0-9_-]{87}$"
+        }
+      }
+    },
+    "exchange-response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "pB",
+        "cB"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "exchange"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pB": {
+          "type": "string",
+          "minLength": 87,
+          "maxLength": 87,
+          "pattern": "^[A-Za-z0-9_-]{87}$"
+        },
+        "cB": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "confirm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "cA"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "confirm"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "cA": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "confirmed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "confirmed"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        }
+      }
+    },
+    "commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "request_digest",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "commit"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "request_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "committed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "authorization_generation",
+        "receipt_digest",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "committed"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "pair_id",
+        "state",
+        "code",
+        "retryable"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "result"
+        },
+        "pair_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "code": {
+          "enum": [
+            "pairing_closed",
+            "expired",
+            "busy",
+            "invalid_shape",
+            "invalid_proof",
+            "identity_changed",
+            "generation_changed",
+            "request_id_reuse",
+            "storage_unavailable",
+            "capacity",
+            "operation_unknown"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rotate-prepare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "expected_epoch",
+        "pA",
+        "nonce"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "rotate-prepare"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_epoch": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "pA": {
+          "type": "string",
+          "minLength": 87,
+          "maxLength": 87,
+          "pattern": "^[A-Za-z0-9_-]{87}$"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "rotate-prepared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "next_epoch",
+        "pB",
+        "nonce"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "rotate-prepared"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "next_epoch": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "pB": {
+          "type": "string",
+          "minLength": 87,
+          "maxLength": 87,
+          "pattern": "^[A-Za-z0-9_-]{87}$"
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "rotate-commit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "expected_epoch",
+        "next_epoch"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "rotate-commit"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "expected_epoch": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "next_epoch": {
+          "$ref": "#/$defs/target-generation"
+        }
+      }
+    },
+    "rotate-committed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "epoch"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "rotate-committed"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "epoch": {
+          "$ref": "#/$defs/target-generation"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "authorization_generation",
+        "request_digest",
+        "state",
+        "result_digest"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "operation"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "request_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "state": {
+          "enum": [
+            "pending",
+            "committed",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "result_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/target-digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "retirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target_id",
+        "controller_id",
+        "assignment_id",
+        "transition_id",
+        "assignment_revision",
+        "retirement_generation",
+        "pair_id",
+        "authorization_generation",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "retirement"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "retirement_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "retired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target_id",
+        "controller_id",
+        "assignment_id",
+        "transition_id",
+        "assignment_revision",
+        "retirement_generation",
+        "pair_id",
+        "authorization_generation",
+        "receipt_digest",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "retired"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "retirement_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "retirement-status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "target_id",
+        "controller_id",
+        "assignment_id",
+        "transition_id",
+        "pair_id",
+        "authorization_generation",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "retirement-status"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "authority-assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assignment_id",
+        "assignment_revision",
+        "state"
+      ],
+      "properties": {
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "state": {
+          "enum": [
+            "legacy",
+            "retiring",
+            "retired",
+            "rollback",
+            "held"
+          ]
+        }
+      }
+    },
+    "authority-endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "host",
+        "port"
+      ],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 254
+        },
+        "port": {
+          "const": 31418
+        }
+      }
+    },
+    "authority-register": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "authorization_generation",
+        "target_id",
+        "controller_id",
+        "controller_incarnation",
+        "controller_generation",
+        "assignments",
+        "endpoint"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "authority-register"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_incarnation": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "assignments": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/authority-assignment"
+          }
+        },
+        "endpoint": {
+          "$ref": "#/$defs/authority-endpoint"
+        }
+      }
+    },
+    "resume-grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "authorization_generation",
+        "target_id",
+        "target_boot_id",
+        "controller_id",
+        "controller_incarnation",
+        "assignment_id",
+        "assignment_revision",
+        "transition_id",
+        "retirement_receipt_digest",
+        "authority_generation",
+        "disabled_revision",
+        "disable_receipt_digest",
+        "candidate_digest",
+        "grant_digest",
+        "wtp_binding"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "resume-grant"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "target_boot_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_incarnation": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "transition_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "retirement_receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "authority_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "disabled_revision": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "disable_receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "candidate_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "wtp_binding": {
+          "$ref": "#/$defs/wtp-binding"
+        }
+      }
+    },
+    "resume-ack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "schema",
+        "operation_id",
+        "pair_id",
+        "authorization_generation",
+        "target_id",
+        "controller_id",
+        "assignment_id",
+        "grant_digest",
+        "outcome",
+        "controller_generation",
+        "receipt_digest",
+        "proof"
+      ],
+      "properties": {
+        "contract": {
+          "const": "Wsprry-Pair/1"
+        },
+        "schema": {
+          "const": "resume-ack"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "pair_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "authorization_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "target_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "controller_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "assignment_id": {
+          "$ref": "#/$defs/target-id"
+        },
+        "grant_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "outcome": {
+          "enum": [
+            "resumed",
+            "refused"
+          ]
+        },
+        "controller_generation": {
+          "$ref": "#/$defs/target-generation"
+        },
+        "receipt_digest": {
+          "$ref": "#/$defs/target-digest"
+        },
+        "proof": {
+          "type": "string",
+          "minLength": 43,
+          "maxLength": 43,
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    },
+    "wtp-binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revocation_generation",
+        "wtp_port",
+        "management_port"
+      ],
+      "properties": {
+        "revocation_generation": {
+          "$ref": "#/$defs/target-counter"
+        },
+        "wtp_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "management_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

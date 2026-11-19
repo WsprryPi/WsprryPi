@@ -31,7 +31,8 @@ inline std::optional<std::string> wtp_fleet_action_query(const httplib::Request&
 // Peer/Host/Origin authority is checked separately by BackendHttpGuard.
 inline std::optional<BrowserRequest> wtp_browser_http_request(const httplib::Request &r) {
   if ((r.target != r.path && !wtp_fleet_action_query(r)) || r.body.size() > 32768 || r.get_header_value_count("Host") != 1) return {};
-  for (const auto name : {"Origin","Content-Type","If-Match","X-WsprryPico-Request","X-WsprryPi-Member-Context","Sec-Fetch-Site"})
+  for (const auto name : {"Origin","Content-Type","If-Match","X-WsprryPico-Request","X-WsprryPi-Member-Context","Sec-Fetch-Site",
+      "X-WsprryPi-Profile-ID","X-WsprryPi-Target-Context","X-WsprryPi-Operation-ID","X-WsprryPi-CSRF"})
     if (r.get_header_value_count(name) > 1) return {};
   const auto fetch = r.get_header_value("Sec-Fetch-Site");
   return BrowserRequest{r.method,r.path,r.body,r.get_header_value("If-Match"),

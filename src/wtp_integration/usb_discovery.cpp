@@ -30,9 +30,10 @@ std::string usb_id(const CdcIdentity &identity) {
   return id;
 }
 } // namespace
-nlohmann::json wtp_usb_discovery(const std::filesystem::path &root,
-                                  const std::filesystem::path &dev) {
-  auto result = nlohmann::json{{"scope", "wtp-usb/1"}, {"available", false},
+namespace {
+nlohmann::json discover_usb(const std::filesystem::path &root,
+                           const std::filesystem::path &dev, PicoCdcRole role) {
+  auto result = nlohmann::json{{"scope", role==PicoCdcRole::Management?"pico-management-usb/1":"wtp-usb/1"}, {"available", false},
       {"reason", "USB discovery is available on Linux hosts"},
       {"candidates", nlohmann::json::array()}};
   if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
@@ -49,8 +50,9 @@ nlohmann::json wtp_usb_discovery(const std::filesystem::path &root,
       try {
         const auto identity = inspect_linux_cdc((dev / entry.path().filename()).string(), root);
         const auto interface = std::filesystem::path(identity.interface_path);
-        if (identity.control_interface != static_cast<unsigned>(PicoCdcRole::Wtp) ||
-            text(interface / "interface") != "WsprryPico WTP" ||
+        if (identity.control_interface != static_cast<unsigned>(role) ||
+            text(interface / "interface") != (role == PicoCdcRole::Management
+                ? "WsprryPico Management" : "WsprryPico WTP") ||
             text(interface.parent_path() / "product") != "WsprryPico" ||
             identity.usb_serial.size() > 128 || !identity.vendor_id || !identity.product_id)
           continue;
@@ -76,7 +78,7 @@ nlohmann::json wtp_usb_discovery(const std::filesystem::path &root,
         }
         found[id] = {{"id", id}, {"instance", "WsprryPico " + identity.usb_serial},
             {"binding", "usb"}, {"state", "online"},
-            {"settings", wtp_settings_json(settings)}};
+            {"settings", management_profile_settings_json(settings)}};
       } catch (const std::exception &) { /* Unrelated or disappearing tty. */ }
     }
     result["available"] = true;
@@ -89,6 +91,15 @@ nlohmann::json wtp_usb_discovery(const std::filesystem::path &root,
     result["reason"] = "USB inventory could not be read; refresh the device list";
   }
   return result;
+}
+} // namespace
+nlohmann::json wtp_usb_discovery(const std::filesystem::path &root,
+                                const std::filesystem::path &dev) {
+  return discover_usb(root, dev, PicoCdcRole::Wtp);
+}
+nlohmann::json pico_management_usb_discovery(const std::filesystem::path &root,
+                                            const std::filesystem::path &dev) {
+  return discover_usb(root, dev, PicoCdcRole::Management);
 }
 void validate_discovered_usb(const nlohmann::json &snapshot,
                              const std::string &id, const WtpSettings &settings) {

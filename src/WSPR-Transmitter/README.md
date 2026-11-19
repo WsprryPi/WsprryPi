@@ -1,5 +1,17 @@
 # WSPR Transmitter
 
+Canonical requests can bind one execution to `slot.start_time` and supply an
+optional application-neutral final-launch guard to `configureExecution()`.
+Bound WSPR slots use the existing scheduler and are never moved to another
+window after delay. Bound message requests wait for that same start. A late or
+refused launch cleans up and reports cancellation; a cleanup failure reports
+failure. Ordinary unbound scheduling and empty guards preserve existing behavior.
+Queued callbacks retain the handler that owned the event when it was queued;
+replacing the handler cannot retarget an earlier completion. The component does
+not interpret solar policy, storage records, or ownership.
+Run `make scheduled-launch-test BACKENDS=simulated SUDO=` in `src` for the standalone binding/guard
+contract; parent simulated execution tests cover the actual worker integration.
+
 `WSPR-Transmitter` is a C++20 component for generating WSPR (Weak Signal
 Propagation Reporter) RF transmissions with precise symbol timing.
 
@@ -21,15 +33,11 @@ On Raspberry Pi 5, RP1 output exclusively uses the externally provisioned endpoi
 
 ### Parent WTP backend integration
 
-`BackendKind::WTP` identifies the parent's explicitly constructed complete-plan
-backend. The shared frequency policy treats it as untested; advertised CAPS do
-not establish RF qualification. The production `WsprTransmitter` factory refuses
-WTP because its transports and worker belong to the parent application. The
-parent explicitly selects WTP through its
-[production integration](../../docs/wtp-production-integration.md) and uses a
-dedicated [early WTP scheduler](../../docs/wtp-scheduling.md) with
-[status and recovery reporting](../../docs/wtp-status-recovery.md).
-Parent lifecycle, tests and limitations are documented in [the WTP backend guide](../../docs/wtp-backend.md).
+The parent WTP backend and its conversion, worker, and remote dispatch lifecycle
+are retired. `BackendKind::WTP` remains an internal legacy identifier; the
+production factory rejects it, and the parent does not advertise or select it.
+Native local execution retains the shared compiler, backend policies, and
+[native execution safety rules](../../docs/native-execution-safety.md).
 No WTP-Client or USB dependency is introduced into this reusable component.
 
 ### Shared chipset clock offsets
@@ -413,9 +421,8 @@ in the parent Si5351 support guide.
 
 ### WTP-facing message validation
 
-The execution-plan compiler limits QRSS, FSKCW and DFCW text to 32 characters
-including spaces when `request.output.backend` is `BackendKind::WTP`. It rejects
-longer messages without modifying them and checks signed nanosecond event-sum
-overflow. Other backends retain their existing behavior. The parent WTP adapter
-owns negotiated device duration, event and encoded-payload admission; this
-component neither starts RF nor claims physical qualification.
+For internal legacy plans carrying `BackendKind::WTP`, the execution-plan compiler
+retains the 32-character QRSS, FSKCW, and DFCW limit, including spaces, and signed
+nanosecond event-sum overflow checks. The parent no longer constructs or dispatches
+those plans. Native backends retain their own admission rules. This component
+neither starts RF nor claims physical qualification.

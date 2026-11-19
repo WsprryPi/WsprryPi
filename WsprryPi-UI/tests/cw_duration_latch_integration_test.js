@@ -168,6 +168,8 @@ async function browserTest() {
         return valid;
     };
 
+    // This isolated fixture supplies local fields rather than fetching the owner.
+    window.SetupTargets.localLoaded();
     const reset = (mode = "QRSS") => {
         clock.reset();
         patches.length = 0;

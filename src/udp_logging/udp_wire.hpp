@@ -2,6 +2,8 @@
 // Shared, allocation-free wsprry-udp/1 codec. Keep the Pi copy byte-identical.
 // Civil-date arithmetic follows the existing USB logger and Howard Hinnant's
 // public-domain civil_from_days: https://howardhinnant.github.io/date_algorithms.html
+#ifndef WSPRRY_LOGGING_UDP_WIRE_HPP
+#define WSPRRY_LOGGING_UDP_WIRE_HPP
 #pragma once
 #include <algorithm>
 #include <array>
@@ -294,3 +296,4 @@ inline bool decode_udp(std::string_view input, UdpEvent& output, std::string_vie
     return true;
 }
 } // namespace wsprry::logging
+#endif // WSPRRY_LOGGING_UDP_WIRE_HPP

@@ -39,13 +39,11 @@ def main():
                 shutil.copy2(original, target)
             elif target.is_file():
                 target.unlink()
-        endpoint = source / 'src/wtp/endpoint.cpp'
+        endpoint = source / 'src/wtp/observation.cpp'
         original = endpoint.read_text()
         marker = 'STAGE1_EDITED_PICO_SOURCE_CONSUMED'
         endpoint.write_text(original + '\n#include <cstdio>\nnamespace { const bool source_probe = [] { std::fputs("' + marker + '\\n", stderr); return true; }(); }\n')
-        assert 'src/wtp/endpoint.cpp' in run(['git', '-C', str(source), 'status', '--short'])
-        reference = ['make', '-C', str(root / 'src/WTP-Client'), 'interop-test', f'PICO_SOURCE={source}', f'BUILD_DIR={base / "client"}']
-        assert marker in run(reference)
+        assert 'src/wtp/observation.cpp' in run(['git', '-C', str(source), 'status', '--short'])
         configure = ['cmake', '-S', str(root / 'src/tests/network'), '-B', str(build), f'-DPICO_SOURCE={source}', f'-DMBEDTLS_SOURCE={args.mbedtls_source.resolve()}']
         output = run(configure)
         assert str(source) in output
@@ -83,8 +81,7 @@ def main():
         run(configure)
         failed = run(['cmake', '--build', str(build), '--target', 'pico_tls_server', '-j4'], succeeds=False)
         assert 'STAGE1_INTENTIONAL_COMPILE_FAILURE' in failed
-        run(reference, succeeds=False)
-    print('Edited Pico production source accepted and executed by client and network fixtures; missing source and compiler errors rejected')
+    print('Edited Pico production source accepted and executed by the production network fixture; missing source and compiler errors rejected')
 
 
 if __name__ == '__main__':

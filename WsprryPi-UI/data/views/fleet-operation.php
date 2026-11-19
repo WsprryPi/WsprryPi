@@ -14,11 +14,8 @@
         </div>
         <div class="operation-hero__controls" aria-label="Selected output controls">
             <p id="operationFleetScheduleState" class="mb-2"></p>
-            <button type="button" class="btn btn-primary" id="operationFleetEnable" disabled>Resume schedule</button>
-            <button type="button" class="btn btn-danger" id="operationFleetPause" disabled>Pause and stop</button>
             <div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="button" class="btn btn-outline-secondary" id="operationFleetRecover" disabled>Reconcile</button>
-                <button type="button" class="btn btn-outline-secondary" id="operationFleetEdit" disabled>Edit schedule</button>
+                <button type="button" class="btn btn-outline-secondary" id="operationFleetEdit" disabled>View migration status</button>
                 <button type="button" class="btn btn-outline-secondary" id="operationFleetRefresh">Read status</button>
                 <button type="button" class="btn btn-outline-secondary" id="operationFleetReview" hidden>Review current state</button>
                 <button type="button" class="btn btn-outline-secondary" id="operationFleetReturn" hidden>Return to This Pi</button>
@@ -44,11 +41,4 @@
         </article>
     </section>
     <p class="form-text mt-3">Clocks in the header belong to the controller. Device status describes software observations; it does not establish measured RF output.</p>
-</div>
-<div class="modal fade" id="operationFleetConfirmation" tabindex="-1" aria-labelledby="operationFleetConfirmationTitle" aria-describedby="operationFleetConfirmationText" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-        <div class="modal-header"><h2 class="modal-title fs-5" id="operationFleetConfirmationTitle">Pause and stop?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button></div>
-        <div class="modal-body"><p id="operationFleetConfirmationText" class="text-break mb-0"></p></div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" id="operationFleetCancel" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-danger" id="operationFleetConfirm">Pause and stop</button></div>
-    </div></div>
 </div>

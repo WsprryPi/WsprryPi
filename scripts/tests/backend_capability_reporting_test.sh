@@ -2,7 +2,7 @@
 set -euo pipefail
 
 binary=${1:?binary path required}
-expected=${2:?expected backend list required},wtp
+expected=${2:?expected backend list required}
 omitted=${3:-}
 expected_ancillary=${4:-enabled}
 
@@ -34,7 +34,7 @@ if [[ -n "$omitted" ]]; then
         echo "invalid backend unexpectedly succeeded" >&2
         exit 1
     fi
-    grep -F "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', 'wtp', or 'simulated'." "$output_file" >/dev/null || {
+    grep -F "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', or 'simulated'." "$output_file" >/dev/null || {
         cat "$output_file" >&2
         exit 1
     }

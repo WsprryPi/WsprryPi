@@ -6,7 +6,7 @@
 #include "consumer_radio.hpp"
 #include "browser_api.hpp"
 #include "control_contract.hpp"
-#include "../WTP-Client/include/wtp/codec.hpp"
+#include "controller_contract.hpp"
 #include <algorithm>
 #include <set>
 #include <regex>
@@ -335,27 +335,19 @@ Json control_document(const std::string &body) {
   return value;
 }
 bool capabilities_shape(const Json &caps) {
-  const auto shape=Json::parse(control_capabilities_shape());
-  if (!caps.is_object() || caps.size()>shape["properties"].size()) return false;
-  for (const auto &field:shape["required"]) {
-    const auto &name=field.get_ref<const std::string&>();
-    if (name!="contract" && !caps.contains(name)) return false;
-  }
-  for (const auto &[name,value]:caps.items()) {
-    if (!shape["properties"].contains(name)) return false;
-    const auto &rule=shape["properties"][name];
-    const auto type=rule.value("type","");
-    if ((type=="object" && !value.is_object()) || (type=="boolean" && !value.is_boolean()) ||
-        (type=="integer" && !value.is_number_integer())) return false;
-    if (type=="integer" && ((rule.contains("minimum") && value<rule["minimum"]) ||
-        (rule.contains("maximum") && value>rule["maximum"]))) return false;
-  }
-  const Json wtp_response={{"type","response"},{"protocol","WTP/1"},
-    {"session_id",std::string(32,'1')},{"request_id",std::string(32,'2')},
-    {"op","CAPS"},{"ok",true},{"body",caps.at("wtp")}};
-  if (!wtp::decode(wtp_response.dump())) return false;
+  static const auto shape=Json::parse(control_capabilities_shape());
+  static const auto definitions=Json::parse(pico_management_response_definitions());
+  if (!caps.is_object()) return false;
+  auto document=caps;document["contract"]="Wsprry-Control/1";
+  if (!valid_closed_contract_document(document,shape,definitions)) return false;
+  const auto &execution=caps.at("execution");
+  for (const auto &range:execution.at("frequency_ranges"))
+    if (std::stoull(range.at("minimum_nhz").get<std::string>())>
+        std::stoull(range.at("maximum_nhz").get<std::string>())) return false;
+  if (std::stoull(execution.at("minimum_arm_lead_ns").get<std::string>())>
+      std::stoull(execution.at("maximum_arm_ahead_ns").get<std::string>())) return false;
   const auto &features=caps.at("features");
-  if (features.size()>shape["properties"]["features"]["maxProperties"].get<unsigned>()) return false;
+  if (features.contains("jobs") || features.size()>shape["properties"]["features"]["maxProperties"].get<unsigned>()) return false;
   for (const auto &field:shape["properties"]["features"]["required"])
     if (!features.contains(field.get<std::string>())) return false;
   for (const auto &[name,value]:features.items()) {
@@ -387,6 +379,19 @@ void success(const PicoHttpResponse &r) {
   throw Rejected{r.status >= 400 && r.status <= 599 ? r.status : 502U, "remote_configuration_rejected"};
 }
 } // namespace
+bool pico_management_capabilities_valid(const nlohmann::json &document,const std::string &carrier) {
+  try {
+    if (!document.is_object() || !document.contains("contract") || document["contract"]!="Wsprry-Control/1") return false;
+    auto caps=document;caps.erase("contract");
+    if (!capabilities_shape(caps) || !caps.contains("management_carriers") ||
+        !valid_management_descriptor(caps["management_carriers"],carrier) ||
+        !caps.contains("application_resources")) return false;
+    for (const auto name : {"application_resources","configuration_updates","saved_progress",
+         "gpio_drive","amplifier_timing","filter_selector","si5351","gps","gray_line","field_access","schedule_stop"})
+      if (caps.contains(name) && !supported_descriptor(caps[name],name)) return false;
+    return true;
+  } catch (...) {return false;}
+}
 PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &method,
     const std::string &body, const std::string &revision,
@@ -656,9 +661,7 @@ void shared_application(const Json &j, const Json &target, bool usb = false) {
     for (unsigned slot=fa;slot<86400;slot+=pa) require(slot < fb || (slot-fb)%pb != 0,"invalid_remote_resource");
   }
 }
-void pin_choices(const Json &j) {
-  require(fields(j,{"choices","active"}) && plan_valid(j["active"]), "invalid_remote_pins");
-  const auto &c = j["choices"];
+void pin_choice_values(const Json &c) {
   require(fields(c,{"schema","numbering","eligible_gps","i2c_pairs","indicator_choices","activation_supported","adapter_support"}) &&
       c["schema"] == "pins" && c["numbering"] == "pico_gp" && c["eligible_gps"] == eligible &&
       c["indicator_choices"] == Json::array({"onboard_led","external","disabled"}) && c["activation_supported"] == true &&
@@ -672,6 +675,10 @@ void pin_choices(const Json &j) {
     require(p == Json{{"id",i},{"controller",pairs[i][0]},{"sda_gp",pairs[i][1]},{"scl_gp",pairs[i][2]}}, "unsupported_pin_capabilities",409);
   }
   for (const auto &gp : c["eligible_gps"]) require(gp.is_number_integer(),"invalid_remote_pins");
+}
+void pin_choices(const Json &j) {
+  require(fields(j,{"choices","active"}) && plan_valid(j["active"]), "invalid_remote_pins");
+  pin_choice_values(j["choices"]);
 }
 }
 namespace {
@@ -1142,6 +1149,52 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
     const std::string &device, const std::string &boot, const std::string &resource,
     const std::string &method, const std::string &body, const std::string &revision,
     const std::string &carrier, const std::string &generation) {
+  if(resource=="status") {
+    try {
+      require(method=="GET"&&body.empty(),"not_found",404);
+      require(identity(device)&&identity(boot),"member_identity_unavailable",409);
+      const auto response=exchange(resource,"GET",{},{});success(response);
+      require(response.body.size()<=16384&&pico_native_status_valid(strict_browser_json(response.body,16),device,boot),"invalid_remote_resource");
+      return response;
+    }catch(const Rejected &error){return {error.status,Json{{"error",{{"code",error.code}}}}.dump(),{}};}
+    catch(...){return {502,Json{{"error",{{"code","invalid_remote_resource"}}}}.dump(),{}};}
+  }
+  if (resource == "schedules/stop") {
+    bool attempted=false;
+    try {
+      require(identity(device)&&identity(boot),"member_identity_unavailable",409);
+      require((method=="GET"&&body.empty())||method=="POST","not_found",404);
+      require(body.size()<=512,"body_too_large",413);
+      static const auto definitions=Json::parse(pico_management_response_definitions());
+      const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+      if(method=="POST") {
+        const auto input=strict_browser_json(body,16);
+        require(valid_closed_contract_document(input,definitions["schedule-stop-request"],definitions),"invalid_schedule_stop",400);
+        require(input["target"]==target,"target_mismatch",409);
+        require(etag(revision),"revision_required",428);
+      }
+      const auto caps_response=exchange("capabilities","GET",{},{});success(caps_response);
+      const auto caps=parsed(caps_response,true);
+      require(caps.contains("schedule_stop")&&supported_descriptor(caps["schedule_stop"],"schedule_stop"),"unsupported_resource",409);
+      if(caps.contains("management_carriers"))require(valid_management_descriptor(caps["management_carriers"],carrier),"unsupported_management_carrier",409);
+      const auto read=[&] {
+        const auto response=exchange(resource,"GET",{},{});success(response);
+        const auto value=strict_browser_json(response.body,16);
+        require(etag(response.etag)&&valid_closed_contract_document(value,definitions["schedule-stop-read"],definitions)&&value["target"]==target,"invalid_remote_resource");
+        return response;
+      };
+      const auto before=read();
+      if(method=="GET")return before;
+      require(before.etag==revision,"revision_conflict",412);
+      attempted=true;
+      const auto result=exchange(resource,"POST",body,revision);success(result);
+      const auto confirmed=read();
+      require(result.etag==confirmed.etag&&strict_browser_json(result.body)==strict_browser_json(confirmed.body)&&
+          strict_browser_json(confirmed.body)["stopped"]==true,"management_outcome_unknown");
+      return result;
+    }catch(const Rejected &error){return {error.status,Json{{"error",{{"code",error.code}}},{"mutation_attempted",attempted}}.dump(),{}};}
+    catch(...){return {502,Json{{"error",{{"code",attempted?"management_outcome_unknown":"invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};}
+  }
   if (resource == "gray-line") {
     bool attempted=false;
     try {
@@ -1382,5 +1435,78 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
   } catch (...) {
     return {502,Json{{"error",{{"code",attempted ? "management_outcome_unknown" : "invalid_remote_resource"}}},{"mutation_attempted",attempted}}.dump(),{}};
   }
+}
+bool pico_native_status_valid(const Json &value,const std::string &device,const std::string &boot) {
+    try {
+        static const auto definitions=Json::parse(pico_management_response_definitions());
+        return device.size()==32 && device.find_first_not_of("0123456789abcdef")==std::string::npos &&
+            boot.size()==32 && boot.find_first_not_of("0123456789abcdef")==std::string::npos &&
+            valid_closed_contract_document(value,definitions.at("status"),definitions) &&
+            value["job"]["boot_id"]==boot && value["standalone"]["boot_id"]==boot;
+    } catch (...) { return false; }
+}
+bool pico_management_response_valid(const std::string &resource,const std::string &method,const PicoHttpResponse &response,
+    const Json &binding,const std::string &request_body){
+    try{
+        static const auto controller_definitions=Json::parse(controller_document_definitions());
+        require(valid_closed_contract_document(binding,controller_definitions["target-binding"],controller_definitions)&&response.body.size()<=32768);
+        const auto device=binding["device_id"].get<std::string>(),boot=binding["boot_id"].get<std::string>();
+        const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
+        if(resource=="wifi"||resource=="hostname"||resource=="logging"||resource=="restart"||resource=="ap")
+            return pico_usb_settings_response_valid(resource,response,target);
+        require(response.status==200);const auto document=strict_browser_json(response.body,16);
+        require(document.is_object()&&document.value("contract",Json(nullptr))=="Wsprry-Control/1");
+        if(resource=="network")return etag(response.etag)&&valid_pico_network_observation(document);
+        if(resource=="status")return method=="GET"&&pico_native_status_valid(document,device,boot);
+        auto value=document;value.erase("contract");
+        if(method=="GET"&&(resource=="application"||resource=="station"||resource=="hardware"||resource=="pins")){
+            require(etag(response.etag)&&fields(value,{"schema","target","carrier","profile_generation","profile_owned_station","application","pin_choices","control_capabilities","member_context"})&&
+                value["schema"]=="member-resources"&&value["target"]==target&&value["carrier"]=="usb_physical"&&value["profile_generation"].is_null()&&value["profile_owned_station"]==false);
+            const auto member=value["member_context"].get<std::string>();
+            require(member.size()>=34&&member.size()<=53&&member[32]==':'&&member.substr(0,32).find_first_not_of("0123456789abcdef")==std::string::npos&&
+                member[33]!='0'&&decimal(member.substr(33)));
+            shared_application(value["application"],target,true);pin_choice_values(value["pin_choices"]);
+            const auto &caps=value["control_capabilities"];require(caps.is_object()&&caps.size()<=6);
+            for(const auto &[name,descriptor]:caps.items()){
+                require(name=="gpio_drive"||name=="amplifier_enable"||name=="amplifier_timing"||name=="filter_selector"||name=="si5351"||name=="gps");
+                require(supported_descriptor(descriptor,name));
+            }
+            return true;
+        }
+        if(resource=="configuration"){
+            return etag(response.etag)&&fields(value,{"schema","target","config","update_strategy","configuration_updates","application","reboot_required"})&&
+                value["schema"]=="pico-settings"&&value["target"]==target&&(value["config"].is_null()||shape(value["config"],false,true))&&
+                value["update_strategy"]=="merge"&&supported_descriptor(value["configuration_updates"],"configuration_updates")&&
+                (value["application"].is_null()||application_shape(value["application"],target,true))&&
+                (value["reboot_required"].is_null()||value["reboot_required"].is_boolean());
+        }
+        if(resource=="progress"||resource=="progress/update"||resource=="gpio-drive-progress"){
+            (void)progress_readback(response,target,resource=="progress/update"||(resource=="gpio-drive-progress"&&method=="PUT"));
+            return true;
+        }
+        if(resource=="progress/apply")return etag(response.etag)&&fields(value,{"config"},{"reboot_required"})&&shape(value["config"],false,true)&&
+            (!value.contains("reboot_required")||value["reboot_required"].is_boolean());
+        if(resource=="pins"){pin_choices(value);return true;}
+        if(resource=="pins/validate"){
+            const auto input=control_document(request_body),expected=review_plan(normalized_plan(input));
+            return value==expected;
+        }
+        static const auto definitions=Json::parse(pico_management_response_definitions());
+        Json rule;
+        if(resource=="station"||resource=="hardware"||resource=="application")rule=definitions["application"]["$defs"][resource+"_read"];
+        else if(resource=="gpio-drive")rule=definitions["gpio-drive"]["$defs"]["read"];
+        else if(resource=="amplifier-timing")rule=definitions["amplifier-timing-resource"];
+        else if(resource=="filter-selector")rule=definitions["filter-selector-resource"];
+        else if(resource=="schedules/stop")rule=definitions["schedule-stop-read"];
+        else if(resource=="gps"||resource=="si5351"||resource=="gray-line"||resource=="udp-logging/capabilities"||resource=="udp-logging/test/capabilities"){
+            const auto family=resource=="udp-logging/capabilities"?"udp-logging-capabilities":resource=="udp-logging/test/capabilities"?"udp-logging-test-capabilities":resource;
+            rule=definitions[family];
+        }else if(resource=="udp-logging")rule=definitions["udp-logging"]["oneOf"][0];
+        else if(resource=="udp-logging/test")rule=definitions["udp-logging-test"]["oneOf"][1];
+        else return false;
+        if(resource!="pins"&&document.value("target",Json(nullptr))!=target)return false;
+        return (resource=="udp-logging/test"||resource.ends_with("/capabilities")||etag(response.etag))&&
+            valid_closed_contract_document(document,rule,definitions);
+    }catch(...){return false;}
 }
 } // namespace wsprrypi

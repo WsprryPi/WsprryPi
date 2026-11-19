@@ -37,6 +37,7 @@ async function unit() {
     b.element("wtp-usb-hostname").value="renamed.local";fail=true;const count=b.requests.length;await b.click("name-save");assert.equal(b.requests.length,count+1);assert.equal(b.element("wtp-usb-hostname").value,"renamed.local");
     fail=false;await b.click("load");b.root.confirm=()=>false;const reviewed=b.requests.length;await b.click("name-save");assert.equal(b.requests.length,reviewed);
     b.root.confirm=()=>true;await b.click("name-save");assert.equal(JSON.parse(b.requests.at(-1).body).hostname,"renamed.local");
+    await b.click('load');await b.click('restart');assert.deepEqual(JSON.parse(b.requests.at(-1).body),{contract:'Wsprry-Control/1'});assert.equal(b.requests.at(-1).method,'POST');
     console.log("USB settings producer: name, Wi-Fi create/replace/remove, password preservation, uncertain outcome and explicit review passed");
 }
 module.exports={browser,reply,target};

@@ -1,10 +1,6 @@
 # Hardware-free simulated backend
 
-The simulated backend provides an explicitly selected, non-RF path for Debian
-development and CI. It runs the normal request planning, execution-plan
-scheduling, cancellation, status, failure, and cleanup lifecycle through
-`ITransmissionBackend`, but it does not initialize GPIO, MMIO, mailbox, DMA,
-I2C, or transmitter device nodes.
+The simulated backend provides an explicitly selected, non-RF path for Debian development and CI. It runs the normal request planning, execution-plan scheduling, cancellation, status, failure, and cleanup lifecycle through `ITransmissionBackend`, but it does not initialize GPIO, MMIO, mailbox, DMA, I2C, or transmitter device nodes.
 
 ## Build and run
 
@@ -31,10 +27,7 @@ Simulation is CLI-only and transient. It is never selected as a fallback and is 
 
 The simulator writes `/tmp/wsprrypi-simulated-trace.json`. The stable JSON document identifies the schema version, backend, plan, ordered events, logical nanosecond timestamps, frequencies, RF state, completion, cancellation, injected failures, and cleanup. Virtual time is the default integration mode, so identical requests produce byte-identical traces without waiting for RF-duration wall-clock time.
 
-The reusable `WSPR-Transmitter` component tests exercise normal completion,
-cancellation before and during execution, configure and execute failure, cleanup
-failure propagation, repeated execution, deterministic time, startup quiescence,
-identity, capabilities, and mode rejection:
+The reusable `WSPR-Transmitter` component tests exercise normal completion, cancellation before and during execution, configure and execute failure, cleanup failure propagation, repeated execution, deterministic time, startup quiescence, identity, capabilities, and mode rejection:
 
 ```sh
 cd WSPR-Transmitter/src
@@ -61,7 +54,7 @@ The available controls depend on how the simulator is constructed:
 
 `--backend simulated` is intentionally the only simulator control exposed by the production application CLI. Simulation timing, trace-path overrides, and lifecycle fault injection are transient typed C++ test/developer APIs. They are not parsed from CLI arguments, INI configuration, environment variables, or the UI, and they never apply to physical backends. Additional shell-facing controls require a separately reviewed developer-harness use case.
 
-The CLI selection is transient, is never persisted, and is never selected automatically after hardware initialization fails. In managed mode it remains selected across INI reloads and HTTP configuration writes until the process exits. The managed WTP endpoint uses real-time simulation through its typed C++ construction so remotely armed jobs follow wall-clock scheduling; direct local simulated jobs retain the existing virtual-time behavior. The application calls the public three-argument `WsprTransmitter::selectBackend()` overload internally with default simulator settings.
+The CLI selection is transient, is never persisted, and is never selected automatically after hardware initialization fails. In managed mode it remains selected across INI reloads and HTTP configuration writes until the process exits. Native software fixtures use transient typed simulator APIs when testing clock and lifecycle behavior. The application calls the public three-argument `WsprTransmitter::selectBackend()` overload internally with default simulator settings.
 
 `WsprTransmitter` owns a small private construction switch rather than a dynamic plugin system. Tests that need the application lifecycle can inject typed settings through the public overload:
 
@@ -208,12 +201,7 @@ This check validates application and backend software contracts. It does not qua
 
 ## Portable semantics validation
 
-`make semantics-test` has one deliberately stable meaning: the full Linux
-semantics suite. It compiles the physical and simulated backend integrations,
-requires the `gpiod.hpp` C++ development header, and fails before compilation
-with a portable-target recommendation when those prerequisites are absent.
-The full suite can still be hardware-free at runtime; CI sets
-`WSPRRYPI_DISABLE_HARDWARE_ACCESS=1` and audits device access separately.
+`make semantics-test` has one deliberately stable meaning: the full Linux semantics suite. It compiles the physical and simulated backend integrations, requires the `gpiod.hpp` C++ development header, and fails before compilation with a portable-target recommendation when those prerequisites are absent. The full suite can still be hardware-free at runtime; CI sets `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1` and audits device access separately.
 
 On macOS and other development hosts without the Linux GPIO toolchain, run:
 
@@ -222,28 +210,13 @@ cd src
 make semantics-test-portable SUDO=
 ```
 
-The portable target pins `BACKENDS=simulated ANCILLARY_GPIO=0`; caller-provided
-backend values cannot broaden it. It builds the simulated application and runs
-the capability, band lookup, clock-model, correction, network-recovery,
-UI/source, GPIO band-policy, JavaScript, and UI-publication checks that are
-valid under that profile. It does not run the backend-specific runtime
-semantics executable or cleanup-lifecycle executable, whose current assertions
-require physical backend capabilities. Therefore a portable pass is not a full
-semantics pass and is not physical-backend, hardware, timing, installation,
-service, or RF qualification.
+The portable target pins `BACKENDS=simulated ANCILLARY_GPIO=0`; caller-provided backend values cannot broaden it. It builds the simulated application and runs the capability, band lookup, clock-model, correction, network-recovery, UI/source, GPIO band-policy, JavaScript, and UI-publication checks that are valid under that profile. It does not run the backend-specific runtime semantics executable or cleanup-lifecycle executable, whose current assertions require physical backend capabilities. Therefore a portable pass is not a full semantics pass and is not physical-backend, hardware, timing, installation, service, or RF qualification.
 
 ## Debian CI
 
-The `Debian non-hardware validation` workflow runs in a Debian Trixie container.
-It checks out the parent repository with its ordinary component trees, builds the
-parent debug executable, runs the semantics and cleanup lifecycle suite,
-exercises the RP1 test-double regression, runs the
-simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS
-and complete WSPR virtual-time traces, and audits file access with `strace`.
+The `Debian non-hardware validation` workflow runs in a Debian Trixie container. It checks out the parent repository with its ordinary component trees, builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
 
-For consistent behavior with GNU and uutils `timeout`, the bounded WSPR helper
-uses foreground mode while keeping `timeout` as the direct supervisor of
-WsprryPi.
+For consistent behavior with GNU and uutils `timeout`, the bounded WSPR helper uses foreground mode while keeping `timeout` as the direct supervisor of WsprryPi.
 
 The workflow sets `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passes an empty `SUDO` make variable, and rejects access to transmitter GPIO, MMIO, mailbox, DMA, I2C, or RP1 device paths. It does not run installation, service, test-tone, live qualification, or hardware targets.
 

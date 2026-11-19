@@ -9,6 +9,9 @@ class WtpFleetStore {
 public:
     explicit WtpFleetStore(std::string path, std::string self_id);
     std::pair<nlohmann::json, std::string> snapshot();
+    // Trusted owner only, after its external coordinated assignment WAL has
+    // recovered or published. Revalidate disk before exposing any context.
+    std::pair<nlohmann::json, std::string> reload();
     std::pair<nlohmann::json, std::string> update(const std::string& revision,
         const std::function<void(nlohmann::json&)>& mutation);
     void revoke(const std::string& device_id, const std::string& generation);

@@ -206,16 +206,14 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
         admitted = row["built_in"] == true && row["available"] == true;
     }
     if (!fields(j["operations"], {"GET", "PUT", "POST"})) return false;
+    static const auto expected_operations=Json::parse(control_management_operations());
     for (const auto &[method, resources] : j["operations"].items()) {
-      (void)method;
-      if (!resources.is_array() || resources.size()>128) return false;
+      const auto &expected=expected_operations.at(method);
+      if (!resources.is_array() || resources.size()!=expected.size()) return false;
       std::set<std::string> seen;
       for (const auto &entry : resources) {
-        if (!entry.is_string()) return false;
-        const auto &name=entry.get_ref<const std::string&>();
-        if (name.empty() || name.size()>128 || (name != "jobs/{id}/abort" && !std::all_of(name.begin(),name.end(),[](unsigned char c) {
-              return (c>='a' && c<='z') || (c>='0' && c<='9') || c=='/' || c=='-';
-            })) || !seen.insert(name).second) return false;
+        if (!entry.is_string() || std::find(expected.begin(),expected.end(),entry)==expected.end() ||
+            !seen.insert(entry.get<std::string>()).second) return false;
       }
     }
     const std::pair<const char*,std::uint64_t> ceilings[] = {
@@ -736,7 +734,7 @@ PicoHttpResponse
 consumer_http_request(PlainTcpStream &stream, TlsStream::Clock clock,
                       const std::string &host, const std::string &path,
                       const std::string &method, const std::string &body,
-                      const std::string &media) {
+                      const std::string &media, std::optional<std::uint64_t> operation_deadline) {
   const auto identity = canonical_network_identity(host);
   if (!identity || *identity != host || host.find(':') != std::string::npos ||
       (method != "GET" && method != "POST") || body.size() > 32768 ||
@@ -751,7 +749,7 @@ consumer_http_request(PlainTcpStream &stream, TlsStream::Clock clock,
     PlainTcpStream &stream;
     ~Close() { stream.close(); }
   } close{stream};
-  const auto deadline = clock() + 8000;
+  const auto deadline = std::min(clock() + 8000, operation_deadline.value_or(UINT64_MAX));
   while (stream.opening() && clock() < deadline) {
     stream.poll_open();
     std::this_thread::sleep_for(std::chrono::milliseconds(2));

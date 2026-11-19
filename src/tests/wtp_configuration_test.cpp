@@ -12,22 +12,21 @@ namespace {
 const std::string device(32, 'a'), boot(32, '1');
 const Json target{{"scope", "member"}, {"device_id", device}, {"boot_id", boot}};
 Json canonical_caps() {
-  Json result{{"wtp",{{"profiles",{"rf-events/1"}},{"modes",{"wspr","tone"}},{"engine","test"},
+  Json result{{"execution",{{"modes",{"wspr","tone"}},{"engine","test"},
     {"frequency_ranges",Json::array({{{"minimum_nhz","100000000000000"},{"maximum_nhz","30000000000000000"}}})},
-    {"max_payload_bytes",65536},{"max_events",512},{"max_job_duration_ns","3600000000000"},
+    {"max_events",512},{"max_job_duration_ns","3600000000000"},
     {"minimum_arm_lead_ns","1000000"},{"maximum_arm_ahead_ns","300000000000"},{"maximum_arm_uncertainty_ns","500000000"},
-    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"},{"minimum_lease_ms",5000},{"maximum_lease_ms",60000},
-    {"response_cache_entries",8},{"response_cache_ttl_seconds",300},{"terminal_record_entries",8},{"terminal_record_ttl_seconds",3600}}},
-    {"features",Json::object()},{"active_job_connections",false},{"max_network_connections",2},{"max_wtp_connections",1},
+    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"}}},
+    {"features",Json::object()},{"active_execution_connections",false},{"max_network_connections",2},
     {"max_pending_connections",1},{"max_handshakes",1},{"max_body_bytes",32768}};
-  for(const auto name:{"config","schedules","jobs","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
-  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line"})result[name]=Json::parse(control_descriptor(name));
+  for(const auto name:{"config","schedules","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
+  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line","schedule_stop"})result[name]=Json::parse(control_descriptor(name));
   return result;
 }
 Json management() {
   Json carriers=Json::array();for(const auto name:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"}) carriers.push_back({{"carrier",name},{"built_in",true},{"available",true}});
   return {{"contract","Wsprry-Control/1"},{"schema","management"},{"target",target},{"profile","engineering"},{"preclock",true},{"profile_generation",nullptr},{"selected","engineering_mtls"},{"carriers",carriers},{"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
-    {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},{"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
+    {"operations",Json::parse(control_management_operations())},
     {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},{"login_ms",30000},{"idle_ms",1800000},{"absolute_ms",28800000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
 }
 std::string document(Json value) { if(!value.contains("contract"))value["contract"]="Wsprry-Control/1";return value.dump(); }
@@ -213,11 +212,11 @@ void checks() {
   }
   for (const auto &modes : {Json::array({"merge", 42}), Json::array({"merge", nullptr})}) {
     Member m; m.modern(); m.caps["configuration_updates"]["modes"] = modes;
-    CHECK(m.call().status == 409 && m.mutations == 0);
+    CHECK(m.call().status == 502 && m.mutations == 0);
   }
   Member future_mode; future_mode.modern();
   future_mode.caps["configuration_updates"]["modes"] = {"merge", "future"};
-  CHECK(future_mode.call().status == 409 && future_mode.mutations == 0);
+  CHECK(future_mode.call().status == 502 && future_mode.mutations == 0);
   for (const auto key : {"station", "hardware", "recurrence", "capabilities", "reboot_required"}) {
     Member m; m.modern(); m.corrupt_application = [key](Json &j) { j.erase(key); };
     CHECK(m.call().status == 502 && m.mutations == 0);
@@ -439,7 +438,7 @@ void gps_resource_binding_checks() {
   CHECK(cleared.emitted["config"]["gps"].is_null() && cleared.emitted["config"]["si5351"].is_null());
   Member beyond; beyond.config=large.config;
   beyond.caps["configuration_updates"]["max_config_bytes"]=4097;
-  CHECK(beyond.call().status==409 && beyond.mutations==0);
+  CHECK(beyond.call().status==502 && beyond.mutations==0);
   const auto runtime=Json::parse(R"({"serial_present":true,"pps_present":true,"time_valid":true,"position_valid":true,"satellites":8,"observation_raw_ns":"2000000000","age_ns":"0","position":{"latitude_e7":390000000,"longitude_e7":-940000000,"locator":"EM39AA","observed_raw_ns":"2000000000","age_ns":"0"},"candidate_utc_ns":"1793620802000000000","candidate_raw_ns":"2100000000","candidate_pps_raw_ns":"2000000000","observations":1,"rejected_sentences":0,"dropped":0,"uart_errors":0,"irq_latency_ns":"4000","maximum_irq_latency_ns":"6000","capture_error_bound_ns":"8000","capture_rejections":0,"error":"","timer_calibration":null,"synthesizer_calibration":null})");
   const Json valid{{"schema","gps"},{"target",target},{"saved",active},{"boot_active",active},
     {"pending_restart",false},{"storage_healthy",true},{"runtime",runtime}};
@@ -466,9 +465,9 @@ void gps_resource_binding_checks() {
   const auto reads_before=gps_reads;
   const auto unsupported=[&] {
     const auto response=read();
-    CHECK(response.status==409 && gps_reads==reads_before);
+    CHECK(response.status==502 && gps_reads==reads_before);
     const auto body=Json::parse(response.body);
-    CHECK(body["error"]["code"]=="unsupported_resource_capabilities");
+    CHECK(body["error"]["code"]=="invalid_remote_response");
     CHECK(body["mutation_attempted"]==false);
   };
   advertised["gps"]["pairing"]="qualified_preceding_edge_rmc";
@@ -623,14 +622,24 @@ void usb_management_contract() {
   Json contract{{"contract","Wsprry-Control/1"},{"schema","management"},{"target",target},{"profile","blank"},{"preclock",true},
     {"profile_generation",nullptr},{"selected","usb_physical"},{"carriers",Json::array()},
     {"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
-    {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},
-      {"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
+    {"operations",Json::parse(control_management_operations())},
     {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},
       {"login_ms",30000},{"idle_ms",300000},{"absolute_ms",900000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
   for(const auto carrier:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"})
     contract["carriers"].push_back({{"carrier",carrier},{"built_in",true},{"available",std::string(carrier)=="usb_physical"}});
   const auto valid=[&](const Json &j){return valid_management_contract(j,"usb_physical",device,boot,"");};
   CHECK(valid(contract));
+  auto operations_reordered=contract;
+  for(auto &resources:operations_reordered["operations"])std::reverse(resources.begin(),resources.end());
+  CHECK(valid(operations_reordered));
+  for(unsigned fault=0;fault<4;++fault) {
+    auto bad=contract;
+    if(fault==0)bad["operations"]["POST"].push_back("jobs");
+    if(fault==1)bad["operations"]["GET"].erase(bad["operations"]["GET"].begin());
+    if(fault==2)bad["operations"]["GET"][1]=bad["operations"]["GET"][0];
+    if(fault==3)bad["operations"]["GET"][0]="unknown-resource";
+    CHECK(!valid(bad));
+  }
   auto reordered=contract;std::reverse(reordered["carriers"].begin(),reordered["carriers"].end());CHECK(valid(reordered));
   auto duplicate_carrier=contract;duplicate_carrier["carriers"][0]=duplicate_carrier["carriers"][1];CHECK(!valid(duplicate_carrier));
   auto invalid_pending=contract;invalid_pending["limits"]["consumer_sessions"]=1;invalid_pending["limits"]["consumer_pending_logins"]=2;CHECK(!valid(invalid_pending));

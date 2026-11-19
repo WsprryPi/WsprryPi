@@ -58,7 +58,19 @@ exec_command() {
     done
     "${args[@]}"
 }
-install() { local n=$#; command cp "${@:n-1:1}" "${@:n:1}"; }
+install() {
+    local destination="${@: -1}"
+    if [[ "$1" == -d ]]; then
+        [[ "$destination" == /usr/local/share/licenses/wsprrypi ]] || return 97
+        command mkdir -p "$FIXTURE/licenses"
+        return
+    fi
+    if [[ "$destination" == /usr/local/share/licenses/wsprrypi/BOTAN-LICENSE.txt ]]; then
+        destination="$FIXTURE/licenses/BOTAN-LICENSE.txt"
+    fi
+    [[ "$destination" == "$FIXTURE/"* ]] || return 98
+    command cp "${@: -2:1}" "$destination"
+}
 hook() { PYTHONPATH="$FIXTURE/helpers" "$PYTHON" "$FIXTURE/hook.py" prepare; }
 systemctl() {
     case "$1" in
@@ -129,8 +141,10 @@ if rp1_gpclk_dkms_installation_selected; then printf selected; else printf exclu
                 for recovery_fail in (0, 1):
                     with self.subTest(backend=backend, selection=selection, recovery_fail=recovery_fail), tempfile.TemporaryDirectory() as raw:
                         root = Path(raw)
-                        for name in ('bin', 'stage', 'repo/executables'):
+                        for name in ('bin', 'stage', 'repo/executables', 'repo/docs/licenses/botan'):
                             (root/name).mkdir(parents=True)
+                        notice = (ROOT/'docs/licenses/botan/BSD-2-Clause.txt').read_bytes()
+                        (root/'repo/docs/licenses/botan/BSD-2-Clause.txt').write_bytes(notice)
                         old = b'older application without restoration markers'
                         new = b'WSPRRYPI_ROUTE_RESTORE_IDLE WSPRRYPI_RP1_REBOOT_IDLE'
                         (root/'bin/wsprrypi').write_bytes(old)
@@ -153,6 +167,7 @@ if rp1_gpclk_dkms_installation_selected; then printf selected; else printf exclu
                                  'PYTHONDONTWRITEBYTECODE': '1'})
                         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                         self.assertEqual((root/'bin/wsprrypi').read_bytes(), old)
+                        self.assertEqual((root/'licenses/BOTAN-LICENSE.txt').read_bytes(), notice)
                         self.assertEqual((root/'wsprrypi.ini').read_bytes(), config)
                         self.assertEqual((root/'status').read_text().strip(), '1')
                         self.assertEqual((root/'finish-status').read_text().strip(), '1')

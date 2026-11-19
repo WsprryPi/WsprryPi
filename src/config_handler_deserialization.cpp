@@ -554,6 +554,7 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
         parse_enable_on_boot_behavior(source.at("Operation"));
     target.transmit_backend =
         parse_transmit_backend_kind(source.at("Operation"));
+    target.stored_wtp_backend = target.transmit_backend == TransmitBackendKind::WTP;
     target.wtp = parse_wtp_settings(source.value("WTP", nlohmann::json::object()),
                                     target.transmit_backend == TransmitBackendKind::WTP);
     target.wtp_server = parse_wtp_server_settings(

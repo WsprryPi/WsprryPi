@@ -19,7 +19,7 @@ TARGETS = {
     "aarch64-trixie": "linux/arm64",
 }
 REPO = Path(__file__).resolve().parent.parent
-EVIDENCE = ("build-metadata.hpp", "file.txt", "elf-header.txt", "elf-attributes.txt", "elf-versions.txt",
+EVIDENCE = ("BOTAN-LICENSE.txt", "PAIRING-PROVIDER.json", "build-metadata.hpp", "file.txt", "elf-header.txt", "elf-attributes.txt", "elf-versions.txt",
             "shared-libraries.txt", "build-packages.txt", "os-release.txt", "elf-dynamic.txt")
 
 
@@ -67,6 +67,10 @@ def build(target, output, candidate_version=None):
             for name in EVIDENCE:
                 if name != "shared-libraries.txt" and not (staging / name).is_file():
                     raise ValueError(f"export is missing evidence: {name}")
+            for name, source in (("BOTAN-LICENSE.txt", REPO / "docs/licenses/botan/BSD-2-Clause.txt"),
+                                 ("PAIRING-PROVIDER.json", REPO / "scripts/pairing_provider.json")):
+                if (staging / name).read_bytes() != source.read_bytes():
+                    raise ValueError("exported pairing notice/provenance mismatch: " + name)
             needed = re.findall(r"\(NEEDED\).*\[([^\]]+)\]", (staging / "elf-dynamic.txt").read_text())
             resolver = container + "-libraries"
             resolved = run("docker", "run", "--rm", "--name", resolver, "--platform", platform,

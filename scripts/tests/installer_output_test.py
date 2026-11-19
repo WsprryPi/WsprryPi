@@ -115,6 +115,27 @@ finish_script 0
                     self.assertNotIn("3.2.0", result.stdout)
                     self.assertNotIn(str(target) + "//", result.stdout + result.stderr)
 
+    def test_managed_ini_keeps_attested_bytes_while_stock_updates(self) -> None:
+        for marker in (".managed-settings.json", ".pi-management"):
+            with self.subTest(marker=marker):
+                directory = self.root / marker[1:]
+                source = directory / "source"
+                target = directory / "target"
+                source.mkdir(parents=True)
+                target.mkdir()
+                original = "; prior version\n[Operation]\nTransmit = false\n"
+                (target / "wsprrypi.ini").write_text(original)
+                (target / ("wsprrypi.ini" + marker)).touch()
+                stock = "; %SEMANTIC_VERSION%\n[Operation]\nTransmit = False\n"
+                (source / "wsprrypi.ini").write_text(stock)
+                self.run_shell(r'''
+LOCAL_CONFIG_DIR="$SOURCE"
+manage_config wsprrypi.ini "$DESTINATION"
+''', SOURCE=str(source), DESTINATION=str(target))
+                self.assertEqual((target / "wsprrypi.ini").read_text(), original)
+                self.assertEqual((target / "wsprrypi.ini.stock").read_text(),
+                                 stock.replace("%SEMANTIC_VERSION%", "3.2.0"))
+
     def test_source_capture_supplies_the_success_version(self) -> None:
         result = self.run_shell(r'''
 LOCAL_REPO_DIR="$FIXTURE_ROOT"

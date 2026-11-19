@@ -7,7 +7,7 @@ binary = Path(sys.argv[1]).resolve()
 transport = subprocess.check_output([str(binary), "--si5351-transport"], text=True).strip()
 assert transport == "mcp2221a-hid", transport
 backends = subprocess.check_output([str(binary), "--list-backends"], text=True).strip()
-assert set(backends.split(",")) == {"si5351", "wtp"}, backends
+assert set(backends.split(",")) == {"si5351"}, backends
 libraries = subprocess.check_output(["otool", "-L", str(binary)], text=True)
 assert "IOKit.framework" in libraries and "CoreFoundation.framework" in libraries
 assert "hidapi" not in libraries

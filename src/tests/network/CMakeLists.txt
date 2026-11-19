@@ -52,6 +52,30 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 set(WSPRRY_PICO_NETWORK_PORT 18443)
 configure_file("${PICO_SOURCE}/cmake/network_credentials.hpp.in" "${CMAKE_BINARY_DIR}/generated/network_credentials.hpp" @ONLY)
 file(CHMOD "${CMAKE_BINARY_DIR}/generated/network_credentials.hpp" PERMISSIONS OWNER_READ OWNER_WRITE)
+# Independent identity, CA and endpoint for the two-target controller fixture.
+# Production server identity checks remain intact; no reused device identity.
+set(credentials_second "${CMAKE_BINARY_DIR}/credentials-second-v3")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "${credentials_second}/server.crt" "${credentials_second}/server.key"
+  "${credentials_second}/client-ca.crt" "${credentials_second}/deployment.json"
+  "${PICO_SOURCE}/scripts/generate_network_test_credentials.py")
+if(NOT EXISTS "${credentials_second}/server.key")
+  execute_process(COMMAND "${Python3_EXECUTABLE}" "${PICO_SOURCE}/scripts/generate_network_test_credentials.py"
+    "${credentials_second}" --device-id bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb COMMAND_ERROR_IS_FATAL ANY)
+endif()
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${PICO_SOURCE}/scripts/network_certificates.py" validate --directory "${credentials_second}"
+  OUTPUT_VARIABLE deployment_second COMMAND_ERROR_IS_FATAL ANY)
+string(JSON WSPRRY_PICO_NETWORK_HOSTNAME GET "${deployment_second}" hostname)
+string(JSON WSPRRY_PICO_NETWORK_DEVICE_ID GET "${deployment_second}" device_id)
+file(READ "${credentials_second}/server.crt" WSPRRY_PICO_CERTIFICATE)
+file(READ "${credentials_second}/server.key" WSPRRY_PICO_PRIVATE_KEY)
+file(READ "${credentials_second}/client-ca.crt" WSPRRY_PICO_CLIENT_CA)
+set(WSPRRY_PICO_NETWORK_PORT 18444)
+configure_file("${PICO_SOURCE}/cmake/network_credentials.hpp.in" "${CMAKE_BINARY_DIR}/generated/network_credentials_second.hpp" @ONLY)
+file(READ "${CMAKE_BINARY_DIR}/generated/network_credentials_second.hpp" second_header)
+string(REPLACE "namespace wsprrypico::network::credentials" "namespace wsprrypico::network::credentials_second" second_header "${second_header}")
+file(WRITE "${CMAKE_BINARY_DIR}/generated/network_credentials_second.hpp" "${second_header}")
+file(CHMOD "${CMAKE_BINARY_DIR}/generated/network_credentials_second.hpp" PERMISSIONS OWNER_READ OWNER_WRITE)
 if(EXISTS "${PICO_SOURCE}/src/network/web/gpio-drive.js")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PICO_SOURCE}/src/network/web/gpio-drive.js")
 endif()
@@ -124,9 +148,7 @@ set(core
     usb/management_endpoint.cpp
     usb/time_exchange.cpp
     wtp/json.cpp
-    wtp/codec.cpp
-    wtp/endpoint.cpp
-    wtp/frame_parser.cpp
+    wtp/observation.cpp
     wtp/inhibited_rf_engine.cpp
     wtp/job_service.cpp
     wtp/sha256.cpp
@@ -157,22 +179,26 @@ target_compile_definitions(pico_consumer_fixture PRIVATE MBEDTLS_CONFIG_FILE="${
 target_link_libraries(pico_consumer_fixture PUBLIC microchrony PRIVATE mbedcrypto)
 target_compile_options(pico_consumer_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 add_executable(consumer_interop consumer_interop.cpp
-    ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp
+    ../../wtp_integration/management_identity.cpp ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp ../../wtp_integration/pico_usb_settings.cpp ../../wtp_integration/controller_contract.cpp
     ../../wtp_integration/browser_api.cpp ../../wtp_integration/network_http.cpp
     ../../wtp_integration/plain_tcp.cpp ../../wtp_integration/tls.cpp
-    ../../wtp_runtime_bridge.cpp ../../wtp_integration/output_lease.cpp ../../wtp_integration/usb_cdc.cpp ../../wtp_integration/usb_management.cpp ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
-    ../../wtp_integration/application.cpp ../../wtp_integration/status.cpp
-    ../../wtp_integration/scheduler.cpp ../../wtp_integration/backend.cpp
-    ../../wtp_integration/execution_plan.cpp ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
+    ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
+    ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
     ../../WSPR-Transmitter/src/transmission_controller.cpp)
 target_compile_definitions(consumer_interop PRIVATE WSPRRYPI_CONSUMER_CRYPTO_TEST=1 MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
 target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include ../../WSPR-Transmitter/src
     "${PICO_SOURCE}/src" "${PICO_SOURCE}/tests" "${CMAKE_BINARY_DIR}/generated" "${MBEDTLS_SOURCE}/include")
 target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto OpenSSL::SSL OpenSSL::Crypto
-    "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
+    pthread)
 target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 
 add_executable(wtp_fixture_clock_test fixture_clock_test.cpp)
 target_include_directories(wtp_fixture_clock_test PRIVATE "${PICO_SOURCE}/src")
 target_link_libraries(wtp_fixture_clock_test PRIVATE pico_consumer_fixture)
 target_compile_options(wtp_fixture_clock_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+# Phase-4 Pi geometry versus the actual caller-selected Pico implementation.
+add_executable(pi_solar_geometry_pair ../solar_geometry_pair_test.cpp ../../solar_geometry.cpp)
+target_include_directories(pi_solar_geometry_pair PRIVATE ../.. "${PICO_SOURCE}/src")
+target_link_libraries(pi_solar_geometry_pair PRIVATE pico_consumer_fixture)
+target_compile_options(pi_solar_geometry_pair PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)

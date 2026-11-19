@@ -146,6 +146,40 @@ PicoCdcSelection paired_linux_cdc(const PicoCdcSelection &selected,
   return *result;
 }
 
+namespace {
+PicoCdcSelection resolve_target_role(const PicoCdcSelection &selected, PicoCdcRole role,
+    const std::filesystem::path &root, const std::filesystem::path &dev_root) {
+  const auto identity = inspect_linux_cdc(selected.path, root);
+  if (identity.usb_serial != selected.usb_serial ||
+      identity.vendor_id != selected.vendor_id || identity.product_id != selected.product_id)
+    throw std::runtime_error("Selected USB identity changed before role resolution");
+  auto source = selected;
+  if (identity.control_interface == static_cast<unsigned>(PicoCdcRole::Management))
+    source.role = PicoCdcRole::Management;
+  else if (identity.control_interface == static_cast<unsigned>(PicoCdcRole::Wtp))
+    source.role = PicoCdcRole::Wtp;
+  else
+    throw std::runtime_error("Select a Pico management interface or an existing WTP locator");
+  // Resolve even a direct selection through the inventory, retaining duplicate
+  // role rejection and the exact physical-parent/serial/VID/PID checks.
+  // An existing direct WTP locator need not enumerate a management sibling.
+  if (role == PicoCdcRole::Wtp && source.role == role) return source;
+  return paired_linux_cdc(source, role, root, dev_root);
+}
+} // namespace
+PicoCdcSelection management_linux_cdc(const PicoCdcSelection &selected,
+    const std::filesystem::path &root, const std::filesystem::path &dev_root) {
+  return resolve_target_role(selected, PicoCdcRole::Management, root, dev_root);
+}
+PicoCdcSelection wtp_linux_cdc(const PicoCdcSelection &selected,
+    const std::filesystem::path &root, const std::filesystem::path &dev_root) {
+  return resolve_target_role(selected, PicoCdcRole::Wtp, root, dev_root);
+}
+PicoCdcSelection logging_linux_cdc(const PicoCdcSelection &selected,
+    const std::filesystem::path &root, const std::filesystem::path &dev_root) {
+  return resolve_target_role(selected, PicoCdcRole::Logging, root, dev_root);
+}
+
 CdcIdentity PosixCdcSystem::inspect(const std::string &path) {
 #ifdef __linux__
   return inspect_linux_cdc(path);

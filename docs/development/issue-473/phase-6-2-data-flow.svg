@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="1180" viewBox="0 0 1450 1180" role="img" aria-labelledby="title desc">
+<title id="title">Phase 6.2 annotated data flow</title>
+<desc id="desc">The browser hop, discovery and Pi WTP remain open. New controller-to-Pi management and reverse retirement callbacks use purpose-separated TLS. Attached Pico management uses physical USB. Target grants, automatic source outcomes and acknowledgement recovery are implemented; phase software qualification passed for the retained sources.</desc>
+<defs>
+<marker id="local" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#46566b"/></marker>
+<marker id="tls" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#14745a"/></marker>
+<marker id="open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#aa4b18"/></marker>
+<marker id="pending" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#6c4ab6"/></marker>
+<marker id="usb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#466681"/></marker>
+</defs>
+<rect width="1450" height="1180" fill="#fff"/>
+<g font-family="Arial, Helvetica, sans-serif" fill="#182738">
+<text x="45" y="43" text-anchor="start" font-size="29" font-weight="bold" fill="#182738">Phase 6.2 | Annotated data flow</text>
+<text x="45" y="76" text-anchor="start" font-size="17" font-weight="normal" fill="#526276">Implementation snapshot · 2026-11-18 · Feature branches · Software-accepted · Not installed</text>
+<rect x="550" y="115" width="350" height="85" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="570" y="145" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Operator browser</text>
+<text x="570" y="174" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Maintenance and Device editors</text>
+<rect x="550" y="255" width="350" height="110" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="570" y="285" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Owning application</text>
+<text x="570" y="314" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Web server + controller pairing owner</text>
+<text x="570" y="338" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Transmitter or controller-only role</text>
+<rect x="45" y="255" width="360" height="110" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="65" y="285" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Controller private storage</text>
+<text x="65" y="314" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Pairing keys and outgoing profiles</text>
+<text x="65" y="338" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Remote operation / recovery journals</text>
+<rect x="550" y="500" width="350" height="120" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="570" y="530" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Managed Pi</text>
+<text x="570" y="559" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Current incoming manager + native API</text>
+<text x="570" y="583" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Typed attached-Pico gateway</text>
+<text x="570" y="607" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Explicit saves, status and authority</text>
+<rect x="1040" y="500" width="365" height="120" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="1060" y="530" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Target Pi private storage</text>
+<text x="1060" y="559" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Its INI, native settings and receipts</text>
+<text x="1060" y="583" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Authority history + frozen handover</text>
+<text x="1060" y="607" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Existing bounded local WAL</text>
+<rect x="45" y="500" width="360" height="120" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="65" y="530" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Existing controller / Fleet</text>
+<text x="65" y="559" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Retirement-purpose TLS listener</text>
+<text x="65" y="583" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Saved legacy assignments + source book</text>
+<text x="65" y="607" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">One-use source resume transaction</text>
+<rect x="550" y="760" width="350" height="100" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="570" y="790" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Attached Pico</text>
+<text x="570" y="819" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Actual identity / boot / USB handler</text>
+<text x="570" y="843" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Native settings and operation journal</text>
+<rect x="1040" y="760" width="365" height="120" rx="10" fill="#f5f7fa" stroke="#7b8ca1" stroke-width="1.5"/>
+<text x="1060" y="790" text-anchor="start" font-size="20" font-weight="bold" fill="#182738">Pi execution admission</text>
+<text x="1060" y="819" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Native scheduler + WTP endpoint</text>
+<text x="1060" y="843" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Clock / policy / ownership / launch</text>
+<text x="1060" y="867" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Output only under existing rules</text>
+<path d="M725 200V255" fill="none" stroke="#aa4b18" stroke-width="3" marker-end="url(#open)" marker-start="url(#open)"/>
+<text x="750" y="226" text-anchor="start" font-size="16" font-weight="normal" fill="#aa4b18">A · HTTP / WebSocket — open</text>
+<path d="M550 300H405" fill="none" stroke="#46566b" stroke-width="3" marker-end="url(#local)" marker-start="url(#local)"/>
+<text x="423" y="284" text-anchor="start" font-size="14" font-weight="normal" fill="#46566b">Local keys / ops</text>
+<path d="M600 365V400H225V500" fill="none" stroke="#46566b" stroke-width="3" marker-end="url(#local)"/>
+<text x="265" y="390" text-anchor="start" font-size="15" font-weight="normal" fill="#46566b">Existing Fleet intent</text>
+<path d="M725 365V500" fill="none" stroke="#14745a" stroke-width="3" marker-end="url(#tls)" marker-start="url(#tls)"/>
+<text x="745" y="425" text-anchor="start" font-size="17" font-weight="normal" fill="#14745a">C · TLS 1.3 PSK-DHE</text>
+<text x="745" y="450" text-anchor="start" font-size="17" font-weight="normal" fill="#14745a">Control/1 + Pair/1</text>
+<path d="M900 320H975V515H900" fill="none" stroke="#6c4ab6" stroke-width="3" marker-end="url(#pending)" stroke-dasharray="9 6"/>
+<text x="995" y="385" text-anchor="start" font-size="16" font-weight="normal" fill="#6c4ab6">Restore: Stop → disable → grant</text>
+<text x="995" y="409" text-anchor="start" font-size="16" font-weight="normal" fill="#6c4ab6">Exact outcome / ACK recovery</text>
+<text x="995" y="433" text-anchor="start" font-size="16" font-weight="normal" fill="#6c4ab6">One-use permission; exact recovery</text>
+<path d="M550 550H405" fill="none" stroke="#14745a" stroke-width="3" marker-end="url(#tls)" marker-start="url(#tls)"/>
+<text x="265" y="463" text-anchor="start" font-size="16" font-weight="normal" fill="#14745a">Retirement-only TLS: Pi → old controller</text>
+<text x="423" y="535" text-anchor="start" font-size="14" font-weight="normal" fill="#14745a">Retire / status</text>
+<path d="M900 560H1040" fill="none" stroke="#46566b" stroke-width="3" marker-end="url(#local)" marker-start="url(#local)"/>
+<text x="925" y="542" text-anchor="start" font-size="15" font-weight="normal" fill="#46566b">Local WAL</text>
+<path d="M725 620V760" fill="none" stroke="#466681" stroke-width="3" marker-end="url(#usb)" marker-start="url(#usb)"/>
+<text x="745" y="680" text-anchor="start" font-size="16" font-weight="normal" fill="#466681">F · Physical USB</text>
+<text x="745" y="704" text-anchor="start" font-size="16" font-weight="normal" fill="#466681">No TLS; no extra pairing</text>
+<text x="745" y="728" text-anchor="start" font-size="16" font-weight="normal" fill="#466681">Fixed typed resources only</text>
+<path d="M1385 620V760" fill="none" stroke="#46566b" stroke-width="3" marker-end="url(#local)"/>
+<text x="1060" y="675" text-anchor="start" font-size="16" font-weight="normal" fill="#46566b">I · Committed native policy</text>
+<text x="1060" y="699" text-anchor="start" font-size="16" font-weight="normal" fill="#46566b">Local activation / next occurrence</text>
+<text x="1060" y="723" text-anchor="start" font-size="16" font-weight="normal" fill="#46566b">Save ≠ output activity</text>
+<path d="M225 620V920H1220V880" fill="none" stroke="#aa4b18" stroke-width="3" marker-end="url(#open)"/>
+<text x="360" y="902" text-anchor="start" font-size="18" font-weight="normal" fill="#aa4b18">H · Existing Pi WTP: Plain LAN TCP — open; pairing does not encrypt this path</text>
+<rect x="45" y="975" width="1360" height="165" rx="10" fill="#fafbfc" stroke="#c7d0db"/>
+<text x="65" y="1005" text-anchor="start" font-size="18" font-weight="bold" fill="#182738">Read the links this way</text>
+<path d="M65 1030H113" fill="none" stroke="#14745a" stroke-width="3" marker-end="url(#tls)"/>
+<text x="127" y="1036" text-anchor="start" font-size="15" font-weight="normal" fill="#14745a">Encrypted device link</text>
+<path d="M410 1030H458" fill="none" stroke="#aa4b18" stroke-width="3" marker-end="url(#open)"/>
+<text x="472" y="1036" text-anchor="start" font-size="15" font-weight="normal" fill="#aa4b18">Open network hop</text>
+<path d="M740 1030H788" fill="none" stroke="#466681" stroke-width="3" marker-end="url(#usb)"/>
+<text x="802" y="1036" text-anchor="start" font-size="15" font-weight="normal" fill="#466681">Physical USB</text>
+<path d="M1060 1030H1108" fill="none" stroke="#6c4ab6" stroke-width="3" marker-end="url(#pending)" stroke-dasharray="9 6"/>
+<text x="1122" y="1036" text-anchor="start" font-size="15" font-weight="normal" fill="#6c4ab6">Restore over paired TLS</text>
+<text x="65" y="1075" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Discovery (mDNS) and the code-authenticated PAKE bootstrap use open transport. PAKE protects its secret exchange.</text>
+<text x="65" y="1103" text-anchor="start" font-size="16" font-weight="normal" fill="#182738">Existing Pico network engineering TLS stays unchanged. Browser-hop and WTP security reviews remain backlogged.</text>
+<text x="45" y="1164" text-anchor="start" font-size="15" font-weight="normal" fill="#526276">Implemented software-qualified paths. Logical roles may share a host. Scheduling UI uses these paths; no RF qualification.</text>
+</g>
+</svg>

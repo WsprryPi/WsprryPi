@@ -52,7 +52,7 @@ async function main() {
         await client.send("Page.navigate", {url}, 60000);
         await client.send('Page.enable');
         const evaluate = expression => client.evaluate(expression);
-        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
+        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagementEditor'), 'WTP scripts');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
         await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
         assert.equal(await evaluate('new URL(location.href).searchParams.get("setup_tab")'), '#fleet-pane');
@@ -161,7 +161,7 @@ async function main() {
                     if (window.__statusFailure) throw new Error('Connection interrupted');
                     return {ok:true, json:async()=>({host:window.__snapshot})};
                 }
-                if (String(url).endsWith('/jobs')) { window.__snapshot.owns=false; window.__snapshot.job_id=''; return {ok:true,json:async()=>({ok:true,result:{cleanup_ok:true}})}; }
+                if (String(url).endsWith('/jobs')) throw Error('Retired execution route contacted');
                 if (String(url).endsWith('/network')) return {ok:true,headers:{get:()=> '\"network-r1\"'},json:async()=>({enabled:true,ipv4:'192.0.2.27',configured_hostname:window.__snapshot.network.hostname,advertised_hostname:window.__discoveryState==='active'?window.__snapshot.network.hostname:'',mdns_state:window.__discoveryState,mdns_reason:window.__discoveryState==='conflict'?'name_conflict':''})};
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
                 if (String(url).endsWith('/member/configuration')) {
@@ -177,70 +177,17 @@ async function main() {
                 }
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
+            // Component visual harness: mount the current reusable editor with its
+            // mocked logical exchange; real target routing is covered by the pair.
+            document.getElementById('fleet-pane').append(document.getElementById('pico-target-template').content.cloneNode(true));
+            WtpManagementEditor.mount(window);WtpUsbSettingsEditor.mount(window);
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
 
-            window.WtpUi.select(true);
+
+            WtpManagement.setAvailability(true,true);
             document.getElementById('fleet-tab').click();
         })()`);
-        await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
-        await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
-        assert.equal(await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), true);
-        await waitFor(async () => await evaluate('document.getElementById("fleet-device").options.length === 2'), 'Fleet catalog');
-        assert.equal(await evaluate('document.getElementById("fleet-device").value'), 'known:'+'c'.repeat(32));
-        await evaluate(`(() => { const selector=document.getElementById('fleet-device'); selector.value='nearby:service-nearby'; selector.dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('fleet-add').click(); document.getElementById('fleet-name').value='Nearby draft'; })()`);
-        assert.equal(await evaluate('document.getElementById("fleet-host").value'), 'nearby.local');
-        assert.equal(await evaluate('document.getElementById("fleet-port").value'), '40123');
-        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
-        assert.equal(await evaluate('window.__requests.filter(r => r.url.endsWith("/host/devices") && r.options.method === "POST").length'), 0);
-        for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
-            await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-            await evaluate(`document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
-            await client.settleRendering();
-            await capture(`${viewport.name}-fleet-selector.png`, {format:'png'});
-            assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Fleet horizontal overflow');
-            await evaluate('document.getElementById("fleet-binding").scrollIntoView({block:"center",behavior:"instant"})');
-            await capture(`${viewport.name}-fleet-editor.png`, {format:'png'});
-        }
-        await client.send('Emulation.setDeviceMetricsOverride', {width:1280,height:900,deviceScaleFactor:1,mobile:false});
-        await evaluate(`document.documentElement.style.zoom='2'; document.getElementById('fleet-device').scrollIntoView({block:'center',behavior:'instant'});`);
-        assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Fleet 200% text/layout overflow');
-        await capture('desktop-fleet-zoom.png', {format:'png'});
-        await evaluate(`document.documentElement.style.zoom='';`);
-        await evaluate(`document.getElementById('fleet-editor-cancel').click()`);
-        assert.equal(await evaluate('window.WtpUi.validate()'), true);
-        await evaluate(`(() => {
-            window.__snapshot.transport='network_plain';
-            window.__snapshot.network.security='plain_lan';
-            document.getElementById('wtp_transport').value='network_plain';
-            document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));
-            document.getElementById('wtp_tcp_port').value='31417';
-            document.getElementById('wtp_device').value='';
-        })()`);
-        assert.equal(await evaluate('window.WtpUi.validate()'), true);
-        assert.equal(await evaluate('document.querySelector("[data-wtp-security=tls]").hidden'), true);
-        assert.equal(await evaluate('document.querySelector("[data-wtp-transport=network]").hidden'), false);
-        assert.equal(await evaluate('document.getElementById("wtp-device-label").textContent.includes("optional")'), true);
-        assert.equal(await evaluate('document.getElementById("wtp-management").hidden'), false);
-        for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
-            await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-            await client.settleRendering();
-            await evaluate('document.getElementById("wtp_transport").scrollIntoView({block:"center",behavior:"instant"})');
-            const transportVisible = await evaluate('(() => { const r=document.getElementById("wtp_transport").getBoundingClientRect(); return {height:r.height,top:r.top,bottom:r.bottom,viewport:window.innerHeight}; })()');
-            assert(transportVisible.height > 0 && transportVisible.top >= 0 && transportVisible.bottom <= transportVisible.viewport, `Plain LAN selector visible: ${JSON.stringify(transportVisible)}`);
-            await capture(`${viewport.name}-plain-lan.png`, {format:'png'});
-            assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'Plain LAN horizontal overflow');
-        }
-        await evaluate(`(() => {
-            window.__snapshot.transport='network';
-            window.__snapshot.network.security='tls';
-            document.getElementById('wtp_transport').value='network';
-            document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));
-            document.getElementById('wtp_tcp_port').value='18443';
-            document.getElementById('wtp_device').value='a'.repeat(32);
-        })()`);
-        await evaluate(`document.getElementById('wtp_transport').value='usb'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true}));`);
-        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local');
-        await evaluate(`document.getElementById('wtp_transport').value='network'; document.getElementById('wtp_transport').dispatchEvent(new Event('change',{bubbles:true})); document.getElementById('wtp-management').open=true;`);
+        await evaluate("document.getElementById('wtp-management').open=true");
         assert.equal(await evaluate('document.getElementById("wtp-combined-settings").open'), false,
             'combined settings start collapsed');
         await evaluate('document.querySelector("#wtp-combined-settings > summary").click()');
@@ -307,8 +254,7 @@ async function main() {
                     for(const id of ['wtp-member-callsign','wtp-member-rf','wtp-remote-password','wtp-management-carrier']) {
                         const e=document.getElementById(id);e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
                     }
-                    const memberCalls=calls;document.getElementById('wtp_hostname').dispatchEvent(new Event('input',{bubbles:true}));
-                    window.scheduleAutosave=original;return memberCalls===0&&calls>0;
+                    window.scheduleAutosave=original;return calls===0;
                 })()`),true,'member draft changes must never schedule host autosave');
                 await evaluate(`document.getElementById('wtp-member-load').click()`);
                 await waitFor(async()=>await evaluate('!document.getElementById("wtp-member-validate").disabled'),'resources after carrier draft change');
@@ -465,56 +411,34 @@ async function main() {
         await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'final settings readback');
         await evaluate(`document.getElementById('wtp-remote-password').value='unsaved-secret';`);
         for (const discovery of ['active', 'conflict', 'failed']) {
+            await evaluate(`(() => {for(let node=document.getElementById('wtp-network-feedback');node;node=node.parentElement)if(node.tagName==='DETAILS')node.open=true;})()`);
             await evaluate(`window.__discoveryState='${discovery}'; document.getElementById('wtp-network-load').click();`);
-            await waitFor(async () => await evaluate(`document.getElementById('wtp-management-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
+            await waitFor(async () => await evaluate(`document.getElementById('wtp-network-feedback').textContent.includes('Discovery: ${discovery}.')`), 'discovery feedback');
             assert.equal(await evaluate('document.getElementById("wtp-remote-password").value'), 'unsaved-secret');
             for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride', {...viewport,deviceScaleFactor:1,mobile:viewport.name==='mobile'});
-                await evaluate(`document.getElementById('wtp-management-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                await client.settleRendering();
+                await evaluate(`document.getElementById('wtp-network-feedback').scrollIntoView({block:'center',behavior:'instant'});`);
+                await client.settleRendering();
+                await waitFor(async () => await evaluate(`(() => {const r=document.getElementById('wtp-network-feedback').getBoundingClientRect();return r.height>0&&r.top>=0&&r.bottom<=innerHeight;})()`), 'Wi-Fi feedback is visible in the viewport');
                 await capture(`${viewport.name}-discovery-${discovery}.png`, {format:'png'});
                 assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'discovery horizontal overflow');
             }
         }
-        await evaluate(`document.getElementById('wtp-remote-callsign').value='MYDRAFT'; window.__snapshot.owns=true; window.__snapshot.job_id='b'.repeat(32); window.WtpUi.select(true);`);
-        await waitFor(async () => await evaluate('!document.getElementById("wtp-cancel").disabled'), 'owned cancellation');
-        await evaluate(`document.getElementById('wtp-cancel').click();`);
-        await waitFor(async () => await evaluate('document.getElementById("wtp-feedback").textContent.includes("Cleanup confirmed")'), 'shared cancellation');
-        assert.equal(await evaluate('JSON.parse(window.__requests.find(r=>r.url.endsWith("/jobs")).options.body).operation'), 'ABORT');
-        assert.equal(await evaluate('document.getElementById("wtp-remote-callsign").value'), 'MYDRAFT');
-        await evaluate(`window.__remoteFailure=true; document.getElementById('wtp-remote-password').value='';`);
-        await waitFor(async () => await evaluate('!document.getElementById("wtp-remote-save").disabled'), 'idle management restored');
-        await evaluate(`document.getElementById('wtp-remote-save').click();`);
-        await waitFor(async () => await evaluate('document.getElementById("wtp-management-feedback").textContent.includes("changed elsewhere")'), 'conflict capture');
         for (const viewport of [{name:'desktop',width:1280,height:900},{name:'mobile',width:390,height:844}]) {
             await client.send('Emulation.setDeviceMetricsOverride', {...viewport, deviceScaleFactor:1,mobile:viewport.name==='mobile'});
             await evaluate('window.scrollTo({top:0,behavior:"instant"})');
             await client.settleRendering();
             const layout=await client.send('Page.getLayoutMetrics');
             await capture(`${viewport.name}-full.png`, {format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:viewport.width,height:layout.cssContentSize.height,scale:1}});
-            for (const section of ['wtp_transport','wtp_hostname','wtp-status-heading','wtp-management','wtp-management-feedback']) {
+            for (const section of ['wtp-management','wtp-management-feedback']) {
                 await evaluate(`document.getElementById('${section}').scrollIntoView({block:'center',behavior:'instant'});`);
                 await client.settleRendering();
                 await capture(`${viewport.name}-${section}.png`, {format:'png'});
             }
             assert(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 1'), 'horizontal overflow');
         }
-        await evaluate(`document.getElementById('wtp_hostname').value='DrAfT.LoCaL.'; window.__statusFailure=true;`);
-        await waitFor(async () => await evaluate('document.getElementById("wtp-feedback").textContent.includes("Connection interrupted")'), 'status failure');
-        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
-        assert.equal(await evaluate('document.getElementById("wtp-output").textContent'), 'Unknown');
-        assert.equal(await evaluate('document.getElementById("wtp-recover").disabled'),true);
-        await evaluate(`document.getElementById('wtp-status-heading').scrollIntoView({block:'start',behavior:'instant'}); window.scrollBy(0,-140);`);
-        assert.equal(await evaluate('document.getElementById("wtp-remote-load").disabled'),true);
-        await client.settleRendering();
-        await capture('mobile-status-failure.png', {format:'png'});
-        await evaluate('document.getElementById("transmitter-hardware-tab").click()');
-        await waitFor(async () => await evaluate('document.getElementById("transmitter-hardware-tab").classList.contains("active")'), 'Transmitter tab after leaving Fleet');
-        assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden || document.getElementById("fleet-pane").hidden'), false);
-        assert.equal(await evaluate('window.WtpUi.read().Hostname'), 'DrAfT.LoCaL.');
-        assert.equal(client.dialogError, null);
-        assert(client.dialogs.length > 0, 'saved-state review must show a real browser confirmation');
-        console.log(`Accepted ${client.dialogs.length} expected saved-state review confirmations`);
-        console.log('Rendered desktop/mobile: transport selection, preserved inactive settings, management revision failure, status failure and drafts passed');
+        assert.equal(await evaluate("window.__requests.filter(r=>r.url.endsWith('/jobs')).length"),0,'Settings workflows cannot submit retired jobs');
         await evaluate(`document.getElementById('fleet-tab').click(); document.getElementById('wtp-management').hidden=false; document.getElementById('wtp-management').open=true; WtpManagement.setAvailability(true,true); document.getElementById('amplifier-timing-read').click()`);
         await waitFor(()=>evaluate('document.getElementById("amplifier-lead-ms").value === "200"'),'member amplifier timing readback');
         assert.equal(await evaluate('document.getElementById("amplifier-tail-ms").value'),'200');

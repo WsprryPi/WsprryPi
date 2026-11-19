@@ -102,7 +102,7 @@ class AvahiBrowser {
         client_ = avahi_client_new(avahi_simple_poll_get(poll_),
             static_cast<AvahiClientFlags>(0), client_event, this, &error);
         if (client_) browser_ = avahi_service_browser_new(client_, AVAHI_IF_UNSPEC,
-            AVAHI_PROTO_UNSPEC, "_wtp._tcp", "local",
+            AVAHI_PROTO_UNSPEC, "_http._tcp", "local",
             static_cast<AvahiLookupFlags>(0), service_event, this);
         if (browser_) {
           wtp_discovery().available(true);

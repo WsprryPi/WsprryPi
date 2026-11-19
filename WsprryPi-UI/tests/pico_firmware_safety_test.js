@@ -1,8 +1,11 @@
 "use strict";
 const assert=require("node:assert/strict"), fs=require("node:fs"), vm=require("node:vm"), path=require("node:path");
 async function main() {
-    const node=(id,disabled=false,safe=false)=>({id,disabled,safe,hidden:true,textContent:"",closest(selector){return selector==="nav"?null:this;},matches(){return this.safe;}});
-    const controls=[node("rebootButton"),node("shutdownButton"),node("wtp_use"),node("fleet-use"),node("test_tone"),node("transmit"),node("pre-disabled",true),node("wtp-firmware-read"),node("wtp-firmware-recover"),node("fleet-tab",false,true)];
+    const node=(id,disabled=false,safe=false,pairing=false)=>({id,disabled,safe,hidden:true,textContent:"",closest(selector){
+        if(selector==="#controllerAccess")return pairing?this:null;
+        return selector==="button, input, select, textarea"?this:null;
+    },matches(){return this.safe;}});
+    const controls=[node("rebootButton"),node("shutdownButton"),node("wtp_use"),node("fleet-use"),node("test_tone"),node("transmit"),node("pre-disabled",true),node("wtp-firmware-read"),node("wtp-firmware-recover"),node("fleet-tab",false,true),node("pairingWindow",false,false,true)];
     const banner=node("pico-firmware-safety"),message=node("message"),events=new Map(); let observer,scheduled,maintenance=false,failed=false;
     banner.querySelector=selector=>selector===".page-warning__message"?message:null;
     const root={AbortSignal,document:{readyState:"complete",body:{},getElementById:()=>banner,querySelectorAll:()=>controls,addEventListener:(name,handler)=>events.set(name,handler)},
@@ -13,6 +16,7 @@ async function main() {
     root.PicoFirmwareSafety.begin();
     for(const control of controls.slice(0,7)) assert(control.disabled,control.id);
     assert(!controls[7].disabled && !controls[8].disabled && !controls[9].disabled);
+    assert(!controls[10].disabled,"Host-only pairing remains owned by its independent protected guard");
     assert(!banner.hidden);assert.match(message.textContent,/reboot and shutdown are disabled/);
     controls[0].disabled=false; observer();assert(controls[0].disabled,"other renderers cannot unlock reboot");
     let prevented=false;events.get("click")({target:controls[0],preventDefault(){prevented=true;},stopImmediatePropagation(){}});assert(prevented);

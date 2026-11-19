@@ -31,7 +31,7 @@ async function run() {
     const events = {}, requests = [], timers = new Map();
     let nextTimer = 0, identifyResolve, delayIdentify = false, failUsb = false;
     let usb = [{id:"usb-test",instance:"WsprryPico SERIAL-C",binding:"usb",state:"online",settings:{...defaults,
-        Endpoint:"/dev/serial/by-id/pico-if02", "USB Serial":"SERIAL-C", "USB Vendor ID":51966, "USB Product ID":16402}}];
+        Endpoint:"/dev/serial/by-id/pico-if04", "USB Serial":"SERIAL-C", "USB Vendor ID":51966, "USB Product ID":16402}}];
     const root = {
         document:{readyState:"loading", getElementById:field, createElement:tag=>new Field(tag),
             querySelectorAll:()=>[], addEventListener:(name, fn)=>{events[name]=fn;}},
@@ -57,7 +57,8 @@ async function run() {
     await tick(); await tick();
     assert.equal(field("fleet-device").options.length, 1);
     assert.match(field("fleet-device").options[0].textContent, /SERIAL-C.*USB/);
-    assert.equal(field("wtp_use").checked, false);
+    assert.equal(field("wtp_use"), undefined, "Retired backend selector is absent");
+    assert.equal(root.WtpUi.selected(), false, "Discovery cannot select an execution backend");
     assert.equal(requests.filter(r=>r.options.method==="POST").length, 0, "listing must not open or save a device");
     const firstOption = field("fleet-device").options[0];
     await field("fleet-refresh").fire("click");
@@ -67,7 +68,7 @@ async function run() {
     field("fleet-add").fire("click");
     await tick();
     for (const [id, expected] of [["fleet-method","manual"],["fleet-binding","usb"],
-        ["fleet-path","/dev/serial/by-id/pico-if02"],["fleet-serial","SERIAL-C"],
+        ["fleet-path","/dev/serial/by-id/pico-if04"],["fleet-serial","SERIAL-C"],
         ["fleet-vendor","51966"],["fleet-product","16402"],["fleet-identity","a".repeat(32)]])
         assert.equal(field(id).value, expected, id);
     const identify = requests.find(r=>r.url.endsWith("/identify"));
@@ -77,13 +78,14 @@ async function run() {
     // Refresh discovers removal without discarding a name or endpoint draft.
     field("fleet-name").value = "Pico C draft";
     usb = [];
-    const poll = [...timers.values()].find(timer=>timer.ms===3000);
+    const poll = [...timers.values()].find(timer=>timer.ms===5000);
     assert(poll, "automatic refresh must be scheduled");
     await poll.fn(); await tick();
     assert.equal(field("fleet-name").value, "Pico C draft");
-    assert.equal(field("fleet-path").value, "/dev/serial/by-id/pico-if02");
+    assert.equal(field("fleet-path").value, "/dev/serial/by-id/pico-if04");
     assert.match(field("fleet-discovery-status").textContent, /No USB Pico/);
-    assert.equal(field("wtp_use").checked, false);
+    assert.equal(field("wtp_use"), undefined, "Retired backend selector is absent");
+    assert.equal(root.WtpUi.selected(), false, "Discovery cannot select an execution backend");
     // An API failure does not leave an old USB observation selectable.
     failUsb = true;
     await field("fleet-refresh").fire("click");
@@ -103,7 +105,8 @@ async function run() {
     await tick();
     assert.equal(field("fleet-editor").hidden, true);
     assert.equal(field("fleet-identity").value, "");
-    assert.equal(field("wtp_use").checked, false);
+    assert.equal(field("wtp_use"), undefined, "Retired backend selector is absent");
+    assert.equal(root.WtpUi.selected(), false, "Discovery cannot select an execution backend");
     console.log("USB discovery UI: automatic list, populated identity, no implicit selection, unplug, errors and late replies passed");
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

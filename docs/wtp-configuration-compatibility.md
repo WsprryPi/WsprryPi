@@ -1,88 +1,33 @@
 # Pico control compatibility
 
-## Published RC.3 companion
+## Coordinated development sources
 
-Current `devel` supports the published **WsprryPico 1.0.0-rc.3** prerelease,
-firmware source `a5270eebb36d2280dc76817b48a33ffab343b42d`.
-The [release](https://github.com/WsprryPi/WsprryPico/releases/tag/v1.0.0-rc.3)
-and [Pico release notes](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
-identify its firmware and limits. A later Pico documentation commit does not
-change that firmware identity. Beta 7 remains a separate published source pair;
-these instructions describe current development support.
+Use matching Pi and Pico sources with the current generated control contract. The generator and `src/wtp_integration/contract/PROVENANCE.json` identify the selected companion source; local validation must also identify tested edits. A previously published firmware version or matching control major alone does not establish compatibility with this development schema. Unsupported or inconsistent descriptors refuse before writes, without selecting an older peer or another carrier.
 
-The maintained generator vendors the exact RC.3 schema, lifecycle guard and
-shared controls. Capability admission still checks the current descriptors,
-carrier, target, and revision; a matching firmware version alone grants no
-authority. RC.3 does not require a control migration or a new major version.
-WTP/1, authentication/transport, and storage remain independently versioned.
+Retirement changes the one current prerelease Control/1 schema. It does not create a historical settings view. Authentication/transport, storage, and internal WTP-format fixtures retain their independent version boundaries; external WTP execution is unsupported.
 
-Select RC.3 explicitly through the [USB firmware interface](pico-usb-installer.md).
-Software source-pair checks and image planning do not qualify physical USB,
-installation, services, timing, or RF.
+Software source-pair checks and image planning do not qualify physical USB, installation, services, timing, or RF. See [USB firmware access](pico-usb-installer.md) for the retained standalone installer and the current browser limitation.
 
 ## Current control contract
 
-Pi and Pico use one current `Wsprry-Control/1` settings/control contract under
-`/api/control/v1`. Earlier beta settings APIs and resource views are unsupported;
-update both applications together. WTP/1 finite-job compatibility is independent.
+Pi and Pico use one current `Wsprry-Control/1` settings/control contract under `/api/control/v1`. Earlier beta settings APIs and resource views are unsupported; update both applications together. External finite-job compatibility is not supported.
 
-Pico’s direct browser controls provide **Wi-Fi/Host → Advanced → Recovery and reset…**. Infrastructure recovery requires the current Pico password and the encrypted consumer session; the public recovery page remains AP-only. Both reset choices require two acknowledgments and an exact typed phrase. These actions use Pico’s existing reset coordinator and are independent of WTP job control or Pi configuration saves. A lost reset reply is uncertain and must not be replayed. The network-pair checks exercise the selected Pico’s production recovery routes and browser confirmations in addition to the independent USB-pair checks.
+Pico’s direct browser controls provide **Wi-Fi/Host → Advanced → Recovery and reset…**. Infrastructure recovery requires the current Pico password and the encrypted consumer session; the public recovery page remains AP-only. Both reset choices require two acknowledgments and an exact typed phrase. These actions use Pico’s existing reset coordinator and are independent of native schedule stop and Pi configuration saves. A lost reset reply is uncertain and must not be replayed. The network-pair checks exercise the selected Pico’s production recovery routes and browser confirmations in addition to the independent USB-pair checks.
 
-Pico owns the authoritative contract. Pi validates the current contract,
-capabilities and selected carrier before using a member resource. Unknown
-optional capabilities grant no authority. Known documents remain closed and
-bounded; malformed descriptors, unsupported types/units, inconsistent
-advertisement/readback and wrong device/boot/profile bindings refuse before
-writes. Policy values are typed and bounded rather than identified by old
-literal session-limit tables.
+Pico owns the authoritative contract. Pi validates the current contract, capabilities, and selected carrier before using a member resource. Unknown optional capabilities grant no authority. Known documents remain closed and bounded; malformed descriptors, unsupported types/units, inconsistent advertisement/readback and wrong device/boot/profile bindings refuse before writes. Policy values are typed and bounded rather than identified by old literal session-limit tables.
 
-The current application/hardware representation includes amplifier-enable pin
-and polarity, GPIO drive and saved versus boot-active state. The general Pi
-coordinator validates and applies that representation. Amplifier timing and
-filter selection retain their domain resources and transaction boundaries.
-Changed hardware remains inhibited until explicit restart, including A/B/A
-saves. No save measures RF power or proves hardware readiness.
+The current application/hardware representation includes amplifier-enable pin and polarity, GPIO drive and saved versus boot-active state. The general Pi coordinator validates and applies that representation. Amplifier timing and filter selection retain their domain resources and transaction boundaries. Changed hardware remains inhibited until explicit restart, including A/B/A saves. No save measures RF power or proves hardware readiness.
 
 New Pico station settings default to a disabled ten-minute UTC-aligned WSPR schedule, a 14095600 Hz dial, 12 mA direct GPIO drive and disabled active-low amplifier control. Existing saved selections retain their values on upgrade. The `N0CALL` and `ZZ99` setup placeholders must be replaced before station application; the Pi rejects those placeholders before writes.
 
-Ordinary settings updates contain intended changes only and preserve omitted
-settings. Explicit false and zero remain values. Pi does not reconstruct full
-configuration from a redacted read or switch automatically to an older save
-strategy. Pico remains the validator and journal authority. Profile-owned
-station/network credentials retain transactional setup; generic edits do not
-bypass it. Independent stored drafts require explicit domain application and
-never establish transmit readiness merely by being saved. For pin drafts, omitted
-amplifier polarity preserves the prior draft, otherwise the applied setting,
-otherwise active-high. Pi derives the expected readback from authenticated
-state bound to the same saved revision before sending a mutation.
+Ordinary settings updates contain intended changes only and preserve omitted settings. Explicit false and zero remain values. Pi does not reconstruct full configuration from a redacted read or switch automatically to an older save strategy. Pico remains the validator and journal authority. Profile-owned station/network credentials retain transactional setup; generic edits do not bypass it. Independent stored drafts require explicit domain application and never establish transmit readiness merely by being saved. For pin drafts, omitted amplifier polarity preserves the prior draft, otherwise the applied setting, otherwise active-high. Pi derives the expected readback from authenticated state bound to the same saved revision before sending a mutation.
 
-Pi accepts complete configuration readbacks up to 4,096 JSON bytes and checks
-the Pico's advertised bounds. Merge requests remain limited to 2,048 bytes.
-Pico separately checks the compact aggregate journal against its 1,984-byte
-flash budget before a durable save.
+Pi accepts complete configuration readbacks up to 4,096 JSON bytes and checks the Pico's advertised bounds. Merge requests remain limited to 2,048 bytes. Pico separately checks the compact aggregate journal against its 1,984-byte flash budget before a durable save.
 
-Before dispatch, Pi merges the patch into the current redacted control document
-and checks its complete size against the smallest configuration limit reported
-by management, the update descriptor, and application metadata. Nested station
-and Wi-Fi leaves preserve omitted values, password null preserves the saved
-password sentinel, and optional GPS/Si5351 nulls remove those objects from the
-size calculation. Pi sends the original patch and validates the returned
-configuration against the same limit. Pico independently validates the
-unredacted configuration and durable storage.
+Before dispatch, Pi merges the patch into the current redacted control document and checks its complete size against the smallest configuration limit reported by management, the update descriptor, and application metadata. Nested station and Wi-Fi leaves preserve omitted values, password null preserves the saved password sentinel, and optional GPS/Si5351 nulls remove those objects from the size calculation. Pi sends the original patch and validates the returned configuration against the same limit. Pico independently validates the unredacted configuration and durable storage.
 
-Mutations require the current target and exact If-Match revision. Missing,
-stale, busy, faulted, unhealthy or ambiguous context refuses. Secrets remain
-redacted. A lost or malformed reply invalidates the write context: retain the
-draft, read saved state and review before another deliberate save. No mutation
-retry, peer substitution or carrier fallback is automatic.
+Mutations require the current target and exact If-Match revision. Missing, stale, busy, faulted, unhealthy, or ambiguous context refuses. Secrets remain redacted. A lost or malformed reply invalidates the write context: retain the draft, read saved state and review before another deliberate save. No mutation retry, peer substitution or carrier fallback is automatic.
 
-USB and supported authenticated network carriers use the same control model
-through their existing production adapters. USB retains its matching response
-ACK before deferred effects; network retains complete-response delivery
-confirmation. Durable saves and accepted jobs can survive a lost reply.
+USB and supported authenticated network carriers use the same control model through their existing production adapters. USB retains its matching response ACK before deferred effects; network retains complete-response delivery confirmation. Durable saves and accepted native occurrences can survive a lost reply.
 
-Both actual production network and USB suites must pass for the explicit
-candidate source pair, including amplifier-enable operations and old-contract
-refusal. Generated contract provenance and tested full-source identities are
-recorded separately. Software evidence does not qualify physical deployment,
-services, timing or RF.
+Both actual production network and USB suites must pass for the explicit candidate source pair, including amplifier-enable operations and old-contract refusal. Generated contract provenance and tested full-source identities are recorded separately. Software evidence does not qualify physical deployment, services, timing, or RF.

@@ -4,8 +4,8 @@
 #include "json.hpp"
 #include "wtp_settings.hpp"
 namespace wsprrypi {
-// Explicit host action: TLS/Plain LAN HELLO, STATUS and CAPS only. No CLAIM.
+// Explicit read-only HTTPS management identification; no execution session.
 nlohmann::json wtp_probe_network_identity(const WtpSettings &);
-// Explicit USB identification. No clock writes, CLAIM, LOAD or ARM.
+// Explicit interface-4 management identification. No clock or execution writes.
 nlohmann::json wtp_probe_usb_identity(const WtpSettings &);
 }

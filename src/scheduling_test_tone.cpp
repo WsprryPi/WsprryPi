@@ -5,6 +5,8 @@
 
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
+#include "recurrence_admission.hpp"
+#include "native_recurrence.hpp"
 
 #include "band_lookup.hpp"
 #include "frequency_semantics.hpp"
@@ -671,6 +673,17 @@ static TestToneStopResult end_test_tone_locked(std::uint64_t expected_generation
     config_lock.unlock();
     checkpoint("before_restore");
 
+    if ((restoration_owner == TestToneRestorationOwner::WsprScheduler ||
+         restoration_owner == TestToneRestorationOwner::ManagedIdleNonWspr) &&
+        !wsprrypi::legacy_recurrence_admitted())
+    {
+        // A manual tone keeps its independent authorization, but ending it
+        // cannot re-arm a retired recurring scheduler through restoration.
+        result.message = "Test Tone ended; recurring scheduling remains disabled.";
+        publish_status("ended", false, result.message, "not_resumed");
+        return result;
+    }
+
     if (restoration_owner == TestToneRestorationOwner::WsprScheduler)
     {
         if (config.mode != ModeType::WSPR)
@@ -863,6 +876,7 @@ StopTransmissionResult stop_transmission_by_user_request(bool persist_transmit)
     }
 
     const bool output_inactive = stop_tone_output();
+    wsprrypi::finish_native_occurrence(output_inactive&&remote_stopped);
     transmitter_set_callbacks(transmitter_cb);
     transmitter_clear_execution_state_after_stop();
     clear_committed_execution_request();

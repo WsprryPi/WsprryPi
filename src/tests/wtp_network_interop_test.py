@@ -3,6 +3,7 @@
 import pathlib
 import os
 import socket
+import ssl
 import selectors
 import subprocess
 import sys
@@ -31,6 +32,18 @@ def start(boot='0', device='a', address='127.0.0.1'):
 
 try:
     server = start()
+    # The real Pico TLS server must reject the retired carrier before any
+    # authenticated application bytes can reach native execution.
+    context=ssl.create_default_context(cafile=str(build/'credentials-v3/client-ca.crt'))
+    context.load_cert_chain(str(build/'credentials-v3/client.crt'),str(build/'credentials-v3/client.key'))
+    context.minimum_version=context.maximum_version=ssl.TLSVersion.TLSv1_3
+    context.set_alpn_protocols(['wtp/1'])
+    try:
+        with socket.create_connection(('127.0.0.1',18443),timeout=5) as connection:
+            with context.wrap_socket(connection,server_hostname='wsprrypico-'+32*'a'+'.local') as retired:
+                raise AssertionError('Retired WTP ALPN handshake unexpectedly succeeded')
+    except ssl.SSLError:
+        pass
     second_loopback = False
     with socket.socket() as probe:
         try:

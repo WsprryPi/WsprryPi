@@ -6,6 +6,8 @@
     const setHidden = (id, hidden) => {el(id).hidden = hidden;};
     function headline(output, row, age, valid) {
         if (!output) return {state: "Removed output", detail: "This selected assignment was removed. Return to This Pi to choose another output."};
+        if(output.state==='migration_required')return {state:'Migration required',detail:output.message||'Legacy controller work remains held. Use WTP-capable software to finish cleanup and retirement.'};
+        if(output.state==='retired')return {state:'Controller retired',detail:'Retirement is confirmed. Manage the device’s native schedule separately.'};
         const wtp = output.wtp;
         if (output.revoked) return {state: "Removed output", detail: output.message || "Cleanup remains unresolved. Only reconciliation is available."};
         if (output.state === "recovery_required" || wtp?.uncertain || wtp?.safety_fault || wtp?.recovery_required)
@@ -34,7 +36,7 @@
         const selector = el("operationDevice"), data = state.data;
         if (data) {
             const names = new Map();for (const row of data.assignments) names.set(row.name, (names.get(row.name) || 0) + 1);
-            const options = [{id: "", label: "This Pi (controller)"}];
+            const options = [{id: "", label: root.ControllerMode?.active ? "Controller (no local output)" : "This Pi (controller)"}];
             for (const [id, output] of Object.entries(data.outputs)) {
                 const row = data.assignments.find(r => r.device_id === id);
                 const name = row?.name || output.retained_name || id;
@@ -46,15 +48,24 @@
                 selector.replaceChildren(...options.map(o => {const n = root.document.createElement("option");n.value = o.id;n.textContent = o.label;return n;}));
             }
             selector.value = selected?.key || "";
-            el("operationDeviceField").hidden = options.length === 1;
+            el("operationDeviceField").hidden = options.length === 1 && !root.ControllerMode?.active;
         }
         selector.disabled = frozen || state.busy;
         const remote = !!selected;
-        setHidden("operationLocalView", remote);el("operationLocalView").inert = remote;
-        setHidden("operationFleetView", !remote);root.document.body.classList.toggle("fleet-remote-selected", remote);
+        const noLocalOutput = root.ControllerMode?.active === true;
+        setHidden("operationLocalView", remote || noLocalOutput);el("operationLocalView").inert = remote || noLocalOutput;
+        setHidden("operationFleetView", !remote);root.document.body.classList.toggle("fleet-remote-selected", remote || noLocalOutput);
+        const controllerView = el("operationControllerView");
+        if (controllerView) {
+            controllerView.hidden = !noLocalOutput || remote;
+            text("operationControllerHeading", !state.valid ? "Fleet status unavailable"
+                : data && Object.keys(data.outputs).length ? "Select an assigned output" : "No assigned outputs");
+            text("operationControllerDetail", !state.valid ? "Read current Fleet status before choosing an output. This controller has no local transmitter."
+                : "This controller has no local transmitter. Choose an assigned output above or manage outputs in Fleet.");
+        }
         for (const label of root.document.querySelectorAll(".times-wrapper .time-label")) {
             const original = label.dataset.localLabel || label.textContent;label.dataset.localLabel = original;
-            label.textContent = remote ? "Controller " + original : original;
+            label.textContent = remote || noLocalOutput ? "Controller " + original : original;
         }
         if (!remote) {
             const backend = typeof selectedRuntimeTransmitBackend === "function" ? selectedRuntimeTransmitBackend() : "";
@@ -70,7 +81,7 @@
         const historical = !state.valid || age === null || age >= 15000n || output?.state === "unavailable";
         text("operationFleetIdentity", output?.identity ? `${output.identity.product} · ${selected.id} · ${historical ? "last observed firmware" : "firmware"} ${output.identity.firmware_version} · ${({usb: "USB", network_plain: "Plain LAN", network: "TLS network"})[output.transport] || ""} · ${output.trust}${historical ? " (last connection)" : ""}` : selected.id + " · identity not currently verified");
         text("operationFleetAge", age === null ? "Observation age unknown" : `Device observation ${age / 1000n} s old`);
-        text("operationFleetScheduleState", row ? row.enabled ? "Schedule enabled" : "Schedule paused" : "Assignment removed");
+        text("operationFleetScheduleState", row ? row.enabled ? "Saved legacy enable: yes (held)" : "Saved legacy enable: no (held)" : "Assignment removed");
         text("operationFleetMode", row?.schedule?.mode?.toUpperCase() || "Unavailable");
         const mode = row?.schedule?.mode;
         text("operationFleetFrequencyLabel", ({wspr: "Assigned RF center", qrss: "Assigned carrier", tone: "Assigned carrier", fskcw: "Assigned space", dfcw: "Assigned dot"})[mode] || "Assigned frequency");
@@ -94,10 +105,7 @@
         text("operationFleetHistory", history ? `Historical ${history.outcome} · job ${history.job_id}${history.error ? " · " + history.error : ""}` : recovery ? `Historical reconciliation: ${recovery.cleanup?.ok ? "confirmed" : "unconfirmed"}` : "No historical report");
         const pendingActions = (output?.actions || []).filter(a => a.work_pending);
         const unavailable = frozen || state.busy || !state.valid || !output;
-        el("operationFleetEnable").disabled = unavailable || !row || row.enabled || !output.can_resume || age === null || age >= 15000n || pendingActions.length > 0;
-        el("operationFleetPause").disabled = unavailable || !row || !!output.revoked || output.can_pause === false || pendingActions.some(a => a.operation === "pause");
-        el("operationFleetRecover").disabled = unavailable || output.can_reconcile === false || pendingActions.length > 0;
-        el("operationFleetEdit").disabled = unavailable || !row || row.enabled || row.in_flight || output.state === "recovery_required" || pendingActions.length > 0;
+        el("operationFleetEdit").disabled = unavailable || !row;
         setHidden("operationFleetReturn", !!output);setHidden("operationFleetReview", !state.review_required.includes(selected.id) && !state.actions.some(a => a.device_id === selected.id && ["outcome_unconfirmed", "unknown_or_expired", "superseded"].includes(a.state)));
         const action = root.FleetClient.outcome(selected.id, {controller_incarnation: selected.incarnation, assignment_generation: selected.generation}) || pendingActions.at(-1);
         const feedback = state.error || (action ? `${root.FleetClient.actionLabel(action)}. ${action.reason || ""}` : output && !output.can_resume ? output.message || output.resume_reason || "Read device status before resuming." : "");
@@ -115,21 +123,6 @@
         }
         announced = "";render();
     }
-    function confirmPause(reviewed) {
-        frozen = true;render();
-        text("operationFleetConfirmationText", `Pause the assigned schedule for ${selected.name} (${selected.id}) and stop this controller's owned work. Other jobs are not stopped. Device output may remain unknown until observed.`);
-        const panel = el("operationFleetConfirmation"), modal = root.bootstrap.Modal.getOrCreateInstance(panel);
-        return new Promise(resolve => {confirmation = {resolve, reviewed, accepted: false, modal};modal.show();});
-    }
-    async function action(operation) {
-        if (!selected || frozen || latest?.busy) return;
-        try {
-            const reviewed = root.FleetClient.capture(selected.id);
-            if (operation === "pause" && !await confirmPause(reviewed)) return;
-            await root.FleetClient.mutate({operation, device_id: reviewed.device_id}, reviewed);
-        } catch (error) {text("operationFleetFeedback", error.message + " Read and review status before another action.");}
-        finally {frozen = false;render();}
-    }
     function restoreReturnFocus() {
         if (root.sessionStorage.getItem("wsprrypi.fleet.return_focus") !== "operationDevice") return;
         root.sessionStorage.removeItem("wsprrypi.fleet.return_focus");
@@ -142,20 +135,16 @@
         root.FleetClient.subscribe(render);restoreReturnFocus();
         root.addEventListener("pageshow", restoreReturnFocus);
         el("operationDevice").addEventListener("change", choose);
+        el("operationControllerRefresh")?.addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
         el("operationFleetReturn").addEventListener("click", () => {el("operationDevice").value = "";choose();el("operationDevice").focus();});
-        for (const [id, op] of [["Enable", "enable"], ["Pause", "pause"], ["Recover", "recover"]]) el("operationFleet" + id).addEventListener("click", () => action(op));
         el("operationFleetRefresh").addEventListener("click", () => root.FleetClient.refresh().catch(() => {}));
         el("operationFleetReview").addEventListener("click", () => {try {root.FleetClient.review(selected.id);} catch (e) {text("operationFleetFeedback", e.message);}});
         el("operationFleetEdit").addEventListener("click", () => {
-            try {const target = root.FleetClient.capture(selected.id);root.sessionStorage.setItem("wsprrypi.fleet.editor.handoff", JSON.stringify({...target, return_focus: "operationFleetEdit"}));
+            try {const target = {device_id:selected.id};root.sessionStorage.setItem("wsprrypi.fleet.editor.handoff", JSON.stringify({...target, return_focus: "operationFleetEdit"}));
                 root.location.href = "index.php?page=config&setup_tab=%23fleet-pane";
             } catch (e) {text("operationFleetFeedback", e.message);}
         });
-        el("operationFleetConfirmation").addEventListener("shown.bs.modal", () => el("operationFleetCancel").focus());
-        el("operationFleetConfirm").addEventListener("click", () => {if (confirmation) {confirmation.accepted = true;confirmation.modal.hide();}});
-        el("operationFleetConfirmation").addEventListener("hidden.bs.modal", () => {const pending = confirmation;confirmation = null;pending?.resolve(pending.accepted);if (pending && !pending.accepted) {frozen = false;render();el("operationFleetPause").focus();}});
-        root.document.addEventListener("visibilitychange", () => {if (root.document.hidden && confirmation) {confirmation.accepted = false;confirmation.modal.hide();}});
     }
-    root.FleetOperation = {remote: () => !!selected, model};
+    root.FleetOperation = {remote: () => !!selected, model, refresh: () => render()};
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init);else init();
 })(window);

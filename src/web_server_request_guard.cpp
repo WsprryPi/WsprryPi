@@ -11,8 +11,13 @@
 #include "privileged_network_runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "pico_usb_installer_state.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "json.hpp"
+#include "wtp_integration/controller_contract.hpp"
 
 #include <optional>
+#include <charconv>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,13 +47,88 @@ void register_request_guard(
                     request.get_header_value(trusted_header, "", index));
             SupportRequestGuardDecision rejection_reason =
                 SupportRequestGuardDecision::allowed;
+            // Legacy GET /config is ordinarily read-only. During protected
+            // recovery its replacement document requires the same peer/proxy
+            // authority as the new recovery route, before reading any draft.
+            const bool host_held=wsprrypi::pi_managed_host_held();
+            const auto protected_path=request.path=="/config"&&host_held
+                ?std::string("/api/control/v1/host/configuration-recovery"):request.path;
             if (evaluate_backend_http_request(
-                    request.method, request.path, request.remote_addr,
+                    request.method, protected_path, request.remote_addr,
                     request.get_header_value("Host"), origin,
                     network_snapshot_provider(),
-                    active_privileged_network_mode(),
+                    host_held||wsprrypi::pi_managed_host_protected_recovery_path(request.path)
+                        ?PrivilegedNetworkMode::enforced:active_privileged_network_mode(),
                     trusted_proxy_identities, &rejection_reason) ==
                 BackendHttpGuardDecision::allowed) {
+                if ((request.path.starts_with("/api/control/v1/member/") && request.path != "/api/control/v1/member/firmware") ||
+                    request.path == "/api/control/v1/network") {
+                    response.status = 404;
+                    response.set_content(wsprrypi::controller_target_error(404,"unsupported_resource").body,"application/json");
+                    return httplib::Server::HandlerResponse::Handled;
+                }
+                if (!controller_http_allowed(request.method, request.path)) {
+                    response.status = 409;
+                    response.set_content(nlohmann::json{{"error", {{"code", "controller_only"},
+                        {"message", "This process has no local transmitter. The requested operation is unavailable."}}},
+                        {"controller", controller_only_status()}}.dump(), "application/json");
+                    return httplib::Server::HandlerResponse::Handled;
+                }
+                const bool management=request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||
+                    request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
+                    request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/")||
+                    (request.path=="/config"&&wsprrypi::pi_managed_host_held());
+                if(management){
+                    std::size_t bytes=0;for(const auto &[name,value]:request.headers)bytes+=name.size()+value.size()+4;
+                    unsigned status=0;const char *code="invalid_shape";
+                    if(bytes>8192||request.path.size()>256){status=431;code="payload_too_large";}
+                    else if(request.get_header_value_count("Content-Length")>1||
+                        (request.has_header("Content-Length")&&request.has_header("Transfer-Encoding")))status=400;
+                    else if(request.has_header("Content-Length")){
+                        const auto value=request.get_header_value("Content-Length");std::uint64_t length{};
+                        const auto parsed=std::from_chars(value.data(),value.data()+value.size(),length);
+                        if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size())status=400;
+                        else if(length>32768){status=413;code="payload_too_large";}
+                        else if(request.method=="GET"&&length)status=400;
+                    }
+                    else if(request.method=="GET"&&request.has_header("Transfer-Encoding"))status=400;
+                    if(status){
+                        response.status=status;response.set_header("Cache-Control","no-store");
+                        response.set_content(wsprrypi::controller_target_error(status,code).body,"application/json");
+                        return httplib::Server::HandlerResponse::Handled;
+                    }
+                }
+                if(!wsprrypi::pi_managed_host_http_allowed(request.method,request.path)) {
+                    response.status=503;
+                    response.set_header("Cache-Control","no-store");
+                    response.set_content(wsprrypi::controller_target_error(503,"authority_pending").body,"application/json");
+                    return httplib::Server::HandlerResponse::Handled;
+                }
+                if(request.method=="GET"&&request.path=="/config"&&wsprrypi::pi_managed_host_held()) {
+                    if(!host_held&&evaluate_backend_http_request(request.method,
+                        "/api/control/v1/host/configuration-recovery",request.remote_addr,
+                        request.get_header_value("Host"),origin,network_snapshot_provider(),
+                        PrivilegedNetworkMode::enforced,trusted_proxy_identities)!=BackendHttpGuardDecision::allowed){
+                        // History can become unverifiable after the first
+                        // request snapshot. Recheck before replacing a public
+                        // legacy read with a protected recovery document.
+                        response.status=403;response.set_header("Cache-Control","no-store");
+                        response.set_content(wsprrypi::controller_target_error(403,"unauthorized").body,"application/json");
+                        return httplib::Server::HandlerResponse::Handled;
+                    }
+                    const auto prefix=request.path+"?_=";
+                    const auto cache_value=request.target.starts_with(prefix)?request.target.substr(prefix.size()):std::string{};
+                    const bool cache_buster=request.params.size()==1&&request.has_param("_")&&
+                        request.get_param_value("_")==cache_value&&!cache_value.empty()&&cache_value.size()<=20&&
+                        cache_value.find_first_not_of("0123456789")==std::string::npos;
+                    const auto result=(request.target==request.path||cache_buster)
+                        ?wsprrypi::pi_managed_host_recovery({"GET","/api/control/v1/host/configuration-recovery",request.body},true)
+                        :wsprrypi::controller_target_error(400,"invalid_shape");
+                    response.status=result.status==200?409:result.status;
+                    response.set_header("Cache-Control","no-store");
+                    response.set_content(result.body,"application/json");
+                    return httplib::Server::HandlerResponse::Handled;
+                }
                 if(wtp_runtime_firmware_busy() && wsprrypi::pico_usb_http_mutation(request.method,request.path)) {
                     response.status=409;
                     response.set_content(R"({"error":{"code":"pico_firmware_maintenance","message":"Pico firmware maintenance is active. Continue or recover the update before making changes."}})","application/json");
@@ -91,7 +171,10 @@ void register_request_guard(
             }
             response.status = 403;
             response.headers.erase("Access-Control-Allow-Origin");
-            response.set_content("Forbidden", "text/plain");
+            if(request.path=="/api/control/v1/host/retirements"||request.path=="/api/control/v1/host/management-session"||request.path=="/api/control/v1/host/readiness"||request.path=="/api/control/v1/host/configuration-recovery"||
+                request.path=="/api/control/v1/targets"||request.path.starts_with("/api/control/v1/targets/"))
+                response.set_content(wsprrypi::controller_target_error(403,"unauthorized").body,"application/json");
+            else response.set_content("Forbidden", "text/plain");
             return httplib::Server::HandlerResponse::Handled;
         });
 }

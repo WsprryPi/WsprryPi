@@ -2,12 +2,48 @@
 #include "wtp_endpoint/revocation_journal.hpp"
 
 #include <utility>
+#include <limits>
 
 namespace wsprrypi {
 
+WtpPiAuthority::OutputState WtpPiAuthority::output_state_locked() const {
+    const auto remote=service_.status();
+    return {remote.boot_id,remote.owner_id,remote.job_id,remote.state,remote.output_active,
+        local_work_active_,local_test_tone_,output_unknown_};
+}
+WtpPiAuthority::OutputTransition::OutputTransition(WtpPiAuthority &value)
+    :owner(value),before(value.output_state_locked()){}
+WtpPiAuthority::OutputTransition::~OutputTransition(){
+    try{
+    if(before==owner.output_state_locked())return;
+    if(owner.output_generation_==std::numeric_limits<std::uint64_t>::max()){
+        owner.output_generation_exhausted_=owner.output_unknown_=true;
+        owner.effective_local_enable_=false;owner.remote_admission_closed_=true;
+    }else ++owner.output_generation_;
+    }catch(...){
+        owner.output_generation_exhausted_=owner.output_unknown_=true;
+        owner.effective_local_enable_=false;owner.remote_admission_closed_=true;
+    }
+}
+WtpPiAuthority::ObservedOutput WtpPiAuthority::observed_output_locked(const std::string &self) const {
+    const auto remote=service_.status();
+    return {output_generation_,local_work_active_?std::optional<std::string>(self):remote.owner_id,
+        local_work_active_?std::nullopt:remote.job_id};
+}
+WtpPiAuthority::ObservedOutput WtpPiAuthority::observed_output(const std::string &self) const {
+    std::lock_guard lock(mutex_);return observed_output_locked(self);
+}
+bool WtpPiAuthority::reserve_observed_stop(const std::string &self,const std::string &boot,const ObservedOutput &expected){
+    std::lock_guard lock(mutex_);
+    if(observed_stop_reserved_||output_generation_exhausted_||configuration_users_||boot!=service_.status().boot_id||expected!=observed_output_locked(self))return false;
+    observed_stop_reserved_=true;return true;
+}
+void WtpPiAuthority::release_observed_stop(){std::lock_guard lock(mutex_);observed_stop_reserved_=false;}
+
 WtpPiAuthority::WtpPiAuthority(wsprrypico::wtp::JobService& service,
-                               bool local_enabled, WtpRevocationJournal* journal)
-    : service_(service), journal_(journal), requested_local_enable_(local_enabled),
+                               bool local_enabled, WtpRevocationJournal* journal,
+                               std::function<bool()> admission_ready)
+    : service_(service), journal_(journal),admission_ready_(std::move(admission_ready)), requested_local_enable_(local_enabled),
       effective_local_enable_(local_enabled),
       remote_admission_closed_(local_enabled) {
     if (journal_ && !journal_->load()) {
@@ -26,9 +62,15 @@ bool WtpPiAuthority::remote_job_active(wsprrypico::wtp::State state) {
 
 wsprrypico::wtp::Response WtpPiAuthority::handle(wsprrypico::wtp::Request&& request) {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     const auto session = request.session_id;
     const bool hello = request.operation == "HELLO";
     auto response = service_.handle(std::move(request), [this](const auto& candidate) {
+        if(admission_ready_&&(candidate.operation=="CLAIM"||candidate.operation=="LOAD"||candidate.operation=="ARM")){
+            try{if(!admission_ready_())return false;}catch(...){return false;}
+        }
+        if((observed_stop_reserved_||output_generation_exhausted_)&&
+            (candidate.operation=="CLAIM"||candidate.operation=="LOAD"||candidate.operation=="ARM"))return false;
         const auto status = service_.status();
         if (candidate.operation == "CLAIM") {
             const auto epoch = session_generations_.find(candidate.session_id);
@@ -74,8 +116,11 @@ WtpPiAuthority::EnableResult WtpPiAuthority::enable_interactive(
     EnableChoice choice, bool confirmed, const std::function<void()>& persist,
     std::optional<std::pair<std::string, std::string>> observed) {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     if (choice == EnableChoice::Decline)
         return EnableResult::Declined;
+    if (observed_stop_reserved_)
+        return EnableResult::ConfirmationRequired;
     const auto status = service_.status();
     if (status.owner_id && !confirmed)
         return EnableResult::ConfirmationRequired;
@@ -91,12 +136,15 @@ WtpPiAuthority::EnableResult WtpPiAuthority::enable_interactive(
 
 WtpPiAuthority::EnableResult WtpPiAuthority::enable_noninteractive() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
+    if (observed_stop_reserved_) return EnableResult::ConfirmationRequired;
     return enable_locked(false);
 }
 
 WtpPiAuthority::EnableResult WtpPiAuthority::enable_locked(bool finish) {
     requested_local_enable_ = true;
     remote_admission_closed_ = true;
+    if(output_generation_exhausted_){effective_local_enable_=false;return EnableResult::OutputUnknown;}
     bool durable = !revocation_unavailable_;
     if (!revocation_recorded_for_enable_) {
         durable = durable && (!journal_ || journal_->advance());
@@ -159,6 +207,7 @@ void WtpPiAuthority::finish_takeover_locked() {
 
 void WtpPiAuthority::disable_local() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     requested_local_enable_ = false;
     effective_local_enable_ = false;
     finishing_remote_job_ = false;
@@ -167,6 +216,7 @@ void WtpPiAuthority::disable_local() {
 }
 
 bool WtpPiAuthority::can_start_local_locked(bool requires_enable) const {
+    if(observed_stop_reserved_||output_generation_exhausted_||configuration_users_)return false;
     if (reconfiguration_hold_) return false;
     if (requires_enable && !effective_local_enable_) return false;
     const auto status = service_.status();
@@ -177,6 +227,8 @@ bool WtpPiAuthority::can_start_local_locked(bool requires_enable) const {
 
 bool WtpPiAuthority::begin_scheduled_work() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
+    if(observed_stop_reserved_||output_generation_exhausted_)return false;
     if (reconfiguration_hold_) return false;
     if (local_work_active_)
         return local_test_tone_ || effective_local_enable_;
@@ -188,6 +240,7 @@ bool WtpPiAuthority::begin_scheduled_work() {
 
 bool WtpPiAuthority::begin_test_tone() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     if (configuration_users_ || !can_start_local_locked(false)) return false;
     local_work_active_ = true;
     local_test_tone_ = true;
@@ -196,11 +249,13 @@ bool WtpPiAuthority::begin_test_tone() {
 
 void WtpPiAuthority::end_local_work(bool output_inactive) {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     end_local_work_locked(output_inactive);
 }
 
 void WtpPiAuthority::end_scheduled_work(bool output_inactive) {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     if (!local_test_tone_) end_local_work_locked(output_inactive);
 }
 
@@ -217,7 +272,8 @@ void WtpPiAuthority::end_local_work_locked(bool output_inactive) {
 bool WtpPiAuthority::begin_configuration() {
     std::lock_guard lock(mutex_);
     const auto status = service_.status();
-    if (status.owner_id || status.output_active || output_unknown_ ||
+    if (observed_stop_reserved_ || output_generation_exhausted_ ||
+        status.owner_id || status.output_active || output_unknown_ ||
         revocation_unavailable_ || finishing_remote_job_ ||
         status.state == wsprrypico::wtp::State::Failed)
         return false;
@@ -232,7 +288,8 @@ void WtpPiAuthority::end_configuration() {
 
 bool WtpPiAuthority::recover_output(bool output_inactive) {
     std::lock_guard lock(mutex_);
-    if (!output_inactive || local_work_active_ || revocation_unavailable_ ||
+    OutputTransition transition(*this);
+    if (observed_stop_reserved_ || output_generation_exhausted_ || !output_inactive || local_work_active_ || revocation_unavailable_ ||
         service_.status().output_active ||
         service_.status().state == wsprrypico::wtp::State::Failed)
         return false;
@@ -251,7 +308,7 @@ void WtpPiAuthority::suspend_remote_admission() {
 bool WtpPiAuthority::reserve_reconfiguration() {
     std::lock_guard lock(mutex_);
     const auto state = service_.status();
-    if (local_work_active_ || configuration_users_ || state.owner_id ||
+    if (observed_stop_reserved_ || output_generation_exhausted_ || local_work_active_ || configuration_users_ || state.owner_id ||
         state.output_active || output_unknown_ || finishing_remote_job_)
         return false;
     configuration_pending_ = reconfiguration_hold_ = true;
@@ -260,6 +317,7 @@ bool WtpPiAuthority::reserve_reconfiguration() {
 
 bool WtpPiAuthority::local_stop() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     const bool had_remote = service_.status().owner_id.has_value() ||
                             service_.status().output_active;
     if (had_remote) (void)enable_locked(false);
@@ -272,7 +330,8 @@ bool WtpPiAuthority::local_stop() {
 
 bool WtpPiAuthority::recover_remote_output() {
     std::lock_guard lock(mutex_);
-    if (local_work_active_ || configuration_users_ || revocation_unavailable_) return false;
+    OutputTransition transition(*this);
+    if (observed_stop_reserved_ || local_work_active_ || configuration_users_ || revocation_unavailable_) return false;
     remote_admission_closed_ = true;
     // Recovery is a local takeover even while local scheduling stays disabled.
     // Record it durably before replacing sessions so an absent controller
@@ -296,6 +355,7 @@ bool WtpPiAuthority::recover_remote_output() {
 
 void WtpPiAuthority::poll() {
     std::lock_guard lock(mutex_);
+    OutputTransition transition(*this);
     service_.poll();
     finish_takeover_locked();
 }
@@ -316,9 +376,17 @@ const wsprrypico::wtp::ServiceConfig& WtpPiAuthority::config() const {
 
 WtpPiAuthority::Snapshot WtpPiAuthority::snapshot() const {
     std::lock_guard lock(mutex_);
+    return snapshot_locked();
+}
+std::pair<WtpPiAuthority::Snapshot,WtpPiAuthority::ObservedOutput>
+WtpPiAuthority::management_snapshot(const std::string &self) const {
+    std::lock_guard lock(mutex_);
+    return {snapshot_locked(),observed_output_locked(self)};
+}
+WtpPiAuthority::Snapshot WtpPiAuthority::snapshot_locked() const {
     return {requested_local_enable_, effective_local_enable_, local_work_active_,
             remote_admission_closed_ || configuration_pending_ || reconfiguration_hold_, output_unknown_, revocation_unavailable_,
             finishing_remote_job_,
-            revocation_generation_, service_.status()};
+            revocation_generation_, service_.status(),observed_stop_reserved_};
 }
 } // namespace wsprrypi

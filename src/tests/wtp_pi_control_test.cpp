@@ -27,4 +27,14 @@ int main() {
     clear_wtp_pi_control_hooks();
     if (!wtp_pi_local_effective())
         throw std::runtime_error("Cleared hooks must restore ordinary runtime behavior");
+    set_wtp_pi_management_readiness([]{return false;});
+    if(wtp_pi_begin_scheduled()||wtp_pi_begin_test_tone()||wtp_pi_begin_configuration())
+        throw std::runtime_error("Durable readiness must fence every new local admission without an endpoint");
+    set_wtp_pi_control_hooks({[]{return true;},[]{return true;},[]{return true;},{},{},{},[]{return true;},{}});
+    if(wtp_pi_begin_scheduled()||wtp_pi_begin_test_tone()||wtp_pi_begin_configuration())
+        throw std::runtime_error("Endpoint hooks cannot bypass durable readiness");
+    clear_wtp_pi_control_hooks();
+    if(wtp_pi_begin_scheduled())throw std::runtime_error("Endpoint teardown cannot clear durable readiness");
+    set_wtp_pi_management_readiness({});
+    if(!wtp_pi_begin_scheduled())throw std::runtime_error("Owner teardown restores direct CLI behavior");
 }

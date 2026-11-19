@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WTP-Server/include/wtp_server/job_service.hpp"
+#include "managed_output_observation.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -22,7 +23,8 @@ public:
 
     explicit WtpPiAuthority(wsprrypico::wtp::JobService& service,
                             bool local_enabled = false,
-                            WtpRevocationJournal* journal = nullptr);
+                            WtpRevocationJournal* journal = nullptr,
+                            std::function<bool()> admission_ready = {});
 
     wsprrypico::wtp::Response handle(wsprrypico::wtp::Request&& request) override;
     wsprrypico::wtp::Response handle(const wsprrypico::wtp::Request& request);
@@ -57,8 +59,19 @@ public:
         bool finishing_remote_job;
         std::uint64_t revocation_generation;
         wsprrypico::wtp::ServiceStatus remote;
+        bool stop_reserved{};
     };
     Snapshot snapshot() const;
+
+    using ObservedOutput=ManagedOutputObservation;
+    ObservedOutput observed_output(const std::string &self) const;
+    std::pair<Snapshot,ObservedOutput> management_snapshot(const std::string &self) const;
+    // Compare and close all new output admission under the same authority lock.
+    // The parent retains this reservation while persisting/cancelling the
+    // observed work; it cannot accidentally stop a later replacement job.
+    bool reserve_observed_stop(const std::string &self,const std::string &boot,
+        const ObservedOutput &);
+    void release_observed_stop();
 
 private:
     EnableResult enable_locked(bool finish);
@@ -66,9 +79,26 @@ private:
     bool can_start_local_locked(bool requires_enable) const;
     void end_local_work_locked(bool output_inactive);
     static bool remote_job_active(wsprrypico::wtp::State state);
+    struct OutputState {
+        std::string boot;
+        std::optional<std::string> owner,job;
+        wsprrypico::wtp::State state;
+        bool active,local,tone,unknown;
+        bool operator==(const OutputState &) const = default;
+    };
+    OutputState output_state_locked() const;
+    Snapshot snapshot_locked() const;
+    ObservedOutput observed_output_locked(const std::string &self) const;
+    struct OutputTransition {
+        WtpPiAuthority &owner;
+        OutputState before;
+        explicit OutputTransition(WtpPiAuthority &);
+        ~OutputTransition();
+    };
 
     wsprrypico::wtp::JobService& service_;
     WtpRevocationJournal* journal_ = nullptr;
+    std::function<bool()> admission_ready_;
     mutable std::mutex mutex_;
     bool requested_local_enable_ = false;
     bool effective_local_enable_ = false;
@@ -83,6 +113,8 @@ private:
     bool finishing_remote_job_ = false;
     bool revocation_recorded_for_enable_ = false;
     std::uint64_t revocation_generation_ = 0;
+    std::uint64_t output_generation_ = 1;
+    bool output_generation_exhausted_ = false, observed_stop_reserved_ = false;
     std::map<std::string, std::uint64_t> session_generations_;
 };
 

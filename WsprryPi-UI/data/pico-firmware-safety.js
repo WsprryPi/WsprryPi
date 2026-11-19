@@ -2,10 +2,20 @@
 (function(root) {
     "use strict";
     if (!root.document) return;
-    let maintenance = true, observed = false, localPending = false, timer = null, closed = false, polling = false;
+    let maintenance = true, observed = false, localPending = false, timer = null, closed = false, polling = false, setupLock;
     const held = new Map();
     const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle"]);
     function allowed(control) {
+        if(control.closest('#controllerAccess')) {
+            // Pairing/removal has its own protected host owner and cannot
+            // dispatch Pico settings, firmware, WTP or output work.
+            held.delete(control);return true;
+        }
+        if(root.ConfigurationRecovery?.active && control.closest('#configurationRecoveryPanel')) {
+            // Native startup recovery has its own protected owner. Keep the
+            // Pico hold intact without retaining/restoring its controls.
+            held.delete(control);return true;
+        }
         return safeIds.has(control.id) || !!control.closest("nav") ||
             control.matches('[role="tab"], [data-bs-toggle="tab"], .navbar-toggler, .btn-close');
     }
@@ -14,7 +24,7 @@
         const active = locked();
         const banner = root.document.getElementById("pico-firmware-safety");
         if (banner) {
-            banner.hidden = !active;
+            banner.hidden = !active || root.ConfigurationRecovery?.active === true;
             const text = active ? observed || localPending
                 ? "Pico firmware maintenance is active. Settings, device selection, transmission, reboot and shutdown are disabled. Use Pico firmware over USB to continue or recover the update."
                 : "Checking Pico firmware status before allowing changes. Settings, transmission, reboot and shutdown remain disabled until the controller responds." : "";
@@ -35,10 +45,15 @@
             root.syncBackendControlAvailability?.();
             root.syncTransmitAvailabilityUi?.();
             root.syncMachinePowerControls?.();
+            root.ControllerMode?.render?.();
         }
+        if (setupLock !== active) {setupLock = active;root.SetupTargets?.render?.();}
     }
     async function poll() {
         if (polling || closed) return;
+        if(root.ConfigurationRecovery?.active) {
+            clearTimeout(timer);render();timer = root.setTimeout(poll,1500);return;
+        }
         polling = true;
         clearTimeout(timer);
         try {
@@ -53,6 +68,7 @@
         if (!closed) timer = root.setTimeout(poll, 1500);
     }
     root.PicoFirmwareSafety = {
+        render,
         get locked() { return locked(); },
         begin() { localPending = true; render(); },
         observeFirmware(state) {

@@ -12,31 +12,20 @@ sudo ./scripts/install.sh --binary-source build
 
 To use an existing executable, select `--binary-source local`. Only the executable is required; no sidecar, source fingerprint, or matching Git commit is needed.
 
-Run from the intended application checkout to select its supporting files.
-Outside a checkout, including `curl | sudo bash`, supporting files come from a private temporary checkout of the selected branch. The same entry point supports fresh installation, identical reinstall and upgrade. Temporary sources are removed when the installer exits. An existing `~/WsprryPi` checkout is preserved and does not select the streamed installer's supporting files.
+Run from the intended application checkout to select its supporting files. Outside a checkout, including `curl | sudo bash`, supporting files come from a private temporary checkout of the selected branch. The same entry point supports fresh installation, identical reinstall and upgrade. Temporary sources are removed when the installer exits. An existing `~/WsprryPi` checkout is preserved and does not select the streamed installer's supporting files.
 
 ```sh
 rm -f ~/finished
 sudo ./scripts/install.sh --binary-source local --binary-path /home/pi/wsprrypi && touch ~/finished
 ```
 
-Without `--binary-path`, local mode reads `wsprrypi` from the invoking user's
-home directory. The installer copies it into temporary staging and leaves the
-original file untouched. Use trusted WsprryPi executables.
+Without `--binary-path`, local mode reads `wsprrypi` from the invoking user's home directory. The installer copies it into temporary staging and leaves the original file untouched. Use trusted WsprryPi executables.
 
 ## Supported targets and checks
 
-The binary matrix is Bookworm and Trixie, each with ARMv6 hard-float and AArch64
-builds. The installer checks the host OS release and Debian userspace
-architecture, then the executable's ELF architecture, floating-point ABI,
-dynamic loader, and runtime libraries. The ARMv6 build serves supported 32-bit
-Pis, including Pi 1A+ and the original Pi Zero. AArch64 serves supported 64-bit
-installations. Kernel bitness alone does not select the binary.
+The binary matrix is Bookworm and Trixie, each with ARMv6 hard-float and AArch64 builds. The installer checks the host OS release and Debian userspace architecture, then the executable's ELF architecture, floating-point ABI, dynamic loader, and runtime libraries. The ARMv6 build serves supported 32-bit Pis, including Pi 1A+ and the original Pi Zero. AArch64 serves supported 64-bit installations. Kernel bitness alone does not select the binary.
 
-After dependencies are installed, library and symbol resolution and the
-executable's `--version` response are checked without root privileges, before
-replacing the installed executable. These checks do not qualify RF operation.
-The installer does not compare the executable with the checkout's commit.
+After dependencies are installed, library and symbol resolution and the executable's `--version` response are checked without root privileges, before replacing the installed executable. These checks do not qualify RF operation. The installer does not compare the executable with the checkout's commit.
 
 The initial notices identify the selected release and make clear when the executable version is still pending validation. A source build from an existing checkout identifies its source version; a streamed source build waits for its checkout. After a successful installation, the summary reports the captured version used in the INI and service metadata. For precompiled installations, this is the executable's validated version, which can differ from its release tag or the supporting checkout. Dry runs do not report an installed version.
 
@@ -46,65 +35,34 @@ Runtime packages are separate from application build packages. Precompiled mode 
 
 The normal APT handler installs Git, runtime packages and inspection tools before RP1 planning or artifact preparation. After artifact inspection identifies additional runtime packages, the same handler installs those packages without repeating the index refresh or dependency-repair transaction. Invalid artifacts can therefore be rejected after baseline dependencies have been installed; the installed executable remains unchanged.
 
-Executables built with DNS-SD support use the Avahi runtime libraries
-`libavahi-client3` and `libavahi-common3`. The installer includes
-`libavahi-client3`; its package dependencies provide `libavahi-common3`.
-Avahi development headers are needed only when building from source.
+Executables built with DNS-SD support use the Avahi runtime libraries `libavahi-client3` and `libavahi-common3`. The installer includes `libavahi-client3`; its package dependencies provide `libavahi-common3`. Avahi development headers are needed only when building from source.
 
-All four repository container recipes install `libavahi-client-dev`. Container
-builds require `pkg-config` to find `avahi-client` before compilation and require
-the executable to directly link both Avahi runtime libraries. The exported
-`elf-dynamic.txt` records these dependencies. A missing dependency fails the
-build; it does not silently produce a binary without DNS-SD discovery. Generic
-source builds retain their optional Avahi support. These checks validate build
-capability and library dependencies, not live discovery or RF operation.
+All four repository container recipes install `libavahi-client-dev`. Container builds require `pkg-config` to find `avahi-client` before compilation and require the executable to directly link both Avahi runtime libraries. The exported `elf-dynamic.txt` records these dependencies. A missing dependency fails the build; it does not silently produce a binary without DNS-SD discovery. Generic source builds retain their optional Avahi support. These checks validate build capability and library dependencies, not live discovery or RF operation.
 
-Web packages are installed unless `--no-web` is selected. Optional RP1 GPCLK
-DKMS installation still requires its own compiler, kernel headers, DKMS tools,
-and build-resource checks, even with a precompiled application.
+Web packages are installed unless `--no-web` is selected. Optional RP1 GPCLK DKMS installation still requires its own compiler, kernel headers, DKMS tools, and build-resource checks, even with a precompiled application.
 
-The executable is staged before service interruption and published by an
-atomic rename. If a subsequent installer step fails, the installer attempts to
-restore the prior executable and service state. This is executable recovery,
-not a rollback of package or configuration changes. Supporting files, including
-the startup hook, remain at the installed version. The hook accepts a restored
-non-RP1 application without requiring RP1 restoration support; RP1 operation
-still requires that support. Recovery does not establish that an older executable
-can read all configuration changes made during the attempted installation.
-The installer reports failure even when executable recovery succeeds.
+The executable is staged before service interruption and published by an atomic rename. If a subsequent installer step fails, the installer attempts to restore the prior executable and service state. This is executable recovery, not a rollback of package or configuration changes. Supporting files, including the startup hook, remain at the installed version. The hook accepts a restored non-RP1 application without requiring RP1 restoration support; RP1 operation still requires that support. Recovery does not establish that an older executable can read all configuration changes made during the attempted installation. The installer reports failure even when executable recovery succeeds.
 
-An upgrade preserves current settings, including WTP connection settings,
-WSPR frequency preferences and band-selector assignments. Retired `GPIO.Use NTP`
-settings migrate to the clock-estimate policy and manual correction; existing
-canonical values take precedence. A failed or empty
-configuration merge stops installation and retains the existing configuration
-and its recovery copy.
+An upgrade preserves current settings, including inactive private legacy WTP connection values, WSPR frequency preferences, and band-selector assignments. The stock retired listener is disabled. Existing active WTP selection or an enabled listener remains a migration hold; installation must not silently convert it to a native backend. Complete [legacy retirement](wtp-status-recovery.md) with compatible software before replacement. Retired `GPIO.Use NTP` settings migrate to the clock-estimate policy and manual correction; existing canonical values take precedence. A failed or empty configuration merge stops installation and retains the existing configuration and its recovery copy.
+
+## First native scheduling policy installation
+
+The first startup with the native scheduling policy holds the previous local scheduler before new work can be admitted. After native output quiescence and verified local ownership, the application uses its existing migration transaction to retire the previous schedule and save native scheduling disabled. Maintenance reports **Migration completed; schedule disabled pending review.** Review the saved policy and explicitly enable it when ready. Transmit permission and boot behavior remain separate.
+
+Durable scheduling authority records make this a one-time handover. Reinstalling or restarting preserves a verified native schedule's current enable state. An explicitly restored previous local schedule remains a separate reviewed restoration. Unknown output, incomplete controller inventory, or unresolved work prevents automatic migration and keeps recurrence held; preserve the records and resolve the reported recovery condition. Remote WTP duties still require retirement with compatible software before replacement.
 
 ## Explicit Beta release downloads
 
-For 4.0 Beta 1, clone the exact application tag first to select matching
-supporting files. Follow the
-[versioned Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html)
-for architecture/OS selection, independent checksums, dependencies and recovery.
-Run from that tagged checkout:
+For 4.0 Beta 1, clone the exact application tag first to select matching supporting files. Follow the [versioned Beta installation guide](https://wsprry-pi.readthedocs.io/en/v4.0.0-beta.1/Install/beta1.html) for architecture/OS selection, independent checksums, dependencies, and recovery. Run from that tagged checkout:
 
 ```sh
 rm -f ~/finished
 sudo ./scripts/install.sh --binary-source release --release-tag v4.0.0-beta.1 && touch ~/finished
 ```
 
-The installer downloads one asset named `wsprrypi-<cpu>-<release>` from the
-selected GitHub release, where `<cpu>` is `armv6` or `aarch64` and `<release>` is
-`bookworm` or `trixie`. This selects the executable only; normal installer
-branch selection controls supporting files. A missing or incompatible asset
-fails the installation without falling back to compilation. Release download
-support performs a checksum comparison when automatic selection supplies the published manifest or GitHub asset checksum. An explicit tagged-release invocation without an expected checksum retains its existing validation behavior. To install independently checked bytes, use the guide's local-binary procedure. Beta public-download
-verification is tracked in the [release evidence](../release_tools/4.0.0-Release-Evidence.md);
-draft or dry-run checks alone do not establish public availability.
+The installer downloads one asset named `wsprrypi-<cpu>-<release>` from the selected GitHub release, where `<cpu>` is `armv6` or `aarch64` and `<release>` is `bookworm` or `trixie`. This selects the executable only; normal installer branch selection controls supporting files. A missing or incompatible asset fails the installation without falling back to compilation. Release download support performs a checksum comparison when automatic selection supplies the published manifest or GitHub asset checksum. An explicit tagged-release invocation without an expected checksum retains its existing validation behavior. To install independently checked bytes, use the guide's local-binary procedure. Beta public-download verification is tracked in the [release evidence](../release_tools/4.0.0-Release-Evidence.md); draft or dry-run checks alone do not establish public availability.
 
-`--dry-run` performs no downloads, package installation, executable replacement,
-or service changes. A local executable receives a basic ELF check; dependency
-and version checks wait for a real installation.
+`--dry-run` performs no downloads, package installation, executable replacement, or service changes. A local executable receives a basic ELF check; dependency and version checks wait for a real installation.
 
 Automatic selection resolves the release before build-resource estimates and package selection. A selected executable skips application compilation, its time/parallelism estimates, and application build dependencies. Optional RP1 provider preparation remains separate. Dry runs do not query release metadata or download executables; they report that release availability and any source-build fallback remain unresolved.
 

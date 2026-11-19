@@ -10,6 +10,89 @@ require __DIR__ . '/../card_header.php';
             </div>
 
             <div class="card-body tab-content bg-body">
+                <div id="installationSetup">
+                    <?php require __DIR__ . '/configuration-recovery.php'; ?>
+                </div>
+                <section id="controllerAccess" class="maintenance-pane mb-4" aria-labelledby="controllerAccessTitle">
+                    <h2 id="controllerAccessTitle" class="maintenance-pane__title h5 mb-0">Controller access</h2>
+                    <p id="pairingState" class="maintenance-pane__body mb-0">Checking controller access…</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button id="pairingWindow" type="button" class="btn btn-outline-primary" disabled>Pair this Pi</button>
+                        <button id="pairingRemoveReview" type="button" class="btn btn-outline-danger" hidden>Remove controller…</button>
+                        <button id="pairingRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
+                    </div>
+                    <div id="pairingCodePanel" class="pairing-code-panel" hidden>
+                        <p class="mb-2">On your controller, open Maintenance, select this Pi, and enter this temporary code.</p>
+                        <output id="pairingCode" class="pairing-code" tabindex="-1" aria-label="Temporary pairing code"></output>
+                        <p id="pairingExpiry" class="small mb-0 mt-2"></p>
+                    </div>
+                    <div id="pairingRemoveConfirmation" class="pt-3 border-top" hidden>
+                        <p>Remove paired management access? Running work and saved schedules continue.</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button id="pairingRemove" type="button" class="btn btn-danger">Remove controller</button>
+                            <button id="pairingRemoveCancel" type="button" class="btn btn-outline-secondary">Cancel</button>
+                        </div>
+                    </div>
+                    <p id="pairingLocalFeedback" class="mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+                    <form id="pairingConnectForm" class="pt-3 border-top" autocomplete="off" aria-labelledby="pairingConnectTitle">
+                        <h3 id="pairingConnectTitle" class="h6">Manage another Pi</h3>
+                        <p class="maintenance-pane__body">Open a pairing window on that Pi’s Maintenance page, then select it here.</p>
+                        <label for="pairingDevice" class="form-label">Pi to manage</label>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <select id="pairingDevice" class="form-select pairing-device" required disabled><option value="">Checking nearby Pis…</option></select>
+                            <button id="pairingDiscoveryRefresh" type="button" class="btn btn-outline-secondary">Refresh devices</button>
+                        </div>
+                        <label for="pairingInput" class="form-label">Temporary pairing code</label>
+                        <input id="pairingInput" class="form-control pairing-input" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="pairingCodeHint" required>
+                        <p id="pairingCodeHint" class="form-text">Enter the eight characters shown on the other Pi.</p>
+                        <button id="pairingConnect" type="submit" class="btn btn-primary" disabled>Connect to Pi</button>
+                        <p id="pairingConnectFeedback" class="mt-3 mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+                    </form>
+                    <div id="pairingPending" class="pt-3 border-top" hidden>
+                        <p class="mb-2">A controller-access change is unconfirmed. Check its saved result before deciding what to do next.</p>
+                        <button id="pairingCheck" type="button" class="btn btn-outline-primary">Check saved result</button>
+                        <p id="pairingPendingFeedback" class="mt-2 mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+                    </div>
+                </section>
+                <section id="recurrenceMigration" class="maintenance-pane mb-4" aria-labelledby="recurrenceMigrationTitle" hidden>
+                    <h2 id="recurrenceMigrationTitle" class="maintenance-pane__title h5">Scheduling ownership</h2>
+                    <p id="recurrenceMigrationState" class="maintenance-pane__body">Checking saved scheduling history…</p>
+                    <div class="mb-3">
+                        <label for="recurrenceMigrationTarget" class="form-label">Device</label>
+                        <select id="recurrenceMigrationTarget" class="form-select" aria-describedby="recurrenceMigrationDevice" disabled></select>
+                    </div>
+                    <p id="recurrenceMigrationDevice" class="small text-break mb-2"></p>
+                    <div id="recurrenceMigrationPrevious" class="mb-3" hidden>
+                        <label for="recurrenceMigrationAssignment" class="form-label">Previous schedule</label>
+                        <select id="recurrenceMigrationAssignment" class="form-select" aria-describedby="recurrenceMigrationRestoreHelp" disabled></select>
+                        <p id="recurrenceMigrationRestoreHelp" class="form-text">Only a previous local schedule can be restored here. Controller-owned WTP schedules remain held for recovery with compatible WTP-capable software.</p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button id="recurrenceMigrationReview" type="button" class="btn btn-outline-primary" disabled>Review migration</button>
+                        <button id="recurrenceMigrationRollback" type="button" class="btn btn-outline-secondary" hidden>Review previous schedule</button>
+                        <button id="recurrenceMigrationRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
+                        <button id="recurrenceMigrationRetry" type="button" class="btn btn-outline-secondary" hidden>Check saved result</button>
+                    </div>
+                    <div id="recurrenceMigrationOutcomeReview" class="mt-3" hidden>
+                        <p class="form-text">An earlier result may remain unknown after management changes. Reviewing current state does not repeat that request or claim it succeeded. An active handover or unconfirmed restoration must finish first.</p>
+                        <button id="recurrenceMigrationReadOutcome" type="button" class="btn btn-outline-secondary">Read current state for review</button>
+                        <p id="recurrenceMigrationOutcomeSummary" class="form-text mt-2" role="status" aria-live="polite"></p>
+                        <button id="recurrenceMigrationConfirmOutcome" type="button" class="btn btn-outline-primary" disabled>I reviewed this state</button>
+                    </div>
+                    <section id="recurrenceMigrationConfirmation" class="mt-3 pt-3 border-top" aria-labelledby="recurrenceMigrationConfirmationTitle" hidden>
+                        <h3 id="recurrenceMigrationConfirmationTitle" class="h6">Review this device</h3>
+                        <p id="recurrenceMigrationSummary" class="small text-break"></p>
+                        <div class="form-check mb-3">
+                            <input id="recurrenceMigrationConsent" type="checkbox" class="form-check-input">
+                            <label id="recurrenceMigrationConsentLabel" for="recurrenceMigrationConsent" class="form-check-label"></label>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button id="recurrenceMigrationConfirm" type="button" class="btn btn-primary" disabled>Confirm migration</button>
+                            <button id="recurrenceMigrationCancel" type="button" class="btn btn-outline-secondary">Cancel review</button>
+                        </div>
+                    </section>
+                    <p id="recurrenceMigrationFeedback" class="mt-3 mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+                </section>
                 <section
                     id="maintenanceResult"
                     class="maintenance-result d-none mb-4"

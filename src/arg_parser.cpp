@@ -1,3 +1,4 @@
+#include "wtp_retirement.hpp"
 /**
  * @file arg_parser.cpp
  * @brief Parse runtime startup choices and frequency-entry syntax.
@@ -28,6 +29,7 @@
 
 // Primary header for this source file
 #include "arg_parser.hpp"
+#include "pi_managed_host_runtime.hpp"
 #include "test_tone_frequency_plan.hpp"
 #include "arg_parser_internal.hpp"
 
@@ -658,7 +660,7 @@ static TransmitBackendKind parse_transmit_backend_option(
             return static_cast<char>(std::tolower(c));
         });
 
-    if (lowered == "wtp") return TransmitBackendKind::WTP;
+    if (lowered == "wtp") throw std::invalid_argument("Migration required: WTP transmitter backend is retired.");
     if (lowered == "gpio")
     {
         if (require_compiled &&
@@ -696,7 +698,7 @@ static TransmitBackendKind parse_transmit_backend_option(
     }
 
     throw std::invalid_argument(
-        "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', 'wtp', or 'simulated'.");
+        "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', or 'simulated'.");
 }
 
 static int parse_integer_option(
@@ -1495,6 +1497,10 @@ bool validate_config_candidate(
     if (error_message != nullptr)
     {
         error_message->clear();
+    }
+    if (const auto refusal = wsprrypi::wtp_retirement_configuration_refusal(candidate); !refusal.empty()) {
+        if (error_message) *error_message = refusal;
+        return false;
     }
     if (!transmit_backend_is_compiled(candidate.transmit_backend))
     {
@@ -2631,6 +2637,7 @@ bool parse_command_line(int argc, char *argv[])
 
             try
             {
+                validate_config_ini_input(config.ini_filename);
                 iniFile.set_raw_passthrough_keys(
                     {{"Security", "Privileged Network Safety"}});
                 iniFile.set_filename(config.ini_filename);
@@ -2708,6 +2715,7 @@ bool parse_command_line(int argc, char *argv[])
                 defer_startup_diagnostic(WARN, "NETWORK SAFETY OFF");
             }
 
+            if(const auto host=wsprrypi::pi_managed_host())host->restore_recovery_listener_ports();
             // Remove "-i <file>" from args
             args.erase(it, it + 2);
             break; // Exit loop after removing argument
@@ -2835,7 +2843,6 @@ bool parse_command_line(int argc, char *argv[])
         {"socket-loopback-only", no_argument, nullptr, 1060},
         {"socket-loopback-family", required_argument, nullptr, 1062},
         {"rp1-development-confirmation-json", required_argument, nullptr, 1063},
-        {"wtp-server-port", required_argument, nullptr, 1064},
         {nullptr, 0, nullptr, 0}};
 
     while (true)
@@ -2854,19 +2861,6 @@ bool parse_command_line(int argc, char *argv[])
         switch (c)
         {
         // No arguments
-        case 1064:
-        {
-            const std::string value = optarg;
-            unsigned int parsed = 0;
-            const auto result = std::from_chars(value.data(),
-                                                value.data() + value.size(), parsed);
-            if (result.ec != std::errc{} ||
-                result.ptr != value.data() + value.size() ||
-                parsed == 0 || parsed > 65535)
-                print_usage("WTP server port must be 1 through 65535.", EXIT_FAILURE);
-            config.wtp_server_port_override = static_cast<std::uint16_t>(parsed);
-            break;
-        }
         case 1060:
             config.socket_loopback_only = true;
             break;

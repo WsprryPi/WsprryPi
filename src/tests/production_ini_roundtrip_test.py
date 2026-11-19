@@ -5,6 +5,7 @@ import argparse
 import configparser
 import fcntl
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -23,10 +24,13 @@ from production_browser_load import normal_browser_schedule
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
-    binary = parser.parse_args().binary.resolve(strict=True)
+    parser.add_argument('--fixture', type=Path, required=True, help='Actual production main with typed private-storage and loopback-only seams')
+    args = parser.parse_args()
+    binary = args.binary.resolve(strict=True)
+    fixture = args.fixture.resolve(strict=True)
     assert sys.platform == 'linux', 'Linux private-network regression required'
     backends = subprocess.check_output([str(binary), '--list-backends'], text=True, timeout=5).strip()
-    assert set(backends.split(',')) == {'simulated', 'wtp'}, 'Build with BACKENDS=simulated'
+    assert set(backends.split(',')) == {'simulated'}, 'Build with BACKENDS=simulated'
     version = subprocess.check_output([str(binary), '--version'], text=True, stderr=subprocess.STDOUT, timeout=5)
     assert 'Ancillary GPIO: disabled' in version, 'Build with ANCILLARY_GPIO=0'
     names = {name for _, name in socket.if_nameindex()}
@@ -62,15 +66,15 @@ def main():
         settings = configparser.ConfigParser(interpolation=None)
         settings.optionxform = str
         settings.read(Path(__file__).resolve().parents[2] / 'config/wsprrypi.ini')
+        assert settings.getboolean('WTP Server','Enabled') is False, 'Stock configuration must not activate the retired listener'
         settings.read_dict({
             'Operation': {'Mode': 'WSPR', 'Transmit': 'false', 'Use LED': 'false', 'Use Amp': 'false',
-                          'Use Shutdown': 'false', 'Enable on Boot': 'Never', 'Transmit Backend': 'wtp',
+                          'Use Shutdown': 'false', 'Enable on Boot': 'Never', 'Transmit Backend': 'gpio',
                           'Web Port': str(web_port), 'Socket Port': str(control_port)},
             'WTP': {'Transport': 'network', 'Hostname': 'pico-loopback.local',
                     'TLS Server Identity': 'pico-loopback.local', 'Device ID': 'a' * 32,
                     'TCP Port': '18443', 'Endpoint': '', 'Allow Frequency Adjustment': 'true',
                     'Start Uncertainty ns': '500000000'},
-            'WTP Server': {'Enabled': 'false'},
             'Calibration': {'PPM': '0'},
             'GPIO': {'Use System Clock Frequency Estimate': 'false', 'Frequency Residual PPM': '0', 'Manual PPM': '0'},
         })
@@ -89,7 +93,7 @@ def main():
                 assert len(data) <= 1024 * 1024, 'Bounded response required'
                 return data
         with (root / 'process.log').open('w') as log:
-            child = subprocess.Popen([str(binary), '--backend', 'simulated', '-i', str(ini),
+            child = subprocess.Popen([str(fixture), str(root / 'native-ledger'), '--backend', 'simulated', '-i', str(ini),
                                       '--socket-loopback-only', '--socket-loopback-family', 'ipv4'],
                                      cwd=root, stdout=log, stderr=subprocess.STDOUT,
                                      env=dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1'))
@@ -100,15 +104,19 @@ def main():
                     try:
                         config = json.loads(get('/config'))
                         break
+                    except http.client.BadStatusLine as error:
+                        raise AssertionError(f'Unexpected HTTP listener at web={web_port}, control={control_port}: '+(root / 'process.log').read_text()[-12000:]) from error
                     except OSError:
                         assert time.monotonic() < end, 'Loopback startup deadline: '+(root / 'process.log').read_text()[-4000:]
                         time.sleep(.05)
-                wtp, operation = config['WTP'], config['Operation']
-                assert wtp['Device ID'] == 'a' * 32 and wtp['Transport'] == 'network'
-                assert wtp['Hostname'] == wtp['TLS Server Identity'] == 'pico-loopback.local'
-                assert wtp['TCP Port'] == 18443 and wtp['Endpoint'] == ''
-                assert wtp['Start Uncertainty ns'] == 500000000 and wtp['Allow Frequency Adjustment'] is True
-                assert operation['Transmit Backend'] == 'wtp', 'Simulation must not replace saved selection'
+                assert 'WTP' not in config and 'WTP Server' not in config
+                operation = config['Operation']
+                assert operation['Transmit Backend'] == 'gpio', 'Simulation must not replace saved selection'
+                persisted = configparser.ConfigParser(interpolation=None)
+                persisted.optionxform = str
+                persisted.read(ini)
+                for section in ('WTP', 'WTP Server'):
+                    assert dict(persisted[section]) == dict(settings[section]), 'Dormant private settings changed'
                 assert operation['Transmit'] is False and operation['Enable on Boot'] == 'Never'
                 assert all(operation[name] is False for name in ('Use LED', 'Use Amp', 'Use Shutdown'))
                 assert operation['Web Port'] == web_port and operation['Socket Port'] == control_port
@@ -156,33 +164,38 @@ def main():
         template = ini.read_text()
         invalid = {
             'lowercase-mode': template.replace('Mode = WSPR', 'mode = WSPR', 1),
-            'lowercase-device-key': template.replace('Device ID = ', 'device id = ', 1),
+            'lowercase-station-key': template.replace('Call Sign = ', 'call sign = ', 1),
             'default-cannot-supply-mode': '[DEFAULT]\nMode = WSPR\n\n' + template.replace('Mode = WSPR\n', '', 1),
         }
         for name, text in invalid.items():
             assert text != template
             bad = root / (name + '.ini'); bad.write_text(text)
+            rejected_hash = hashlib.sha256(bad.read_bytes()).digest()
             record = root / (name + '.log')
             with record.open('w') as output:
-                child = subprocess.Popen([str(binary), '--backend', 'simulated', '-i', str(bad),
+                child = subprocess.Popen([str(fixture), str(root / (name + '-ledger')), '--backend', 'simulated', '-i', str(bad),
                                           '--socket-loopback-only', '--socket-loopback-family', 'ipv4'],
                                          cwd=root, stdout=output, stderr=subprocess.STDOUT,
                                          env=dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1'))
                 try:
                     end = time.monotonic() + 15
-                    while 'Configuration load failed:' not in record.read_text():
-                        assert child.poll() is None, record.read_text()[-4000:]
-                        assert time.monotonic() < end, record.read_text()[-4000:]
-                        time.sleep(.05)
                     while True:
                         assert child.poll() is None, record.read_text()[-4000:]
                         try:
-                            safe = json.loads(get('/config', 31415))
+                            readiness = json.loads(get('/api/control/v1/host/readiness', web_port))
+                            assert readiness['state'] == 'configuration_recovery', readiness
+                            try:
+                                get('/config', web_port)
+                                raise AssertionError('Invalid configuration exposed as current settings')
+                            except urllib.error.HTTPError as error:
+                                assert error.code == 409
+                                assert json.loads(error.read())['schema'] == 'configuration-recovery'
                             break
                         except OSError:
                             assert time.monotonic() < end, record.read_text()[-4000:]
                             time.sleep(.05)
-                    assert safe['Operation']['Transmit'] is False, 'Invalid INI enabled output'
+                    assert hashlib.sha256(bad.read_bytes()).digest() == rejected_hash, 'Rejected INI changed'
+                    assert not (root / (name + '-ledger.simulated-trace.json')).exists(), 'Invalid INI constructed an output backend'
                 finally:
                     if child.poll() is None:
                         child.terminate()

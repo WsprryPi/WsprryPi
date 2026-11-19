@@ -40,7 +40,7 @@ int main(){
     require(own.preserve_interactive_takeover,"own file-monitor reload retains finish choice");
     commit_config_candidate(own);
     require(aborts==0,"own reload does not cancel remote job");
-    patch_all_from_web({{"WTP Server",{{"Port",31418}}}});
+    patch_all_from_web({{"Operation",{{"Web Port",31418}}}});
     prepare_ini_config_candidate(config.ini_filename,own);
     require(own.valid&&own.preserve_interactive_takeover,"unrelated HTTP patch preserves finish choice");
     require(aborts==0,"unrelated HTTP patch does not cancel");

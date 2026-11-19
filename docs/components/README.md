@@ -1,8 +1,6 @@
 # Component maintenance
 
-WsprryPi tracks its first-party web interface and reusable C++ components as
-ordinary directories in this repository. A normal clone contains every
-component needed to build and test the product.
+WsprryPi tracks its first-party web interface and reusable C++ components as ordinary directories in this repository. A normal clone contains every component needed to build and test the product.
 
 ## Component inventory
 
@@ -23,9 +21,7 @@ component needed to build and test the product.
 | `src/WTP-Client` | Portable WTP/1 client framing, codecs and sessions |
 | `src/WTP-Server` | Portable WTP/1 server and job-policy core |
 
-Each component root owns its source hierarchy, public interfaces, README,
-standalone build or test entry points, and extraction boundary. Application
-integration remains in the parent repository.
+Each component root owns its source hierarchy, public interfaces, README, standalone build or test entry points, and extraction boundary. Application integration remains in the parent repository.
 
 ## Maintenance rules
 
@@ -34,24 +30,14 @@ integration remains in the parent repository.
 - Keep reusable components independent of WsprryPi application internals.
 - Preserve standalone build and test entry points where supplied.
 - Do not copy generated build output into a component tree.
-- Run the component's focused tests and the applicable parent integration
-  tests after a change.
+- Run the component's focused tests and the applicable parent integration tests after a change.
 
-The repository-root `AGENTS.md` defines the complete component policy and safe
-validation profiles.
+The repository-root `AGENTS.md` defines the complete component policy and safe validation profiles.
 
 ## Licensing and attribution
 
-WsprryPi-authored component code is covered by the repository-root
-`LICENSE.md` unless a component or file states otherwise.
+WsprryPi-authored component code is covered by the repository-root `LICENSE.md` unless a component or file states otherwise.
 
-The web interface retains third-party notices and license texts under
-`WsprryPi-UI/data/vendor/`. The bundled nlohmann/json header in
-`src/WSPR-Reference/include/nlohmann/json.hpp` retains its embedded copyright
-and SPDX notices; the corresponding license texts are stored under
-`docs/licenses/nlohmann-json/`.
+The web interface retains third-party notices and license texts under `WsprryPi-UI/data/vendor/`. The bundled nlohmann/json header in `src/WSPR-Reference/include/nlohmann/json.hpp` retains its embedded copyright and SPDX notices; the corresponding license texts are stored under `docs/licenses/nlohmann-json/`.
 
-When extracting a component for independent use, copy its complete component
-directory, preserve required sibling-component relationships, and add the
-repository metadata and license files appropriate to the new distribution.
-Retain all embedded and third-party notices.
+When extracting a component for independent use, copy its complete component directory, preserve required sibling-component relationships, and add the repository metadata and license files appropriate to the new distribution. Retain all embedded and third-party notices.

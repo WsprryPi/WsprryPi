@@ -5,6 +5,9 @@
 
 #include "scheduling.hpp"
 #include "wtp_runtime_bridge.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "pi_recovery_runtime.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/fleet_runtime.hpp"
 #include "wtp_integration/usb_logging.hpp"
@@ -12,6 +15,7 @@
 #include "wtp_pi_control.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "scheduling_internal.hpp"
+#include "native_recurrence.hpp"
 
 #include "gpio_input.hpp"
 #include "gpio_output.hpp"
@@ -32,6 +36,7 @@
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
+#include <exception>
 #include <cstring>
 #include <iomanip>
 #include <mutex>
@@ -117,7 +122,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started QRSS transmission at frequency: ",
-                          transmitter_format_frequency_mhz(config.qrss.frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -126,7 +131,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started FSKCW transmission at mark frequency: ",
-                          transmitter_format_frequency_mhz(config.fskcw.mark_frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -135,7 +140,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             {
                 llog.logS(to_log_level(level),
                           "Started DFCW transmission at dot frequency: ",
-                          transmitter_format_frequency_mhz(config.dfcw.dot_frequency_hz),
+                          transmitter_format_frequency_mhz(current_transmission_request.actual_rf_frequency_hz),
                           " MHz",
                           active_gpio_log_suffix(),
                           ".");
@@ -243,6 +248,11 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
         {
             reset_active_wspr_plan_state();
         }
+        if(!continuing_wspr_plan&&wsprrypi::native_occurrence_active()){
+            const bool inactive=transmitter_output_inactive_confirmed();
+            wsprrypi::finish_native_occurrence(inactive);
+            if(config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(inactive);
+        }
 
         if (shutdown_when_idle && do_config)
         {
@@ -307,6 +317,10 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             "transmission failure",
             true,
             true);
+        reset_active_wspr_plan_state();
+        const bool native_work=wsprrypi::native_occurrence_active();
+        wsprrypi::finish_native_occurrence(transmitter_output_inactive_confirmed());
+        if(native_work&&config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
         send_ws_message("transmit", "failed", reason);
 
         if (config.use_ini)
@@ -342,6 +356,10 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
             runtime_should_hold_selector_gpios_initialized(config),
             "transmission cancellation",
             true);
+        reset_active_wspr_plan_state();
+        const bool native_work=wsprrypi::native_occurrence_active();
+        wsprrypi::finish_native_occurrence(transmitter_output_inactive_confirmed());
+        if(native_work&&config.transmit_backend!=TransmitBackendKind::WTP)wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
         if (suppress_ws_event)
         {
             llog.logS(
@@ -631,6 +649,16 @@ void stop_runtime_components_for_test() noexcept
  */
 bool wspr_loop()
 {
+    if (controller_only_mode()) return controller_only_loop();
+    wsprrypi::PiRecoveryRuntime recovery;
+    if(!recovery.await_configuration())return exiting_wspr.load(std::memory_order_acquire);
+    // The saved source has passed owning validation before any selector,
+    // backend, or ancillary worker starts. Unwind every native worker before
+    // main releases the persistence/readiness owner on an exception.
+    struct NativeUnwind {
+        int exceptions=std::uncaught_exceptions();
+        ~NativeUnwind(){if(std::uncaught_exceptions()>exceptions)stop_runtime_components_for_process_exit();}
+    } native_unwind;
     transmission_runtime_failed.store(false, std::memory_order_release);
     const bool any_selector_gpio_configured =
         has_configured_selector_gpios(config);
@@ -677,7 +705,8 @@ bool wspr_loop()
     // automatic-transmit path can run.  This latch is process-lifetime by
     // design: ordinary reloads and toggles cannot clear a hardware-safety
     // failure; Pico retains its separate explicit reconciliation boundary.
-    if (!run_startup_quiesce_gate(config))
+    const bool startup_quiesced=run_startup_quiesce_gate(config);
+    if (!startup_quiesced)
     {
         if (config.transmit_backend == TransmitBackendKind::WTP)
             llog.logS(ERROR, "Pico startup is not ready; inspect endpoint status and explicitly reconcile before scheduling.");
@@ -701,10 +730,12 @@ bool wspr_loop()
         }
     }
 
+    bool endpoint_ready=false;
     if (config.use_ini && !startup_quiesce_inhibited_state())
     {
         std::string endpoint_error;
-        if (!wsprrypi::start_wtp_pi_endpoint(config, &endpoint_error))
+        endpoint_ready=wsprrypi::start_wtp_pi_endpoint(config, &endpoint_error);
+        if (!endpoint_ready)
             llog.logS(ERROR, "WTP Pi endpoint unavailable: ", endpoint_error);
     }
 
@@ -714,6 +745,17 @@ bool wspr_loop()
         try { wsprrypi::start_usb_logging(config.ini_filename); }
         catch (const std::exception&) { llog.logS(ERROR, "USB log collector unavailable; review its saved settings."); }
     }
+    if(const auto host=wsprrypi::pi_managed_host()){
+        // WTP peer readiness is separate from the verified host/storage owner.
+        // An offline peer keeps its existing explicit reconciliation path and
+        // cannot dispatch: its application and managed-state gate still refuse.
+        // Physical startup inhibition remains a process-lifetime hold.
+        if((startup_quiesced||config.transmit_backend==TransmitBackendKind::WTP)&&
+            !startup_quiesce_inhibited_state()&&endpoint_ready){
+            wsprrypi::wtp_pi_with_configuration([&]{host->activate(wsprrypi::wtp_pi_with_configuration);});
+        }else host->hold_output();
+    }
+    recovery.finish_native_startup();
     const bool start_web = web_server_start_enabled(config);
     const bool start_websocket = websocket_server_start_enabled(config);
     const int startup_web_port = config.web_port;
@@ -724,7 +766,7 @@ bool wspr_loop()
     {
         llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
     }
-    else if (start_web)
+    else if (start_web&&!recovery.owns_http())
     {
         try
         {
@@ -760,7 +802,7 @@ bool wspr_loop()
         llog.logS(DEBUG, "Skipping web server.");
     }
 
-    if (start_websocket)
+    if (start_websocket&&!recovery.owns_websocket())
     {
         if (!socketServer.start(
                 startup_socket_port,
@@ -965,6 +1007,8 @@ bool wspr_loop()
                     {"test_tone", test_tone_status_json(tone_status)}}.dump());
             }
             wsprrypi::poll_wtp_pi_endpoint();
+            wsprrypi::poll_pi_managed_migration();
+            wsprrypi::poll_native_recurrence();
             if (ini_reload_pending.load(std::memory_order_acquire) &&
                 !web_test_tone.load() && !transmitter_reload_should_defer() &&
                 wtp_pi_begin_configuration())

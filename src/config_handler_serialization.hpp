@@ -27,6 +27,10 @@ int config_serialization_integer(
 std::string config_serialization_si5351_i2c_address(int address);
 int config_serialization_gpio_transmit_pin(int gpio) noexcept;
 const BandJsonKeys &band_json_keys() noexcept;
+// Projects the nine saved configuration sections without platform discovery,
+// backend initialization, runtime publication, or file access.
+nlohmann::json saved_configuration_from_internal_json(
+    const nlohmann::json &source);
 nlohmann::json public_config_from_internal_json(
     const nlohmann::json &source);
 

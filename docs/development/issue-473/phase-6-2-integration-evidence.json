@@ -1,0 +1,314 @@
+{
+  "schema": "issue473-phase62-integration-evidence/1",
+  "stage": "intermediate shared-contract and foundation source pair; not final phase acceptance",
+  "source_manifest_sha256": "7d9c570ec164d66219d9f2e80d86b7e6fbf6ecb6aa4bf1ef8109a8ff6dcc9540",
+  "source_root": "/Users/lbussy/GitHub/WsprryPi/build/issue473-phase62-provider/frozen-pair-1794925949004649000",
+  "repositories": {
+    "pi": {
+      "base_revision": "4d2f0da9251f4801dc1f324518a89f86e11f5dcc",
+      "branch": "codex/issue-473-device-owned-scheduling",
+      "uncommitted_source_files": {
+        "WsprryPi-UI/data/control-contract.js": "d35383b59b2d9d6379cffc402b734b63797b0f40bbd61ea0dca45bfca20d9a48",
+        "docs/development/issue-473-phases.md": "ce1b7f2cc55d5043b2fb0a7ca6142d0553a533c6ff9a360a4607013c1d7d1c0f",
+        "docs/development/issue-473/deferred-pi-security.md": "6189357b321905970ec8324c8ef8fe8f294df7163a2ecbe0a6e82c60e61f3f2a",
+        "docs/development/issue-473/phase-1-contract-details.md": "843c3ac1c86a94fd20226c6046c87172e1e722b224d97fdba5c06480d2a9572d",
+        "docs/development/issue-473/phase-1-pairing.md": "5879d0b8ac083da1687e38b02790aa9c1aa7602099baec20059d7e039a067e59",
+        "docs/development/issue-473/phase-6-2-decisions.md": "9999d4f1b4c3cf9dca42eb68bedf04352c929ef5b1c928feccca3e1e904a4864",
+        "docs/development/issue-473/phase-6-2-implementation-plan.md": "bafe5f35dc2e958f50f618f846a75e357bfcd9a2209e0dbabab6e94e4c969cd3",
+        "scripts/generate_control_contract.py": "67501975c5f77f934f6a5e5147c0a5e1e4c1120c35d043ad458871fd83dec470",
+        "src/Makefile": "30ba5df496da724ff4890a1bb91494770546f5063d54bd74dbfac12bb5c0429a",
+        "src/privileged_network_policy.cpp": "d88e66446f0b2da2dc151da43a0c35ea528f91c556b84b64c1be085799c3c091",
+        "src/tests/pi_managed_store_test.cpp": "6f5eb2d241cb6ecd6c3a53ef95b683c8a98fecdf21431c71e84d32b84740c2a6",
+        "src/tests/pi_management_journal_test.cpp": "3b734cd1346928872a4741c582ab9bac80ca511a150ee2b7382d0ca10e42de96",
+        "src/tests/privileged_network_policy_test.cpp": "a0a36d4dc3e2b22ac8f50d8456b4e97cf51ec350f4d951fcf37294b5547470bc",
+        "src/tests/wtp_fleet_test.cpp": "1addff89b0f8aeb00db278285aa04ce76cbb02e356586c1a3d39525233ddabf3",
+        "src/wtp_endpoint/runtime.cpp": "8e99be5a8e65efea4f4b38c77235ee7c60355dfa6899a150cfff6efa58ac340c",
+        "src/wtp_endpoint/runtime.hpp": "822d6e524eea11bdc9b992234460302389c1b3013a6f65e73eecb459fd5a5f41",
+        "src/wtp_integration/contract/PROVENANCE.json": "d837537d879ac19fc2868d4258f9cff71627d8e468c07f27f0a24752561bbb03",
+        "src/wtp_integration/contract/check_control_policy.py": "dbbf70d5f4eec64842540eae512a362b8f45c930e14d61b8ced014c3fb2f3221",
+        "src/wtp_integration/contract/control-1.schema.json": "bcb3680be9240c9dac022d45eb8b2b49ea5d06f23cb2354326d0270086734a90",
+        "src/wtp_integration/contract/control-controller-vectors.json": "342fb7d171704fcebbdcbd20bc2640367d0bd013e5fa3db70074649baf947176",
+        "src/wtp_integration/control_contract.hpp": "9f85fbd7b3b6d4eb0d9ab711c6c3bf6778270580c445121a09450a4736f1a328",
+        "src/wtp_integration/controller_contract.cpp": "9733eb65b9cf722fb64fd80763fdfbab7ba98aa528685c0851a21947de467c99",
+        "src/wtp_integration/controller_contract.hpp": "34d02bfad119eca26ff94b826bc4c77df6308c354c68f99cae046b44534946b4",
+        "src/wtp_integration/controller_retirement.cpp": "d2c80e5fdcedfdb325327e129deb1ecc52076227d2def998f0b986a4ace01fd7",
+        "src/wtp_integration/controller_retirement.hpp": "6c7a4c117a32df2982337241261016492c6e641525c89d12dc87bf40f5140a42",
+        "src/wtp_integration/management_browser_session.cpp": "e91182f0bb22694c6158d07fc5951b639d4234c1ec08f61517f08fc3a1b1e48b",
+        "src/wtp_integration/management_browser_session.hpp": "40400eedc7d1e810da839c500f973adf533d474587198777c7be08dc1440a651",
+        "src/wtp_integration/pi_managed_store.cpp": "2a965c24e62be3a8b2bb0a8165d929091572db043de86814499881c8ad3da843",
+        "src/wtp_integration/pi_managed_store.hpp": "97286cfb39e1db72c5ae92ad6fcfcb466881877c54e61093ec117c8f5a5e3eb8",
+        "src/wtp_integration/pi_management_journal.cpp": "e7c2824182df8b91cfb573e5ba010545b954a35c496b2ab1f3d4bfd847c21f85",
+        "src/wtp_integration/pi_management_journal.hpp": "0d3ed844cee8e68f0e0b90ff20127304449988fa57093f81ef7aab6e6b4b605c",
+        "src/wtp_integration/pi_management_service.cpp": "2df696be5e4ab2c89872129abe7889eaec047e970a903afe89d0aa7c9c5017d1",
+        "docs/development/issue-473/phase-6-2-progress.md": "6a0e5fcc2205666cff56f780673c38e6c7a2533e8356430c57cb03e6b140108b",
+        "docs/development/issue-473/phase-6-2-provider-evidence.json": "580a4dad86c4f17ec948bfd0247e7af9be7d002242fc1392aaed51edd6003117",
+        "docs/development/issue-473/phase-6-2-provider-qualification.md": "2b8fa630b2e28d20fd2a1153b1fcbc40fdf8a173348c2ce782302f3477f03cdd",
+        "docs/licenses/botan/BSD-2-Clause.txt": "758ea6b4a65d5611bf79c24920f92473ef44bdde0b3b97fa578470a0ffc34f14",
+        "docs/licenses/botan/README.md": "ec45d0650206592feb2af8a87d4ec3a4f50a2ccf32540a0a22802d6f81b9e9a3",
+        "scripts/build_pairing_provider.py": "0d421a3991595ecc5c38e6bceb1838b44cda21e784d452e9e5600061a8f22a45",
+        "scripts/generate_pair_contract.py": "338ae3f68fba1ba9d7c3116a23c98755e6d0f715282f46236857656082ec1859",
+        "scripts/pairing_provider.json": "8f6fca238da7f12db9b22fa86fc6c5a75c5f7a1666a05cdc11e64a8ac0a89210",
+        "scripts/tests/pairing_provider_build_test.py": "39aa1f14f1b81a4054c9bd526c6b5e3d1791d107e4c2c9e81998a48127836ada",
+        "src/tests/local_browser_principal_test.cpp": "ebdcc4308df1d137ce7f49e7d5bb32dd3b37e93752f497da4123e6cc82345db3",
+        "src/tests/pairing_provider/generate_profile_vector.py": "d1deb68b9088a741360a5f3a76ec0ab8abace960da90154e5b55be54e23fd323",
+        "src/tests/pairing_provider/profile-vector.json": "872676bfd34eb3dd27abe3d3b15c64179936c0c7043e7818d2b7ebde6979c074",
+        "src/tests/pairing_provider/profile_probe.cpp": "dcf501e9cda971ba90f0017ea5220ea9dd6cf40af7284dfee4c262fb19449640",
+        "src/tests/pairing_provider/profile_vector.hpp": "aa3140fd47e94a632e13ecbe12e0d25a98d24480c7e6796c9ce8f3dd0c776128",
+        "src/tests/pi_pair_contract_test.cpp": "6993a11db1ec660c71d5578b5e3595a00b44f2562fe54d8f6201bc9136c28f3f",
+        "src/tests/pi_pair_crypto_test.cpp": "18fe1cd55270895b2f433192ef7b0fc282a44ace07dcc6c935d2f8b026d6ae3c",
+        "src/tests/pi_pair_operations_test.cpp": "4b0d2d78475a5685276aa778323f199298650a2a9a7ce03f3a93e28743749b40",
+        "src/tests/pi_pair_records_test.cpp": "37763d2c080ecda07f04d85ac86c141b1213b8b8d48d7ecc3efa18d25ddb29f8",
+        "src/tests/pi_pair_tls_test.cpp": "68ecb17702363eed00b78c3e695f1476bdac6689b2c402008f29fbd1b5a50064",
+        "src/wtp_integration/contract/pair-1.schema.json": "eecbf128180eb4e55b369bb36fcc3c66a7b847dacf012f8df354c0dde395b36f",
+        "src/wtp_integration/local_browser_principal.cpp": "0587ca13822c43c604adde5828a48ba471cfb8dbeccbcb7b34cfbc1b933c3e87",
+        "src/wtp_integration/local_browser_principal.hpp": "a274e0e2304ae04e87565507766b94cb34493c90f42ddfcdbd742a2fc94679c8",
+        "src/wtp_integration/pi_pair_catalog_store.cpp": "2fd161308fe603e29dff565037e6a099ba67b71288b801fb096b94c5b59b5ffb",
+        "src/wtp_integration/pi_pair_catalog_store.hpp": "b38da40b8935b183fbc42a7135a10ec8602cb4e58175da44e8420a04b15fb389",
+        "src/wtp_integration/pi_pair_contract.cpp": "cfeb63c52fc00522f5210a94a052a644dc7cc5c99654828210c1284c732cd0e6",
+        "src/wtp_integration/pi_pair_contract.hpp": "28e5ff26540ff0fc83604b93ec0b300da61d5760ea73f5a8230c8103d9b94067",
+        "src/wtp_integration/pi_pair_contract_data.hpp": "2f7d2202b0dd388caeccfa68d1cf7f0227e60bc897d710259ac7393ebcaeed40",
+        "src/wtp_integration/pi_pair_crypto.cpp": "046b528afddd6d2ca9434df1df59bb451ebb7a6010a40e1d7f179671cc9c6142",
+        "src/wtp_integration/pi_pair_crypto.hpp": "33bf4899451ed685808df7339a117600742c8c67956f2e73f9983211ebe93a85",
+        "src/wtp_integration/pi_pair_history.cpp": "0b55ec534a805e839e68dd01cbfafb2ed20e306e9401a4ea599117f525dd243c",
+        "src/wtp_integration/pi_pair_history.hpp": "38030224a028ac2260d918a0149d2645a97ddb836a69939d4bd8685ca4fb0c37",
+        "src/wtp_integration/pi_pair_initialization.hpp": "4095f25e5dad65b826cde84afaacd8a4181c62941dfd920172258946539a496b",
+        "src/wtp_integration/pi_pair_operations.cpp": "b2333e90e8ac694d59b6be876dfa7d58b97320b9af57e75c3f0846e635f182b5",
+        "src/wtp_integration/pi_pair_operations.hpp": "d2fc6a406e683ff5b984f2d5a8e3eacd0d8fa052f0216bd1cd764e410e64c7a3",
+        "src/wtp_integration/pi_pair_records.cpp": "86de8b5d69669706bdfe2a3dd496295eb3af548bcb18cc831d0ac3d2978a8219",
+        "src/wtp_integration/pi_pair_records.hpp": "c550c8d6774b94d35f466c17956ae5ec14ebcd7319c43c4f049b0c487768b37f",
+        "src/wtp_integration/pi_pair_rotation.cpp": "dabb977ddcd4f72f8a4f44108a6c27cd080dcddcc904e89ec335927e7cb832f2",
+        "src/wtp_integration/pi_pair_rotation.hpp": "ac88309c9127d19d331e72962b816a32aabcf68b17bdb39027ab15707643a000",
+        "src/wtp_integration/pi_pair_tls.cpp": "9030f7a00fe3901d11c578757c4137c119c745fed0df34d2043cd5d6a97ad11a",
+        "src/wtp_integration/pi_pair_tls.hpp": "696fe9c93214ac8fbd031c4897eee7104d3cc087b48881974aba8f416e79cd72"
+      }
+    },
+    "pico": {
+      "base_revision": "2fdf078a5e379fd9fb329745150ca5005f39ad04",
+      "branch": "codex/issue-473-phase62-paired-candidate",
+      "uncommitted_source_files": {
+        "engineering/protocol/control-1.schema.json": "bcb3680be9240c9dac022d45eb8b2b49ea5d06f23cb2354326d0270086734a90",
+        "engineering/protocol/control-controller-vectors.json": "342fb7d171704fcebbdcbd20bc2640367d0bd013e5fa3db70074649baf947176",
+        "scripts/check_control_policy.py": "dbbf70d5f4eec64842540eae512a362b8f45c930e14d61b8ced014c3fb2f3221",
+        "scripts/generate_control_contract.py": "20b1d9ce11b8657e3b6cb9684de18c3e98211d3c860be71a748556f24f9df7c9",
+        "src/network/bootstrap_web/radio-bundle.js": "8a41fc7d884a5cd1220bdb57cf7f6ed283462e9f616daa3a5431a93dde26deed",
+        "src/network/control_contract.hpp": "87b4d05d2dbfb44b7ffdcaff81b510d86b6ac1c2a218cd91cec85946e3ca8a94",
+        "src/network/web/app.min.js": "8949656375c52aee66a23294fce6e493e6bab1558fa91873ad652898a589f4d5",
+        "src/network/web/asset-build.json": "c173229d2167c37db8d3458fd12c13da771826e345836b63292f827b9f80be9f",
+        "src/network/web/control-contract.js": "d35383b59b2d9d6379cffc402b734b63797b0f40bbd61ea0dca45bfca20d9a48"
+      }
+    }
+  },
+  "image": "sha256:10c9d9b806935f1162f7ccaef018da951d0be3c5710aaf61590d27e246f2a0f1",
+  "user": "501:20",
+  "network": "none; container loopback only",
+  "hardware_access": "disabled; no hardware devices passed",
+  "mbedtls_revision": "0bebf8b8c7f07abe3571ded48a11aa907a1ffb20",
+  "mbedtls_framework_revision": "dff9da04438d712f7647fd995bc90fadd0c0e2ce",
+  "source_manifest_unchanged": true,
+  "results": [
+    {
+      "stage": "parity",
+      "command": [
+        "python3",
+        "scripts/generate_control_contract.py",
+        "--source",
+        "/work/pico",
+        "--check"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.03
+    },
+    {
+      "stage": "pair-shapes",
+      "command": [
+        "python3",
+        "scripts/generate_pair_contract.py",
+        "--check"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.01
+    },
+    {
+      "stage": "foundations",
+      "command": [
+        "make",
+        "-j4",
+        "pi-pair-contract-test",
+        "pi-pair-crypto-test",
+        "pi-pair-records-test",
+        "pi-pair-tls-test",
+        "local-browser-principal-test",
+        "pi-pair-operations-test",
+        "pi-management-journal-test",
+        "pi-managed-store-test",
+        "wtp-fleet-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 35.3
+    },
+    {
+      "stage": "network-runtime",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-network-runtime-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 24.05
+    },
+    {
+      "stage": "network-interop",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-network-interop-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 173.11
+    },
+    {
+      "stage": "configuration-interop",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-config-interop-test",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 511.81
+    },
+    {
+      "stage": "pico-usb-configure",
+      "command": [
+        "cmake",
+        "-S",
+        "/work/pico",
+        "-B",
+        "/work/results/pico-usb",
+        "-DWSPRRY_PICO_BUILD_FIRMWARE=OFF",
+        "-DWSPRRY_PICO_BUILD_TESTS=ON",
+        "-DCMAKE_BUILD_TYPE=Debug"
+      ],
+      "cwd": "/work",
+      "returncode": 0,
+      "elapsed_seconds": 0.36
+    },
+    {
+      "stage": "pico-usb-build",
+      "command": [
+        "cmake",
+        "--build",
+        "/work/results/pico-usb",
+        "--target",
+        "usb_management_driver",
+        "endpoint_driver",
+        "-j4"
+      ],
+      "cwd": "/work",
+      "returncode": 0,
+      "elapsed_seconds": 10.26
+    },
+    {
+      "stage": "pi-usb-build",
+      "command": [
+        "make",
+        "-j4",
+        "wtp-usb-pair-client-build",
+        "wtp-usb-management-test",
+        "wtp-fleet-operations-driver-build",
+        "build/bin/pico_management_usb_pair_client",
+        "BACKENDS=simulated",
+        "ANCILLARY_GPIO=0",
+        "SUDO=",
+        "PAIRING_PROVIDER_CACHE=/botan-cache",
+        "PICO_SOURCE=/work/pico",
+        "MBEDTLS_SOURCE=/mbedtls"
+      ],
+      "cwd": "/work/pi/src",
+      "returncode": 0,
+      "elapsed_seconds": 19.41
+    },
+    {
+      "stage": "ui-usb-settings",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/wtp_usb_settings_test.js"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.02
+    },
+    {
+      "stage": "usb-pair",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/wtp_usb_pair_test.js",
+        "src/build/wtp-network/wtp_usb_pair_client",
+        "/work/results/pico-usb/usb_management_driver"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 5.54
+    },
+    {
+      "stage": "usb-independent-management",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/pico_management_usb_pair_test.js",
+        "src/build/bin/pico_management_usb_pair_client",
+        "/work/results/pico-usb/usb_management_driver"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 0.62
+    },
+    {
+      "stage": "usb-fleet",
+      "command": [
+        "node",
+        "WsprryPi-UI/tests/fleet_operations_pair_test.js",
+        "src/build/bin/wtp_fleet_operations_driver",
+        "usb",
+        "/work/results/pico-usb/endpoint_driver",
+        "/work/pi/src/build/wtp-network/credentials-v3"
+      ],
+      "cwd": "/work/pi",
+      "returncode": 0,
+      "elapsed_seconds": 7.31
+    }
+  ],
+  "limitations": [
+    "Later Pi-only HTTP-principal, rotation-HKDF and checksummed-authority changes are outside this frozen run.",
+    "Production Pi pairing/listener/client, gateway, handover, UI, packaging and full-phase adversarial acceptance remain incomplete.",
+    "Software fixtures do not qualify installation, services, physical USB, timing, GPIO or RF."
+  ]
+}

@@ -9,6 +9,10 @@ namespace wsprrypi {
 nlohmann::json wtp_usb_discovery(
     const std::filesystem::path &sysfs_root = "/sys",
     const std::filesystem::path &dev_root = "/dev");
+// Discover the management role itself; a WTP sibling is not required.
+nlohmann::json pico_management_usb_discovery(
+    const std::filesystem::path &sysfs_root = "/sys",
+    const std::filesystem::path &dev_root = "/dev");
 // Resolve a fresh observation and reject changed or disconnected endpoints.
 void validate_discovered_usb(const nlohmann::json &snapshot,
                              const std::string &id, const WtpSettings &);

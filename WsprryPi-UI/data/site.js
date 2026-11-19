@@ -297,6 +297,13 @@ function ajaxWithEndpointFallback(endpoint, options = {}) {
                     rejectDeferred(this, [jqXHR, textStatus, errorThrown]);
                     return;
                 }
+                if (endpoint === SETTINGS_ENDPOINT && jqXHR.status === 409 &&
+                    typeof jqXHR.responseJSON?.contract === 'string' && jqXHR.responseJSON.contract.startsWith('Wsprry-Control/')) {
+                    // Protected recovery is an authoritative host reply, not a
+                    // proxy outage. Never replace it with a direct-port peer
+                    // or an older settings view, including unknown versions.
+                    rejectDeferred(this,[jqXHR,textStatus,errorThrown]);return;
+                }
 
                 if (!useFallback) {
                     const reason = jqXHR && typeof jqXHR.status === "number" && jqXHR.status > 0
@@ -580,15 +587,6 @@ const configSchema = {
             "Si5351 Detection Error": { required: false, type: "string" }
         }
     },
-    WTP: { required: false, keys: {
-        "Endpoint": { required: false, type: "string" },
-        "USB Serial": { required: false, type: "string" },
-        "Device ID": { required: false, type: "string" },
-        "USB Vendor ID": { required: false, type: "number" },
-        "USB Product ID": { required: false, type: "number" },
-        "Start Uncertainty ns": { required: false, type: "number" },
-        "Allow Frequency Adjustment": { required: false, type: "boolean" }
-    } },
     Si5351: {
         required: false,
         keys: {
@@ -1640,6 +1638,7 @@ function populateConfig(callback = null) {
 
     getJsonWithEndpointFallback(SETTINGS_ENDPOINT)
         .done(function (configJson, textStatus, xhr) {
+            if (window.ConfigurationRecovery?.normalResponse()) return;
             window.WtpUi?.setHostRevision(xhr?.getResponseHeader?.("ETag"));
             try {
                 if (!configJson || typeof configJson !== "object") {
@@ -1770,7 +1769,10 @@ function populateConfig(callback = null) {
                         "gpio"
                     ) || "gpio"
                 ).toLowerCase();
-                if (!["gpio", "rp1-gpclk", "si5351", "wtp"].includes(transmitBackend)) {
+                if (transmitBackend === "wtp") {
+                    throw new Error("Migration required: retire the saved WTP backend before loading native settings.");
+                }
+                if (!["gpio", "rp1-gpclk", "si5351"].includes(transmitBackend)) {
                     transmitBackend = "gpio";
                 }
                 let enableOnBoot = String(
@@ -1973,6 +1975,9 @@ function populateConfig(callback = null) {
                 // Band GPIO.<band>.Active High and per-frequency via
                 // @GPIO[H|L] metadata, not as a single GPIO-wide setting.
 
+                // A selected remote editor cannot consume or overwrite the
+                // local draft retained when its autosave timer was suspended.
+                if (isConfigView() && window.SetupTargets?.retainingLocalDraft) return;
                 // If we are on the config page
                 if (isConfigView()) {
                     if (typeof suspendConfigAutosave === "function") {
@@ -2015,7 +2020,6 @@ function populateConfig(callback = null) {
                         renderBandPreferenceRows();
                     }
                     if (typeof setTransmitBackendSelection === "function") {
-                        window.WtpUi?.populate(configJson.WTP);
                         // Inventory starts once, after the saved bus/address are populated below.
                         setTransmitBackendSelection(transmitBackend, true, false);
                     } else {
@@ -2133,6 +2137,7 @@ function populateConfig(callback = null) {
                     if (typeof restorePersistedConfigDraft === "function") {
                         restorePersistedConfigDraft();
                     }
+                    window.SetupTargets?.localLoaded?.();
                     if (typeof suspendConfigAutosave === "function") {
                         suspendConfigAutosave(false);
                     }
@@ -2199,6 +2204,24 @@ function populateConfig(callback = null) {
             }
         })
         .fail(function (jqXHR, textStatus, errorThrown) {
+            if (jqXHR.status === 409 && window.ConfigurationRecovery?.accept(jqXHR.responseJSON)) {
+                backendCurrentlyConnected = true;
+                backendConnectedOnce = true;
+                clearPendingPopulateConfigRetry();clearConfigLoadFailureState();syncConnectionAlert();pageLoaded();
+                if (typeof callback === 'function') callback();
+                return;
+            }
+            if (jqXHR.status === 409 && window.ControllerMode?.accept(jqXHR.responseJSON?.controller)) {
+                backendCurrentlyConnected = true;
+                backendConnectedOnce = true;
+                clearPendingPopulateConfigRetry();
+                clearConfigLoadFailureState();
+                syncConnectionAlert();
+                window.ControllerMode.render();
+                pageLoaded();
+                if (typeof callback === "function") callback();
+                return;
+            }
             if (isConfigView() &&
                 typeof suspendConfigAutosave === "function") {
                 suspendConfigAutosave(false);
@@ -3209,7 +3232,7 @@ function renderGpioFrequencyCorrection(status) {
     if (!panelNode || !valueNode || !detailNode || !status) {
         return;
     }
-    panelNode.hidden = ["si5351", "wtp"].includes(status.transmitBackend);
+    panelNode.hidden = status.transmitBackend === "si5351";
     if (panelNode.hidden) {
         return;
     }
@@ -3955,6 +3978,14 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
             msg = JSON.parse(ev.data);
         } catch (err) {
             debugConsole("warn", "WebSocket ⚠️ invalid JSON:", err);
+            return;
+        }
+
+        if (window.ControllerMode?.accept(msg)) {
+            backendCurrentlyConnected = true;
+            backendConnectedOnce = true;
+            setConnectionState("connected");
+            syncConnectionAlert();
             return;
         }
 
@@ -7608,7 +7639,7 @@ function updateMachinePowerCapabilities(value) {
     syncMachinePowerControls();
 }
 function syncMachinePowerControls(message = "") {
-    const busy = pendingSystemAction !== null || window.PicoFirmwareSafety?.locked === true;
+    const busy = pendingSystemAction !== null || window.PicoFirmwareSafety?.locked === true || window.ControllerMode?.active === true;
     for (const [id, key] of [["rebootButton", "reboot"], ["shutdownButton", "power_off"]]) {
         const button = document.getElementById(id);
         if (button) {
@@ -7618,7 +7649,8 @@ function syncMachinePowerControls(message = "") {
     }
     const hint = document.getElementById("machine-power-status");
     if (hint) {
-        hint.textContent = message || (machinePowerCapabilities.reboot && machinePowerCapabilities.power_off
+        hint.textContent = window.ControllerMode?.active ? "Machine power controls are unavailable in controller-only mode."
+            : message || (machinePowerCapabilities.reboot && machinePowerCapabilities.power_off
             ? "" : machinePowerCapabilitiesKnown ? "Machine reboot and power-off are unavailable on this host." : "Machine power controls are unavailable until host support is confirmed.");
         hint.hidden = !hint.textContent;
     }

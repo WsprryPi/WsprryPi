@@ -68,12 +68,15 @@ def main():
     expected_transport = sys.argv[2] if len(sys.argv) > 2 else 'linux-i2c'
     durations = []
     for option, required in [('--version', 'Compiled backends:'), ('-v', 'Ancillary GPIO:'),
-                             ('--help', 'Usage:'), ('-h', 'Usage:'), ('--list-backends', 'wtp'),
+                             ('--help', 'Usage:'), ('-h', 'Usage:'), ('--list-backends', ''),
                              ('--list-i2c-adapters', expected_transport)]:
         for logging in ([], ['--journald'], ['-J']):
             result, elapsed = run_cli([binary, *logging, option])
             assert result.returncode == 0, (option, result.returncode, result.stderr)
             assert required.lower() in (result.stdout + result.stderr).lower(), option
+            if option == '--list-backends':
+                names = result.stdout.strip().split(',')
+                assert names and set(names) <= {'rpi-gpio', 'rp1-gpclk', 'si5351', 'simulated'}, names
             if option == '--list-i2c-adapters':
                 body = json.loads(result.stdout)
                 assert set(body) == {'Transport', 'I2C Adapters', 'Discovery Error'}

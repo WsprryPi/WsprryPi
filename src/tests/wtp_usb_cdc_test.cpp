@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-#include "WTP-Client/include/wtp/session.hpp"
 #include "wtp_integration/usb_cdc.hpp"
 #include "wtp_integration/usb_discovery.hpp"
 #include "wtp_settings_json.hpp"
@@ -532,14 +531,62 @@ void pairing() {
   CHECK(paired.path==management_port.slave && paired.role==selected_role);
   // Duplicate serials on other physical parents do not select another board.
   CHECK(paired.path!=other_port.slave);
+  if (selected_role == PicoCdcRole::Management) {
+    const auto from_legacy = management_linux_cdc(selected,tree.root,devices);
+    CHECK(from_legacy.path == management_port.slave);
+    auto direct = selected;
+    direct.path = management_port.slave;
+    const auto resolved = management_linux_cdc(direct,tree.root,devices);
+    CHECK(resolved.path == management_port.slave && resolved.role == PicoCdcRole::Management);
+    CHECK(wtp_linux_cdc(selected,tree.root,devices).path == wtp_port.slave);
+    const auto wtp_name = tree.root / "class/tty/legacy-execution";
+    std::filesystem::create_directory(wtp_name);
+    std::filesystem::create_symlink(wtp_port.slave,devices / "legacy-execution");
+    const auto execution = wtp_linux_cdc(direct,tree.root,devices);
+    CHECK(execution.path == wtp_port.slave && execution.role == PicoCdcRole::Wtp);
+    auto wrong = direct;
+    wrong.usb_serial = "OTHER";
+    bool mismatch = false;
+    try { (void)management_linux_cdc(wrong,tree.root,devices); } catch (...) { mismatch = true; }
+    CHECK(mismatch);
+    const auto management_interface = std::filesystem::path(inspect_linux_cdc(direct.path,tree.root).interface_path);
+    Tree::write(management_interface / "bInterfaceNumber", "00\n");
+    bool console = false;
+    try { (void)management_linux_cdc(direct,tree.root,devices); } catch (...) { console = true; }
+    CHECK(console);
+    Tree::write(management_interface / "bInterfaceNumber", "04\n");
+  }
   std::filesystem::create_directory(tree.root/"class/tty"/"duplicate-role-alias");
   std::filesystem::create_symlink(management_port.slave,devices/"duplicate-role-alias");
   bool refused=false;try {(void)paired_linux_cdc(selected,selected_role,tree.root,devices);}catch(...){refused=true;}
   CHECK(refused);
+  if (selected_role == PicoCdcRole::Management) {
+    auto direct = selected;
+    direct.path = management_port.slave;
+    bool ambiguous = false;
+    try { (void)management_linux_cdc(direct,tree.root,devices); } catch (...) { ambiguous = true; }
+    CHECK(ambiguous);
+    std::filesystem::remove(devices / "duplicate-role-alias");
+    std::filesystem::remove(tree.root / "class/tty/duplicate-role-alias");
+    // A management-only device remains usable without any WTP sibling.
+    std::filesystem::remove_all(tree.interface);
+    CHECK(management_linux_cdc(direct,tree.root,devices).path == management_port.slave);
+    bool no_execution = false;
+    try { (void)wtp_linux_cdc(direct,tree.root,devices); } catch (...) { no_execution = true; }
+    CHECK(no_execution);
+  }
   Fake system;system.device.control_interface=role_number;UsbCdcStream stream(system);
   auto role=selection();role.role=selected_role;
   CHECK(stream.begin_open(role,0));stream.close();
-  CHECK(!stream.begin_open(selection(),0)); }
+  CHECK(!stream.begin_open(selection(),0));
+  if (selected_role == PicoCdcRole::Logging) {
+    std::filesystem::remove(devices / "duplicate-role-alias");
+    std::filesystem::remove(tree.root / "class/tty/duplicate-role-alias");
+    CHECK(logging_linux_cdc(selected,tree.root,devices).path == management_port.slave);
+    Tree::write(tree.interface / "bInterfaceNumber", "04\n");
+    CHECK(logging_linux_cdc(selected,tree.root,devices).path == management_port.slave);
+  }
+ }
 }
 
 void metadata() {
@@ -624,7 +671,7 @@ void metadata() {
 #endif
 }
 
-void discovery() {
+void discovery(bool management = false) {
   Pty port;
   Tree tree(port.slave);
   const auto devices = tree.root / "nodes";
@@ -632,12 +679,17 @@ void discovery() {
   std::filesystem::create_directories(devices / "serial/by-id");
   std::filesystem::create_symlink(port.slave, devices / "arbitrary-name");
   Tree::write(tree.usb / "product", "WsprryPico\n");
-  Tree::write(tree.interface / "interface", "WsprryPico WTP\n");
+  Tree::write(tree.interface / "interface", management ? "WsprryPico Management\n" : "WsprryPico WTP\n");
+  const auto role = management ? "04\n" : "02\n";
+  Tree::write(tree.interface / "bInterfaceNumber", role);
+  const auto discover = [&](const auto &root, const auto &dev) {
+    return management ? pico_management_usb_discovery(root,dev) : wtp_usb_discovery(root,dev);
+  };
   // Discovery reads synthetic metadata only. The PTY stays unopened by it.
   const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
   const std::optional<std::string> previous = disabled ? std::optional<std::string>(disabled) : std::nullopt;
   ::unsetenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-  const auto snapshot = wtp_usb_discovery(tree.root, devices);
+  const auto snapshot = discover(tree.root, devices);
   CHECK(snapshot.at("available") && snapshot.at("candidates").size() == 1);
   const auto candidate = snapshot.at("candidates").at(0);
   const auto id = candidate.at("id").get<std::string>();
@@ -651,171 +703,32 @@ void discovery() {
   CHECK(refused);
   const auto stable = devices / "serial/by-id/pico-role2";
   std::filesystem::create_symlink(port.slave, stable);
-  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").at(0).at("settings").at("Endpoint") == stable.string());
-  // Neither console nor management nor another product is a WTP candidate.
-  for (const auto &role : {"00\n", "04\n"}) {
-    Tree::write(tree.interface / "bInterfaceNumber", role);
-    CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  CHECK(discover(tree.root, devices).at("candidates").at(0).at("settings").at("Endpoint") == stable.string());
+  // Other roles never become candidates for the requested function.
+  for (const auto &other : {"00\n", management ? "02\n" : "04\n", "06\n"}) {
+    Tree::write(tree.interface / "bInterfaceNumber", other);
+    CHECK(discover(tree.root, devices).at("candidates").empty());
   }
-  Tree::write(tree.interface / "bInterfaceNumber", "02\n");
+  Tree::write(tree.interface / "bInterfaceNumber", role);
   Tree::write(tree.usb / "product", "Other serial device\n");
-  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  CHECK(discover(tree.root, devices).at("candidates").empty());
   Tree::write(tree.usb / "product", "WsprryPico\n");
   std::filesystem::create_directories(tree.root / "class/tty/duplicate");
   std::filesystem::create_symlink(port.slave, devices / "duplicate");
-  CHECK(wtp_usb_discovery(tree.root, devices).at("candidates").empty());
+  CHECK(discover(tree.root, devices).at("candidates").empty());
   std::filesystem::remove(devices / "duplicate");
   std::filesystem::remove(devices / "arbitrary-name");
-  const auto unplugged = wtp_usb_discovery(tree.root, devices);
+  const auto unplugged = discover(tree.root, devices);
   CHECK(unplugged.at("candidates").empty());
   refused = false;
   try { validate_discovered_usb(unplugged, id, settings); } catch (...) { refused = true; }
   CHECK(refused);
   ::setenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS", "1", 1);
-  CHECK(!wtp_usb_discovery(tree.root, devices).at("available").get<bool>());
+  CHECK(!discover(tree.root, devices).at("available").get<bool>());
   if (previous) ::setenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS", previous->c_str(), 1);
   else ::unsetenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
 }
 
-const std::string sid(32, '1'), owner(32, '2'), device_id(32, '4'),
-    boot(32, '5');
-const std::string capabilities =
-    R"({"profiles":["rf-events/1"],"modes":["tone"],"engine":"fake","frequency_ranges":[{"minimum_nhz":"1","maximum_nhz":"30000000000000000"}],"max_payload_bytes":65536,"max_events":162,"max_job_duration_ns":"110592000000","minimum_arm_lead_ns":"1000000","maximum_arm_ahead_ns":"10000000000","maximum_arm_uncertainty_ns":"1000000","maximum_holdover_age_ns":"1000000000","output_disable_timeout_ns":"1000000","minimum_lease_ms":5000,"maximum_lease_ms":60000,"response_cache_entries":8,"response_cache_ttl_seconds":300,"terminal_record_entries":8,"terminal_record_ttl_seconds":3600})";
-struct ServerFake : Fake {
-  wtp::FrameParser parser;
-  std::vector<wtp::Operation> operations;
-  bool claimed{};
-  void discard(int fd) override {
-    Fake::discard(fd);
-    parser = wtp::FrameParser{};
-  }
-  CdcTransfer write(int fd, std::span<const std::uint8_t> bytes) override {
-    auto result = Fake::write(fd, bytes);
-    if (result.count <= 0)
-      return result;
-    auto frames =
-        parser.feed(bytes.first(static_cast<std::size_t>(result.count)), 0);
-    for (const auto &frame : frames.events)
-      if (frame.kind == wtp::FrameEventKind::Payload) {
-        auto decoded =
-            wtp::decode({reinterpret_cast<const char *>(frame.payload.data()),
-                         frame.payload.size()});
-        CHECK(decoded);
-        const auto &r = std::get<wtp::Request>(*decoded.message);
-        operations.push_back(r.op);
-        std::string body;
-        if (r.op == wtp::Operation::Hello)
-          body = "{\"selected_version\":\"WTP/1\",\"device_id\":\"" +
-                 device_id + "\",\"boot_id\":\"" + boot +
-                 "\",\"product\":\"fake\",\"firmware_version\":\"1\"}";
-        else if (r.op == wtp::Operation::Status)
-          body =
-              "{\"boot_id\":\"" + boot +
-              "\",\"state\":\"empty\",\"output_active\":false,\"owner_id\":" +
-              (claimed ? "\"" + owner + "\"" : "null") +
-              ",\"job_id\":null,\"terminal_records\":[]}";
-        else if (r.op == wtp::Operation::Caps)
-          body = capabilities;
-        else if (r.op == wtp::Operation::Claim) {
-          claimed = true;
-          body = "{\"owner_id\":\"" + owner +
-                 "\",\"granted_lease_ms\":5000,\"expires_monotonic_ns\":"
-                 "\"5000000000\"}";
-        } else
-          throw std::runtime_error("unexpected test mutation");
-        const std::string reply =
-            "{\"type\":\"response\",\"protocol\":\"WTP/1\",\"session_id\":\"" +
-            r.session_id + "\",\"request_id\":\"" + r.request_id +
-            "\",\"op\":\"" + std::string(wtp::operation_name(r.op)) +
-            "\",\"ok\":true,\"body\":" + body + "}";
-        auto checked_reply = wtp::decode(reply);
-        if (!checked_reply)
-          throw std::runtime_error("Test reply: " + checked_reply.error);
-        auto encoded = wtp::encode_frame(
-            {reinterpret_cast<const std::uint8_t *>(reply.data()),
-             reply.size()});
-        incoming.insert(incoming.end(), encoded.begin(), encoded.end());
-      }
-    return result;
-  }
-};
-void session_integration() {
-  ServerFake os;
-  os.write_limit = 3;
-  os.read_limit = 7;
-  UsbCdcStream stream(os);
-  open_ready(stream);
-  wtp::Session session({sid, owner, device_id});
-  CHECK(session.connect(stream, 100));
-  CHECK(!session.request(wtp::Operation::Claim, wtp::LeaseRequest{owner, 5000},
-                         100));
-  auto pump = [&](std::uint64_t now) {
-    for (unsigned i = 0; i < 10000; ++i) {
-      session.poll(now);
-      if (session.phase() == wtp::SessionPhase::Ready && !session.busy() &&
-          !session.needs_status())
-        return;
-      if (session.phase() == wtp::SessionPhase::Fault ||
-          session.phase() == wtp::SessionPhase::Disconnected)
-        throw std::runtime_error("USB session: " + session.diagnostic() + "; " +
-                                 stream.diagnostic());
-    }
-    throw std::runtime_error("fake session stalled");
-  };
-  pump(100);
-  CHECK(os.operations == std::vector<wtp::Operation>({wtp::Operation::Hello,
-                                                      wtp::Operation::Status,
-                                                      wtp::Operation::Caps}));
-  CHECK(session.request(wtp::Operation::Claim, wtp::LeaseRequest{owner, 5000},
-                        100));
-  pump(100);
-  CHECK(session.take_result()->kind == wtp::ResultKind::Acknowledged);
-  wtp::Job job{std::string(32, '3'),
-               wtp::Mode::Tone,
-               1'000'000,
-               {{0, 1'000'000, true, 1'000'000'000}},
-               false};
-  CHECK(session.request(wtp::Operation::Load, job, 100));
-  session.poll(100); // Three bytes accepted, never a complete LOAD.
-  stream.close();
-  session.poll(101);
-  CHECK(session.take_result()->kind == wtp::ResultKind::Unknown &&
-        session.uncertain());
-  const auto previous = os.operations.size();
-  open_ready(stream, 200);
-  CHECK(session.connect(stream, 300));
-  pump(300);
-  CHECK(os.operations.size() == previous + 3);
-  CHECK(os.operations[previous] == wtp::Operation::Hello &&
-        os.operations[previous + 1] == wtp::Operation::Status);
-  CHECK(session.uncertain() &&
-        !session.request(wtp::Operation::Load, job, 300));
-  CHECK(!session.retry_uncertain(
-      300)); // Empty STATUS does not prove retransmission safe.
-  CHECK(session.request(wtp::Operation::Status, wtp::Empty{}, 300));
-  os.poll_result = {0, 0, 0};
-  session.poll(301);
-  session.poll(5299);
-  CHECK(session.busy());
-  session.poll(5300); // No accepted write bytes: idle deadline closes locally.
-  CHECK(session.take_result()->kind == wtp::ResultKind::NotSent);
-  CHECK(stream.state() == CdcState::Closed && session.uncertain());
-  os.poll_result = {1, POLLIN | POLLOUT, 0};
-  open_ready(stream, 6000);
-  CHECK(session.connect(stream, 6100));
-  pump(6100);
-  CHECK(session.request(wtp::Operation::Status, wtp::Empty{}, 6100));
-  os.write_limit = 4096;
-  os.read_limit = 0;
-  session.poll(6100);
-  session.poll(11099);
-  CHECK(session.busy());
-  session.poll(
-      11100); // Submitted request, stalled reply: unknown, never success.
-  CHECK(session.take_result()->kind == wtp::ResultKind::Unknown);
-  CHECK(stream.state() == CdcState::Closed && session.uncertain());
-  session.disconnect();
-}
 } // namespace
 int main() {
   try {
@@ -824,9 +737,9 @@ int main() {
     io_contract();
     metadata();
     discovery();
+    discovery(true);
     pseudo_terminal();
-    session_integration();
-    std::cout << "WTP USB CDC checks passed: " << checks
+    std::cout << "Management USB CDC checks passed: " << checks
               << " (fakes, synthetic sysfs and PTYs only)\n";
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';

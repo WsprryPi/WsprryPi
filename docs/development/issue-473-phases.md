@@ -2,39 +2,21 @@
 
 Status: ▧ not started · ⏳ in progress · ✅ complete.
 
-These indicators track implementation, not prompt preparation. All eight prompts
-have been prepared and reviewed. At preparation (2026-11-15), no implementation
-phase had started.
+These indicators track phase execution, not prompt preparation. Phase 1 is design-only; its completion does not claim application implementation. The original eight prompts were prepared and reviewed on 2026-11-15, before implementation started. Phase 6 was split into separately prompted 6.1 and 6.2 on 2026-11-16.
 
-Follow the [authoritative plan](device-owned-solar-scheduling-plan.md) for
-[issue #473](https://github.com/WsprryPi/WsprryPi/issues/473). Each prompt requires
-separate authorization to execute and successful prerequisite gates.
+Follow the [authoritative plan](device-owned-solar-scheduling-plan.md) for [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473). Each prompt requires separate authorization to execute and successful prerequisite gates.
 
-1. ▧ **Define contracts and decisions:** Resolve security, capabilities,
-   migration, ownership, persistence, and time/location requirements.
-   [Phase 1 prompt](issue-473/01-contracts-and-decisions.md)
-2. ▧ **Separate target management:** Manage local Pis, remote Pis, and Picos
-   independently of the controller's transmitter backend.
-   [Phase 2 prompt](issue-473/02-target-management.md)
-3. ▧ **Unify Setup controls:** Add the shared Device selector and move existing
-   controls into target-aware tabs.
-   [Phase 3 prompt](issue-473/03-shared-setup.md)
-4. ▧ **Build Pi solar policy:** Implement solar calculations and the complete
-   configuration lifecycle, preserving existing behavior when disabled.
-   [Phase 4 prompt](issue-473/04-solar-policy.md)
-5. ▧ **Prevent competing authorities:** Add safeguards and explicit migration
-   from controller-owned schedules before allowing new schedule enables.
-   [Phase 5 prompt](issue-473/05-authority-transition.md)
-6. ▧ **Integrate device-owned recurrence:** Apply solar policies to Pi scheduling,
-   including ownership, enablement, restart handling, and status.
-   [Phase 6 prompt](issue-473/06-device-recurrence.md)
-7. ▧ **Add shared Scheduling UI:** Provide target-specific scheduling controls
-   and verify autonomous remote operation.
-   [Phase 7 prompt](issue-473/07-scheduling-ui.md)
-8. ▧ **Complete documentation and validation:** Finish operator guides,
-   integration tests, visual reviews, and delivery evidence.
-   [Phase 8 prompt](issue-473/08-closeout.md)
+1. ✅ **Define contracts and decisions:** Resolve security, capabilities, migration, ownership, persistence, and time/location requirements. [Phase 1 prompt](issue-473/01-contracts-and-decisions.md) · [Approved decisions and phase-1 acceptance](issue-473/phase-1-decisions.md)
+2. ✅ **Separate target management:** Manage the local Pi and existing Picos independently of the controller's transmitter backend; keep new remote Pi management unavailable under the approved security deferral. [Phase 2 prompt](issue-473/02-target-management.md) · [Phase-2 acceptance and deferred-security boundary](issue-473/phase-2-progress.md)
+3. ✅ **Unify Setup controls:** Add the shared Device selector and move existing controls into target-aware tabs. [Phase 3 prompt](issue-473/03-shared-setup.md) · [Phase-3 implementation and validation](issue-473/phase-3-progress.md)
+4. ✅ **Build Pi solar policy:** Implement solar calculations and the complete configuration lifecycle, preserving existing behavior when disabled. [Phase 4 prompt](issue-473/04-solar-policy.md) · [Phase-4 implementation and validation](issue-473/phase-4-progress.md)
+5. ✅ **Prevent competing authorities:** Add safeguards and explicit migration from controller-owned schedules before allowing new schedule enables. [Phase 5 prompt](issue-473/05-authority-transition.md) · [Phase-5 implementation and validation](issue-473/phase-5-progress.md)
+6. ✅ **Device-owned recurrence and secure remote management:** Both subphases require separate execution authority and acceptance before phase 7.
+   - ✅ **6.1 Integrate device-owned recurrence:** Apply solar policies to Pi scheduling, including ownership, enablement, restart handling, and status. [Phase 6.1 prompt](issue-473/06-device-recurrence.md) · [Phase 6.1 progress](issue-473/phase-6-1-progress.md)
+   - ✅ **6.2 Complete Pi security and remote management:** Deliver automatic pairing/TLS, authenticated remote adapters, and deferred editor/handover integration. [Phase 6.2 prompt](issue-473/06-2-pi-security.md) · [Phase 6.2 progress](issue-473/phase-6-2-progress.md) · [Annotated data-flow diagrams](issue-473/phase-6-2-data-flow.md) · [Security-gate requirements](issue-473/deferred-pi-security.md) Accepted on 2026-11-18 after repeated adversarial review and fixes. Automatic pairing/rotation, native Pi editing, automatic attached-Pico management, authenticated retirement and two restore cycles pass actual protected HTTP/PAKE/TLS/USB-handler and journal fixtures, including unknown replies, revocation, fresh-process crash recovery and positive retired-key closure. The final intended source pair passes strict compilation, 45 foundation targets and both complete network/USB suites. All four Linux package/loading/startup profiles, ARM and Intel Mac application/role checks, portable semantics, full UI/browser checks and rendered operator documentation pass. [Final acceptance evidence](issue-473/phase-6-2-final-acceptance.json) and [review record](issue-473/phase-6-2-progress.md#final-acceptance-and-adversarial-assessment) identify exact sources and qualification limits. WTP and browser-hop security reviews remain backlogged. No hardware, installation, service, timing or RF qualification is claimed; phase 7 was not started by that acceptance.
+7. ✅ **Add shared Scheduling UI:** Provide target-specific scheduling controls and verify autonomous remote operation. [Phase 7 prompt](issue-473/07-scheduling-ui.md) · [Acceptance evidence](issue-473/phase-7-acceptance.json) · [Review record](issue-473/phase-7-progress.md#final-acceptance) Accepted on 2026-11-18 after repeated adversarial assessment and fixes. Local and paired Pis share target-bound controls with explicit disabled-save/readback/enable, retained drafts and uncertain-write recovery. Two actual-main simulated targets continued scheduled admissions and execution without the browser/controller, with no reconnect replay. Both complete exact-source network/USB suites, UI/browser checks, portable semantics and rendered operator guides pass. Pico controls preserve existing capabilities; no firmware or protocol changes were required. Physical hardware, installation, service, timing and RF qualification remain separate. Phase 8 is accepted below.
+8. ✅ **Complete documentation and validation:** Finish operator guides, integration tests, visual reviews, and delivery evidence. [Phase 8 prompt](issue-473/08-closeout.md) · [Requirement matrix](issue-473/phase-8-requirement-matrix.md) · [Acceptance evidence](issue-473/phase-8-acceptance.json) · [Review record](issue-473/phase-8-progress.md#final-acceptance) Accepted on 2026-11-18 after current-source integrated validation and repeated adversarial assessment. All eight software phases are complete for the identified feature-branch candidates. Full Linux and portable semantics, security/authority/configuration/recurrence checks, both actual network/USB suites, paired browsers, two-target autonomy and strict rendered documentation pass. Final independent review of 64 current captures reports no remaining actionable UI/documentation issue. No release, merge, issue closure, deployment or physical qualification is implied; the WTP and browser-hop security reviews remain backlogged.
 
-Read the [shared execution rules and prompt review record](issue-473/execution-rules.md)
-with every prompt. Update an indicator only from actual phase evidence; ✅ requires
-its acceptance gate and applicable documentation and validation to be satisfied.
+The user approved the [security sequencing amendment](issue-473/deferred-pi-security.md) on 2026-11-16. It preserves all eight phases, existing WTP/Pico TLS, and the eventual automatic-security requirements. It authorizes no later-phase execution.
+
+Read the [shared execution rules and prompt review record](issue-473/execution-rules.md) with every prompt. Update an indicator only from actual phase evidence; ✅ requires its acceptance gate and applicable documentation and validation to be satisfied.

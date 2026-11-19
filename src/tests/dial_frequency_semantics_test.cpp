@@ -705,7 +705,7 @@ int main(int argc, char *argv[])
         ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
         auto data = make_managed_ini_data(
             "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
-        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Transmit Backend"] = "gpio";
         data["Operation"]["Use LED"] = "false";
         data["Operation"]["Use Amp"] = "false";
         data["Operation"]["Use Shutdown"] = "false";
@@ -730,7 +730,7 @@ int main(int argc, char *argv[])
         write_managed_ini_file(ini.path(), data);
         reset_getopt_state();
         std::vector<std::string> args = {
-            "wsprrypi", "-i", ini.path(),
+            "wsprrypi", "--backend", "simulated",
             "--dfcw-message", "ET E",
             "--dfcw-dot-frequency", "137505",
             "--dfcw-dash-frequency", "137500",
@@ -738,30 +738,31 @@ int main(int argc, char *argv[])
         std::vector<char *> parsed_argv = argv_for(args);
         require(
             parse_command_line(static_cast<int>(parsed_argv.size()), parsed_argv.data()),
-            "managed WTP INI plus complete transient DFCW request must parse");
+            "explicit simulated transient DFCW request must parse");
         std::string message;
         double dot_hz = 0.0;
         double dash_hz = 0.0;
         double dot_seconds = 0.0;
         require(
-            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+            !config.use_ini && config.transmit_backend == TransmitBackendKind::SIMULATED &&
                 try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
                 message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
                 nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
-            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
-        std::cout << "Managed WTP transient INI parsing passed" << std::endl;
+            "native transient DFCW must preserve explicit reverse-profile frequencies");
+        std::cout << "Managed native transient INI parsing passed" << std::endl;
         return EXIT_SUCCESS;
     }
     if (argc == 2 && std::string(argv[1]) == "--calibration-roundtrip-only")
     {
         init_config_json();
         json_to_config();
+        config.simulated_backend_override = true; // Explicit hardware-free candidate validation.
         for (const double value : {0.0, -0.0, 12.345678, -3.5})
         {
             auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
-            // WTP is compiled in the portable profile. Candidate preparation
-            // validates these fixture identities without opening an endpoint.
-            data["Operation"]["Transmit Backend"] = "wtp";
+            // Preserve a valid saved native backend while selecting the
+            // simulated execution profile explicitly for this fixture.
+            data["Operation"]["Transmit Backend"] = "gpio";
             data["WTP"] = {{"Endpoint", "/dev/calibration-test"},
                 {"USB Serial", "calibration-test"}, {"USB Vendor ID", "1"},
                 {"USB Product ID", "2"}, {"Device ID", std::string(32, 'a')}};
@@ -814,7 +815,7 @@ int main(int argc, char *argv[])
         }
         {
             auto data = make_managed_ini_data("AA0NT", "EM18", "20m", false);
-            data["Operation"]["Transmit Backend"] = "wtp";
+            data["Operation"]["Transmit Backend"] = "gpio";
             data["WTP"] = {{"Endpoint", "/dev/calibration-test"},
                 {"USB Serial", "calibration-test"}, {"USB Vendor ID", "1"},
                 {"USB Product ID", "2"}, {"Device ID", std::string(32, 'a')}};
@@ -6752,33 +6753,10 @@ int main(int argc, char *argv[])
     {
         init_default_config();
         config.use_ini = true;
-        config.ini_filename = "/tmp/wtp_server_settings_patch.ini";
-        config.wtp_server_port_override = 31419;
+        config.ini_filename = "/tmp/retired_listener_settings.ini";
         config_to_json();
-        require(config.wtp_server.enabled && config.wtp_server.port == 31417 &&
-                    config.wtp_server.interface == "auto",
-                "WTP server defaults must enable Plain LAN on port 31417");
-        patch_all_from_web({{"WTP Server", {{"Enabled", false},
-                                               {"Port", 31418},
-                                               {"Interface", "eth0"}}}});
-        require(!config.wtp_server.enabled && config.wtp_server.port == 31418 &&
-                    config.wtp_server.interface == "eth0" &&
-                    config.wtp_server_port_override == 31419,
-                "WTP server settings must apply through HTTP config writes");
-        const auto saved = iniFile.getData();
-        require(saved.at("WTP Server").at("Enabled") == "false" &&
-                    saved.at("WTP Server").at("Port") == "31418" &&
-                    saved.at("WTP Server").at("Interface") == "eth0",
-                "WTP server settings must persist in INI");
-        PreparedConfigCandidate candidate;
-        prepare_ini_config_candidate(config.ini_filename, candidate);
-        require(candidate.valid && !candidate.normalized_config.wtp_server.enabled &&
-                    candidate.normalized_config.wtp_server.port == 31418 &&
-                    candidate.normalized_config.wtp_server.interface == "eth0",
-                "WTP server settings must survive managed INI reload");
-        commit_config_candidate(candidate);
-        require(config.wtp_server_port_override == 31419,
-                "managed INI reload must retain transient WTP server port override");
+        require(!config.wtp_server.enabled && !get_public_config_json().contains("WTP Server") && !get_public_config_json().contains("WTP"),
+                "retirement defaults must disable listeners and omit retired public settings");
     }
 
     {
@@ -7343,7 +7321,7 @@ int main(int argc, char *argv[])
         ScopedTemporaryFile ini("/tmp/wsprrypi-wtp-transient-XXXXXX");
         auto data = make_managed_ini_data(
             "AA0NT", "EM18", "20m", true, WsprPlannerPreference::Auto, "Follow");
-        data["Operation"]["Transmit Backend"] = "wtp";
+        data["Operation"]["Transmit Backend"] = "gpio";
         data["Operation"]["Use LED"] = "false";
         data["Operation"]["Use Amp"] = "false";
         data["Operation"]["Use Shutdown"] = "false";
@@ -7368,7 +7346,7 @@ int main(int argc, char *argv[])
         write_managed_ini_file(ini.path(), data);
         reset_getopt_state();
         std::vector<std::string> args = {
-            "wsprrypi", "-i", ini.path(),
+            "wsprrypi", "--backend", "simulated",
             "--dfcw-message", "ET E",
             "--dfcw-dot-frequency", "137505",
             "--dfcw-dash-frequency", "137500",
@@ -7376,17 +7354,18 @@ int main(int argc, char *argv[])
         std::vector<char *> argv = argv_for(args);
         require(
             parse_command_line(static_cast<int>(argv.size()), argv.data()),
-            "managed WTP INI plus complete transient DFCW request must parse");
+            "explicit simulated transient DFCW request must parse");
         std::string message;
         double dot_hz = 0.0;
         double dash_hz = 0.0;
         double dot_seconds = 0.0;
         require(
-            config.use_ini && config.transmit_backend == TransmitBackendKind::WTP &&
+            !config.use_ini && config.transmit_backend == TransmitBackendKind::SIMULATED &&
                 try_get_dfcw_startup_request(message, dot_hz, dash_hz, dot_seconds) &&
                 message == "ET E" && nearly_equal(dot_hz, 137505.0) &&
                 nearly_equal(dash_hz, 137500.0) && nearly_equal(dot_seconds, 3.0),
-            "managed WTP transient DFCW must preserve explicit reverse-profile frequencies");
+            "native transient DFCW must preserve explicit reverse-profile frequencies");
+        config.simulated_backend_override = false;
     }
 
     {

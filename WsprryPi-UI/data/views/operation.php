@@ -7,6 +7,14 @@ unset($cardFleetSelector);
 ?>
 
             <div class="card-body operation-card-body">
+                <section id="operationControllerView" hidden aria-labelledby="operationControllerHeading">
+                    <h2 id="operationControllerHeading" class="h5">Select an assigned output</h2>
+                    <p id="operationControllerDetail" class="form-text">This controller has no local transmitter. Choose an assigned output above or manage outputs in Fleet.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-primary" href="index.php?page=config&amp;setup_tab=%23fleet-pane">Manage Fleet</a>
+                        <button id="operationControllerRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
+                    </div>
+                </section>
                 <div id="operationLocalView">
                 <p id="operationLocalRoute" class="form-text" hidden></p>
                 <section class="operation-hero" aria-labelledby="operationPageTitle">

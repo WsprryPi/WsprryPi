@@ -281,6 +281,7 @@ struct ArgParserConfig
     bool use_offset; ///< Enable WSPR random frequency offset.
     int power_level; ///< Active backend RF power level.
     TransmitBackendKind transmit_backend; ///< RF hardware backend.
+    bool stored_wtp_backend = false; ///< Storage-only legacy activation, preserved across process overrides.
     bool simulated_backend_override = false; ///< Explicit process-only CLI selection.
     WtpSettings wtp;
     WtpServerSettings wtp_server; ///< Independent inbound WTP listener settings.
@@ -465,6 +466,7 @@ struct ArgParserConfig
         use_offset = other.use_offset;
         power_level = other.power_level;
         transmit_backend = other.transmit_backend;
+        stored_wtp_backend = other.stored_wtp_backend;
         simulated_backend_override = other.simulated_backend_override;
         wtp = other.wtp;
         wtp_server = other.wtp_server;

@@ -5,7 +5,7 @@
 #include "scheduling_internal.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "wspr_transmit.hpp"
-#include "wtp_integration/execution_plan.hpp"
+#include "json.hpp"
 
 #include <array>
 #include <cmath>
@@ -17,7 +17,6 @@
 #include <unistd.h>
 #include <vector>
 
-namespace wtp = wsprrypi::wtp;
 
 namespace {
 unsigned checks = 0;
@@ -89,21 +88,12 @@ struct Draws {
         return values.at(calls++);
     }
 };
-wtp::Capabilities capabilities() {
-    wtp::Capabilities c;
-    c.profiles = {"rf-events/1"}; c.modes = {wtp::Mode::Wspr};
-    c.frequency_ranges = {{1, std::numeric_limits<std::uint64_t>::max()}};
-    c.max_events = 512; c.max_payload_bytes = 65536;
-    c.max_job_duration_ns = 86'400'000'000'000ULL;
-    c.maximum_arm_uncertainty_ns = 500'000'000;
-    return c;
-}
 constexpr std::array<double, 4> plus37 = {
     14097134.802734375, 14097136.267578125, 14097137.732421875, 14097139.197265625};
 constexpr std::array<double, 4> minus21 = {
     14097076.802734375, 14097078.267578125, 14097079.732421875, 14097081.197265625};
 void verify(double offset, unsigned frame, const std::array<double, 4> &tones,
-            bool convert = true) {
+            bool = true) {
     const auto request = current_transmission_request_for_test();
     equal(request.dial_frequency_hz, 14095600, "committed dial");
     equal(request.applied_offset_hz, offset, "committed placement");
@@ -135,24 +125,7 @@ void verify(double offset, unsigned frame, const std::array<double, 4> &tones,
         check(e.rf_on && e.offset_from_start.count() == static_cast<long long>(i) * 682666666 &&
               e.duration.count() == 682666666, "RF gate and symbol timeline preserved");
     }
-    if (!convert) return;
-    const auto wire = wsprrypi::prepare_wtp_plan(plan, capabilities(),
-        {std::string(32, 'a'), 1'800'000'000'000'000'000ULL, 1000});
-    check(bool(wire), "actual scheduler slot converts to WTP: " + wire.explanation);
-    check(wire.prepared->job.events.size() == 162 &&
-          wire.prepared->job.total_duration_ns == 110591999892ULL &&
-          wire.prepared->request_id.value == plan.request_id.value,
-          "WTP identity, frame count and duration retained");
-    // Independent integer constants; no second dial-to-center/random conversion.
-    const std::array<std::uint64_t, 4> nhz = offset == 37
-        ? std::array<std::uint64_t, 4>{14097134802734375ULL,14097136267578125ULL,14097137732421875ULL,14097139197265625ULL}
-        : std::array<std::uint64_t, 4>{14097076802734375ULL,14097078267578125ULL,14097079732421875ULL,14097081197265625ULL};
-    for (std::size_t i = 0; i < 162; ++i) {
-        const auto &e = wire.prepared->job.events[i];
-        check(e.rf_on && e.frequency_nhz == nhz.at(request.payload.frames[0].symbols[i]) &&
-              e.offset_ns == i * 682666666ULL && e.duration_ns == 682666666ULL,
-              "WTP events remain absolute with exact timing");
-    }
+
 }
 void pair_and_independent() {
     Fixture f; Draws draws{{37, -21, -21, 0}};
@@ -433,13 +406,14 @@ void export_scheduler_vectors(const char *path) {
         const auto request = current_controller_request_for_test();
         check(request.has_value(), "export committed scheduler request");
         const auto plan = wsprrypi::ExecutionPlanCompiler{}.compile(*request);
-        const auto wire = wsprrypi::prepare_wtp_plan(plan, capabilities(),
-            {std::string(32, static_cast<char>('a' + i)), 1'800'000'000'000'000'000ULL, 1000});
-        check(bool(wire), "export production WTP conversion");
-        const auto encoded = wtp::encode_request({std::string(32, '1'),
-            std::string(32, static_cast<char>('a' + i)), wtp::Operation::Load, wire.prepared->job});
-        check(bool(encoded), "encode scheduler-produced WTP LOAD");
-        output << *encoded.payload << '\n';
+        nlohmann::json events=nlohmann::json::array();
+        for(const auto &event:plan.events){
+            const auto frequency=static_cast<std::uint64_t>(std::round(static_cast<long double>(event.frequency_hz)*1'000'000'000.0L));
+            events.push_back({{"offset_ns",std::to_string(event.offset_from_start.count())},
+                {"duration_ns",std::to_string(event.duration.count())},{"rf_on",event.rf_on},{"frequency_nhz",std::to_string(frequency)}});
+        }
+        output<<nlohmann::json{{"schema","native-plan-fixture/1"},{"job_id",std::string(32,static_cast<char>('a'+i))},
+            {"mode","wspr"},{"total_duration_ns",std::to_string(plan.summary.total_duration.count())},{"events",events}}.dump()<<'\n';
     }
     output.close();
     check(bool(output) && draws.calls == 2, "export complete with one draw per randomized plan");
@@ -447,7 +421,7 @@ void export_scheduler_vectors(const char *path) {
 } // namespace
 int main(int argc, char **argv) {
     try {
-        if (argc == 3 && std::string(argv[1]) == "--export-wtp") {
+        if (argc == 3 && std::string(argv[1]) == "--export-native-tests") {
             export_scheduler_vectors(argv[2]);
             return 0;
         }

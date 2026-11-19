@@ -30,6 +30,9 @@
 // Primary header for this source file
 #include "main.hpp"
 #include "si5351_inventory_process.hpp"
+#include "controller_runtime.hpp"
+#include "pi_managed_host_runtime.hpp"
+#include "web_server_routes.hpp"
 
 // Project headers
 #include "arg_parser.hpp"
@@ -225,11 +228,16 @@ void callback_signal_handler(int signum, bool is_critical)
  */
 int main(int argc, char *argv[])
 {
+    const bool controller_only = controller_only_requested(argc, argv);
+    // Role parsing must precede even diagnostic helpers: mixed invocations
+    // cannot use an early hardware-inventory exit to evade role validation.
     // Export only the bundled diagnostic worker; no singleton or transmitter initialization.
-    if (const auto worker_exit = udp_worker_image_main(argc,argv)) return *worker_exit;
-    // Inventory workers never acquire the application singleton or initialize output.
-    if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
-        return *inventory_exit;
+    if (!controller_only) {
+        if (const auto worker_exit = udp_worker_image_main(argc,argv)) return *worker_exit;
+        // Inventory workers never acquire the application singleton or initialize output.
+        if (const auto inventory_exit = si5351_inventory_process::helper_main(argc, argv))
+            return *inventory_exit;
+    }
     // Maintain retval for main()
     int retval = EXIT_SUCCESS;
 
@@ -308,18 +316,24 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (simulated_backend)
+    if (simulated_backend || controller_only)
         set_hardware_platform_detection_enabled(false);
 
     // Sets up logger based on DEBUG flag: INFO or DEBUG
     initialize_logger();
 
     // Parse command line first allowing calls for -h or -v
-    handle_early_cli_options(argc, argv);
+    if (!controller_only) handle_early_cli_options(argc, argv);
+    else {
+        for (int i = 1; i < argc; ++i)
+            if (std::string_view(argv[i]) == "--help" || std::string_view(argv[i]) == "-h")
+                print_usage("Controller-only mode has no local transmitter; use -i <file> for controller state.", EXIT_SUCCESS);
+    }
 
     // Preserve the pre-parse privilege boundary for every executable capable
-    // of physical GPIO. Only an explicit simulation bypasses this legacy gate.
-    if (getuid() != 0 && !simulated_backend &&
+    // of physical GPIO. Explicit simulation and the no-output controller role
+    // bypass this legacy gate; neither can be selected after a startup failure.
+    if (getuid() != 0 && !simulated_backend && !controller_only &&
         build_has_physical_gpio_capability())
     {
         print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
@@ -333,12 +347,23 @@ int main(int argc, char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
+    // Keep the managed owner alive until the scheduling loop has stopped all
+    // workers. Recover durable input before the component first opens the INI.
+    std::shared_ptr<wsprrypi::PiManagedHost> managed_host;
     // Now do the full arguments check
     try
     {
-        if (!parse_command_line(argc, argv))
+        if (controller_only)
         {
-            print_usage("Failure parsing command line.", EXIT_FAILURE);
+            configure_controller_only(argc, argv);
+        }
+        else
+        {
+            if(const auto ini=wsprrypi::pi_managed_ini_argument(argc,argv))
+                managed_host=wsprrypi::prepare_pi_managed_host(*ini);
+            if(!parse_command_line(argc, argv))
+                print_usage("Failure parsing command line.", EXIT_FAILURE);
+            if(managed_host)managed_host->parsed();
         }
     }
     catch (const std::exception &e)
@@ -351,7 +376,7 @@ int main(int argc, char *argv[])
     // GPIO-capable executables retain the legacy privilege boundary. A
     // GPIO-free Si5351 executable relies on the selected I2C device's ordinary
     // kernel permissions, and simulation requires no hardware privilege.
-    if (getuid() != 0 && transmit_backend_requires_root(config.transmit_backend))
+    if (getuid() != 0 && !controller_only && transmit_backend_requires_root(config.transmit_backend))
     {
         print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
     }
@@ -381,11 +406,10 @@ int main(int argc, char *argv[])
                   config.date_time_log ? "enabled" : "disabled");
     }
 
-    llog.logS(
-        INFO,
-        "Platform: ",
-        get_pi_model(),
-        ".");
+    if (controller_only)
+        llog.logS(INFO, "Role: controller-only; no local transmitter output.");
+    else
+        llog.logS(INFO, "Platform: ", get_pi_model(), ".");
 
     llog.logS(
         INFO,
@@ -419,6 +443,7 @@ int main(int argc, char *argv[])
         retval = EXIT_FAILURE;
     }
 
+    web_server_routes::retire_control_management();
     // Stop the SignalHandler.
     signalHandler.stop();
 

@@ -25,7 +25,8 @@ async function main() {
   await client.send('Page.navigate',{url:`http://127.0.0.1:${phpPort}/index.php?page=config`});
   await waitFor(()=>evaluate('document.readyState==="complete" && typeof buildConfigPayload==="function"'),'shipped setup');
   await evaluate(`
-   globalThis.autosaveCalls=0;scheduleAutosave=()=>{autosaveCalls++};
+   // This isolated presentation fixture supplies fields below instead of an owning HTTP read.
+   window.SetupTargets.localLoaded();globalThis.autosaveCalls=0;scheduleAutosave=()=>{autosaveCalls++};
    window.WSPRRYPI_PLATFORM={...(window.WSPRRYPI_PLATFORM||{}),raspberryPiGeneration:5,rp1GpioOperatorVisible:true,gpioClockTransmissionSupported:true};
    setTransmitBackendSelection('gpio');clickTransmitBackend();
    document.querySelectorAll('.modal.show').forEach(el=>{bootstrap.Modal.getInstance(el)?.hide();el.classList.remove('show');el.style.display='none'});

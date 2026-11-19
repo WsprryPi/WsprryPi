@@ -14,6 +14,8 @@ Remaining feature items:
   and Windows host support. Track [WsprryPi issue #475](https://github.com/WsprryPi/WsprryPi/issues/475),
   read the [implementation plan](docs/development/controller-only-linux-plan.md),
   and follow the [implementation prompt](docs/development/issue-475-implementation-prompt.md).
+- ▧ Review WTP's remaining role alongside device-owned scheduling and management APIs: identify capabilities still needed by remote jobs, the WTP backend and existing clients; decide whether to retain, consolidate or retire those paths, and evaluate automatic pairing-based TLS for retained WTP communications using separate purpose-bound keys. Existing WTP TLS support and compatibility remain unchanged until that review is approved.
+- ▧ Review and propose automatic security for the browser-to-device hop, covering web pages, API requests and WebSockets, including pairing-code display and submission. Evaluate HTTPS/WSS, initial browser trust, device address changes and ownership transfer without manual certificate or key provisioning; define Linux/macOS packaging and recovery requirements before implementation.
 - ✅ Implement the Fleet Operations device selector, per-device status and
   controls, required coordinated Pi/Pico changes, documentation, and validation.
   Follow the [implementation prompt](release_tools/Fleet%20Operations%20Implementation%20Prompt.md).

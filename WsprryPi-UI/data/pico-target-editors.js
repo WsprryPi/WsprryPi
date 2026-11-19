@@ -1,0 +1,445 @@
+// SPDX-License-Identifier: MIT
+(function (root) {
+    'use strict';
+    const identity = value => typeof value === 'string' && /^[0-9a-f]{32}$/.test(value);
+    function create(host) {
+        const client = host.PicoTargetClient.create({base:host.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1'});
+        const entries = new Map();
+        let active = null, selection = 0, template;
+        const node = id => host.document.getElementById(id);
+        const fingerprint = profile => JSON.stringify([profile.managed === true,profile.id,profile.name,profile.settings]);
+        const busy = entry => entry.pending > 0 || entry.panel.querySelector('[aria-busy="true"]') !== null;
+        function retained() {
+            const disclosure = node('pico-target-retained'),list = node('pico-target-retained-list');
+            const drafts = Array.from(entries.values()).filter(entry => entry !== active);
+            disclosure.hidden = drafts.length === 0;
+            list.replaceChildren();
+            for (const entry of drafts) {
+                const row = host.document.createElement('details'),title = host.document.createElement('summary');
+                row.className = 'mt-2';title.className = 'text-break';row.dataset.retainedDevice = entry.profile.settings['Device ID'];
+                title.textContent = entry.profile.managed ? `${entry.profile.name} · paired connection · retained draft` : `${entry.profile.name} · saved profile ${entry.generation || 'not connected'}`;
+                row.append(title);list.append(row);
+                row.addEventListener('toggle',() => {
+                    if (!row.open || row.childElementCount > 1) return;
+                    const identity = host.document.createElement('p');identity.className = 'form-text text-break';
+                    identity.textContent = `Device ${entry.profile.settings['Device ID']}. Read-only retained entries; saved values may have changed.`;
+                    const values = host.document.createElement('dl');values.className = 'text-break';
+                    for (const field of entry.panel.querySelectorAll('input,select,textarea')) {
+                        if (['button','submit','hidden'].includes(field.type) || field.type === 'radio' && !field.checked) continue;
+                        const label = (field.id ? entry.panel.querySelector(`label[for="${host.CSS.escape(field.id)}"]`) : null) || field.closest('label');
+                        const term = host.document.createElement('dt'),detail = host.document.createElement('dd');
+                        const labelContent = label?.cloneNode(true);
+                        labelContent?.querySelectorAll('input,select,textarea,button,option').forEach(control => control.remove());
+                        term.textContent = labelContent?.textContent.trim().slice(0,160) || field.getAttribute('aria-label') ||
+                            field.id.replace(/^wtp-(?:remote-|member-|usb-)?/,'').replaceAll('-',' ') || field.name || 'Setting';
+                        detail.textContent = field.type === 'password' ? field.value ? 'A password entry is retained but is not displayed. Enter it again in a current editor if needed.' : 'No password entry.'
+                            : field.type === 'checkbox' ? field.checked ? 'Yes' : 'No'
+                            : field.tagName === 'SELECT' ? Array.from(field.selectedOptions).map(option => option.textContent).join(', ') || 'No selection'
+                            : field.value || 'Empty';
+                        values.append(term,detail);
+                    }
+                    row.append(identity,values);
+                });
+            }
+        }
+        function ledger() {
+            const list = node('pico-target-operations');
+            if (!list) return;
+            list.replaceChildren();
+            for (const record of client.operations().slice().reverse()) {
+                const row = host.document.createElement('li');
+                row.textContent = `${record.device} · ${record.resource} · ${record.state}`;
+                list.append(row);
+            }
+        }
+        function recovery(entry) {
+            if (active !== entry) return;
+            entry.panel.inert = Boolean(entry.hold) || entry.paused;
+            node('pico-target-recovery').hidden = !entry.hold;
+            if (!entry.hold) return;
+            node('pico-target-recovery-state').textContent = entry.recoveryMessage || 'An earlier change is unconfirmed on this Pico. Your draft is preserved. Read its current settings and review them before another change.';
+            node('pico-target-review-recovery').disabled = !entry.observed || entry.recovering || entry.paused;
+            node('pico-target-read-recovery').disabled = entry.recovering || entry.paused;
+        }
+        function hold(entry, hint) {
+            entry.hold = hint; entry.observed = null;
+            entry.nativeHold = true;
+            entry.recoveryMessage = '';
+            if (active === entry) node('pico-target-recovery-observation').replaceChildren();
+            recovery(entry);
+        }
+        async function generation(entry) {
+            const value = await entry.handle.generation();
+            const key = `${entry.profile.settings['Device ID']}:${entry.handle.scope || entry.profile.id}:${value}`;
+            if (!entries.has(key) || entries.get(key) === entry) {
+                if (entry.key && entries.get(entry.key) === entry) entries.delete(entry.key);
+                entry.key = key; entries.set(key,entry);
+            }
+            entry.generation = value;
+            if (entries.get(key) !== entry && !entry.restoreObserver) {
+                entry.restoreObserver = new host.MutationObserver(() => restoreConnected(entry,key));
+                entry.restoreObserver.observe(entry.panel,{attributes:true,attributeFilter:['aria-busy']});
+                host.queueMicrotask(() => restoreConnected(entry,key));
+            }
+            return key;
+        }
+        function restoreConnected(entry,key) {
+            if (active !== entry || entry.paused) {entry.restoreObserver?.disconnect();entry.restoreObserver = null;return;}
+            if (busy(entry)) return;
+            const saved = entries.get(key);if (!saved || saved === entry) return;
+            entry.restoreObserver.disconnect();entry.restoreObserver = null;
+            entry.paused = true;++entry.epoch;entry.panel.remove();
+            if (entries.get(entry.key) === entry) entries.delete(entry.key);
+            saved.handle = entry.handle;saved.paused = false;++saved.epoch;
+            saved.management.invalidate();saved.usb.invalidate();saved.udp.invalidate();
+            active = saved;node('pico-target-panel').append(saved.panel);
+            saved.management.setAvailability(saved.handle.state.connected,true);
+            saved.usb.setAvailability(saved.handle.state.carrier === 'usb_physical');saved.udp.setAvailability(saved.handle.state.connected);
+            node('pico-target-feedback').textContent = 'Connected to this Pico. Its retained draft is restored; read current saved settings before another change.';
+            recovery(saved);ledger();retained();notify();
+        }
+        function response(result) {
+            const headers = new Headers(result.response.headers);
+            headers.set('Content-Type','application/json');
+            return new Response(JSON.stringify(result.data),{status:result.response.status,headers});
+        }
+        async function exchange(entry, url, options = {}) {
+            if (entry.paused || !entry.handle) throw Error('This editor needs a fresh connection. Its draft is preserved.');
+            const base = host.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1';
+            if (typeof url !== 'string' || !url.startsWith(base + '/')) throw Error('Unsupported Pico settings path.');
+            const path = url.slice(base.length + 1);
+            const resource = path.startsWith('member/') ? path.slice(7) : path;
+            const method = options.method || 'GET', mutation = method !== 'GET';
+            if (!host.WsprryControl.controllerAdapter.pico_routes[method]?.includes(resource)) throw Error('Unsupported Pico setting.');
+            if (entry.hold && mutation && resource !== 'management') throw Error('Review the unconfirmed change before another save.');
+            const handle = entry.handle, epoch = entry.epoch;
+            const body = options.body ? JSON.parse(options.body) : undefined;
+            const headers = new Headers(options.headers || {});
+            ++entry.pending;
+            try {
+                let result = await handle.request(resource,{method,body,revision:headers.get('If-Match') || '',memberContext:headers.get('X-WsprryPi-Member-Context') || ''});
+                const tracked = result.operation && client.operations().find(record => record.device === handle.device && record.operation === result.operation);
+                const uncertain = mutation && resource !== 'management' && resource !== 'pins/validate' &&
+                    (result.data?.schema === 'target-operation' && ['pending','unknown'].includes(result.data.state) ||
+                        tracked?.state === 'unconfirmed' || result.response.status >= 500);
+                if (uncertain || result.recovery && !result.response.ok)
+                    hold(entry,result.recovery || {device:handle.device,operation:result.operation,resource,read:host.WsprryControl.controllerRecoveryRead(resource)});
+                if (result.data?.schema === 'target-error' && ['profile_changed','connection_changed','capability_changed','unauthenticated','unauthorized'].includes(result.data.error?.code)) {
+                    entry.paused = true;++entry.epoch;handle.retire();entry.panel.inert = true;
+                    if (active === entry) node('pico-target-feedback').textContent = 'This Pico connection changed or permission was withdrawn. Its draft is preserved. Manage the intended saved Pico again before editing.';
+                }
+                if (entry.paused || epoch !== entry.epoch) throw Error('The response belongs to the previous editor. Its request remains tracked on that Pico.');
+                if (resource === 'management' && method === 'POST' && result.response.ok &&
+                    !['inspect_logins','retire_login','reconcile'].includes(body?.action)) {
+                    if (body?.action === 'disconnect') {
+                        handle.retire(); entry.handle = await client.open(entry.profile);
+                        result = await entry.handle.request('management');
+                    } else {
+                        result = await handle.request('management');
+                        if (result.response.ok && result.data.connected) await generation(entry);
+                    }
+                }
+                if (entry.paused || epoch !== entry.epoch) throw Error('This editor was superseded. Its draft is preserved.');
+                entry.usb?.setAvailability(entry.handle.state.connected && entry.handle.state.carrier === 'usb_physical');
+                entry.udp?.setAvailability(entry.handle.state.connected);
+                return response(result);
+            } catch (error) {
+                if (error.code === 'request_unconfirmed' && error.operation)
+                    hold(entry,{device:handle.device,operation:error.operation,resource,read:host.WsprryControl.controllerRecoveryRead(resource)});
+                throw error;
+            } finally {--entry.pending;ledger();recovery(entry);notify();}
+        }
+        function stopControls() {
+            const entry=active,available=!!entry && !entry.paused && entry.handle?.state.connected && !entry.nativeStopBusy;
+            if(node('pico-native-stop'))node('pico-native-stop').disabled=!available || !!entry?.nativeStopUnknown || !!entry?.nativeStopUnsupported;
+            if(node('pico-native-stop-read'))node('pico-native-stop-read').disabled=!available;
+            if(node('pico-native-status-read'))node('pico-native-status-read').disabled=!available || !!entry?.nativeStatusBusy;
+            if(node('pico-native-status'))node('pico-native-status').textContent=entry?.nativeStatusMessage || '';
+            if(node('pico-native-stop-status'))node('pico-native-stop-status').textContent=entry?.nativeStopMessage || (available ? 'Stop applies to this Pico only. Your settings drafts are preserved.' : 'Connect to the intended Pico first.');
+        }
+        async function nativeStatus() {
+            const entry=active;
+            if(!entry || entry.paused || !entry.handle?.state.connected || entry.nativeStatusBusy)return;
+            const epoch=entry.epoch;
+            entry.nativeStatusBusy=true;entry.nativeStatusMessage='Reading device status…';stopControls();
+            try {
+                const result=await entry.handle.request('status');
+                const value=result.data;
+                if(entry.paused || entry.epoch!==epoch)throw Error('Connection changed.');
+                if(!result.response.ok || !value || value.contract!==host.WsprryControl.contract ||
+                    !value.job || !value.standalone || !identity(value.job.boot_id) || value.job.boot_id!==value.standalone.boot_id ||
+                    typeof value.job.state!=='string' || typeof value.job.output_active!=='boolean')throw Error('Invalid status.');
+                entry.nativeStatusMessage=entry.nativeStopUnknown ? 'Output and ownership remain unknown for the unconfirmed stop. Read stop status to reconcile it; this ordinary observation does not resolve that hold.' : `Device status: ${value.job.state}. Output ${value.job.output_active?'active':'inactive'}; ${value.job.owner_id?'owned':'unowned'}. This observation does not change schedules or settings.`;
+            } catch(error) {entry.nativeStatusMessage='Device status is unavailable. Output state is unknown. Reconnect to this Pico and read again; a lost connection does not confirm a stop.';}
+            finally {entry.nativeStatusBusy=false;notify();}
+        }
+        function checkedStop(entry,result,target) {
+            const value=result.data;
+            if(!result.response.ok || !value || Object.keys(value).sort().join(',')!=='contract,message_enabled,output_active,owned,schema,stopped,target,wspr_enabled' ||
+                value.contract!==host.WsprryControl.contract || value.schema!=='schedule-stop' || !value.target ||
+                Object.keys(value.target).sort().join(',')!=='boot_id,device_id,scope' || value.target.scope!=='member' ||
+                value.target.device_id!==entry.handle.device || !identity(value.target.boot_id) ||
+                target && (value.target.device_id!==target.device_id || value.target.boot_id!==target.boot_id) ||
+                !['message_enabled','output_active','owned','stopped','wspr_enabled'].every(key=>typeof value[key]==='boolean') ||
+                value.stopped && (value.message_enabled || value.wspr_enabled || value.owned || value.output_active) ||
+                !/^"[^"\x00-\x20\x7f]{1,126}"$/.test(result.response.headers.get('ETag') || ''))
+                throw Error('Stop status could not be verified for this Pico.');
+            return value;
+        }
+        async function nativeStop(readOnly) {
+            const entry=active;
+            if(!entry || entry.paused || !entry.handle?.state.connected || entry.nativeStopBusy || !readOnly && entry.nativeStopUnknown)return;
+            const epoch=entry.epoch;
+            entry.nativeStopBusy=true;entry.nativeStopMessage=readOnly?'Reading native stop status…':'Stopping native schedules…';stopControls();
+            try {
+                const before=await entry.handle.request('schedules/stop');
+                if(!before.response.ok && before.data?.error?.code==='unsupported_resource') {
+                    entry.nativeStopUnsupported=true;
+                    entry.nativeStopMessage='This Pico does not support native schedule stop through this management connection. Use its local USB Console safety control.';
+                    return;
+                }
+                entry.nativeStopUnsupported=false;
+                let value=checkedStop(entry,before);
+                if(entry.paused || entry.epoch!==epoch)throw Error('This Pico connection changed. Reconnect and read stop status.');
+                if(!readOnly) {
+                    entry.nativeStopUnknown=true;entry.nativeStatusMessage='Output and ownership are unknown while the stop is unconfirmed.';
+                    const result=await entry.handle.request('schedules/stop',{method:'POST',revision:before.response.headers.get('ETag'),body:{schema:'schedule-stop',target:value.target,stop:true}});
+                    entry.nativeStopOperation=result.operation;
+                    value=checkedStop(entry,result,value.target);
+                    if(!value.stopped)throw Error('Inactive and unowned output was not confirmed.');
+                }
+                if(entry.paused || entry.epoch!==epoch)throw Error('This Pico connection changed. Reconnect and read stop status.');
+                if(entry.nativeStopOperation)client.reviewed(entry.nativeStopOperation,entry.handle.device);
+                entry.nativeStopUnknown=false;entry.nativeStatusMessage='';
+                entry.nativeStopMessage=value.stopped?'Both native schedules are disabled; output is confirmed inactive and unowned. Your drafts are preserved. Read saved settings before explicitly enabling again.':'Current status read: a native schedule remains enabled or output is not confirmed inactive and unowned. Stop explicitly or use local Console recovery.';
+            } catch(error) {
+                entry.nativeStopUnknown=true;entry.nativeStatusMessage='Output and ownership are unknown for the unconfirmed stop. Read stop status to reconcile it.';
+                entry.nativeStopMessage='Stop is refused or unconfirmed. Read stop status before another action. A lost connection does not confirm inactive output; use local USB Console recovery if this Pico cannot be reached.';
+            } finally {entry.nativeStopBusy=false;ledger();notify();}
+        }
+        function notify() { stopControls();host.SetupTargets?.editorChanged?.(); }
+        function organize(panel) {
+            if (panel.dataset.setupOrganized) return;
+            panel.dataset.setupOrganized = 'true';
+            const find = id => panel.querySelector('#' + host.CSS.escape(id));
+            const pane = (name,label,tab) => {
+                const section = host.document.createElement('section');
+                section.id = 'setup-pico-' + name;section.className = 'tab-pane fade';
+                section.setAttribute('role','tabpanel');section.setAttribute('aria-labelledby',tab);section.tabIndex = 0;
+                const title = host.document.createElement('h3');title.className = 'cw-control-section__title';title.textContent = label;
+                section.append(title);return section;
+            };
+            const signal = pane('signal','Signal Setup','radio-tab'), transmitter = pane('transmitter','Transmitter','transmitter-hardware-tab'), io = pane('io','Device I/O','pi-hardware-tab');
+            const scheduling=pane('scheduling','Scheduling','scheduling-tab');
+            const common = host.document.createElement('div');common.className = 'setup-pico-observations';
+            const member = find('wtp-member-heading').closest('section');
+            const heading = find('wtp-member-heading'),intro = heading.nextElementSibling;
+            heading.textContent = 'Saved and active resources';heading.classList.add('d-inline','mb-0');
+            const observations = host.document.createElement('details'), summary = host.document.createElement('summary');
+            observations.className = 'mt-2';summary.append(heading);observations.append(summary,intro,member.querySelector('dl'));
+            common.append(find('wtp-member-load'),find('wtp-member-feedback'),observations);
+            const station = member.querySelector('h5');station.id = 'setup-pico-station-heading';member.setAttribute('aria-labelledby',station.id);
+            const hardware = find('wtp-hardware-settings');
+            transmitter.append(find('wtp-si5351-controls'),find('amplifier-timing-settings'),find('filter-selector-controls'),find('gpio-drive-form'));
+            const hint = host.document.createElement('p');hint.className = 'form-text';
+            hint.textContent = 'The RF engine and pin assignments are validated and saved together in Device I/O. These independent RF controls keep their own save and activation actions.';
+            const jump = host.document.createElement('button');jump.type = 'button';jump.className = 'btn btn-outline-secondary mb-3';jump.textContent = 'Edit RF engine and pins';
+            jump.addEventListener('click',() => {host.bootstrap.Tab.getOrCreateInstance(node('pi-hardware-tab')).show();node('pi-hardware-tab').focus();});
+            transmitter.prepend(hint,jump);
+            io.append(hardware,find('wtp-usb-settings'),find('member-udp-logging-controls').closest('details'),find('wtp-management-carrier').closest('.row'));
+            const network = host.document.createElement('section');network.className = 'mt-4';
+            const networkTitle = host.document.createElement('h4');networkTitle.className = 'cw-control-section__title';networkTitle.textContent = 'Wi-Fi radio';
+            const feedback = find('wtp-network-feedback'),explanation = feedback.nextElementSibling;
+            network.append(networkTitle,find('wtp-network-load'),find('wtp-network-disable'),feedback,explanation);io.append(network);
+            scheduling.append(find('wtp-gray-line-controls').parentElement,find('wtp-combined-settings'));
+            const limits=host.document.createElement('p');limits.className='form-text';limits.textContent='WSPR recurrence and keyed-message recurrence are separate. The WSPR control below changes only WSPR. Stop native schedules disables both schedules and confirms inactive, unowned output. Keyed-message enable/pause state and editing are unavailable through this verified adapter; use the Pico’s own controls. Independent Pi day/night frequency profiles are unavailable; no controller sunrise writes are performed.';scheduling.prepend(limits);
+            signal.append(member);
+            const unavailable = host.document.createElement('p');unavailable.className = 'form-text';unavailable.textContent = 'Pi CW profiles are unavailable on this Pico. Its station controls retain their separate save and apply actions. WSPR recurrence and gray-line controls are in Scheduling.';signal.prepend(unavailable);
+            const panes = host.document.createElement('div');panes.className = 'tab-content';panes.append(signal,scheduling,transmitter,io);
+            panel.append(common,panes);
+        }
+        function mount(profile, handle, key) {
+            const panel = template.content.firstElementChild.cloneNode(true);
+            organize(panel);
+            if (profile.managed) {
+                const connection=panel.querySelector('#wtp-management-carrier').closest('.row');connection.hidden=true;connection.inert=true;
+                const source=host.document.createElement('p');source.className='form-text';
+                source.textContent='Connected automatically through paired Pi '+handle.parentDevice.slice(0,8)+'. No separate Pico login is needed.';
+                connection.before(source);
+            }
+            const entry = {profile,signature:fingerprint(profile),panel,handle,key,pending:0,epoch:0,paused:false,hold:null,observed:null,recovering:false};
+            const scoped = new Proxy(host.document,{get(document,property) {
+                if (property === 'getElementById') return id => id === panel.id ? panel : panel.querySelector('#' + host.CSS.escape(id));
+                if (property === 'querySelector') return selector => panel.querySelector(selector);
+                if (property === 'querySelectorAll') return selector => panel.querySelectorAll(selector);
+                if (property === 'readyState') return 'complete';
+                const value = document[property];return typeof value === 'function' ? value.bind(document) : value;
+            }});
+            const environment = {document:scoped,crypto:host.crypto,confirm:host.confirm.bind(host),targetManagement:true,
+                WSPRRYPI_PATHS:host.WSPRRYPI_PATHS,WtpUi:{read:() => profile.settings,selected:() => true},
+                fetch:(...args) => exchange(entry,...args)};
+            for (const name of ['WsprryControl','WsprryAmplifierTiming','WsprryFilters','WsprryGpioDrive','WsprryGps','WsprryGrayLine','WsprrySi5351']) environment[name] = host[name];
+            entry.management = host.WtpManagementEditor.mount(environment);
+            entry.usb = host.WtpUsbSettingsEditor.mount(environment);
+            entry.udp = host.WsprryUdp.mount(scoped.getElementById('member-udp-logging-controls'),{
+                inputClass:'form-control',buttonClass:'btn btn-outline-secondary',checkClass:'form-check',
+                context:() => entry.handle?.context,
+                exchange:async (path,method = 'GET',body,revision) => {
+                    const reply = await exchange(entry,(host.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1')+'/member/'+path,
+                        {method,...(body ? {body:JSON.stringify(body),headers:{'If-Match':revision}} : {})});
+                    const value = host.WsprryUdp.parseJson(await reply.text());
+                    if (!reply.ok) throw Error('Logging request refused or unconfirmed. Read this Pico and review the preserved draft.');
+                    return {value,revision:reply.headers.get('ETag') || ''};
+                }
+            });
+            environment.WsprryMemberUdp = entry.udp;
+            return entry;
+        }
+        async function select(profile) {
+            if (!template) return;
+            if (!profile || profile.legacy_unverified || !identity(profile.id) || !identity(profile.settings?.['Device ID'])) {
+                node('pico-target-feedback').textContent = 'Save and verify this Pico profile before managing settings.';return;
+            }
+            profile = structuredClone(profile);Object.freeze(profile.settings);Object.freeze(profile);
+            const working = Array.from(entries.values()).find(entry => entry.profile.settings['Device ID'] === profile.settings['Device ID'] && busy(entry));
+            const epoch = ++selection;
+            if (active) {active.paused = true;++active.epoch;active.restoreObserver?.disconnect();active.restoreObserver = null;active.handle.retire();active.panel.remove();}
+            active = null;
+            retained();
+            node('pico-target-panel').replaceChildren();node('pico-target-recovery').hidden = true;
+            node('pico-target-identity').textContent = `${profile.name} · ${profile.settings.Transport} · device ${profile.settings['Device ID']}`;
+            if (working) {node('pico-target-feedback').textContent = 'A request is still finishing on this Pico. Its result is tracked here; wait before reconnecting its editor.';notify();return;}
+            node('pico-target-feedback').textContent = 'Checking this Pico. The transmitter backend and accepted jobs remain unchanged.';
+            let handle;
+            try {
+                handle = await client.open(profile);
+                if (epoch !== selection) {handle.retire();return;}
+                if (!handle.state.connected && ['usb','network'].includes(profile.settings.Transport)) {
+                    const connected = await handle.request('management',{method:'POST',body:{action:profile.settings.Transport === 'usb' ? 'usb_physical' : 'engineering_mtls'}});
+                    if (epoch !== selection) {handle.retire();return;}
+                    if (!connected.response.ok) throw Error('This Pico could not be connected. Check its saved profile and try Manage settings again.');
+                    const checked = await handle.request('management');if (!checked.response.ok || !checked.data.connected) throw Error('Pico connection is unconfirmed.');
+                }
+                const generation = handle.state.connected ? await handle.generation() : 'unconnected';
+                if (epoch !== selection) {handle.retire();return;}
+                const key = `${handle.device}:${handle.scope || profile.id}:${generation}`;
+                let entry = entries.get(key);
+                if (!entry) {
+                    if (entries.size >= 64) throw Error('The browser is retaining 64 Pico drafts. Open a new page to manage another device; existing drafts stay on this page.');
+                    entry = mount(profile,handle,key);entries.set(key,entry);
+                } else {
+                    entry.handle = handle;entry.paused = false;++entry.epoch;
+                    entry.management.invalidate();entry.usb.invalidate();entry.udp.invalidate();
+                }
+                active = entry;entry.generation = generation;
+                node('pico-target-panel').append(entry.panel);entry.panel.open = true;
+                node('pico-target-feedback').textContent = profile.managed ? 'Settings are bound to this Pico through its paired Pi. Read saved settings before editing. Drafts stay with this device and connection.' : 'Settings are bound to this Pico. Read saved settings before editing. Drafts stay with their device and saved profile.';
+                entry.management.setAvailability(handle.state.connected,true);
+                entry.usb.setAvailability(handle.state.connected && handle.state.carrier === 'usb_physical');
+                entry.udp.setAvailability(handle.state.connected);
+                recovery(entry);ledger();retained();notify();
+            } catch (error) {
+                handle?.retire();
+                if (epoch === selection) node('pico-target-feedback').textContent = error.message || 'Pico management is unavailable. Saved drafts are retained.';
+                notify();
+            }
+        }
+        async function readRecovery() {
+            const entry = active;
+            if (!entry?.hold || entry.paused || entry.recovering) return;
+            entry.recovering = true;entry.observed = null;entry.recoveryMessage = 'Reading current settings from this Pico…';recovery(entry);
+            try {
+                try {
+                    const prior = await entry.handle.lookup(entry.hold.operation);
+                    entry.hold = prior.recovery;entry.nativeHold = entry.handle.managed || ['pending','unknown'].includes(prior.data.state);
+                } catch (error) {
+                    if (error.status !== 404) throw error;
+                    entry.nativeHold = Boolean(entry.handle.managed);
+                }
+                const result = await entry.handle.request(entry.hold.read);
+                if (active !== entry || entry.paused) return;
+                if (!result.response.ok || !result.readback) throw Error('Authoritative settings could not be read. Reconnect this Pico; no change was repeated.');
+                entry.observed = result.readback;
+                const list = node('pico-target-recovery-observation');list.replaceChildren();
+                const show = (names,item) => {
+                    const term = host.document.createElement('dt'),detail = host.document.createElement('dd');
+                    term.textContent = names.join(' · ').replaceAll('_',' ');
+                    detail.textContent = item === null ? 'Unavailable' : typeof item === 'object' ? JSON.stringify(item) : typeof item === 'boolean' ? item ? 'Yes' : 'No' : String(item);
+                    list.append(term,detail);
+                };
+                const inspect = (value,names = []) => {
+                    if (value !== null && typeof value === 'object' && !Array.isArray(value) && names.length < 5) {
+                        for (const [name,item] of Object.entries(value)) {
+                            if (['contract','schema','member_context','control_capabilities','capabilities','pin_choices'].includes(name) || /password|secret|private_key|psk|pairing_code/.test(name)) continue;
+                            if (!names.length && entry.hold.read === 'network' && !['enabled','requested_enabled','withdrawal_pending','ipv4','configured_hostname','advertised_hostname','link_status'].includes(name)) continue;
+                            inspect(item,name === 'config' && !names.length ? names : [...names,name]);
+                        }
+                    } else show(names,value);
+                };
+                const observed = entry.hold.read === 'configuration'
+                    ? {target:result.data.target,saved:result.data.config,restart_required:result.data.reboot_required}
+                    : result.data;
+                inspect(observed);
+                entry.recoveryMessage = 'Review this Pico’s current settings beside your preserved draft. Matching values do not prove that the earlier request committed.';
+            } catch (error) {entry.recoveryMessage = error.message;}
+            finally {entry.recovering = false;recovery(entry);}
+        }
+        async function reviewRecovery() {
+            const entry = active;
+            if (!entry?.hold || entry.paused || !entry.observed || entry.recovering) return;
+            entry.recovering = true;recovery(entry);
+            try {
+                if (entry.nativeHold) {
+                    const result = entry.handle.managed ? await entry.handle.review(entry.hold.operation,entry.observed) :
+                        await entry.handle.request('management',{method:'POST',body:{action:'reconcile',operation_id:entry.hold.operation,readback_revision:entry.observed}});
+                    if (active !== entry || entry.paused) return;
+                    if (!result.response.ok) throw Error('Review was not accepted. Read this Pico again before another change.');
+                    if (entry.handle.managed) {
+                        try {entry.handle = await client.open(entry.profile);}
+                        catch (error) {entry.paused = true;++entry.epoch;entry.handle.retire();throw error;}
+                        if (active !== entry || entry.paused) {entry.handle.retire();return;}
+                        await generation(entry);
+                    }
+                }
+                client.reviewed(entry.hold.operation,entry.handle.device);
+                entry.hold = null;entry.observed = null;entry.management.invalidate();entry.usb.invalidate();entry.udp.invalidate();
+                node('pico-target-feedback').textContent = 'Current settings reviewed. The earlier outcome remains historical. Your draft is preserved; read saved settings before a new explicit change.';
+            } catch (error) {if (active === entry) node('pico-target-feedback').textContent = error.message;}
+            finally {entry.recovering = false;recovery(entry);ledger();notify();}
+        }
+        function catalogChanged(profiles,managed = false) {
+            if (!active || Boolean(active.profile.managed)!==managed || !Array.isArray(profiles)) return;
+            const current = profiles.find(profile => profile.id === active.profile.id);
+            if (current && fingerprint(current) === active.signature) return;
+            active.paused = true;++active.epoch;active.handle.retire();active.panel.inert = true;
+            recovery(active);
+            node('pico-target-feedback').textContent = managed ? 'This paired management source changed or is unavailable. The draft is retained; reconnect the intended Pico with Device.' : 'This saved profile changed or was removed. Its draft is retained separately. Choose the intended saved Pico with Device again.';
+            notify();
+        }
+        function init() {
+            template = node('pico-target-template');if (!template) return;
+            node('pico-native-stop')?.addEventListener('click',()=>nativeStop(false));
+            node('pico-native-stop-read')?.addEventListener('click',()=>nativeStop(true));
+            node('pico-native-status-read')?.addEventListener('click',nativeStatus);
+            node('pico-target-read-recovery').addEventListener('click',readRecovery);
+            node('pico-target-review-recovery').addEventListener('click',reviewRecovery);
+            host.addEventListener('pagehide',() => {++selection;for (const entry of entries.values()) {entry.paused = true;++entry.epoch;entry.handle.retire();}});
+        }
+        function leave() {
+            ++selection;
+            if (active) {active.paused = true;++active.epoch;active.restoreObserver?.disconnect();active.restoreObserver = null;active.handle.retire();active.panel.remove();}
+            active = null;node('pico-target-panel')?.replaceChildren();
+            if (node('pico-target-recovery')) node('pico-target-recovery').hidden = true;
+            retained();ledger();notify();
+        }
+        return Object.freeze({init,select,leave,catalogChanged,managedTargetsChanged:profiles=>catalogChanged(profiles,true),operations:() => client.operations(),
+            retainedProfiles:() => Array.from(new Map(Array.from(entries.values()).map(entry => [(entry.profile.managed ? "paired:" : "local:")+entry.profile.id,entry.profile])).values()),
+            get state() {return active ? {device:active.profile.settings['Device ID'],profile:active.profile.id,connected:!!active.handle?.state.connected,
+                pending:active.pending,paused:active.paused,unconfirmed:!!active.hold,generation:active.generation} : null;}});
+    }
+    if (typeof module !== 'undefined' && module.exports) module.exports = {create};
+    if (!root.document) return;
+    root.PicoTargetEditors = create(root);
+    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded',root.PicoTargetEditors.init);
+    else root.PicoTargetEditors.init();
+})(typeof window === 'undefined' ? globalThis : window);

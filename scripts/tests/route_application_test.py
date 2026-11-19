@@ -69,6 +69,12 @@ class Tests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     app.configuration(original, require_runtime_backend=True)
 
+    def test_idle_route_retains_exact_bytes_for_managed_integrity(self):
+        for value in (b'False', b'false', b'FALSE', b'0', b'no'):
+            with self.subTest(transmit=value):
+                original = self.data.replace(b'Transmit = False', b'Transmit = '+value)
+                self.assertEqual(app.edit(original, 'gpio4'), original)
+
     def test_crlf_and_unknown_settings_are_preserved(self):
         data = self.data.replace(b'\n', b'\r\n')+b'\r\n[Custom]\r\nValue = literal%value\r\n'
         self.assertEqual(app.edit(data, 'gpio20'), data.replace(b'Transmit Pin = 4', b'Transmit Pin = 20'))

@@ -40,12 +40,12 @@ async function main() {
         // Navigate the owned target explicitly; startup can expose a blank page.
         await client.send("Page.navigate", {url}, 60000);
         const evaluate = expression => client.evaluate(expression);
-        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagement'), 'WTP scripts');
+        await waitFor(async () => await evaluate('document.readyState === "complete" && !!window.WtpUi && !!window.WtpManagementEditor'), 'WTP scripts');
         assert.equal(await evaluate('document.getElementById("fleet-tab-item").hidden'), false);
         await waitFor(async () => await evaluate('document.getElementById("fleet-tab").classList.contains("active")'), 'Fleet deep link');
         assert.equal(await evaluate('new URL(location.href).searchParams.get("setup_tab")'), '#fleet-pane');
         assert.equal(await evaluate('document.getElementById("fleet-tab").disabled'), false);
-        assert.equal(await evaluate('document.getElementById("wtp-controls").closest("[role=tabpanel]").id'), 'fleet-pane');
+
         await evaluate(`(() => {
             configAutosaveSuspended = true;
             clearPendingPopulateConfigRetry(); clearWebSocketReconnectTimer();
@@ -92,7 +92,7 @@ async function main() {
                     if (window.__statusFailure) throw new Error('Connection interrupted');
                     return {ok:true, json:async()=>({host:window.__snapshot})};
                 }
-                if (String(url).endsWith('/jobs')) { window.__snapshot.owns=false; window.__snapshot.job_id=''; return {ok:true,json:async()=>({ok:true,result:{cleanup_ok:true}})}; }
+                if (String(url).endsWith('/jobs')) throw Error('Retired execution route contacted');
                 if (String(url).endsWith('/network')) return {ok:true,headers:{get:()=> '\"network-r1\"'},json:async()=>({enabled:true,ipv4:'192.0.2.27',configured_hostname:window.__snapshot.network.hostname,advertised_hostname:window.__discoveryState==='active'?window.__snapshot.network.hostname:'',mdns_state:window.__discoveryState,mdns_reason:window.__discoveryState==='conflict'?'name_conflict':''})};
                 if (window.__remoteFailure) return {ok:false,status:412,json:async()=>({error:{code:'revision_conflict'}})};
                 if (String(url).endsWith('/member/configuration')) {
@@ -101,12 +101,14 @@ async function main() {
                 }
                 return {ok:true,headers:{get:()=> '"remote-r1"'},json:async()=>({config:{version:1,enabled:false,station:{callsign:'AA0NT',locator:'EM18',power_dbm:20},wifi:{ssid:'Bench Wi-Fi',password:null,ntp_ipv4:'192.0.2.1'},schedules:[{period_s:120,phase_s:0}]}})};
             };
+            document.getElementById('fleet-pane').append(document.getElementById('pico-target-template').content.cloneNode(true));
+            WtpManagementEditor.mount(window);WtpUsbSettingsEditor.mount(window);
             window.WtpUi.populate({Transport:'network',Hostname:window.__snapshot.network.hostname,'TCP Port':18443,'Device ID':'a'.repeat(32),'TLS CA File':'/etc/wsprrypi/pico/ca.crt','TLS Client Certificate':'/etc/wsprrypi/pico/client.crt','TLS Client Key':'/etc/wsprrypi/pico/client.key','TLS Server Identity':'','Start Uncertainty ns':1000000,'Allow Frequency Adjustment':false,Endpoint:'/dev/preserved','USB Serial':'00001234','USB Vendor ID':51966,'USB Product ID':16402});
 
-            window.WtpUi.select(true);
+            WtpManagement.setAvailability(true,true);
             document.getElementById('fleet-tab').click();
         })()`);
-        await waitFor(async () => await evaluate('document.getElementById("wtp-network-state").textContent.includes("192.0.2.27")'), 'network snapshot');
+
         await waitFor(async () => await evaluate('!window.PicoFirmwareSafety.locked'), 'host firmware maintenance status');
 
         await client.send('Page.enable');

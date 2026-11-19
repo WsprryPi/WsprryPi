@@ -1,7 +1,6 @@
 # WsprryPi Support Bundle Private Intake Contract
 
-Maintainer operations are documented in the
-[Support Bundle Intake Maintainer Runbook](support-bundle-maintainer-runbook.md).
+Maintainer operations are documented in the [Support Bundle Intake Maintainer Runbook](support-bundle-maintainer-runbook.md).
 
 ## Purpose
 
@@ -58,8 +57,7 @@ The application SHALL collect only information reasonably relevant to support. K
 
 Potentially identifying diagnostic categories MAY be included when relevant, but MUST be disclosed before upload. These include email addresses, callsigns, locators, hostnames, usernames, internal IP addresses, device identifiers, logs, and configuration.
 
-Every version-1 readable bundle SHALL contain a machine-readable manifest with
-exactly these top-level fields:
+Every version-1 readable bundle SHALL contain a machine-readable manifest with exactly these top-level fields:
 
 ```text
 schema_version
@@ -75,10 +73,7 @@ collection_warnings
 files, with relative path, size, and SHA-256
 ```
 
-The v1 manifest deliberately contains no installation identifier, encryption key,
-recipient, fingerprint, or upload destination. Those values are not needed to
-inspect the readable archive and some are selected only after finalization.
-Collection errors, omissions, and partial results SHALL be recorded.
+The v1 manifest deliberately contains no installation identifier, encryption key, recipient, fingerprint, or upload destination. Those values are not needed to inspect the readable archive and some are selected only after finalization. Collection errors, omissions, and partial results SHALL be recorded.
 
 ## Local Creation, Review, and Finalization
 
@@ -111,8 +106,7 @@ The application MUST NOT recollect diagnostics between review and encryption.
 
 ## Integrity Terminology and Local Receipt
 
-The application SHALL calculate the finalized readable archive's SHA-256 digest
-and SHALL provide a receipt containing exactly the v1 fields:
+The application SHALL calculate the finalized readable archive's SHA-256 digest and SHALL provide a receipt containing exactly the v1 fields:
 
 ```text
 schema_version
@@ -137,11 +131,7 @@ Documentation and UI MUST distinguish a hash, a digital signature, and encryptio
 
 After review and consent, the application SHALL encrypt the exact readable archive bytes with the WsprryPi bundle-encryption public key using a standard format such as `age`.
 
-It SHALL record the key identifier, require successful non-empty exact-size and
-SHA-256-verified output, retain the readable archive unless the user deletes it
-explicitly, and never upload the readable archive. Real packaged-`age`
-encrypt/decrypt fixtures validate the format; the application does not
-claim that superficial ciphertext parsing proves decryptability.
+It SHALL record the key identifier, require successful non-empty exact-size and SHA-256-verified output, retain the readable archive unless the user deletes it explicitly, and never upload the readable archive. Real packaged-`age` encrypt/decrypt fixtures validate the format; the application does not claim that superficial ciphertext parsing proves decryptability.
 
 Recommended encrypted filename:
 
@@ -156,8 +146,7 @@ The encrypted manifest is authoritative. Dropbox may alter the stored filename.
 Before upload, the user SHALL provide one of:
 
 - an existing GitHub issue reference;
-- intent to create a new GitHub issue, plus a meaningful description and
-  user-approved contact method until that public issue exists; or
+- intent to create a new GitHub issue, plus a meaningful description and user-approved contact method until that public issue exists; or
 - a meaningful problem description and contact method.
 
 A bundle MUST NOT be uploaded with no GitHub correlation, no useful description, and no contact method. An explicitly anonymous submission MAY be permitted only when the project has a documented no-follow-up workflow.
@@ -182,9 +171,7 @@ When no issue exists, the application SHOULD offer a prefilled issue containing 
 
 GitHub requires an authenticated user or authenticated intermediary to create or comment on an issue. The application MUST explain that sign-in is required and MUST NOT contain maintainer GitHub credentials or create issues automatically. WsprryPi does not provide an anonymous issue-creation intermediary.
 
-If the issue is created after encryption, the case ID SHALL correlate it with the
-bundle. The version-1 downloaded receipt is immutable and is not retroactively
-rewritten; it retains the issue reference known when encryption began.
+If the issue is created after encryption, the case ID SHALL correlate it with the bundle. The version-1 downloaded receipt is immutable and is not retroactively rewritten; it retains the issue reference known when encryption began.
 
 ## Non-GitHub Workflow
 
@@ -222,8 +209,7 @@ user_message, nullable
 bundle_encryption_key_id
 ```
 
-The signing key ID is carried by the detached signature envelope together with
-the Ed25519 algorithm and signature. It is not duplicated inside `intake.json`.
+The signing key ID is carried by the detached signature envelope together with the Ed25519 algorithm and signature. It is not duplicated inside `intake.json`.
 
 Before every upload attempt, the application SHALL retrieve the manifest and signature and verify the exact-byte signature, project ID, supported schema, expiry, minimum application version, and active status. It SHALL use the request URL only if every check succeeds.
 
@@ -320,17 +306,9 @@ The completion view SHOULD provide **Open Existing Issue**, **Create GitHub Issu
 
 ## Maintainer Intake and Retention
 
-For every received artifact, the maintainer SHOULD pair it with the separately
-downloaded receipt; decrypt it with the project key; verify the ciphertext and
-readable archive sizes and hashes, project, case ID, format, and key ID; reject
-absolute paths, traversal, symlinks, and excessive expansion; inspect before
-opening individual files; correlate the support context; promote it from
-`Incoming` to a canonical `Processed` case; and assign retention.
+For every received artifact, the maintainer SHOULD pair it with the separately downloaded receipt; decrypt it with the project key; verify the ciphertext and readable archive sizes and hashes, project, case ID, format, and key ID; reject absolute paths, traversal, symlinks, and excessive expansion; inspect before opening individual files; correlate the support context; promote it from `Incoming` to a canonical `Processed` case; and assign retention.
 
-Dropbox may append uploader identity to its stored filename. The processor SHALL
-therefore treat that name as untrusted personal metadata and SHALL NOT copy it
-into the canonical processing record. Canonical correlation comes from the
-validated receipt and encrypted manifest, not the provider filename.
+Dropbox may append uploader identity to its stored filename. The processor SHALL therefore treat that name as untrusted personal metadata and SHALL NOT copy it into the canonical processing record. Canonical correlation comes from the validated receipt and encrypted manifest, not the provider filename.
 
 Decryption or integrity failure MUST be reported and MUST NOT be treated as valid.
 
@@ -359,17 +337,11 @@ The application SHOULD require confirmation or impose a local cooldown before re
 - Dropbox failure: retain the encrypted artifact, case ID, and receipt for retry; never suggest a public plaintext attachment.
 - GitHub failure or refusal: continue only with sufficient description and contact information.
 
-Operator instructions live in the separate `Wsprry_Pi_Docs` repository. This
-repository retains only the normative contract and durable maintainer runbook.
+Operator instructions live in the separate `Wsprry_Pi_Docs` repository. This repository retains only the normative contract and durable maintainer runbook.
 
 ## Deliberate Operational Limits
 
-- Local deletion cannot erase Dropbox history, synchronized replicas, backups,
-  downloaded copies, or user-held artifacts.
-- Retention deletion is one explicit case at a time; there is no automatic bulk
-  deletion or automatic active-to-resolved transition.
-- GitHub authentication remains user-controlled. There is no anonymous issue
-  proxy and no embedded GitHub or Dropbox credential.
-- Provider behavior and the signed request route must be revalidated when the
-  Dropbox request is replaced, account behavior changes, or a new intake
-  generation is published.
+- Local deletion cannot erase Dropbox history, synchronized replicas, backups, downloaded copies, or user-held artifacts.
+- Retention deletion is one explicit case at a time; there is no automatic bulk deletion or automatic active-to-resolved transition.
+- GitHub authentication remains user-controlled. There is no anonymous issue proxy and no embedded GitHub or Dropbox credential.
+- Provider behavior and the signed request route must be revalidated when the Dropbox request is replaced, account behavior changes, or a new intake generation is published.

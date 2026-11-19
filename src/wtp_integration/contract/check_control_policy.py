@@ -16,7 +16,34 @@ def schema_digest(schema):
     return hashlib.sha256(json.dumps(schema, sort_keys=True, separators=(',', ':'),
                                      ensure_ascii=False).encode()).hexdigest()
 
+def pi_resource_descriptors(schema):
+    """Bind each Pi resource to the closed current types and approved policies.
+
+    The full controller definition closure deliberately invalidates all Pi resource
+    digests on any coordinated controller-schema change. Immutable policy-source
+    revisions bind the incorporated value/authority semantics as well as shape.
+    These are type identities, never resource permission advertisements on Pico.
+    """
+    definitions = {name:schema['$defs'][name] for name in schema['controller_adapter']['definitions']}
+    result = {}
+    for resource, definition in [('pi-config','pi-config'), ('pi-scheduling','pi-scheduling'), ('stop','target-stop'), ('migration','target-migration')]:
+        identity = 'urn:wsprry:control:1:' + resource
+        document = {'$id':identity, '$ref':'#/$defs/'+definition, '$defs':definitions,
+                    'policy_dependencies':schema['pi_management_policies']}
+        result[resource] = {'schema_id':identity, 'schema_digest':schema_digest(document)}
+    return result
+
 def validate(policy, schema, stable_release=False):
+    sources = schema.get('pi_management_policies')
+    if not isinstance(sources,dict) or set(sources) != {'repository','configuration','management'} or sources['repository'] != 'https://github.com/WsprryPi/WsprryPi':
+        raise ValueError('Missing or unknown Pi management policy dependencies')
+    for name in ('configuration','management'):
+        dependency=sources[name]
+        if not isinstance(dependency,dict) or set(dependency) != {'revision','paths'} or not isinstance(dependency['revision'],str) or not re.fullmatch('[0-9a-f]{40}',dependency['revision']):
+            raise ValueError('Invalid Pi management policy dependency')
+        paths=dependency['paths']
+        if not isinstance(paths,list) or not paths or len(paths)>16 or any(not isinstance(path,str) or not re.fullmatch(r'(?:src|docs)/[A-Za-z0-9_./-]+',path) or '..' in path for path in paths) or len(set(paths))!=len(paths):
+            raise ValueError('Invalid Pi management policy dependency paths')
     if set(policy) != {*IDENTITY, 'phase', 'first_release', 'schema_sha256'}:
         raise ValueError('Unknown or missing control lifecycle policy field')
     if any(type(policy[k]) is not type(v) or policy[k] != v for k, v in IDENTITY.items()):
@@ -85,6 +112,40 @@ def validate(policy, schema, stable_release=False):
             if len(names) != len(set(names)):
                 raise ValueError('Duplicate control routes')
     route_map(schema.get('management_routes'), True)
+    adapter = schema.get('controller_adapter')
+    if not isinstance(adapter, dict) or set(adapter) != {'scope', 'headers', 'limits', 'pico_routes', 'documents', 'definitions', 'browser_session', 'reconciliation_reads', 'host_routes'}:
+        raise ValueError('Missing or unknown controller adapter contract fields')
+    if adapter['scope'] != 'wsprrypi-controller' or adapter['headers'] != {
+            'profile':'X-WsprryPi-Profile-ID', 'context':'X-WsprryPi-Target-Context',
+            'operation':'X-WsprryPi-Operation-ID', 'readback':'X-WsprryPi-Readback-Revision', 'csrf':'X-WsprryPi-CSRF',
+            'recovery':'X-WsprryPi-Recovery-Resource'}:
+        raise ValueError('Controller context header contract differs')
+    if adapter['browser_session'] != 'host/management-session':
+        raise ValueError('Controller browser-session path differs')
+    if adapter['limits'] != {'maximum_targets':64, 'maximum_connections':4,
+            'maximum_body_bytes':32768, 'maximum_header_bytes':8192, 'maximum_nesting':16,
+            'terminal_receipts_per_target':256, 'maximum_unresolved':32, 'operation_deadline_ms':24000}:
+        raise ValueError('Controller management bounds differ')
+    if set(adapter['pico_routes']) != {'GET','PUT','POST','DELETE'} or adapter['pico_routes']['DELETE'] != ['wifi']:
+        raise ValueError('Controller Pico route methods differ')
+    route_map({method:adapter['pico_routes'][method] for method in ('GET','PUT','POST')}, True)
+    if any(not re.fullmatch(r'[a-z][a-z0-9-]*(?:/[a-z][a-z0-9-]*)*', name)
+           for names in adapter['pico_routes'].values() for name in names):
+        raise ValueError('Invalid controller Pico resource name')
+    mutations = set().union(*(set(adapter['pico_routes'][method]) for method in ('PUT','POST','DELETE'))) - {'management','pins/validate'}
+    reconciliation = {name:name for name in mutations}
+    reconciliation.update({'progress/update':'progress','progress/apply':'progress','udp-logging/test':'udp-logging','restart':'hostname','ap':'hostname'})
+    if adapter['reconciliation_reads'] != reconciliation or any(value not in adapter['pico_routes']['GET'] for value in reconciliation.values()):
+        raise ValueError('Controller reconciliation read contract differs')
+    if adapter['documents'] != ['targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-context', 'target-status', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action', 'target-migration', 'target-migration-rollback', 'target-migration-read', 'controller-retirement', 'controller-retirement-operation', 'controller-retirements', 'pairing-state', 'pair-window-request', 'pair-window-response', 'pair-remove', 'pair-connect', 'pair-discovery', 'target-operation-review', 'target-operation-reviewed'] or adapter['definitions'] != ['target-id', 'target-digest', 'target-generation', 'target', 'target-binding', 'targets', 'target-operation', 'controller-pico-selection', 'controller-browser-session', 'target-error', 'pi-band-preferences', 'pi-wspr-list', 'pi-config', 'pi-solar-ordinary', 'pi-solar-gray', 'pi-scheduling', 'pi-candidate', 'target-observed-output', 'target-save', 'target-enable', 'target-action', 'target-stop', 'target-settings', 'target-counter', 'target-capability', 'target-context', 'target-clock', 'target-status', 'pi-recovery-unavailable', 'pi-recovery-preserved', 'pi-recovery-path', 'pi-recovery-config', 'pi-recovery-candidate', 'host-readiness', 'configuration-recovery', 'configuration-recovery-save', 'configuration-recovery-action', 'migration-controller', 'migration-retirement', 'migration-job', 'target-migration', 'target-migration-rollback', 'target-migration-read', 'controller-retirement', 'controller-retirement-operation', 'controller-retirement-entry', 'controller-retirements', 'pair-authorization', 'pair-gateway-resource', 'pair-gateway-binding', 'pair-manager', 'pair-browser-window', 'pairing-state', 'pair-window-request', 'pair-window-response', 'pair-remove', 'pair-connect', 'pair-discovery-entry', 'pair-discovery', 'target-operation-review', 'target-operation-reviewed', 'pi-wtp-binding']:
+        raise ValueError('Controller document registry differs')
+    if adapter['host_routes'] != {'GET': ['host/readiness', 'host/configuration-recovery', 'host/retirements', 'host/pairing', 'host/pairing/discovery', 'host/pairing/operations/{operation_id}'], 'PUT': ['host/configuration-recovery'], 'POST': ['host/configuration-recovery', 'host/retirements', 'host/pairing/window', 'host/pairing/remove', 'host/pairing/connect']}:
+        raise ValueError('Controller host recovery routes differ')
+    if any(name not in schema['$defs'] for name in adapter['definitions']):
+        raise ValueError('Missing controller document definition')
+    authorization = schema['$defs']['pair-authorization']
+    if authorization.get('additionalProperties') is not False or set(authorization.get('required', [])) != {'pair_id', 'authorization_generation', 'renewal_required'} or set(authorization.get('properties', {})) != {'pair_id', 'authorization_generation', 'renewal_required'} or authorization['properties']['renewal_required'] != {'type': 'boolean'}:
+        raise ValueError('Paired authorization renewal boundary differs')
     scopes = schema.get('client_routes')
     if not isinstance(scopes, dict) or set(scopes) != {'pi_management', 'pi_consumer_session'}:
         raise ValueError('Unknown or missing control client authority scope')

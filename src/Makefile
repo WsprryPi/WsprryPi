@@ -315,7 +315,7 @@ THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE := ./WSPR-Transmitter/src/thread_affinit
 COMPONENT_CPP_SOURCES := $(filter-out $(PPM_MANAGER_TEST_SOURCE) $(SIGNAL_HANDLER_TEST_SOURCE) $(SINGLETON_TEST_SOURCE) $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(LEGACY_GPIO_CLOCK_MODEL_TEST_SOURCE) $(GPIO_FREQUENCY_CORRECTION_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE) $(RP1_GPCLK_PLANNER_TEST_SOURCE) $(RP1_GPCLK_LIFECYCLE_TEST_SOURCE) $(RP1_GPCLK_TRANSITION_TEST_SOURCE) $(RP1_GPCLK_BACKEND_TEST_SOURCE) $(RP1_GPCLK_LINUX_PROVIDER_TEST_SOURCE) $(RP1_GPCLK_DEVELOPMENT_POLICY_TEST_SOURCE) $(RP1_GPCLK_TRANSMIT_BACKEND_TEST_SOURCE) $(RP1_GPCLK_ADMIN_PROBE_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE),$(COMPONENT_CPP_SOURCES))
 COMPONENT_CPP_SOURCES := $(filter-out $(TRANSMITTER_SHARED_CPP_SOURCES) $(TRANSMITTER_BACKEND_CPP_SOURCES),$(COMPONENT_CPP_SOURCES))
 
-WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp) $(wildcard WTP-Client/src/*.cpp) WTP-Client/src/detail/json.cpp
+WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp)
 WTP_APPLICATION_SOURCES += $(wildcard WTP-Server/src/*.cpp)
 WTP_APPLICATION_SOURCES += $(filter-out wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp,$(wildcard wtp_endpoint/*.cpp))
 WTP_APPLICATION_SOURCES += $(if $(filter si5351,$(BACKEND_LIST)),wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp)
@@ -676,7 +676,7 @@ CXXFLAGS := $(SI5351_TRANSPORT_FLAGS) $(if $(findstring clang,$(CXX_VERSION_LINE
            -DLIB_JOURNALD=$(HAVE_JOURNALD)
 
 # Include paths
-CXXFLAGS += -I$(abspath ./WTP-Client/include) -I$(abspath ./WTP-Client/src)
+CXXFLAGS += -I$(abspath ./WTP-Client/include)
 CXXFLAGS += -I$(abspath ./WTP-Server/include)
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += -I$(abspath $(BUILD_METADATA_DIR))
@@ -694,11 +694,11 @@ else
 ATOMIC_LIB :=
 endif
 
-LDFLAGS := $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
+LDFLAGS = $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
            $(AVAHI_LIBS) \
-           $(SYSTEMD_LIBS)
+           $(SYSTEMD_LIBS) $(PAIRING_PROVIDER_LINK)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Verbosity control
@@ -717,9 +717,31 @@ endif
 .PHONY: all
 all: release
 
+# The PAKE candidate is isolated from system installations and existing TLS.
+# Ordinary application builds do not enable pairing at this qualification stage.
+PAIRING_PROVIDER_KEY := $(shell python3 ../scripts/build_pairing_provider.py --key --compiler "$(CXX)")
+PAIRING_PROVIDER_ROOT := $(abspath build/pairing-provider/$(PAIRING_PROVIDER_KEY))
+PAIRING_PROVIDER_CACHE ?= $(abspath build/pairing-provider-cache)
+PAIRING_PROVIDER_LIB := $(PAIRING_PROVIDER_ROOT)/sdk/usr/lib/libbotan-3.a
+PAIRING_PROVIDER_INCLUDE := $(PAIRING_PROVIDER_ROOT)/sdk/usr/include/botan-3
+PAIRING_PROVIDER_LINK = $(if $(filter %/pi_pair_crypto.o %/pi_pair_crypto.cpp,$^),$(PAIRING_PROVIDER_LIB))
+CXX_DEBUG_FLAGS += -I"$(PAIRING_PROVIDER_INCLUDE)"
+CXX_RELEASE_FLAGS += -I"$(PAIRING_PROVIDER_INCLUDE)"
+$(filter %/pi_pair_crypto.o,$(CPP_OBJECTS) $(CPP_DEBUG_OBJECTS)): $(PAIRING_PROVIDER_LIB)
+
+$(PAIRING_PROVIDER_LIB): ../scripts/build_pairing_provider.py ../scripts/pairing_provider.json
+	$(Q)python3 ../scripts/build_pairing_provider.py --root "$(PAIRING_PROVIDER_ROOT)" --cache "$(PAIRING_PROVIDER_CACHE)" --compiler "$(CXX)"
+
+.PHONY: pairing-provider-test
+pairing-provider-test: $(PAIRING_PROVIDER_LIB)
+	$(Q)python3 ../scripts/tests/pairing_provider_build_test.py
+	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Werror -DPROVIDER_WITH_OPENSSL $(OPENSSL_CFLAGS) -I"$(PAIRING_PROVIDER_INCLUDE)" tests/pairing_provider/profile_probe.cpp "$(PAIRING_PROVIDER_LIB)" $(OPENSSL_LIBS) -o "$(PAIRING_PROVIDER_ROOT)/profile-probe"
+	$(Q)"$(PAIRING_PROVIDER_ROOT)/profile-probe"
+
 .PHONY: control-contract-check
 control-contract-check:
 	$(Q)python3 ../scripts/generate_control_contract.py --check
+	$(Q)python3 ../scripts/generate_pair_contract.py --check
 
 # One prerequisite per make invocation; optimized release remains a candidate
 # build. Stable publication policy is selected only by an explicit stable tag.
@@ -1198,7 +1220,7 @@ clean:
 	$(Q)$(SUDO) rm -rf build
 	$(Q)$(SUDO) rm -rf ../executables
 
-release: $(BIN_DIR)/$(OUT)
+release: $(BIN_DIR)/$(OUT) pairing-notices
 
 ifeq ($(BUILD_METADATA_QUERY),)
 	$(Q)echo "Release build completed successfully."
@@ -1235,7 +1257,11 @@ wtp-protocol-test: wtp-client-host-build
 wtp-server-host-build:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
 
-# Portable Pi WTP ownership model; inhibited engine and injected clock only.
+# Portable native ownership model; inhibited engine and injected clock only.
+.PHONY: wtp-server-core-test
+wtp-server-core-test: wtp-server-host-build
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
+
 .PHONY: wtp-pi-authority-test
 wtp-pi-authority-test: wtp-server-host-build
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
@@ -1244,34 +1270,6 @@ wtp-pi-authority-test: wtp-server-host-build
 		wtp_endpoint/revocation_journal.cpp \
 		WTP-Server/build/libwtp_server.a -o build/wtp_pi_authority_test
 	$(Q)build/wtp_pi_authority_test
-
-.PHONY: wtp-pi-listener-test
-ifeq ($(HOST_OS),Linux)
-WTP_LISTENER_TEST_FLAGS := -DWSPRRYPI_TEST_SOCKET_WRAPPERS
-WTP_LISTENER_TEST_LDFLAGS := -Wl,--wrap=setsockopt -Wl,--wrap=accept
-endif
-wtp-pi-listener-test: wtp-server-host-build wtp-client-host-build
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_LISTENER_TEST_FLAGS) \
-		-I. -IWTP-Server/include -IWTP-Client/include \
-		tests/wtp_pi_plain_listener_test.cpp wtp_endpoint/authority.cpp \
-		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
-		WTP-Server/build/libwtp_server.a \
-		WTP-Client/build/libwtp_client.a $(WTP_LISTENER_TEST_LDFLAGS) -o build/wtp_pi_plain_listener_test
-	$(Q)build/wtp_pi_plain_listener_test
-
-# Linux-only network fixture; no transmitter hardware. The routing acceptance
-# uses private namespaces and needs root/CAP_NET_ADMIN, unlike ordinary tests.
-.PHONY: wtp-pi-routing-probe wtp-pi-routing-test
-wtp-pi-routing-probe: wtp-server-host-build wtp-client-host-build
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
-		-I. -IWTP-Server/include -IWTP-Client/include \
-		tests/wtp_pi_routing_probe.cpp wtp_endpoint/authority.cpp \
-		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
-		WTP-Server/build/libwtp_server.a WTP-Client/build/libwtp_client.a \
-		-Wl,--wrap=setsockopt -o build/wtp_pi_routing_probe
-
-wtp-pi-routing-test: wtp-pi-routing-probe
-	$(Q)$(SUDO) python3 tests/wtp_pi_reply_routing_test.py --probe build/wtp_pi_routing_probe
 
 .PHONY: wtp-pi-revocation-test
 wtp-pi-revocation-test:
@@ -1317,22 +1315,6 @@ wtp-pi-control-test:
 		-o build/wtp_pi_control_test
 	$(Q)build/wtp_pi_control_test
 
-# Pure parent adapter tests. Kept outside automatic production source discovery
-# until WTP backend integration is approved. No transport or hardware is opened.
-WTP_PLAN_BUILD_DIR ?= build/wtp-plan
-WTP_PLAN_CXXFLAGS ?= -O2 -g
-WTP_PLAN_LDFLAGS ?=
-.PHONY: wtp-plan-test
-wtp-plan-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_PLAN_BUILD_DIR)/client)" CXXFLAGS="$(WTP_PLAN_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_PLAN_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_PLAN_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_execution_plan_test.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp "$(WTP_PLAN_BUILD_DIR)/client/libwtp_client.a" \
-		$(WTP_PLAN_LDFLAGS) -o "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-	$(Q)"$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-	$(Q)python3 -B tests/wtp_frequency_vectors.py "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-
 WTP_USB_BUILD_DIR ?= build/wtp-usb
 WTP_USB_CXXFLAGS ?= -O2 -g
 WTP_USB_LDFLAGS ?=
@@ -1341,7 +1323,7 @@ wtp-usb-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_USB_BUILD_DIR)/client)" CXXFLAGS="$(WTP_USB_CXXFLAGS)"
 	$(Q)mkdir -p "$(WTP_USB_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_USB_CXXFLAGS) $(OPENSSL_CFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp "$(WTP_USB_BUILD_DIR)/client/libwtp_client.a" \
+		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp \
 		$(OPENSSL_LIBS) $(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 	$(Q)"$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 
@@ -1356,7 +1338,7 @@ machine-power-control-test: $(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)./$(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)python3 $(MACHINE_POWER_REGRESSION_TEST)
 
-debug: $(BIN_DIR)/$(TEST_OUT)
+debug: $(BIN_DIR)/$(TEST_OUT) pairing-notices
 	$(Q)echo "Debug build completed successfully."
 
 test: debug
@@ -1399,7 +1381,9 @@ semantics-test:
 	$(Q)$(MAKE) --no-print-directory semantics-test-full \
 		BACKENDS=$(DEFAULT_BACKENDS) ANCILLARY_GPIO=1
 
-semantics-test-full: linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-full: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/pi_managed_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+	# Run deadline-sensitive launch checks after all parallel builds/tests finish.
+	$(Q)$(MAKE) --no-print-directory -j1 native-recurrence-test native-recurrence-main-test
 	$(Q)echo "Running runtime semantics tests."
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)echo "Running cleanup lifecycle tests."
@@ -1427,7 +1411,9 @@ semantics-test-portable:
 	$(Q)$(MAKE) --no-print-directory semantics-test-portable-profile \
 		BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-semantics-test-portable-profile: linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-portable-profile: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/pi_managed_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+	# Run deadline-sensitive launch checks after all parallel builds/tests finish.
+	$(Q)$(MAKE) --no-print-directory -j1 native-recurrence-test native-recurrence-main-test
 	$(Q)echo "Running portable UI/source regression tests."
 	$(Q)./$(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT)
 	$(Q)echo "Running portable GPIO band fail-closed policy tests."
@@ -1493,6 +1479,21 @@ websocket-lifecycle-test: $(BIN_DIR)/$(WEBSOCKET_LIFECYCLE_TEST_OUT)
 
 web-server-network-lifecycle-test: $(BIN_DIR)/$(WEB_SERVER_NETWORK_LIFECYCLE_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WEB_SERVER_NETWORK_LIFECYCLE_TEST_OUT)
+
+# Identity is injected only in the fixture launcher; every service and storage
+# operation is production code, with no output backend selected.
+$(OBJ_DIR_DEBUG)/tests/controller_only_fixture.o: tests/controller_only_fixture.cpp
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
+
+$(BIN_DIR)/controller_only_fixture: $(OBJ_DIR_DEBUG)/tests/controller_only_fixture.o $(filter-out $(MAIN_DEBUG_OBJECT),$(CPP_DEBUG_OBJECTS))
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+
+.PHONY: controller-only-test
+controller-only-test: $(BIN_DIR)/controller_only_fixture $(BIN_DIR)/controller_only_production_fixture
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_fixture
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_production_fixture --production-main --private-state
 
 wspr-band-catalog-test: $(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
@@ -1872,13 +1873,13 @@ gdb: debug
 	$(Q)echo "Running debug session."
 	$(Q)$(SUDO) gdb --args ./$(BIN_DIR)/$(TEST_OUT) -D -i $(INI_FILE)
 
-install-binary: release
+install-binary: release install-pairing-notices
 	$(Q)echo "Installing $(OUT) binary to $(PREFIX)."
 	$(Q)$(SUDO) install -d "$(PREFIX)"
 	$(Q)$(SUDO) install -m 755 "$(BIN_DIR)/$(OUT)" "$(PREFIX)/$(OUT)"
 	$(Q)echo "Binary installation complete: $(PREFIX)/$(OUT)"
 
-install: release
+install: release install-pairing-notices
 	$(Q)echo "Installing $(OUT) to $(PREFIX)."
 	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
 	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
@@ -1891,7 +1892,7 @@ install: release
 	$(Q)$(SUDO) systemctl start $(OUT).service || true
 	$(Q)echo "Installation complete."
 
-debuginstall: debug
+debuginstall: debug install-pairing-notices
 	$(Q)echo "Installing DEBUG $(OUT) to $(PREFIX)."
 	$(Q)echo "$(PREFIX)/$(OUT) status before install:"
 	$(Q) ls -al $(PREFIX)/$(OUT) || { $(Q)echo "Error: Daemon binary not found at $(PREFIX)/$(OUT)."; }
@@ -1927,12 +1928,7 @@ help:
 	$(Q)echo "  semantics-test          Run the full Linux semantics suite (requires gpiod.hpp)"
 	$(Q)echo "  semantics-test-portable Run the simulated-only portable semantics subset"
 	$(Q)echo "  wtp-protocol-test       Run standalone WTP/1 wire and session tests"
-	$(Q)echo "  wtp-plan-test           Run hardware-free WTP execution-plan conversion tests"
-	$(Q)echo "  wtp-scheduler-test      Run hardware-free early WTP scheduling tests"
-	$(Q)echo "  wtp-status-test         Run WTP status and explicit recovery tests"
-	$(Q)echo "  wtp-application-test    Run hardware-free WTP owned-worker tests"
 	$(Q)echo "  wtp-production-test     Run injected parent configuration/runtime and UI tests"
-	$(Q)echo "  wtp-backend-test        Run hardware-free complete-plan WTP backend tests"
 	$(Q)echo "  wtp-usb-test            Run WTP USB adapter tests using fakes and PTYs only"
 	$(Q)echo "  gdb                     Debug with gdb"
 	$(Q)echo "  test-tone               Run the binary with a test tone"
@@ -1964,82 +1960,6 @@ calibration-roundtrip-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 idle-startup-policy-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT) --idle-startup-overrides-only
 
-# Explicit complete-plan WTP backend, scripted peer and virtual clock only.
-WTP_BACKEND_BUILD_DIR ?= build/wtp-backend
-WTP_BACKEND_CXXFLAGS ?= -O2 -g
-WTP_BACKEND_LDFLAGS ?=
-.PHONY: wtp-backend-test
-wtp-backend-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_BACKEND_BUILD_DIR)/client)" CXXFLAGS="$(WTP_BACKEND_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_BACKEND_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_BACKEND_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_backend_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_BUILD_DIR)/client/libwtp_client.a" $(WTP_BACKEND_LDFLAGS) -o "$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
-	$(Q)"$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
-
-# Optional reference endpoint test; caller supplies a provenance-verified checkout.
-WTP_BACKEND_REFERENCE_BUILD_DIR ?= build/wtp-backend-reference
-.PHONY: wtp-backend-interop-test
-wtp-backend-interop-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client interop-test PICO_SOURCE="$(abspath $(PICO_SOURCE))" BUILD_DIR="$(abspath $(WTP_BACKEND_REFERENCE_BUILD_DIR))"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
-		tests/wtp_backend_reference_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
-		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
-	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
-
-# Early WTP scheduling through a virtual host/device clock and scripted peer.
-WTP_SCHEDULER_BUILD_DIR ?= build/wtp-scheduler
-WTP_SCHEDULER_CXXFLAGS ?= -O2 -g
-WTP_SCHEDULER_LDFLAGS ?=
-.PHONY: wtp-scheduler-test
-wtp-scheduler-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_SCHEDULER_BUILD_DIR)/client)" CXXFLAGS="$(WTP_SCHEDULER_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_SCHEDULER_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_SCHEDULER_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_scheduler_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_SCHEDULER_BUILD_DIR)/client/libwtp_client.a" $(WTP_SCHEDULER_LDFLAGS) -o "$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
-	$(Q)"$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
-
-.PHONY: wtp-scheduler-interop-test
-wtp-scheduler-interop-test: wtp-backend-interop-test
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
-		tests/wtp_scheduler_reference_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
-		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
-	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
-
-# Coherent cross-thread WTP status and explicit recovery reporting.
-WTP_STATUS_BUILD_DIR ?= build/wtp-status
-WTP_STATUS_CXXFLAGS ?= -O2 -g
-WTP_STATUS_LDFLAGS ?=
-.PHONY: wtp-status-test
-wtp-status-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_STATUS_BUILD_DIR)/client)" CXXFLAGS="$(WTP_STATUS_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_STATUS_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_STATUS_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_status_test.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_STATUS_BUILD_DIR)/client/libwtp_client.a" $(WTP_STATUS_LDFLAGS) -o "$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
-	$(Q)"$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
-
-WTP_APPLICATION_BUILD_DIR ?= build/wtp-application
-WTP_APPLICATION_CXXFLAGS ?= -O2 -g
-WTP_APPLICATION_LDFLAGS ?=
-.PHONY: wtp-application-test
-wtp-application-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_APPLICATION_BUILD_DIR)/client)" CXXFLAGS="$(WTP_APPLICATION_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_APPLICATION_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_APPLICATION_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_application_test.cpp wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_APPLICATION_BUILD_DIR)/client/libwtp_client.a" $(WTP_APPLICATION_LDFLAGS) -o "$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
-	$(Q)"$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
-
 .PHONY: wtp-production-test
 WTP_CATALOG_BUILD_DIR ?= build/wtp-catalog
 .PHONY: wtp-catalog-test
@@ -2049,13 +1969,372 @@ wtp-catalog-test:
 		tests/wtp_catalog_discovery_test.cpp wtp_integration/catalog.cpp wtp_integration/discovery.cpp \
 		$(OPENSSL_LIBS) -o "$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
 	$(Q)"$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
-$(BIN_DIR)/wtp_production_test: tests/wtp_production_test.cpp $(SEMANTICS_TEST_DEPS)
+$(BIN_DIR)/wtp_production_test: tests/wtp_retirement_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_production_test
 
 wtp-production-test: wtp-production-cpp-test wtp-ui-test
+
+.PHONY: pi-wtp-binding-test
+$(BIN_DIR)/pi_wtp_binding_test: tests/pi_wtp_binding_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-wtp-binding-test: $(BIN_DIR)/pi_wtp_binding_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_wtp_binding_test"
+
+.PHONY: wtp-managed-output-test
+$(BIN_DIR)/wtp_managed_output_test: tests/wtp_managed_output_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+wtp-managed-output-test: $(BIN_DIR)/wtp_managed_output_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/wtp_managed_output_test"
+
+.PHONY: pico-management-target-test
+$(BIN_DIR)/pico_management_target_test: tests/pico_management_target_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pi_pair_browser_fixture: tests/pi_pair_browser_fixture.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_management_pair_client: tests/pico_management_pair_client.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_management_usb_pair_client: tests/pico_management_usb_pair_client.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pico_controller_pair_fixture: tests/pico_controller_pair_fixture.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-target-test: $(BIN_DIR)/pico_management_target_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_management_target_test"
+
+.PHONY: pico-management-journal-test
+.PHONY: pico-management-history-test
+$(BIN_DIR)/pico_management_history_test: tests/pico_management_history_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-history-test: $(BIN_DIR)/pico_management_history_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_management_history_test"
+
+.PHONY: pico-usb-settings-test
+$(BIN_DIR)/pico_usb_settings_test: tests/pico_usb_settings_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-usb-settings-test: $(BIN_DIR)/pico_usb_settings_test
+	$(Q)"$(BIN_DIR)/pico_usb_settings_test"
+
+$(BIN_DIR)/pico_management_journal_test: tests/pico_management_journal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-management-journal-test: $(BIN_DIR)/pico_management_journal_test
+	$(Q)"$(BIN_DIR)/pico_management_journal_test"
+
+.PHONY: pico-target-controller-test
+$(BIN_DIR)/pico_target_controller_test: tests/pico_target_controller_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pico-target-controller-test: $(BIN_DIR)/pico_target_controller_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pico_target_controller_test"
+
+.PHONY: controller-contract-test
+.PHONY: pi-config-persistence-coordinator-test
+.PHONY: pi-management-anchor-test
+.PHONY: pi-management-journal-test
+.PHONY: pi-managed-store-test
+.PHONY: pi-management-service-test
+.PHONY: pi-managed-startup-test
+.PHONY: pi-managed-host-test
+.PHONY: pi-managed-host-runtime-test
+.PHONY: pi-private-network-persistence-test
+.PHONY: pi-managed-main-test
+.PHONY: pi-managed-wtp-main-test
+$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
+$(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+$(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+# Two isolated actual-main targets with independent identity and approved typed
+# clock-health fixtures; production identity itself is exercised elsewhere.
+$(BIN_DIR)/scheduling_autonomy_fixture: tests/scheduling_autonomy_fixture.cpp main.cpp $(filter-out %/wtp_endpoint/identity.o,$(SEMANTICS_TEST_DEPS))
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter-out main.cpp,$^) -o $@ $(LDFLAGS)
+
+.PHONY: scheduling-autonomy-test
+scheduling-autonomy-test: $(BIN_DIR)/scheduling_autonomy_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/scheduling_autonomy_test.py --fixture "$(abspath $(BIN_DIR)/scheduling_autonomy_fixture)" --output "$(abspath ../build/scheduling-autonomy)"
+
+pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture"
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --network-safety-off
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --initialization
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --policy-upgrade
+
+$(BIN_DIR)/shared_setup_main_fixture: tests/shared_setup_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/pi_managed_wtp_main_fixture: tests/pi_managed_wtp_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+# Actual-main fixtures deliberately retain the production singleton boundary.
+# Serialize them even when the parent validation target uses parallel make.
+pi-managed-wtp-main-test: pi-managed-main-test $(BIN_DIR)/pi_managed_wtp_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_wtp_main_test.py --fixture "$(BIN_DIR)/pi_managed_wtp_main_fixture"
+
+$(BIN_DIR)/pi_private_network_persistence_test: tests/pi_private_network_persistence_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-private-network-persistence-test: $(BIN_DIR)/pi_private_network_persistence_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_private_network_persistence_test"
+
+$(BIN_DIR)/pi_managed_host_runtime_test: tests/pi_managed_host_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-host-runtime-test: $(BIN_DIR)/pi_managed_host_runtime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_host_runtime_test"
+
+$(BIN_DIR)/pi_managed_host_test: tests/pi_managed_host_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-host-test: $(BIN_DIR)/pi_managed_host_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_host_test"
+
+$(BIN_DIR)/pi_managed_startup_test: tests/pi_managed_startup_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-startup-test: $(BIN_DIR)/pi_managed_startup_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_startup_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_service_test: tests/pi_management_service_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-service-test: $(BIN_DIR)/pi_management_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_service_test"
+
+$(BIN_DIR)/pi_pair_contract_test: tests/pi_pair_contract_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-contract-test
+pi-pair-contract-test: $(BIN_DIR)/pi_pair_contract_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_contract_test"
+
+$(BIN_DIR)/pi_pair_crypto_test: tests/pi_pair_crypto_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-crypto-test
+pi-pair-crypto-test: $(BIN_DIR)/pi_pair_crypto_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_crypto_test"
+
+$(BIN_DIR)/pi_pair_records_test: tests/pi_pair_records_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-records-test
+pi-pair-records-test: $(BIN_DIR)/pi_pair_records_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_records_test"
+
+$(BIN_DIR)/pi_pair_tls_test: tests/pi_pair_tls_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-tls-test
+pi-pair-tls-test: $(BIN_DIR)/pi_pair_tls_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_tls_test"
+
+$(BIN_DIR)/local_browser_principal_test: tests/local_browser_principal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: local-browser-principal-test
+local-browser-principal-test: $(BIN_DIR)/local_browser_principal_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/local_browser_principal_test"
+
+$(BIN_DIR)/pi_pair_operations_test: tests/pi_pair_operations_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-operations-test
+pi-pair-operations-test: $(BIN_DIR)/pi_pair_operations_test
+	$(Q)python3 tests/pairing_provider/generate_rotation_vector.py --check
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_operations_test"
+
+$(BIN_DIR)/pi_pair_recovery_test: tests/pi_pair_recovery_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-recovery-test
+pi-pair-recovery-test: $(BIN_DIR)/pi_pair_recovery_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_recovery_test"
+
+$(BIN_DIR)/pi_pair_retirement_key_test: tests/pi_pair_retirement_key_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-retirement-key-test
+pi-pair-retirement-key-test: $(BIN_DIR)/pi_pair_retirement_key_test
+	$(Q)python3 tests/pairing_provider/generate_retirement_vector.py --check
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_retirement_key_test"
+
+$(BIN_DIR)/pi_pair_admission_test: tests/pi_pair_admission_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-admission-test
+pi-pair-admission-test: $(BIN_DIR)/pi_pair_admission_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_admission_test"
+
+$(BIN_DIR)/pi_pair_history_tls_test: tests/pi_pair_history_tls_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-history-tls-test
+pi-pair-history-tls-test: $(BIN_DIR)/pi_pair_history_tls_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_history_tls_test"
+
+$(BIN_DIR)/pi_pair_peers_test: tests/pi_pair_peers_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-peers-test
+pi-pair-peers-test: $(BIN_DIR)/pi_pair_peers_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_peers_test"
+
+$(BIN_DIR)/pi_pair_window_test: tests/pi_pair_window_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-window-test
+pi-pair-window-test: $(BIN_DIR)/pi_pair_window_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_window_test"
+
+$(BIN_DIR)/pi_pair_http_test: tests/pi_pair_http_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-http-test
+pi-pair-http-test: $(BIN_DIR)/pi_pair_http_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_http_test"
+
+$(BIN_DIR)/pi_pair_server_test: tests/pi_pair_server_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-server-test
+pi-pair-server-test: $(BIN_DIR)/pi_pair_server_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_server_test"
+
+$(BIN_DIR)/pi_pair_client_test: tests/pi_pair_client_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-client-test
+pi-pair-client-test: $(BIN_DIR)/pi_pair_client_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_client_test"
+
+$(BIN_DIR)/pi_pair_discovery_test: tests/pi_pair_discovery_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-discovery-test
+pi-pair-discovery-test: $(BIN_DIR)/pi_pair_discovery_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_discovery_test"
+
+$(BIN_DIR)/pi_pair_outgoing_rotation_test: tests/pi_pair_outgoing_rotation_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-outgoing-rotation-test
+pi-pair-outgoing-rotation-test: $(BIN_DIR)/pi_pair_outgoing_rotation_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_outgoing_rotation_test"
+
+$(BIN_DIR)/pi_pair_guarded_http_test: tests/pi_pair_guarded_http_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-guarded-http-test
+pi-pair-guarded-http-test: $(BIN_DIR)/pi_pair_guarded_http_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_guarded_http_test"
+
+$(BIN_DIR)/pi_pair_bootstrap_client_test: tests/pi_pair_bootstrap_client_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-bootstrap-client-test
+pi-pair-bootstrap-client-test: $(BIN_DIR)/pi_pair_bootstrap_client_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_bootstrap_client_test"
+
+$(BIN_DIR)/pi_pair_connect_test: tests/pi_pair_connect_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-connect-test
+pi-pair-connect-test: $(BIN_DIR)/pi_pair_connect_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_connect_test"
+
+$(BIN_DIR)/pi_pair_usage_test: tests/pi_pair_usage_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-usage-test
+pi-pair-usage-test: $(BIN_DIR)/pi_pair_usage_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_usage_test"
+
+$(BIN_DIR)/pi_pair_machine_service_test: tests/pi_pair_machine_service_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-machine-service-test
+pi-pair-machine-service-test: $(BIN_DIR)/pi_pair_machine_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test"
+
+.PHONY: pi-pair-resume-refusal-test
+pi-pair-resume-refusal-test: $(BIN_DIR)/pi_pair_machine_service_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test" --refuse-second
+
+$(BIN_DIR)/pi_pair_owner_test: tests/pi_pair_owner_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-owner-test
+pi-pair-owner-test: $(BIN_DIR)/pi_pair_owner_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_owner_test"
+
+$(BIN_DIR)/pi_pair_service_lifetime_test: tests/pi_pair_service_lifetime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-service-lifetime-test
+pi-pair-service-lifetime-test: $(BIN_DIR)/pi_pair_service_lifetime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_service_lifetime_test"
+
+$(BIN_DIR)/pi_pair_local_test: tests/pi_pair_local_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+.PHONY: pi-pair-local-test
+pi-pair-local-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test"
+
+$(BIN_DIR)/pi_managed_store_test: tests/pi_managed_store_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-store-test: $(BIN_DIR)/pi_managed_store_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_store_test" wtp_integration/contract/control-controller-vectors.json
+
+.PHONY: pi-managed-records-test
+$(BIN_DIR)/pi_managed_records_test: tests/pi_managed_records_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-managed-records-test: $(BIN_DIR)/pi_managed_records_test
+	$(Q)"$(BIN_DIR)/pi_managed_records_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_journal_test: tests/pi_management_journal_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-journal-test: $(BIN_DIR)/pi_management_journal_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_journal_test" wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/pi_management_anchor_test: tests/pi_management_anchor_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-management-anchor-test: $(BIN_DIR)/pi_management_anchor_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_management_anchor_test"
+
+$(BIN_DIR)/pi_config_persistence_coordinator_test: tests/pi_config_persistence_coordinator_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+pi-config-persistence-coordinator-test: $(BIN_DIR)/pi_config_persistence_coordinator_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_config_persistence_coordinator_test"
+
+$(BIN_DIR)/controller_contract_test: tests/controller_contract_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+controller-contract-test: $(BIN_DIR)/controller_contract_test
+	$(Q)"$(BIN_DIR)/controller_contract_test" wtp_integration/contract/control-controller-vectors.json
+	$(Q)node ../WsprryPi-UI/tests/controller_contract_test.js
 
 .PHONY: wtp-production-cpp-test wtp-api-cpp-test wtp-config-cpp-test wtp-ui-test wtp-management-ui-test
 wtp-ui-test:
@@ -2068,7 +2347,7 @@ wtp-management-ui-test:
 WTP_NETWORK_BUILD_DIR ?= build/wtp-network
 WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
-WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include -IWTP-Client/src $(OPENSSL_CFLAGS)
+WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include $(OPENSSL_CFLAGS)
 include ../scripts/network_build_rules.mk
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
 wtp-config-cpp-test: $(NETWORK_BIN_DIR)/wtp_configuration_test
@@ -2098,18 +2377,14 @@ wtp-network-client-build:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_network_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
-		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
+		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
 wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
-		wtp_integration/configuration.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
-		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
+		wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
+		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
 # These fixtures share a CMake tree, credentials and loopback TLS port.
 # Serialize an invocation that requests both; parallel recipe builds still use CMake -j.
 ifneq ($(filter wtp-config-interop-test wtp-network-interop-test,$(MAKECMDGOALS)),)
@@ -2122,12 +2397,16 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_progress_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/engineering/protocol/Consumer-Radio-v1-vectors.json"
 	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/wspr_scheduler_frequency_export BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-wtp "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-native-tests "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" --scheduler-frequency "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_amplifier_timing_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_gpio_drive_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node tests/network/consumer_browser_interop.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(PICO_SOURCE))"
+	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/pico_management_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+	$(Q)node ../WsprryPi-UI/tests/pico_management_transport_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_management_pair_client)"
+	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/pico_controller_pair_fixture BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+	$(Q)node ../WsprryPi-UI/tests/pico_controller_http_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_controller_pair_fixture)"
 wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
@@ -2199,7 +2478,7 @@ wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
@@ -2263,9 +2542,9 @@ udp-logging-test:
 # Actual application and finite read-only load, built without physical backends.
 .PHONY: production-browser-regression-test tls-observer-test
 TEST_NETNS_RUNNER ?= unshare --net
-production-browser-regression-test: debug
+production-browser-regression-test: debug $(BIN_DIR)/pi_managed_main_fixture
 	$(Q)python3 -B tests/production_browser_load_test.py
-	$(Q)$(TEST_NETNS_RUNNER) python3 -B tests/production_ini_roundtrip_test.py "$(abspath $(PROFILE_DEBUG_BIN))"
+	$(Q)$(TEST_NETNS_RUNNER) python3 -B tests/production_ini_roundtrip_test.py "$(abspath $(PROFILE_DEBUG_BIN))" --fixture "$(abspath $(BIN_DIR)/pi_managed_main_fixture)"
 
 tls-observer-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
@@ -2294,16 +2573,91 @@ ci-installer-offline-test: support-bundle-runtime-installer-test pico-usb-instal
 
 .PHONY: gpio-line-resolver-test non-wspr-repeat-policy-test
 
-.PHONY: wtp-fleet-capacity-test
-$(BIN_DIR)/wtp_fleet_capacity_test: tests/wtp_fleet_capacity_test.cpp $(SEMANTICS_TEST_DEPS)
-	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
-# Explicit typed memory carriers and deterministic logical clocks; no hardware.
-wtp-fleet-capacity-test: $(BIN_DIR)/wtp_fleet_capacity_test
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_fleet_capacity_test
 
 .PHONY: wtp-fleet-operations-driver-build
-$(BIN_DIR)/wtp_fleet_operations_driver: tests/wtp_fleet_operations_driver.cpp $(SEMANTICS_TEST_DEPS)
+$(BIN_DIR)/wtp_fleet_operations_driver: tests/fleet_retirement_pair_driver.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 wtp-fleet-operations-driver-build: $(BIN_DIR)/wtp_fleet_operations_driver
+
+# Pure geometry: no application, device, networking, or clock acquisition.
+.PHONY: solar-geometry-test
+$(BIN_DIR)/solar_geometry_test: tests/solar_geometry_test.cpp solar_geometry.cpp solar_geometry.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. tests/solar_geometry_test.cpp solar_geometry.cpp -o $@
+solar-geometry-test: $(BIN_DIR)/solar_geometry_test
+	$(Q)$(BIN_DIR)/solar_geometry_test
+
+.PHONY: solar-policy-test
+$(BIN_DIR)/solar_policy_test: tests/solar_policy_test.cpp solar_policy.cpp solar_policy.hpp solar_geometry.cpp solar_geometry.hpp config_types.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWSPR-Reference/src/wspr tests/solar_policy_test.cpp solar_policy.cpp solar_geometry.cpp -o $@
+solar-policy-test: $(BIN_DIR)/solar_policy_test
+	$(Q)$(BIN_DIR)/solar_policy_test
+
+.PHONY: solar-geometry-pair-test
+solar-geometry-pair-test:
+	$(Q)test -n "$(PICO_SOURCE)" -a -n "$(MBEDTLS_SOURCE)"
+	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
+	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" --target pi_solar_geometry_pair -j4
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pi_solar_geometry_pair"
+
+.PHONY: recurrence-authority-record-test
+.PHONY: solar-clock-test
+.PHONY: native-recurrence-test
+.PHONY: wtp-retirement-config-test
+$(BIN_DIR)/wtp_retirement_config_test: tests/wtp_retirement_config_test.cpp wtp_retirement.hpp config_types.hpp wtp_settings.hpp wtp_settings_json.hpp wtp_server_settings.hpp wtp_server_settings_json.hpp wtp_integration/identity.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWSPR-Reference/src/wspr tests/wtp_retirement_config_test.cpp -o $@
+wtp-retirement-config-test: $(BIN_DIR)/wtp_retirement_config_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/wtp_retirement_config_test
+$(BIN_DIR)/native_recurrence_test: tests/native_recurrence_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+native-recurrence-test: $(BIN_DIR)/native_recurrence_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/native_recurrence_test
+.PHONY: native-recurrence-main-test
+native-recurrence-main-test: $(BIN_DIR)/pi_managed_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 tests/native_recurrence_main_test.py --fixture $(BIN_DIR)/pi_managed_main_fixture
+.PHONY: recurrence-progress-test
+$(BIN_DIR)/recurrence_progress_test: tests/recurrence_progress_test.cpp recurrence_progress.cpp recurrence_progress.hpp wtp_integration/pi_management_journal.cpp wtp_integration/pi_management_journal.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $(OPENSSL_CFLAGS) tests/recurrence_progress_test.cpp recurrence_progress.cpp wtp_integration/pi_management_journal.cpp -o $@ $(OPENSSL_LIBS)
+recurrence-progress-test: $(BIN_DIR)/recurrence_progress_test
+	$(Q)$(BIN_DIR)/recurrence_progress_test
+
+$(BIN_DIR)/solar_clock_test: tests/solar_clock_test.cpp solar_clock.cpp solar_clock.hpp solar_policy.cpp solar_policy.hpp solar_geometry.cpp solar_geometry.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWSPR-Reference/src/wspr tests/solar_clock_test.cpp solar_clock.cpp solar_policy.cpp solar_geometry.cpp -o $@
+solar-clock-test: $(BIN_DIR)/solar_clock_test
+	$(Q)$(BIN_DIR)/solar_clock_test
+
+$(BIN_DIR)/recurrence_authority_record_test: tests/recurrence_authority_record_test.cpp recurrence_authority.cpp recurrence_authority.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. tests/recurrence_authority_record_test.cpp recurrence_authority.cpp -o $@
+recurrence-authority-record-test: $(BIN_DIR)/recurrence_authority_record_test
+	$(Q)$(BIN_DIR)/recurrence_authority_record_test
+
+.PHONY: scheduled-launch-test
+scheduled-launch-test:
+	$(Q)$(MAKE) -C WSPR-Transmitter/src scheduled-launch-test BACKENDS=simulated SUDO=
+
+.PHONY: pi-pair-local-http-test
+pi-pair-local-http-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test" --http
+
+.PHONY: pi-pair-runtime-test
+pi-pair-runtime-test: $(BIN_DIR)/pi_pair_local_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_local_test" --runtime
+
+# Static Botan code is distributed with its upstream notice and exact pin.
+.PHONY: pairing-notices
+pairing-notices:
+	$(Q)mkdir -p "$(BIN_DIR)"
+	$(Q)cp ../docs/licenses/botan/BSD-2-Clause.txt "$(BIN_DIR)/BOTAN-LICENSE.txt"
+	$(Q)cp ../scripts/pairing_provider.json "$(BIN_DIR)/PAIRING-PROVIDER.json"
+
+.PHONY: install-pairing-notices
+install-pairing-notices: pairing-notices
+	$(Q)$(SUDO) install -d "$(PREFIX)/../share/licenses/wsprrypi"
+	$(Q)$(SUDO) install -m 644 "$(BIN_DIR)/BOTAN-LICENSE.txt" "$(PREFIX)/../share/licenses/wsprrypi/BOTAN-LICENSE.txt"

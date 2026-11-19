@@ -6,7 +6,7 @@ const {schedules,changes} = require('../data/wtp-management.js');
 (async()=>{
   const {stationHint}=require('../data/wtp-management.js');
   const fs=require('node:fs'),path=require('node:path');
-  const view=fs.readFileSync(path.join(__dirname,'../data/views/wtp-controls.php'),'utf8');
+  const view=fs.readFileSync(path.join(__dirname,'../data/views/pico-target-settings.php'),'utf8');
   assert(view.includes(stationHint(null)));
   assert(!stationHint(null).includes('Type 1 station writes only'));
   assert.match(stationHint('application'),/automatically selects WSPR Type 1, 2 or 3/);
@@ -27,6 +27,8 @@ const {schedules,changes} = require('../data/wtp-management.js');
   let fail=false, reboot=false;
   const b=browser(r=>fail ? response({error:{code:'revision_conflict'}},412) : response({...context(),reboot_required:reboot}));
   await b.click('wtp-remote-load');
+  assert.equal(b.networkReads.length,1,'Wi-Fi state loads automatically with the confirmed connection');
+  assert.match(b.element('wtp-network-feedback').textContent,/Wi-Fi: enabled/);
   assert.equal(b.element('wtp-remote-callsign').value,'AA0NT');
   await b.click('wtp-remote-save'); assert.equal(b.requests.length,1);
   b.element('wtp-remote-callsign').value='K1ABC';

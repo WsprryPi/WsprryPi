@@ -33,8 +33,9 @@
     function stationHint() {
         return "Read saved progress, save valid station fields, then apply the saved progress separately. Complete station save is an alternative below. The Pico automatically selects WSPR Type 1, 2 or 3; reported power is metadata, not measured RF output.";
     }
-    if (typeof module !== "undefined" && module.exports) module.exports = { schedules, changes, stationHint };
+    if (typeof module !== "undefined" && module.exports) module.exports = { schedules, changes, stationHint, mount };
     if (!root.document) return;
+    function mount(root) {
     const byId = id => root.document.getElementById(id);
     let available = false, busy = false, loaded = false, reconcile = false;
     let canSelect = false, consumerConnected = false, explicitDisconnected = false, selectionObserved = false;
@@ -64,7 +65,9 @@
         const availability = byId("wtp-management-availability");
         if (availability) {
             availability.hidden = available;
-            const message = root.WtpUi?.selected?.() || canSelect
+            const message = root.targetManagement
+                ? "Connect to this Pico before reading its settings. Its transmitter backend does not need to be selected."
+                : root.WtpUi?.selected?.() || canSelect
                 ? "Management is unavailable until this Pi is idle and the Pico connection is confirmed. Review Pico status above before reading settings."
                 : "Select and use a saved Pico above, then turn on Use Pico for this Pi. Management reads require an idle host and a confirmed Pico connection.";
             if (!available && availability.textContent !== message) availability.textContent = message;
@@ -269,6 +272,7 @@
         root.WsprryMemberUdp?.invalidate();
         invalidateProgress();
         configRevision = networkRevision = ""; target = null; reconcile = loaded;
+        if (byId("wtp-network-feedback")) byId("wtp-network-feedback").textContent = "Wi-Fi status needs a fresh observation from this Pico.";
         invalidateResources();
     }
     function hardwareCandidate() {
@@ -417,13 +421,14 @@
         const shared = ["member/application", "member/station", "member/hardware", "member/pins/validate"].includes(resource);
         const beacon = scope === "beacon";
         const feedback = beacon ? member("beacon-feedback") : shared ? member(resource.endsWith("validate") ? "pin-feedback" : method === "PUT" ? `${resource.split("/")[1]}-feedback` : "feedback")
-            : byId(resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
+            : byId(resource === "network" ? "wtp-network-feedback" : resource === "member/management" ? "wtp-management-connection-feedback" : "wtp-management-feedback");
         const context = resourceContext;
         const recoveryAction = resource === "member/management" && ["inspect_logins","retire_login"].includes(body?.action);
         if (method !== "GET" && !resource.endsWith("validate")) invalidateEditors();
-        feedback.textContent = "Contacting the idle Pico…";
+        feedback.textContent = "Contacting this Pico…";
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 180000);
+        let refreshNetwork = false;
         try {
             if (resource === 'member/configuration' && method === 'POST' && (body?.config?.pins || beacon)) {
                 // The complete configuration coordinator has its own read binding.
@@ -572,16 +577,18 @@
                 invalidateEditors();
                 feedback.textContent = data.carrier === "usb_physical" || body?.action === "usb_physical"
                     ? "USB management selected. Load saved Pico settings before editing. Wi-Fi and a network password are not required."
-                    : consumerConnected
+                    : consumerConnected && data.carrier?.startsWith("consumer_")
                     ? "Consumer management authenticated for this Pico and boot. Load saved Pico settings before editing. The login password has been cleared."
                     : explicitDisconnected ? "Management disconnected. Only this client's consumer session was closed. Your settings draft is preserved."
+                        : consumerConnected ? "Engineering HTTPS authenticated for this Pico and boot. Load saved Pico settings before editing."
                         : "Engineering HTTPS selected. Load saved Pico settings before editing.";
             } else if (resource === "network") {
                 networkRevision = etag;
                 const discovery = data.mdns_state ? ` Discovery: ${data.mdns_state}. Configured hostname: ${data.configured_hostname || "none"}. Advertised hostname: ${data.advertised_hostname || "none"}. Current address: ${data.ipv4 || "unavailable"}.` : "";
                 const problem = data.mdns_state === "conflict" ? " Resolve the name conflict, then retry the same certified name with an idle disable/re-enable or restart. No automatic rename occurred."
                     : data.mdns_state === "failed" ? ` Discovery failed (${data.mdns_reason || "unconfirmed reason"}); inspect the Pico deployment before retrying.` : "";
-                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${method === "PUT" ? "Network control may now disconnect its network carrier. USB management stays available." : "This is a remote observation."}`;
+                const transition = data.withdrawal_pending || data.requested_enabled !== null && data.requested_enabled !== undefined && data.requested_enabled !== data.enabled;
+                feedback.textContent = `Pico Wi-Fi: ${data.enabled ? "enabled" : "disabled"}.${discovery}${problem} ${transition ? "A Wi-Fi change is pending; this observation does not confirm completion." : ""} ${method === "PUT" ? "Wi-Fi disable requested. Network control may disconnect; USB management stays available." : "Observed on this Pico."}`;
                 if (method === "PUT") { networkRevision = ""; configRevision = ""; reconcile = true; }
             } else {
                 if (data.schema !== "pico-settings" || !data.target || !Object.hasOwn(data, "config") || !etag)
@@ -604,6 +611,7 @@
                     feedback.textContent = (body.operation === "schedules" ? "Pico schedules saved. Other drafts are preserved." : "Pico settings saved.") + restartFeedback(data.reboot_required);
                 }
             }
+            refreshNetwork = resource === "member/management" || method === "GET" && ["member/configuration","member/application"].includes(resource);
             return data;
         } catch (error) {
             // No retry or strategy switch: even a failed delivery can follow a commit.
@@ -618,6 +626,8 @@
         } finally {
             if (resource === "member/management" && method === "POST" && byId("wtp-management-password")) byId("wtp-management-password").value = "";
             clearTimeout(timeout); busy = false; render();
+            if (available && !networkRevision && refreshNetwork)
+                await request("network");
         }
     }
     function save(onlySchedules) {
@@ -774,4 +784,8 @@
         render();
     }
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init); else init();
+    return root.WtpManagement;
+    }
+    root.WtpManagementEditor = Object.freeze({mount});
+    if (!root.PicoTargetEditors) mount(root);
 })(typeof window === "undefined" ? globalThis : window);

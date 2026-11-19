@@ -9,6 +9,8 @@
 #include "scheduling.hpp"
 #include "band_gpio_selector.hpp"
 #include "system_clock_frequency_estimate.hpp"
+#include "transmitter_runtime_bridge.hpp"
+namespace wsprrypi {struct NativeOccurrence;}
 
 struct BandGPIOResolution
 {
@@ -106,7 +108,8 @@ double maybe_apply_wspr_random_offset(double, const ArgParserConfig &);
 void schedule_next_non_wspr_launch(const ArgParserConfig &);
 bool launch_scheduled_non_wspr_if_current(std::uint64_t);
 bool start_non_wspr_transmission_now(const ArgParserConfig &,
-    std::optional<std::chrono::system_clock::time_point> = std::nullopt);
+    std::optional<std::chrono::system_clock::time_point> = std::nullopt,
+    std::shared_ptr<wsprrypi::NativeOccurrence> = {});
 TransmissionRequest make_skip_window_request(
     const ArgParserConfig &, double, double, const WsprFrequencyEntry &);
 bool configure_current_wspr_transmission(
@@ -117,7 +120,8 @@ bool configure_current_wspr_transmission(
 void refresh_frequency_estimate_for_config();
 GpioFrequencyCorrection select_and_publish_gpio_correction_for_config(
     const ArgParserConfig &);
-void commit_execution_request(const TransmissionRequest &);
+void commit_execution_request(const TransmissionRequest &,std::optional<std::chrono::system_clock::time_point> = {},std::function<bool()> = {},TransmitterRuntimeCallback = {});
+std::size_t prepared_wspr_occurrence_frame_count(const ArgParserConfig &);
 void clear_committed_execution_request() noexcept;
 TransmissionRequest make_tone_request(
     const ArgParserConfig &, double, double, double,

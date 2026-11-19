@@ -101,7 +101,11 @@ def main() -> None:
         merged_ini = root / "merged.ini"
         stock_ini = root / "installed.ini.stock"
 
+        require(parse_ini(current).getboolean("WTP Server", "Enabled") is False,
+                "new stock must leave the retired listener disabled")
         custom = {
+            "Operation": {"Transmit Backend": "wtp"},
+            "WTP Server": {"Enabled": "true", "Port": "31499", "Interface": "legacy0"},
             "Si5351": {"Adapter Identity": "usb:04d8:00dd:serial:6164616672756974", "I2C Bus": "17"},
             "WTP": {"Transport": "network", "Hostname": "station.example", "TCP Port": "31418",
                     "TLS Server Identity": "station.example", "TLS CA File": "/etc/station/ca.pem",

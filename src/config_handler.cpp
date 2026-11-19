@@ -32,6 +32,8 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "config_handler.hpp"
+#include "privileged_network_admin.hpp"
+#include "wtp_integration/pi_management_journal.hpp"
 #include "i2c_bus_inventory.hpp"
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
@@ -57,6 +59,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -72,9 +75,48 @@
 #include <unordered_map>
 #include <vector>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 ArgParserConfig config;
 nlohmann::json jConfig;
+
+namespace {
+ConfigPersistenceCoordinator config_persistence_owner;
+ConfigSnapshotValidator config_snapshot_validator;
+ConfigStockCoordinator config_stock_coordinator;
+ConfigIniDraftObserver config_ini_draft_observer;
+ConfigIniInputGuard config_ini_input_guard;
+ConfigPrivateCoordinator config_private_coordinator;
+thread_local bool explicit_config_persistence = false;
+struct ExplicitConfigPersistence {
+    bool previous{explicit_config_persistence};
+    ExplicitConfigPersistence(){explicit_config_persistence=true;}
+    ~ExplicitConfigPersistence(){explicit_config_persistence=previous;}
+};
+}
+void set_config_persistence_owner(ConfigPersistenceCoordinator owner,ConfigSnapshotValidator validator,
+    ConfigStockCoordinator stock,ConfigIniDraftObserver draft,ConfigIniInputGuard input,ConfigPrivateCoordinator private_owner) {
+    std::lock_guard lock(config_update_mutex());
+    if(bool(owner)!=bool(validator)||bool(owner)!=bool(stock)||((draft||input||private_owner)&&!owner))throw std::invalid_argument("Configuration persistence, snapshot and stock owners must be installed together");
+    config_persistence_owner=std::move(owner);
+    config_snapshot_validator=std::move(validator);
+    config_stock_coordinator=std::move(stock);
+    config_ini_draft_observer=std::move(draft);
+    config_ini_input_guard=std::move(input);
+    config_private_coordinator=std::move(private_owner);
+}
+void validate_config_ini_input(const std::string &filename){
+    std::lock_guard lock(config_update_mutex());
+    if(config_ini_input_guard)config_ini_input_guard(filename);
+}
+bool read_owned_ini_snapshot(const std::string &path,std::optional<std::string> &bytes){
+    std::lock_guard lock(config_update_mutex());
+    if(!config_persistence_owner||!config.use_ini||path!=config.ini_filename)return false;
+    try{validate_config_ini_input(path);bytes=wsprrypi::PiManagementJournal::read_ini_input(path).bytes;}
+    catch(...){bytes.reset();}
+    return true;
+}
 
 bool transmit_backend_is_compiled(TransmitBackendKind backend) noexcept
 {
@@ -89,7 +131,7 @@ bool transmit_backend_is_compiled(TransmitBackendKind backend) noexcept
     case TransmitBackendKind::SIMULATED:
         return WSPRRYPI_BACKEND_SIMULATED;
     case TransmitBackendKind::WTP:
-        return true;
+        return false;
     }
     return false;
 }
@@ -1341,6 +1383,7 @@ namespace
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
         target.transmit_backend = source.transmit_backend;
+        target.stored_wtp_backend = source.stored_wtp_backend;
         target.simulated_backend_override = source.simulated_backend_override;
         target.wtp = source.wtp;
         target.wtp_server = source.wtp_server;
@@ -1491,7 +1534,7 @@ namespace
     void ini_to_json_impl(
         const std::string &filename,
         const std::map<std::string, std::unordered_map<std::string, std::string>> &ini_data,
-        nlohmann::json &target)
+        nlohmann::json &target,bool normalize_legacy=true)
     {
         nlohmann::json patch;
 
@@ -1570,7 +1613,7 @@ namespace
                 else
                 {
                     nlohmann::json value = parse_ini_value(trimmed);
-                    if (section == "GPIO" && key == "Manual PPM" &&
+                    if (normalize_legacy && section == "GPIO" && key == "Manual PPM" &&
                         value.is_number() &&
                         std::fpclassify(value.get<double>()) == FP_SUBNORMAL)
                     {
@@ -1604,10 +1647,12 @@ namespace
         ArgParserConfig &candidate_config,
         std::string *error_message,
         nlohmann::json *error_details,
-        std::vector<std::string> *warning_messages)
+        std::vector<std::string> *warning_messages,bool observe_saved_draft=false)
     {
         try
         {
+            const auto draft_stamp=observe_saved_draft&&config_ini_draft_observer&&!iniFile.hasPendingChanges()
+                ?config_file_stamp(filename):std::string{};
             init_config_json_impl(candidate_json);
 
             // External INI edits are observed by the file monitor before this
@@ -1619,9 +1664,53 @@ namespace
                 iniFile.load();
             }
 
+            auto ini_data = iniFile.getData();
+            if(observe_saved_draft&&config_ini_draft_observer&&!draft_stamp.empty()){
+                // Observe saved input before required-section, migration, or
+                // semantic validation. A partial/invalid INI must remain an
+                // unconfirmed draft, never the parser's initialized defaults.
+                ConfigIniDraftSnapshot draft{filename,draft_stamp,nlohmann::json::object(),{}};
+                for(const auto &[section,known]:candidate_json.items()){
+                    if(!known.is_object()||section=="Meta")continue;
+                    const auto saved_section=ini_data.find(section);
+                    if(saved_section==ini_data.end())continue;
+                    for(const auto &[key,unused]:known.items()){
+                        (void)unused;
+                        const auto saved=saved_section->second.find(key);
+                        const auto polarity=saved_section->second.find(key+" Active High");
+                        if(saved==saved_section->second.end()&&
+                            (section!="Band GPIO"||polarity==saved_section->second.end()))continue;
+                        if(section=="Band GPIO"){
+                            auto raw=nlohmann::json::object();
+                            if(saved!=saved_section->second.end())raw[key]=saved->second;
+                            if(polarity!=saved_section->second.end())raw[key+" Active High"]=polarity->second;
+                            draft.raw_source[section][key]=std::move(raw);
+                        }else draft.raw_source[section][key]=saved->second;
+                        std::map<std::string,std::unordered_map<std::string,std::string>> one_field{
+                            {"Operation",{{"Mode","WSPR"}}}};
+                        if(saved!=saved_section->second.end())one_field[section][key]=saved->second;
+                        if(section=="Band GPIO"&&polarity!=saved_section->second.end())
+                            one_field[section][key+" Active High"]=polarity->second;
+                        nlohmann::json observed=nlohmann::json::object();
+                        try{
+                            ini_to_json_impl(filename,one_field,observed,false);
+                            if(observed.contains(section)&&observed[section].contains(key)){
+                                if(observed[section][key].is_number_float()&&!std::isfinite(observed[section][key].get<double>()))
+                                    throw std::runtime_error("Unrepresentable saved number");
+                                draft.source[section][key]=observed[section][key];
+                            }
+                        }catch(...){/* Retain the invalid saved text below. */}
+                        if(!draft.source.contains(section)||!draft.source[section].contains(key)){
+                            draft.source[section][key]=draft.raw_source[section][key];
+                        }
+                        draft.present_fields.push_back(section+"."+key);
+                    }
+                }
+                if(config_file_stamp(filename)!=draft_stamp)throw std::runtime_error("Configuration changed during draft parsing");
+                config_ini_draft_observer(draft);
+            }
             std::vector<std::string> local_warnings;
             bool missing_required_tx_item = false;
-            auto ini_data = iniFile.getData();
             const bool migration_required =
                 migrate_legacy_gpio_keys(ini_data, local_warnings);
 
@@ -1715,6 +1804,20 @@ void init_config_json()
 {
     std::lock_guard update_lock(config_update_mutex());
     init_config_json_impl(jConfig);
+}
+
+nlohmann::json initial_configuration_draft()
+{
+    std::lock_guard update_lock(config_update_mutex());
+    nlohmann::json draft;
+    init_config_json_impl(draft);
+    return draft;
+}
+
+bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &draft)
+{
+    std::lock_guard lock(config_update_mutex());
+    return !draft.file_stamp.empty()&&config_file_stamp(draft.filename)==draft.file_stamp;
 }
 
 void ini_to_json(std::string filename)
@@ -1916,6 +2019,15 @@ build_persistent_ini_data(const nlohmann::json &source)
 
 void persist_config_json(const nlohmann::json &source)
 {
+    if(config_persistence_owner&&!explicit_config_persistence){
+        bool attempted=false,completed=false;
+        config_persistence_owner(source,[&]{
+            if(attempted)throw std::logic_error("Configuration persistence already attempted");
+            attempted=true;ExplicitConfigPersistence raw;persist_config_json(source);completed=true;
+        });
+        if(!completed)throw std::logic_error("Configuration persistence was not completed");
+        return;
+    }
     if (source.contains("GPIO") && source.at("GPIO").is_object() &&
         source.at("GPIO").contains("Manual PPM") &&
         source.at("GPIO").at("Manual PPM").is_number())
@@ -1943,6 +2055,22 @@ void persist_config_json(const nlohmann::json &source)
     }
 }
 } // namespace
+
+std::string serialize_config_ini_projection_for_management(const nlohmann::json &source)
+{
+    const auto data = build_persistent_ini_data(source);
+    for (const auto &[section, values] : data)
+        for (const auto &[key, value] : values)
+            if (value.find_first_of(std::string("\r\n\0;#", 5)) != std::string::npos ||
+                (!value.empty() && (std::isspace(static_cast<unsigned char>(value.front())) ||
+                                   std::isspace(static_cast<unsigned char>(value.back())))))
+                throw std::invalid_argument("Configuration value cannot round-trip through INI");
+    if (source.contains("GPIO") && source.at("GPIO").is_object() &&
+        source.at("GPIO").contains("Manual PPM") &&
+        source.at("GPIO").at("Manual PPM").is_number())
+        require_persistable_gpio_manual_ppm(source.at("GPIO").at("Manual PPM").get<double>());
+    return iniFile.serialize_with_data(data);
+}
 
 void json_to_ini()
 {
@@ -2035,6 +2163,7 @@ void prepare_ini_config_candidate(
     PreparedConfigCandidate &candidate_out)
 {
     std::unique_lock update_lock(config_update_mutex());
+    validate_config_ini_input(filename);
     const auto initial_revision = config_revision_locked();
     const auto file_stamp = config_file_stamp(filename);
     candidate_out = PreparedConfigCandidate{};
@@ -2045,7 +2174,7 @@ void prepare_ini_config_candidate(
             candidate_out.normalized_config,
             &candidate_out.error_reason,
             &candidate_out.error_details,
-            &candidate_out.warnings))
+            &candidate_out.warnings,true))
     {
         candidate_out.valid = false;
         candidate_out.transmit_enabled = false;
@@ -2106,6 +2235,8 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
         iniFile.erase_value("GPIO", "Use NTP");
         persist_config_json(candidate.normalized_json);
     }
+    if(config_snapshot_validator&&candidate.normalized_config.use_ini)
+        config_snapshot_validator(candidate.normalized_json);
 
     const auto process_wtp_port = config.wtp_server_port_override;
     copy_config(candidate.normalized_config, config);
@@ -2134,9 +2265,10 @@ void dump_json(const nlohmann::json &j, std::string tag)
 
 void patch_all_from_web(const nlohmann::json &j) { (void)patch_all_from_web_revision(j, {}); }
 
-std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision,
+static std::string patch_all_from_web_revision_impl(const nlohmann::json &j, const std::string &expected_revision,
     LocalEnableAction action, bool confirmed,
-    const std::string& observed_owner, const std::string& observed_job)
+    const std::string& observed_owner, const std::string& observed_job,
+    const ConfigPersistenceCoordinator &coordinator)
 {
     std::unique_lock tone_transaction(test_tone_lifecycle_mutex());
     std::unique_lock update_lock(config_update_mutex());
@@ -2321,6 +2453,20 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
     if (interactive)
         wsprrypi::wtp_pi_enable_interactive(action == LocalEnableAction::FinishCurrent,
                                            confirmed, persist, observed_owner, observed_job);
+    else if (coordinator)
+    {
+        if (!candidate_config.use_ini)
+            throw std::runtime_error("Configuration transaction requires an active INI");
+        bool attempted = false, completed = false;
+        coordinator(candidate_json, [&] {
+            if (attempted) throw std::logic_error("Configuration persistence already attempted");
+            attempted = true;
+            ExplicitConfigPersistence owned;
+            persist();
+            completed = true;
+        });
+        if (!completed) throw std::logic_error("Configuration persistence was not completed");
+    }
     else persist();
     // Persist edits during Test Tone, but do not replace its runtime backend,
     // mode, selectors, or reservation. End consumes the deferred INI candidate.
@@ -2340,6 +2486,22 @@ std::string patch_all_from_web_revision(const nlohmann::json &j, const std::stri
         callback_ini_changed();
     }
     return revision;
+}
+
+std::string patch_all_from_web_revision(const nlohmann::json &j, const std::string &expected_revision,
+    LocalEnableAction action, bool confirmed,
+    const std::string &observed_owner, const std::string &observed_job)
+{
+    return patch_all_from_web_revision_impl(j, expected_revision, action, confirmed,
+        observed_owner, observed_job, {});
+}
+
+std::string patch_config_with_persistence_coordinator(const nlohmann::json &j,
+    const std::string &expected_revision, const ConfigPersistenceCoordinator &coordinator)
+{
+    if (!coordinator) throw std::invalid_argument("Configuration persistence coordinator required");
+    return patch_all_from_web_revision_impl(j, expected_revision, LocalEnableAction::Noninteractive,
+        false, {}, {}, coordinator);
 }
 
 void set_patch_all_from_web_runtime_apply_suppressed_for_test(bool suppressed) noexcept
@@ -2391,12 +2553,168 @@ bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message) noexce
     }
 }
 
+namespace {
+PreparedConfigCandidate prepare_ini_after_image(const std::string &filename,const std::string &bytes)
+{
+    // The component is a singleton. Use its existing parser on an exclusively
+    // created private preparation file while holding the configuration lock;
+    // restore the live parser before invoking the durable owner. No live file
+    // or runtime setting changes during preparation.
+    std::string pattern = filename + ".preview.XXXXXX";
+    std::vector<char> path(pattern.begin(), pattern.end());path.push_back('\0');
+    const int descriptor = ::mkstemp(path.data());
+    if (descriptor < 0) throw std::runtime_error("Cannot prepare stock transaction");
+    struct PreparedFile {
+        int descriptor;const char *path;
+        ~PreparedFile(){::close(descriptor);::unlink(path);}
+    } prepared_file{descriptor,path.data()};
+    if (::fcntl(descriptor,F_SETFD,FD_CLOEXEC) || ::fchmod(descriptor,0600))
+        throw std::runtime_error("Cannot protect stock preparation");
+    std::size_t offset=0;
+    while(offset<bytes.size()) {
+        const auto count=::write(descriptor,bytes.data()+offset,bytes.size()-offset);
+        if(count<0&&errno==EINTR)continue;
+        if(count<=0)throw std::runtime_error("Cannot write stock preparation");
+        offset+=static_cast<std::size_t>(count);
+    }
+    PreparedConfigCandidate candidate;
+    try {
+        iniFile.set_filename(path.data());
+        candidate.valid=build_candidate_from_ini(filename,candidate.normalized_json,candidate.normalized_config,
+            &candidate.error_reason,&candidate.error_details,&candidate.warnings);
+        iniFile.set_filename(filename);
+    } catch (...) {
+        iniFile.set_filename(filename);
+        throw;
+    }
+    if (!candidate.valid) throw std::runtime_error("Configuration after-image rejected: " + candidate.error_reason);
+    if (candidate.normalized_json.contains("Meta"))
+        candidate.normalized_json["Meta"].erase("Legacy GPIO Migration Required");
+    return candidate;
+}
+}
+
+void persist_stock_configuration(bool preserve_compatible_values)
+{
+    std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
+    std::lock_guard update_lock(config_update_mutex());
+    if (!config_stock_coordinator || !config.use_ini || iniFile.hasPendingChanges())
+        throw std::runtime_error("Stock transaction requires a current, settled configuration owner");
+    const auto filename = config.ini_filename;
+    const auto inspect = [](const std::string &path) {
+        struct stat info{};
+        if (::lstat(path.c_str(), &info) || !S_ISREG(info.st_mode) ||
+            info.st_uid != geteuid() || info.st_nlink != 1 ||
+            (info.st_mode & 0022) || info.st_size < 0 || info.st_size > 1048576)
+            throw std::runtime_error("Stock transaction input is unavailable or untrusted");
+        return config_file_stamp(path);
+    };
+    const auto original_stamp = inspect(filename), stock_stamp = inspect(filename + ".stock");
+    const auto revision = config_revision_locked();
+    const auto bytes = iniFile.serialize_from_stock(get_raw_version_string(), preserve_compatible_values);
+    if (bytes.size() > 1048576) throw std::runtime_error("Stock transaction exceeds INI capacity");
+    const auto candidate=prepare_ini_after_image(filename,bytes);
+    if (inspect(filename)!=original_stamp || inspect(filename+".stock")!=stock_stamp ||
+        config_revision_locked()!=revision)
+        throw std::runtime_error("Configuration changed during stock validation");
+    config_stock_coordinator(candidate.normalized_json,bytes);
+    iniFile.set_filename(filename);
+}
+
+void persist_recovery_configuration(const nlohmann::json &configuration,
+    const nlohmann::json &preserved_internal)
+{
+    std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
+    std::lock_guard update_lock(config_update_mutex());
+    if(!config_stock_coordinator||!config.use_ini||iniFile.hasPendingChanges())
+        throw std::runtime_error("Recovery requires a settled configuration owner");
+    auto internal=jConfig;
+    // Experimental settings are excluded from the public candidate and remain
+    // server-owned. Preserve actual saved input rather than a rendered default.
+    if(preserved_internal.is_object()&&preserved_internal.contains("Experimental"))
+        internal["Experimental"]=preserved_internal["Experimental"];
+    // Inactive retired fields remain byte-for-byte values in the private
+    // source projection. They are neither exposed nor accepted by Control/1.
+    for(const auto *section:{"WTP","WTP Server"})
+        if(preserved_internal.is_object()&&preserved_internal.contains(section))
+            internal[section]=preserved_internal[section];
+    config_handler_serialization::apply_public_config_to_internal_json(configuration,internal);
+    internal["Meta"]["Use INI"]=true;internal["Meta"]["INI Filename"]=config.ini_filename;
+    const auto bytes=serialize_config_ini_projection_for_management(internal);
+    if(bytes.size()>1048576)throw std::runtime_error("Recovery after-image exceeds INI capacity");
+    const auto candidate=prepare_ini_after_image(config.ini_filename,bytes);
+    // The transaction owner compares the normalized complete candidate to the
+    // authorized request and checks its fixed-file recovery precondition.
+    config_stock_coordinator(candidate.normalized_json,bytes);
+}
+
+bool persist_owned_network_safety_ini(const std::string &path,const std::string &before,const std::string &after)
+{
+    std::lock_guard tone(test_tone_lifecycle_mutex());
+    std::lock_guard lock(config_update_mutex());
+    if(!config_persistence_owner)return false;
+    if(!config_private_coordinator||!config.use_ini||path!=config.ini_filename||iniFile.hasPendingChanges()||
+        before.size()>1048576||after.size()>1048576)
+        throw std::runtime_error("Private configuration requires its managed owner");
+    const auto value=read_privileged_network_ini_value(after);
+    const auto canonical_before=render_privileged_network_ini(before,"enforced");
+    if(!parse_privileged_network_mode(value).valid||!canonical_before||
+        canonical_before!=render_privileged_network_ini(after,"enforced"))
+        throw std::runtime_error("Private configuration changes only network safety");
+    const auto candidate=prepare_ini_after_image(path,after);
+    config_private_coordinator(candidate.normalized_json,before,after);
+    // Refresh raw passthrough layout without applying runtime configuration.
+    // Subsequent ordinary saves must preserve the newly committed private value.
+    iniFile.set_filename(path);
+    return true;
+}
+
+bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserved_owner)
+{
+    std::lock_guard tone(test_tone_lifecycle_mutex());
+    std::lock_guard lock(config_update_mutex());
+    if(!config_persistence_owner){
+        if(reserved_owner)throw std::runtime_error("Managed Stop owner unavailable");
+        return false;
+    }
+    if(!config.use_ini||iniFile.hasPendingChanges())
+        throw std::runtime_error("Managed Stop requires an unchanged saved input");
+    validate_config_ini_input(config.ini_filename);
+    // Validate the actual saved input, not jConfig: Stop can restore a
+    // temporary Test Tone mode, and unrelated runtime edits are not saves.
+    const auto before=wsprrypi::PiManagementJournal::read_ini_input(config.ini_filename).bytes;
+    auto saved=prepare_ini_after_image(config.ini_filename,before);
+    saved.normalized_json["Operation"]["Transmit"]=false;
+    const auto after=serialize_config_ini_projection_for_management(saved.normalized_json);
+    const auto candidate=prepare_ini_after_image(config.ini_filename,after);
+    if(config_handler_serialization::saved_configuration_from_internal_json(candidate.normalized_json)!=
+        config_handler_serialization::saved_configuration_from_internal_json(saved.normalized_json))
+        throw std::runtime_error("Managed Stop changed unrelated saved settings");
+    bool attempted=false,completed=false;
+    const auto &owner=reserved_owner?reserved_owner:config_persistence_owner;
+    owner(candidate.normalized_json,[&]{
+        if(attempted)throw std::logic_error("Managed Stop persistence already attempted");
+        attempted=true;
+        ExplicitConfigPersistence raw;
+        persist_config_json(candidate.normalized_json);completed=true;
+    });
+    if(!completed)throw std::logic_error("Managed Stop persistence was not completed");
+    return true;
+}
+
 void repair_from_web(bool attempt_repair)
 {
     std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
     const std::string filename = config.ini_filename;
 
-    if (attempt_repair)
+    if (config_stock_coordinator)
+    {
+        persist_stock_configuration(attempt_repair);
+        iniMonitor.stop();
+        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
+        iniMonitor.setPriority(SCHED_RR, 10);
+    }
+    else if (attempt_repair)
     {
         iniFile.repair_from_stock(get_raw_version_string());
         iniMonitor.stop();

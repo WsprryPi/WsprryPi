@@ -6,6 +6,7 @@
 #include <cctype>
 #include <chrono>
 #include <set>
+#include <map>
 #include <openssl/sha.h>
 
 namespace wsprrypi {
@@ -38,30 +39,18 @@ std::string service_id(const WtpServiceKey &key) {
 }
 } // namespace
 std::optional<std::string> wtp_dns_sd_binding(const std::vector<std::string> &entries) {
-  if (entries.empty() || entries.size() > 32) return {};
-  std::set<std::string> keys;
-  std::string binding;
-  for (std::size_t i = 0; i < entries.size(); ++i) {
-    const auto &entry = entries[i];
-    if (entry.empty() || entry.size() > 255) return {};
-    const auto eq = entry.find('=');
-    if (eq == 0) return {};
-    const auto key = lower(entry.substr(0, eq));
-    if (!std::all_of(key.begin(), key.end(), [](unsigned char c) {
-          return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-        })) return {};
-    if ((key == "txtvers" || key == "binding") && !keys.insert(key).second) return {};
-    const auto value = eq == std::string::npos ? std::string{} : entry.substr(eq + 1);
-    if (i == 0 && (key != "txtvers" || value != "1")) return {};
-    if (key == "txtvers" && (i != 0 || value != "1")) return {};
-    if (key == "binding") {
-      if (value != "tls" && value != "plain") return {};
-      binding = value;
-    }
+  if(entries.size()!=3)return {};
+  std::map<std::string,std::string> fields;
+  for(const auto &entry:entries){
+    if(entry.empty()||entry.size()>255)return {};
+    const auto equal=entry.find('=');if(equal==std::string::npos||equal==0)return {};
+    const auto key=lower(entry.substr(0,equal));
+    if(!fields.emplace(key,entry.substr(equal+1)).second)return {};
   }
-  if (binding.empty()) return {};
-  return binding;
+  if(fields!=std::map<std::string,std::string>{{"txtvers","1"},{"product","WsprryPico"},{"management","Consumer-Radio/1"}})return {};
+  return "consumer";
 }
+
 void WtpDiscovery::available(bool value, std::string reason) {
   std::lock_guard lock(mutex_);
   available_ = value;
@@ -117,7 +106,7 @@ void WtpDiscovery::resolved(const WtpServiceKey &key, std::string target,
   for (const auto &entry : txt) txt_bytes += entry.size();
   if (txt.size() <= 32 && txt_bytes <= 4096) record.txt = txt;
   else record.txt.clear();
-  if (!binding || !canonical || port == 0 || port > 65535 || txt_bytes > 4096) {
+  if (!binding || !canonical || port != 80 || txt_bytes > 4096) {
     record.state = "invalid";
     record.reason = "Invalid TXT binding or SRV target/port";
     record.target.clear(); record.port = 0; record.binding.clear();
@@ -169,7 +158,7 @@ nlohmann::json WtpDiscovery::snapshot(std::uint64_t now) const {
         {"first_seen_ms", s.first_seen}, {"last_seen_ms", s.last_seen},
         {"state_changed_ms", s.state_changed_ms}});
   }
-  return {{"scope", "wtp-dns-sd/1"}, {"service", "_wtp._tcp.local."},
+  return {{"scope", "pico-management-dns-sd/1"}, {"service", "_http._tcp.local."},
       {"available", available_}, {"reason", reason_}, {"candidates", items}};
 }
 std::optional<WtpService> WtpDiscovery::candidate(const std::string &id,

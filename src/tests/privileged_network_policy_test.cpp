@@ -37,9 +37,41 @@ int main() {
     expect_http("POST", "/config/repair", Classification::protected_operation);
     expect_http("POST", "/control/stop", Classification::protected_operation);
     expect_http("POST", "/api/wtp/recover", Classification::protected_operation);
+    expect_http("GET","/api/control/v1/host/pairing",Classification::protected_operation);
+    expect_http("GET","/api/control/v1/host/pairing/discovery",Classification::protected_operation);
+    expect_http("GET","/api/control/v1/host/pairing/operations/"+std::string(32,'a'),Classification::protected_operation);
+    for(const auto &suffix:{std::string(),std::string(31,'a'),std::string(32,'A'),std::string(33,'a'),std::string(32,'a')+"/extra"})
+        expect_http("GET","/api/control/v1/host/pairing/operations/"+suffix,Classification::reject);
+    for(const auto *method:{"POST","PUT","DELETE","PATCH"})
+        expect_http(method,"/api/control/v1/host/pairing/operations/"+std::string(32,'a'),Classification::reject);
+    for(const auto *suffix:{"window","remove","connect"}){
+        const auto path=std::string("/api/control/v1/host/pairing/")+suffix;
+        expect_http("POST",path,Classification::protected_operation);
+        for(const auto *method:{"GET","PUT","DELETE","PATCH"})expect_http(method,path,Classification::reject);
+    }
+    for(const auto *method:{"POST","PUT","DELETE","PATCH"})expect_http(method,"/api/control/v1/host/pairing",Classification::reject);
+    expect_http("POST","/api/control/v1/host/pairing/window/extra",Classification::reject);
     expect_http("GET", "/api/wtp", Classification::read_only);
     expect_http("GET", "/api/wtp/recover", Classification::reject);
     expect_http("PUT", "/api/wtp", Classification::reject);
+    for(const auto *method:{"GET","POST"})expect_http(method,"/api/control/v1/host/retirements",Classification::protected_operation);
+    for(const auto *method:{"PUT","DELETE","PATCH"})expect_http(method,"/api/control/v1/host/retirements",Classification::reject);
+    const std::string target="/api/control/v1/targets/"+std::string(32,'a');
+    expect_http("GET",target+"/migration",Classification::protected_operation);
+    for(const auto *suffix:{"/migration","/migration/rollback"})expect_http("POST",target+suffix,Classification::protected_operation);
+    for(const auto *suffix:{"/enable","/disable"}){
+        expect_http("POST",target+suffix,Classification::protected_operation);
+        expect_http("GET",target+suffix,Classification::reject);
+        expect_http("PUT",target+suffix,Classification::reject);
+    }
+    expect_http("GET",target+"/migration/rollback",Classification::reject);
+    expect_http("PUT",target+"/migration",Classification::reject);
+    expect_http("POST",target+"/migration/unknown",Classification::reject);
+    expect_http("GET","/api/control/v1/host/readiness",Classification::protected_operation);
+    for(const auto *method:{"POST","PUT","DELETE"})expect_http(method,"/api/control/v1/host/readiness",Classification::reject);
+    for(const auto *method:{"GET","PUT","POST"})expect_http(method,"/api/control/v1/host/configuration-recovery",Classification::protected_operation);
+    expect_http("DELETE","/api/control/v1/host/configuration-recovery",Classification::reject);
+    expect_http("GET","/api/control/v1/host/configuration-recovery/other",Classification::reject);
     for (const auto* path : {"/api/control/v1/host/logging", "/api/control/v1/member/logging"}) {
         expect_http("GET", path, PrivilegedOperationClass::protected_operation);
         expect_http("PUT", path, PrivilegedOperationClass::protected_operation);

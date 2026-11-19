@@ -4,8 +4,7 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 
 ## Working Principles
 
-- Inspect the current repository, branch, working-tree status, affected component
-  paths, and relevant implementation contracts before acting.
+- Inspect the current repository, branch, working-tree status, affected component paths, and relevant implementation contracts before acting.
 - Keep work tightly within the user-approved scope.
 - Preserve all existing changes. A dirty working tree belongs to the user unless explicitly stated otherwise.
 - Do not discard, overwrite, reset, stage, commit, amend, rebase, push, or create a pull request unless the user explicitly requests that action.
@@ -38,39 +37,24 @@ These instructions apply to the entire WsprryPi repository unless a more specifi
 Changes to advertised capabilities, protocol/API schemas, descriptors, carrier support, wire formats, limits/units, session policies or protocol-facing interfaces are coordinated WsprryPi/WsprryPico changes.
 
 - Inspect the producer and every affected companion client before implementation. Update capability advertisements, version descriptors, companion negotiation/parsing, strict validators, runtime consumption, serialization, generated assets, paired test adapters and documentation together in the same task.
-- Support one current settings/control major version. Remove superseded control views rather than maintaining historical compatibility branches. Preserve exact closed validation for the current contract and independently versioned WTP, transport and storage formats. Validate document shape before field access. Reject unsupported versions/carriers, missing or extra fields, wrong types, inconsistent advertised/returned schemas, and invalid device/boot/profile bindings before mutation.
+- Support one current settings/control major version. Remove superseded control views rather than maintaining historical compatibility branches. Preserve exact closed validation for the current contract and independently versioned WTP, transport, and storage formats. Validate document shape before field access. Reject unsupported versions/carriers, missing or extra fields, wrong types, inconsistent advertised/returned schemas, and invalid device/boot/profile bindings before mutation.
 - Keep WTP, transport/authentication and storage formats independent from the shared settings/control contract. Before the first shared-control stable release, keep the control major, contract identifier and namespace fixed at 1 while evolving the one current schema and semantics, including breaking changes, with coordinated consumers and both required integration suites; do not add historical views. The authoritative Pico control-policy.json and its checker enforce this prerelease policy. The explicit first-release transition records the stable release identifier and immutable canonical schema digest. After that transition, incompatible existing control messages or semantics require an explicitly reviewed new control major; optional features use defined extension points and policy values remain within documented bounds. Do not accept arbitrary version ranges, relax validation, substitute an older peer or add hidden downgrade/carrier fallback to make tests pass.
 - Both actual network and USB integration suites must pass before completion, including when a change initially appears specific to one carrier. Exercise the production Pi client/coordinator and Pico handlers, crypto, serialization, framing/ACK and journals using the intended candidate sources from both repositories. Mock-only checks, isolated unit tests, builds, old green CI or tests against stale or unintended snapshots do not satisfy this gate.
 - Use the checked-in WsprryPi `.github/workflows/debian-non-hardware.yml` recipes for `wtp-network-loopback` and `wtp-usb-management-pair`. Network coverage includes `wtp-network-runtime-test`, `wtp-network-interop-test` and `wtp-config-interop-test`; USB coverage includes building the actual Pico `usb_management_driver`, `wtp-usb-pair-client-build`, `wtp-usb-management-test` and running `WsprryPi-UI/tests/wtp_usb_pair_test.js` through the production Pi/Pico pair. Select the actual edited/candidate Pico source and required pinned dependencies explicitly.
 - Cover the valid current control contract, independently supported protocol boundaries, and negative cases for superseded/unknown control versions, malformed descriptors/documents, changed limits, identity/revision mismatches and refusal before writes. Update affected test adapters when production interfaces change; preserve production-path coverage.
-- Failed, cancelled, timed-out or skipped required integration checks remain unresolved. Investigate and fix or rerun them; do not declare completion while either required suite lacks a successful result for the intended source pair. An inherited companion mismatch that prevents validating the changed contract is part of the integration work.
+- Failed, cancelled, timed-out, or skipped required integration checks remain unresolved. Investigate and fix or rerun them; do not declare completion while either required suite lacks a successful result for the intended source pair. An inherited companion mismatch that prevents validating the changed contract is part of the integration work.
 - Keep repository authority and Git boundaries separate. Ensure required companion changes are available on the intended paired refs; do not claim delivery on `devel` or `main` when the companion update exists only on an unmerged side branch. Report missing authority or unavailable dependencies as blockers instead of leaving a companion follow-up behind a completion claim.
-- Report both source revisions and any tested uncommitted changes, exact commands/results and relevant CI links. These integration fixtures are hardware-free software evidence; physical USB, installation, service, timing and RF qualification remain separate.
+- Report both source revisions and any tested uncommitted changes, exact commands/results and relevant CI links. These integration fixtures are hardware-free software evidence; physical USB, installation, service, timing, and RF qualification remain separate.
 
 ## Repository and Work-Harness Cleanup
 
-- For an explicit request to clean up WsprryPi, follow the
-  [reusable cleanup instructions](docs/development/repository-cleanup-prompt.md).
-- Present an exact DELETE / REWRITE / RETAIN / HOLD inventory before changes.
-  Include project-owned tracked, untracked and ignored artifacts, Mac work areas,
-  and the Raspberry Pi hosts authorized for the request. Verify physical paths,
-  active use, dependencies and recovery duties; preserve user work and shared tools.
-- Describe the current product in direct, impersonal language. Operator prose
-  explains capabilities, use and meaningful limitations. Keep required technical
-  detail in engineering guides; remove development diaries and future promises.
-- Delete completed, superseded and abandoned execution prompts, temporary
-  handoffs and obsolete evidence after consolidating needed current information.
-  Repair references; do not create an archive or permanent cleanup report.
-- Keep handoffs needed for selected unfinished work and genuinely reusable
-  instructions. The release punchlist is the selected work authority; preserve
-  its priorities and acceptance gates. Active release/research plans may retain
-  phase/step organization; remove that framing from ordinary documentation.
-- Preserve component boundaries, current behavioral tests/fixtures, source
-  provenance, dependencies, live settings and required rollback/recovery assets.
-  Keep permission-limited or ambiguous items on hold and continue independent work.
-- Cleanup does not authorize hardware operation, service/configuration changes,
-  sibling-repository edits, checkout synchronization, Git-history changes,
-  staging, commits, pushes or publication. Separate explicit requests govern them.
+- For an explicit request to clean up WsprryPi, follow the [reusable cleanup instructions](docs/development/repository-cleanup-prompt.md).
+- Present an exact DELETE / REWRITE / RETAIN / HOLD inventory before changes. Include project-owned tracked, untracked, and ignored artifacts, Mac work areas, and the Raspberry Pi hosts authorized for the request. Verify physical paths, active use, dependencies, and recovery duties; preserve user work and shared tools.
+- Describe the current product in direct, impersonal language. Operator prose explains capabilities, use, and meaningful limitations. Keep required technical detail in engineering guides; remove development diaries and future promises.
+- Delete completed, superseded, and abandoned execution prompts, temporary handoffs and obsolete evidence after consolidating needed current information. Repair references; do not create an archive or permanent cleanup report.
+- Keep handoffs needed for selected unfinished work and genuinely reusable instructions. The release punchlist is the selected work authority; preserve its priorities and acceptance gates. Active release/research plans may retain phase/step organization; remove that framing from ordinary documentation.
+- Preserve component boundaries, current behavioral tests/fixtures, source provenance, dependencies, live settings and required rollback/recovery assets. Keep permission-limited or ambiguous items on hold and continue independent work.
+- Cleanup does not authorize hardware operation, service/configuration changes, sibling-repository edits, checkout synchronization, Git-history changes, staging, commits, pushes, or publication. Separate explicit requests govern them.
 - Reading or maintaining the instructions does not invoke cleanup.
 
 ## Raspberry Pi and Hardware Safety
@@ -99,64 +83,30 @@ Before any authorized live transmission, confirm the exact frequency, mode, dura
 
 ### Authorized Installation Monitoring
 
-When the user explicitly authorizes an installation, keep its completion marker
-outside the Git checkout. Before starting, always remove any stale marker from
-the invoking user's home directory. Create the marker only if the installer
-succeeds:
+When the user explicitly authorizes an installation, keep its completion marker outside the Git checkout. Before starting, always remove any stale marker from the invoking user's home directory. Create the marker only if the installer succeeds:
 
 ```sh
 rm -f ~/finished
 sudo ./scripts/install.sh && touch ~/finished
 ```
 
-For an installation running in an existing terminal session, monitor
-`~/finished`; never create or monitor `finished` relative to the repository
-working directory. The marker belongs to the invoking command, not to
-`scripts/install.sh`.
+For an installation running in an existing terminal session, monitor `~/finished`; never create or monitor `finished` relative to the repository working directory. The marker belongs to the invoking command, not to `scripts/install.sh`.
 
 ## Hardware-Free Simulated Backend
 
-WsprryPi provides a canonical hardware-free simulated transmission backend for
-ordinary Debian development, automated tests, and CI. Read
-`docs/simulated-backend.md` before planning or running application-level
-transmission tests that do not require physical hardware.
+WsprryPi provides a canonical hardware-free simulated transmission backend for ordinary Debian development, automated tests, and CI. Read `docs/simulated-backend.md` before planning or running application-level transmission tests that do not require physical hardware.
 
-- Prefer the explicit `--backend simulated` selection when exercising the real
-  application planning, scheduling, cancellation, status, failure, and cleanup
-  paths without GPIO, MMIO, mailbox, DMA, I2C, transmitter device nodes, or RF.
-- Use `.github/workflows/debian-non-hardware.yml` as the checked-in reference
-  for the canonical unprivileged Debian validation suite.
-- Simulation must never be selected automatically because hardware is absent or
-  initialization fails, and it must not weaken safety policy for physical
-  backends.
-- Timing-mode selection, trace-path overrides, and lifecycle fault injection are
-  transient typed C++ test/developer APIs, not production CLI, INI, environment,
-  or UI controls. Additional shell-facing controls require a separately reviewed
-  developer-harness use case.
-- Simulator evidence qualifies software contracts only. It does not qualify
-  Raspberry Pi timing, GPIO, MMIO, DMA, mailbox, I2C electrical behavior,
-  Si5351 output, installation, services, RF output, frequency accuracy, or a
-  physical transmitter chain.
+- Prefer the explicit `--backend simulated` selection when exercising the real application planning, scheduling, cancellation, status, failure, and cleanup paths without GPIO, MMIO, mailbox, DMA, I2C, transmitter device nodes, or RF.
+- Use `.github/workflows/debian-non-hardware.yml` as the checked-in reference for the canonical unprivileged Debian validation suite.
+- Simulation must never be selected automatically because hardware is absent or initialization fails, and it must not weaken safety policy for physical backends.
+- Timing-mode selection, trace-path overrides, and lifecycle fault injection are transient typed C++ test/developer APIs, not production CLI, INI, environment, or UI controls. Additional shell-facing controls require a separately reviewed developer-harness use case.
+- Simulator evidence qualifies software contracts only. It does not qualify Raspberry Pi timing, GPIO, MMIO, DMA, mailbox, I2C electrical behavior, Si5351 output, installation, services, RF output, frequency accuracy, or a physical transmitter chain.
 
 ## Raspberry Pi Kernel Build Worker
 
-Maintainer kernel work can use the Debian ARM64 build worker prepared outside
-the WsprryPi repositories. Agents working on kernel source, configuration,
-builds, staging, or deployment planning must read this document before
-operating the worker:
+Maintainer kernel work can use the Debian ARM64 build worker prepared outside the WsprryPi repositories. Agents working on kernel source, configuration, builds, staging, or deployment planning must read this document before operating the worker:
 
-- `docs/raspberry-pi-kernel-build-worker-setup.md` is the canonical guide.
-  It defines VM requirements, package installation, workspace creation, exact
-  source pinning, target-config import and normalization, stock validation,
-  staging, checksums, acceptance criteria, repeat runs, cleanup, and the
-  validated safety boundary.
-The worker contract is build-and-stage only. Keep kernel source, out-of-tree
-build output, staged artifacts, and WsprryPi repositories separate. Never
-install a built kernel into the worker's `/boot` or `/lib/modules`. Target-Pi
-access, copying, installation, boot configuration, `depmod`, reboot, service
-operation, GPIO, transmission, and RF activity require separate explicit
-authorization. A successful build or manifest verification is not target
-hardware qualification.
+- `docs/raspberry-pi-kernel-build-worker-setup.md` is the canonical guide. It defines VM requirements, package installation, workspace creation, exact source pinning, target-config import and normalization, stock validation, staging, checksums, acceptance criteria, repeat runs, cleanup, and the validated safety boundary. The worker contract is build-and-stage only. Keep kernel source, out-of-tree build output, staged artifacts, and WsprryPi repositories separate. Never install a built kernel into the worker's `/boot` or `/lib/modules`. Target-Pi access, copying, installation, boot configuration, `depmod`, reboot, service operation, GPIO, transmission, and RF activity require separate explicit authorization. A successful build or manifest verification is not target hardware qualification.
 
 ## User Interface Work: Impeccable Is Required
 
@@ -187,36 +137,28 @@ Do not commit local skill/runtime artifacts such as `.agents/`, `.impeccable/`, 
 
 ## Operator Documentation Repository
 
-Operator documentation lives in the separate sibling Git repository
-`../Wsprry_Pi_Docs`.
+Operator documentation lives in the separate sibling Git repository `../Wsprry_Pi_Docs`.
 
 - Inspect and follow `Wsprry_Pi_Docs/AGENTS.md` before working there.
 - Do not write to that repository without explicit cross-repository authorization.
 - Preserve its current branch and working tree, including all existing user changes.
 - Build, render, and verify documentation using that repository's documented workflow.
 - Use Impeccable to review affected rendered UI documentation. Replace screenshots only when they are materially inaccurate.
-- Keep application/UI changes and `Wsprry_Pi_Docs` changes as separate review,
-  commit, and push boundaries.
+- Keep application/UI changes and `Wsprry_Pi_Docs` changes as separate review, commit, and push boundaries.
 - If cross-repository documentation changes are not authorized, review and report the required operator-documentation follow-up without modifying that repository.
 
 ## Component Policy
 
-WsprryPi tracks its application and reusable components as ordinary content in
-one Git repository:
+WsprryPi tracks its application and reusable components as ordinary content in one Git repository:
 
 - `WsprryPi-UI` contains the first-party application web interface.
-- Named components under `src/` provide libraries and supporting functionality
-  used by the C++ application.
+- Named components under `src/` provide libraries and supporting functionality used by the C++ application.
 
-Treat every component as a coherent source and test boundary inside the parent
-repository. Preserve its named root, internal hierarchy, public interfaces,
-README, attribution, standalone build or test entry points, and extraction
-potential where present.
+Treat every component as a coherent source and test boundary inside the parent repository. Preserve its named root, internal hierarchy, public interfaces, README, attribution, standalone build or test entry points, and extraction potential where present.
 
 ### Initial Inspection
 
-Before building, testing, or modifying code, inspect the parent repository and
-the affected component paths:
+Before building, testing, or modifying code, inspect the parent repository and the affected component paths:
 
 ```sh
 git status --short --branch
@@ -224,10 +166,7 @@ git diff --check
 git diff --cached --check
 ```
 
-Review both staged and unstaged changes. Confirm that affected component files
-are ordinary parent-repository content and inspect applicable nested
-instructions before acting. Existing changes anywhere in the repository belong
-to the user and must be preserved.
+Review both staged and unstaged changes. Confirm that affected component files are ordinary parent-repository content and inspect applicable nested instructions before acting. Existing changes anywhere in the repository belong to the user and must be preserved.
 
 ### Root UI Component
 
@@ -238,42 +177,31 @@ For UI work:
 - Follow the mandatory Impeccable workflow.
 - Inspect the complete parent working tree and the existing UI source state.
 - Make UI source changes inside `WsprryPi-UI`.
-- Do not replace missing UI sources with copies from an installed web root,
-  generated output, or another checkout.
-- Coordinate UI behavior with the parent repository's configuration,
-  validation, persistence, websocket, scheduling, and runtime contracts.
-- Run UI-specific tests from `WsprryPi-UI` and applicable integration or
-  source-regression tests from the parent repository.
+- Do not replace missing UI sources with copies from an installed web root, generated output, or another checkout.
+- Coordinate UI behavior with the parent repository's configuration, validation, persistence, websocket, scheduling, and runtime contracts.
+- Run UI-specific tests from `WsprryPi-UI` and applicable integration or source-regression tests from the parent repository.
 - Review UI changes as an explicit component portion of the parent diff.
 
 ### `src/` Components
 
-Components under `src/` retain strong independent boundaries even though they
-are tracked by the parent repository.
+Components under `src/` retain strong independent boundaries even though they are tracked by the parent repository.
 
 - Do not modify a component merely to work around a parent integration problem.
-- Do not apply formatting, refactoring, warning cleanup, or modernization as
-  incidental work.
-- If a required fix belongs in a component, identify the affected component,
-  suspected defect, why a parent-level fix would be inappropriate, proposed
-  change, and validation.
+- Do not apply formatting, refactoring, warning cleanup, or modernization as incidental work.
+- If a required fix belongs in a component, identify the affected component, suspected defect, why a parent-level fix would be inappropriate, proposed change, and validation.
 - Obtain approval before broadening a parent-only task into component changes.
 - Keep component changes independently buildable and testable where supported.
-- Preserve reusable components such as `LCBLog` and `WSPR-Reference` without
-  introducing dependencies on WsprryPi application internals.
+- Preserve reusable components such as `LCBLog` and `WSPR-Reference` without introducing dependencies on WsprryPi application internals.
 
 Never conceal a component modification inside an otherwise parent-only change.
 
 ### Dirty Component Paths
 
-Existing changes inside a component path belong to the user just like changes
-elsewhere in the parent repository.
+Existing changes inside a component path belong to the user just like changes elsewhere in the parent repository.
 
-- Do not reset, clean, switch, checkout, stash, rebase, overwrite, or discard
-  them.
+- Do not reset, clean, switch, checkout, stash, rebase, overwrite, or discard them.
 - Work around unrelated changes when safe.
-- If requested work overlaps existing changes, inspect them and continue only
-  when the task clearly authorizes that scope.
+- If requested work overlaps existing changes, inspect them and continue only when the task clearly authorizes that scope.
 - Otherwise stop and ask for direction.
 
 ### Commit and Push Boundaries
@@ -286,8 +214,7 @@ When an authorized change includes a component:
 2. Run the component's relevant standalone tests where available.
 3. Run applicable parent integration tests.
 4. Review the complete staged parent diff.
-5. Commit the component and integration changes in the parent repository at a
-   boundary appropriate to the approved task.
+5. Commit the component and integration changes in the parent repository at a boundary appropriate to the approved task.
 6. Push only the parent branch and remote the user authorized.
 
 Any future extraction or publication workflow requires separate authorization.
@@ -305,8 +232,7 @@ In the completion report, state:
 - validation not run and why; and
 - whether a parent commit or push occurred.
 
-Do not describe the repository as clean when a component path contains staged,
-unstaged, or untracked changes.
+Do not describe the repository as clean when a component path contains staged, unstaged, or untracked changes.
 
 ## Configuration and Compatibility
 
@@ -350,11 +276,7 @@ Choose the semantics profile explicitly for the build host:
 | Linux with the libgpiod C++ development headers | `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make semantics-test SUDO=` | Full semantics coverage for the default physical and simulated backend profile, with hardware access disabled. |
 | macOS, another non-Linux host, or Linux without the libgpiod C++ development headers | `make semantics-test-portable SUDO=` | Portable simulated-only coverage with `BACKENDS=simulated ANCILLARY_GPIO=0`. |
 
-`semantics-test-portable` is an explicit subset, not an automatic fallback and
-not evidence that the full suite passed. It excludes the backend-specific
-runtime-semantics and cleanup-lifecycle executables whose assertions require
-physical backend capabilities. Neither profile qualifies physical hardware,
-GPIO timing, installation, services, or RF output.
+`semantics-test-portable` is an explicit subset, not an automatic fallback and not evidence that the full suite passed. It excludes the backend-specific runtime-semantics and cleanup-lifecycle executables whose assertions require physical backend capabilities. Neither profile qualifies physical hardware, GPIO timing, installation, services, or RF output.
 
 Use focused targets when they cover the changed behavior, including as applicable:
 
@@ -384,7 +306,9 @@ When reporting validation:
 
 ## Documentation Requirements
 
-Every WsprryPi release body must begin with install/update instructions and a copyable idempotent installer command using `curl -fsSL <installer-url> | sudo env REPO_BRANCH=<branch> bash`. Every dev, beta and RC release must pin its own exact published executable with `bash -s -- --binary-source release --release-tag <exact-release-tag>`; a command that follows the newest channel release does not satisfy this requirement. Use the matching installer URL and branch for the release channel (`devel` for current prereleases, `main` for stable releases). Explain that rerunning the pinned command reinstalls the same executable version while the installer and supporting files follow the selected branch. Include this section before release highlights and verify the exact tag and command in the published release body.
+Keep each prose paragraph on a single physical source line; do not hard-wrap prose to a fixed column width. Keep each list item's prose on one line where possible. Preserve code blocks, tables, directives, and intentional Markdown line breaks. Use direct, impersonal operator prose, exact labels and configuration keys, and Oxford commas.
+
+Every WsprryPi release body must begin with install/update instructions and a copyable idempotent installer command using `curl -fsSL <installer-url> | sudo env REPO_BRANCH=<branch> bash`. Every dev, beta, and RC release must pin its own exact published executable with `bash -s -- --binary-source release --release-tag <exact-release-tag>`; a command that follows the newest channel release does not satisfy this requirement. Use the matching installer URL and branch for the release channel (`devel` for current prereleases, `main` for stable releases). Explain that rerunning the pinned command reinstalls the same executable version while the installer and supporting files follow the selected branch. Include this section before release highlights and verify the exact tag and command in the published release body.
 
 Review documentation impact for every user-visible or operator-facing change.
 

@@ -1,0 +1,9 @@
+{
+  "provider": "Botan",
+  "version": "3.14.1",
+  "revision": "01af88c039fcfaedc418b1af4d6d3a139674e591",
+  "url": "https://codeload.github.com/randombit/botan/tar.gz/01af88c039fcfaedc418b1af4d6d3a139674e591",
+  "sha256": "617d5a2684cd5a6745e60180fcf2a54e045ff82512e4715ea8a1cd514b18ed4d",
+  "modules": ["spake2p", "pcurves_secp256r1", "scrypt", "auto_rng", "system_rng"],
+  "license": "BSD-2-Clause"
+}

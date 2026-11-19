@@ -3,7 +3,7 @@
 (function (root) {
     "use strict";
     const defaults = Object.freeze({
-        "Transport": "usb", "Hostname": "", "TCP Port": 31417, "TLS Server Identity": "",
+        "Transport": "usb", "Hostname": "", "TCP Port": 80, "TLS Server Identity": "",
         "TLS CA File": "", "TLS Client Certificate": "", "TLS Client Key": "",
         "Endpoint": "", "USB Serial": "", "Device ID": "",
         "USB Vendor ID": 0, "USB Product ID": 0,
@@ -37,7 +37,7 @@
             if (typeof value !== "string" || value.length > max || /[\x00-\x1f\x7f]/.test(value))
                 result[key] = `Enter a valid ${key.toLowerCase()}.`;
         }
-        if (!["usb", "network_plain", "network"].includes(settings.Transport)) result.Transport = "Choose USB, Plain LAN or TLS.";
+        if (!["usb", "network_plain", "network"].includes(settings.Transport)) result.Transport = "Choose USB, Consumer Wi-Fi, or HTTPS.";
         const network = settings.Transport === "network" || settings.Transport === "network_plain";
         const tls = settings.Transport === "network";
         for (const key of ["Hostname", ...(tls ? ["TLS Server Identity"] : [])]) {
@@ -50,15 +50,15 @@
             else if (selected && tls && !value.startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
         }
         if (selected && network && !settings.Hostname) result.Hostname = "Enter the Pico's configured hostname or literal IP address.";
-        if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured WTP port (1–65535).";
+        if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured management port (1–65535).";
         if (selected) {
-            if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated WTP device path under /dev/.";
+            if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated management device path under /dev/.";
             if (!network && !settings["USB Serial"]) result["USB Serial"] = "Enter the selected device's USB serial.";
-            if (!((settings.Transport === "network_plain" || settings.Transport === "usb") && settings["Device ID"] === "") &&
+            if (!(settings.Transport === "usb" && settings["Device ID"] === "") &&
                 !/^[0-9a-f]{32}$/.test(settings["Device ID"]))
                 result["Device ID"] = "Enter 32 lowercase hexadecimal characters.";
         }
-        for (const key of ["USB Vendor ID", "USB Product ID", "Start Uncertainty ns"]) {
+        for (const key of ["USB Vendor ID", "USB Product ID"]) {
             const value = settings[key];
             const minimum = key === "Start Uncertainty ns" || (selected && !network) ? 1 : 0;
             const maximum = key === "Start Uncertainty ns" ? 1000000000 : 65535;
@@ -107,120 +107,12 @@
         }
     }
     const byId = id => root.document.getElementById(id);
-    let saved = { ...defaults }, snapshot = null, busy = false, timer = null, initialized = false, closed = false, statusReadFailed = false, hostRevision = "", cancelling = false;
-    let browserSession = "";
-    const selected = () => byId("wtp_use")?.checked === true;
-    function read() {
-        const result = { ...saved };
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => {
-            result[field.dataset.wtpKey] = field.type === "checkbox" ? field.checked
-                : field.type === "number" ? (field.value === "" ? NaN : Number(field.value)) : field.value;
-        });
-        return result;
-    }
-    function validate() {
-        const invalid = errors(read(), selected());
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.setCustomValidity(invalid[field.dataset.wtpKey] || ""));
-        return Object.keys(invalid).length === 0;
-    }
-    function render() {
-        if (!byId("wtp-controls")) return;
-        root.FleetSchedules?.setVisible(true);
-        byId("wtp_use").disabled = false;
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => { field.disabled = !selected(); });
-        const transport = read().Transport;
-        const network = transport === "network" || transport === "network_plain";
-        if (byId("wtp-device-label")) byId("wtp-device-label").textContent =
-            (transport === "network_plain" || transport === "usb") ? "Device identity (optional)" : "Device identity";
-        if (byId("wtp-device-hint")) byId("wtp-device-hint").textContent =
-            (transport === "network_plain" || transport === "usb")
-                ? "Leave blank to learn this Pico's identity on first connect; later connections in this session check it."
-                : "32 lowercase hexadecimal characters from Pico HELLO.";
-        root.document.querySelectorAll("[data-wtp-transport]").forEach(group => {
-            group.hidden = group.dataset.wtpTransport !== (network ? "network" : "usb");
-        });
-        root.document.querySelectorAll("[data-wtp-security]").forEach(group => {
-            group.hidden = group.dataset.wtpSecurity !== (transport === "network" ? "tls" : "none");
-        });
-        const n = snapshot?.network;
-        if (byId("wtp-network-state")) byId("wtp-network-state").textContent = n
-            ? `Configured target: ${n.hostname}:${n.port} · ${n.state}. ${n.security === "plain_lan" ? "Plain LAN; clients on this network can control the Pico." : `Expected identity: ${n.expected_identity || "unconfirmed"}. Last authenticated identity: ${n.authenticated_identity || "unconfirmed"}.`} Resolved address: ${n.resolved_address || "unresolved"}. Observation age: ${n.observed_ms && snapshot.now_ms ? Math.max(0, Number(BigInt(snapshot.now_ms) - BigInt(n.observed_ms))) + " ms" : "unknown"}. ${n.diagnostic || ""}`
-            : "Network connection is unconfirmed.";
-        root.WtpManagement?.setAvailability(selected() && (transport === "network" || transport === "usb") && snapshot?.selected === true && (snapshot.ready === true || snapshot.management_available === true) && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns,
-            selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns && !snapshot.uncertain && !snapshot.safety_fault);
-        if (byId("wtp-status-heading")) byId("wtp-status-heading").textContent = snapshot?.common_name ? snapshot.common_name + (snapshot.common_name_confirmed ? "" : " (last confirmed)") : "Pico status";
-        if (byId("wtp-connection-method")) byId("wtp-connection-method").textContent = transport === "usb"
-            ? `USB${snapshot?.common_name ? " · configured hostname" : " · hostname unconfirmed"}${snapshot?.name_pending_restart ? " · name pending restart" : ""}`
-            : transport === "network" ? "Wi-Fi · Engineering HTTPS" : "Wi-Fi · Plain LAN";
-        if (byId("wtp-usb-time")) {
-            const time=snapshot?.usb?.management?.time;
-            byId("wtp-usb-time").textContent = transport !== "usb" ? "Uses the selected Pico time source"
-                : time?.accepted ? `USB observation accepted · uncertainty ${time.uncertainty_ns} ns · refreshed at host monotonic ${time.observed_ms} ms`
-                    : time?.selected_source ? `Active Pico source: ${time.selected_source}. USB observation ${time.accepted ? "accepted" : "not selected"}; clock admission remains required.`
-                    : time?.reason ? `USB time unavailable: ${time.reason}. Pico clock admission remains required.` : "USB time has not been confirmed";
-        }
-        root.WtpFirmware?.setAvailability(selected() && transport === "usb" && (snapshot?.selected === true || statusReadFailed),
-            JSON.stringify([read()["USB Serial"], read().Endpoint, read()["Device ID"]]), snapshot?.firmware_selection_id || "", read()["USB Serial"]);
-        root.WsprryMemberUdp?.setAvailability(selected() && snapshot?.selected === true && snapshot.phase === "idle" && !snapshot.worker_active && !snapshot.recovery_required && !snapshot.owns);
-        root.WtpUsbSettings?.setAvailability(selected() && transport === "usb" && snapshot?.management_available === true);
-        const state = summarize(snapshot);
-        for (const [id, value] of [["wtp-status-text", state.text], ["wtp-output", state.output], ["wtp-clock", state.clock], ["wtp-identity", state.identity], ["wtp-history", state.history]]) byId(id).textContent = value;
-        if (byId("wtp-cancel")) byId("wtp-cancel").disabled = cancelling || !selected() || snapshot?.selected !== true || !snapshot?.job_id || !(snapshot.owns || snapshot.phase === "waiting");
-        byId("wtp-recover").disabled = busy || !selected() || !state.recover;
-        if (selected() && typeof root.updateBackendPlatformSupportUi === "function") root.updateBackendPlatformSupportUi();
-        else if (typeof root.syncTransmitAvailabilityUi === "function") root.syncTransmitAvailabilityUi();
-    }
-    async function request(recover = false) {
-        if (busy || closed) return;
-        busy = true;
-        clearTimeout(timer);
-        render();
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), recover ? 30000 : 5000);
-        if (recover) byId("wtp-feedback").textContent = "Reconciling the current session…";
-        let receivedStatus = false;
-        try {
-            const url = recover ? (root.WSPRRYPI_PATHS?.wtpPath || "/api/wtp") + "/recover"
-                : (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/status";
-            const response = await root.fetch(url, {
-                method: recover ? "POST" : "GET", cache: "no-store", signal: controller.signal,
-                ...(recover ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "reconcile" }) } : {})
-            });
-            const data = await readReply(response);
-            if (recover && data.status) { snapshot = data.status; receivedStatus = true; }
-            if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
-            if (!recover) {
-                snapshot = data.host || data;
-                if (statusReadFailed) byId("wtp-feedback").textContent = "Status connection restored.";
-                statusReadFailed = false;
-            }
-            else byId("wtp-feedback").textContent = "Reconciliation finished. Review the current observation above.";
-        } catch (error) {
-            // Historical results may remain, but a failed read cannot establish current safety.
-            if (!recover) statusReadFailed = true;
-            if (!receivedStatus) snapshot = null;
-            byId("wtp-feedback").textContent = error.name === "AbortError"
-                ? "The request timed out. Device state is unconfirmed; refresh status before another recovery."
-                : `Pico status unavailable: ${error.message}`;
-        } finally {
-            clearTimeout(timeout);
-            busy = false;
-            render();
-            void fleetLoad();
-            root.updateCwMessageLengthEstimate?.();
-            root.validateCwMessage?.();
-            if (!closed) timer = setTimeout(() => request(), 3000);
-        }
-    }
-    function populate(value) {
-        saved = { ...defaults, ...(value || {}) };
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => {
-            const value = saved[field.dataset.wtpKey];
-            if (field.type === "checkbox") field.checked = value === true;
-            else field.value = String(value);
-        });
-        render();
-    }
+    let saved={...defaults},snapshot=null,hostRevision="",timer=null,closed=false;
+    const selected=()=>false;
+    const read=()=>({...saved});
+    const validate=()=>true;
+    function render(){fleetRender();}
+    function populate(value){saved={...defaults,...(value||{})};fleetRender();}
     let fleetCatalog = null, fleetDiscovery = null, fleetRevision = "", fleetChoice = "", fleetEditId = "", fleetObservedId = "", fleetBusy = false;
     let fleetReadFailed = false;
     let fleetLoading = false, fleetUsbId = "", fleetProbeGeneration = 0, fleetOptionsSignature = "";
@@ -260,7 +152,7 @@
                     candidate?.state === "online" ? "advertised; identity unconfirmed" : "offline";
                 const endpoint = profile.settings?.Transport === "usb" ? profile.settings?.Endpoint :
                     `${profile.settings?.Hostname || "?"}:${profile.settings?.["TCP Port"] || "?"}`;
-                return [`known:${profile.id}`, `${fleetCatalog.active_id === profile.id && snapshot?.common_name ? snapshot.common_name + (snapshot.common_name_confirmed ? "" : " (last confirmed)") : profile.name} · ${profile.settings?.Transport || "?"} · ${state} · ${endpoint} · ${(profile.settings?.["Device ID"] || "unverified").slice(0, 8)}…`];
+                return [`known:${profile.id}`, `${profile.name} · ${profile.settings?.Transport || "?"} · ${state} · ${endpoint} · ${(profile.settings?.["Device ID"] || "unverified").slice(0, 8)}…`];
             }));
             group("Attached USB Picos", (fleetDiscovery?.usb?.candidates || []).map(candidate =>
                 [`nearby:${candidate.id}`, `${candidate.instance} · USB · attached`]));
@@ -274,18 +166,19 @@
         selector.disabled = false;
         const selection = fleetSelection();
         const profile = selection?.profile, candidate = selection?.candidate;
-        byId("fleet-use").hidden = !profile;
         byId("fleet-edit").hidden = !profile;
         byId("fleet-remove").hidden = !profile;
-        byId("fleet-use").disabled = fleetBusy || !profile || profile.legacy_unverified;
         byId("fleet-edit").disabled = fleetBusy || !profile;
         byId("fleet-remove").disabled = fleetBusy || !profile;
+        if (byId("fleet-manage")) byId("fleet-manage").disabled = fleetBusy || !profile || profile.legacy_unverified;
+        root.PicoTargetEditors?.catalogChanged(fleetCatalog.profiles);
+        root.SetupTargets?.catalogChanged(fleetCatalog.profiles,[...(fleetDiscovery?.candidates || []),...(fleetDiscovery?.usb?.candidates || [])]);
         if (byId("fleet-uncertainty-default")) byId("fleet-uncertainty-default").disabled = fleetBusy;
         byId("fleet-device-detail").textContent = profile
-            ? `${fleetCatalog.active_id === profile.id ? "Active host endpoint. " : "Saved profile. "}${profile.method === "dns_sd" ? "DNS-SD hint; identity must be checked again before use. " : "Manual endpoint. "}${profile.legacy_unverified ? "Confirm the full device ID before use. " : ""}Expected ID: ${profile.settings?.["Device ID"] || "unverified"}. Endpoint: ${profile.settings?.Transport === "usb" ? profile.settings?.Endpoint : `${profile.settings?.Hostname}:${profile.settings?.["TCP Port"]}`}.${candidate?.state === "online" && (candidate.target !== profile.settings?.Hostname || candidate.port !== profile.settings?.["TCP Port"]) ? ` Nearby SRV is now ${candidate.target}:${candidate.port}; edit and verify this profile before use.` : ""} Selecting does not connect or save.`
+            ? `${fleetCatalog.active_id === profile.id ? "Saved profile. " : "Saved profile. "}${profile.method === "dns_sd" ? "DNS-SD hint; identity must be checked again before use. " : "Manual endpoint. "}${profile.legacy_unverified ? "Confirm the full device ID before use. " : ""}Expected ID: ${profile.settings?.["Device ID"] || "unverified"}. Endpoint: ${profile.settings?.Transport === "usb" ? profile.settings?.Endpoint : `${profile.settings?.Hostname}:${profile.settings?.["TCP Port"]}`}.${candidate?.state === "online" && (candidate.target !== profile.settings?.Hostname || candidate.port !== profile.settings?.["TCP Port"]) ? ` Nearby SRV is now ${candidate.target}:${candidate.port}; edit and verify this profile before use.` : ""} Selecting does not connect or save.`
             : candidate?.binding === "usb" ? `Attached by USB. Serial: ${candidate.settings["USB Serial"]}. Add device reads this Pico's identity and fills its connection details. Selecting does not connect or save.`
-            : candidate ? `${candidate.binding === "plain" ? "Plain LAN needs your explicit consent and device-ID confirmation. " : "TLS needs device-specific trust files and identity validation. "}SRV: ${candidate.target || "unresolved"}:${candidate.port || "?"}; interface ${candidate.interface}, protocol ${candidate.protocol}, domain ${candidate.domain}. This advertisement is not proof of RF readiness or identity.`
-            : fleetCatalog.active_unmatched ? "The active [WTP] endpoint has no matching saved profile. Add it manually if needed." : "Choose a saved device or nearby candidate. Exploring does not change the active endpoint.";
+            : candidate ? `${candidate.binding === "consumer" ? "Consumer Wi-Fi requires the expected device ID and an authenticated password login. " : "HTTPS requires device-specific trust and identity validation. "}SRV: ${candidate.target || "unresolved"}:${candidate.port || "?"}; interface ${candidate.interface}, protocol ${candidate.protocol}, domain ${candidate.domain}. This advertisement is not proof of RF readiness or identity.`
+            : fleetCatalog.active_unmatched ? "Choose the intended saved management profile." : "Choose a saved device or nearby candidate. Exploring does not connect or save.";
     }
     async function fleetLoad() {
         if (!byId("fleet-device") || fleetBusy || fleetLoading) return;
@@ -333,18 +226,14 @@
             "TLS CA File":byId("fleet-ca").value, "TLS Client Certificate":byId("fleet-cert").value,
             "TLS Client Key":byId("fleet-key").value, Endpoint:byId("fleet-path").value,
             "USB Serial":byId("fleet-serial").value, "USB Vendor ID":Number(byId("fleet-vendor").value),
-            "USB Product ID":Number(byId("fleet-product").value), "Device ID":byId("fleet-identity").value,
-            "Start Uncertainty ns":Number(byId("fleet-uncertainty").value),
-            "Allow Frequency Adjustment":byId("fleet-adjust").checked};
+            "USB Product ID":Number(byId("fleet-product").value), "Device ID":byId("fleet-identity").value};
     }
     function fleetDraftWrite(settings) {
         const s = {...defaults, ...settings};
         for (const [id, key] of [["fleet-binding","Transport"],["fleet-host","Hostname"],["fleet-port","TCP Port"],
             ["fleet-tls-identity","TLS Server Identity"],["fleet-ca","TLS CA File"],["fleet-cert","TLS Client Certificate"],
             ["fleet-key","TLS Client Key"],["fleet-path","Endpoint"],["fleet-serial","USB Serial"],
-            ["fleet-vendor","USB Vendor ID"],["fleet-product","USB Product ID"],["fleet-identity","Device ID"],
-            ["fleet-uncertainty","Start Uncertainty ns"]]) byId(id).value = String(s[key] ?? "");
-        byId("fleet-adjust").checked = s["Allow Frequency Adjustment"] === true;
+            ["fleet-vendor","USB Vendor ID"],["fleet-product","USB Product ID"],["fleet-identity","Device ID"]]) byId(id).value = String(s[key] ?? "");
         byId("fleet-plain-consent").checked = false;
         fleetObservedId = "";
         fleetEditorRender();
@@ -360,7 +249,7 @@
         byId("fleet-host").readOnly = false;
         byId("fleet-port").readOnly = false;
         byId("fleet-identify").textContent = fleetUsbId ? "Read USB Pico identity" : "Identify selected nearby device";
-        byId("fleet-identify").disabled = fleetUsbId ? binding !== "usb" : !discovered || binding === "usb";
+        byId("fleet-identify").disabled = fleetUsbId ? binding !== "usb" : !discovered || binding !== "network";
     }
     function fleetEditorOpen(edit) {
         if (!fleetCatalog) { fleetFeedback("Load the device list first."); return; }
@@ -379,12 +268,16 @@
             Transport:selection.candidate.binding === "tls" ? "network" : "network_plain",
             Hostname:selection.candidate.target, "TCP Port":selection.candidate.port
         } : defaults));
-        editorFeedback(edit ? "Edit the saved profile. The active endpoint changes only when you use it." :
-            "Save a device profile; the active endpoint remains unchanged.");
+        editorFeedback(edit ? "Edit the saved profile. Changes retire this profile’s previous management connection; verify identity before reconnecting." :
+            "Save a device profile; saving does not connect or enable a schedule.");
         byId("fleet-name").focus();
         if (fleetUsbId) void fleetIdentify();
     }
     async function fleetMutation(body, feedback) {
+        if (root.ControllerMode?.active && !root.ControllerMode.ready) {
+            fleetFeedback("Controller management is unavailable. Read current controller status before saving.");
+            return;
+        }
         fleetBusy = true; fleetRender();
         try {
             const response = await root.fetch(fleetUrl("devices"), {method:"POST", cache:"no-store",
@@ -409,10 +302,10 @@
         if (settings.Transport === "network" && (Object.keys(errors(settings, true)).length || !/^[0-9a-f]{32}$/.test(settings["Device ID"]))) {
             editorFeedback("Enter the expected device ID and host TLS trust file references first."); return;
         }
-        if (settings.Transport === "network_plain" && !byId("fleet-plain-consent").checked) {
-            editorFeedback("Choose Plain LAN explicitly before identifying this candidate."); return;
+        if (settings.Transport === "network_plain") {
+            editorFeedback("Enter the expected immutable device ID, save the profile, then authenticate through Consumer Wi-Fi."); return;
         }
-        editorFeedback(fleetUsbId ? "Reading the USB Pico's identity…" : "Reading HELLO, STATUS and CAPS from the selected endpoint…");
+        editorFeedback(fleetUsbId ? "Reading the USB Pico's identity…" : "Reading authenticated management identity and native status…");
         try {
             const response = await root.fetch(fleetUrl("discovery/identify"), {method:"POST", cache:"no-store",
                 headers:{"Content-Type":"application/json", "X-WsprryPico-Request":"1"},
@@ -424,10 +317,8 @@
             if (!/^[0-9a-f]{32}$/.test(data.device_id)) throw new Error("Pico returned an invalid device identity.");
             fleetObservedId = data.device_id;
             if (fleetUsbId) byId("fleet-identity").value = data.device_id;
-            if (settings.Transport === "network_plain" && root.confirm(`Plain LAN reported WTP device ID ${data.device_id}. This is not cryptographic authentication. Save this as the expected ID?`))
-                byId("fleet-identity").value = data.device_id;
-            editorFeedback(fleetUsbId ? "USB Pico identified. Save this profile, then choose Use this device. Identification does not enable transmission."
-                : `Observed WTP device ID ${data.device_id}. ${data.authenticated ? "TLS server identity validated." : "Plain LAN is unauthenticated."} No job was claimed or armed.`);
+            editorFeedback(fleetUsbId ? "USB Pico identified. Save this profile, then choose Manage settings. Identification does not enable transmission."
+                : `Observed device ID ${data.device_id}. HTTPS server identity validated. No execution ownership was requested.`);
         } catch (error) { if (generation === fleetProbeGeneration) { fleetObservedId = ""; editorFeedback(error.message); } }
     }
     async function fleetSave() {
@@ -442,49 +333,21 @@
         const discoveryId = profile?.discovery_id || selection?.candidate?.id || "";
         if (method === "dns_sd" && !discoveryId) { editorFeedback("Choose a nearby candidate first."); return; }
         if (settings.Transport === "network_plain" && !byId("fleet-plain-consent").checked) {
-            editorFeedback("Choose Plain LAN explicitly before saving."); return;
+            editorFeedback("Choose Consumer Wi-Fi explicitly before saving."); return;
         }
-        if (method === "dns_sd" && settings.Transport === "network_plain" && fleetObservedId !== settings["Device ID"] && !profile) {
-            editorFeedback("Identify and confirm this Plain LAN device before saving."); return;
-        }
-        if (!root.confirm(`Save ${name} as a ${settings.Transport} ${method === "dns_sd" ? "nearby" : "manual"} device? The active endpoint will not change.`)) return;
+        if (!root.confirm(`Save ${name} as a ${settings.Transport} ${method === "dns_sd" ? "nearby" : "manual"} device? Saving does not enable a schedule.`)) return;
         const unchanged = profile && Object.keys(defaults).every(key => profile.settings?.[key] === settings[key]);
         const body = profile ? unchanged ? {operation:"rename", id:profile.id, name} :
             {operation:"edit", id:profile.id, name, settings, consent_plain:byId("fleet-plain-consent").checked} :
             {operation:"add", name, method, discovery_id:method === "dns_sd" ? discoveryId : "", settings,
              consent_plain:byId("fleet-plain-consent").checked};
-        await fleetMutation(body, "Device profile saved. Use this device to apply it to the host.");
-    }
-    async function fleetUse() {
-        const profile = fleetSelection()?.profile;
-        if (!profile || fleetBusy) return;
-        if (typeof root.hasUnsavedLocalConfigChanges === "function" && root.hasUnsavedLocalConfigChanges()) {
-            fleetFeedback("Save or resolve your other setup edits before switching devices."); return;
-        }
-        if (!root.confirm(`Use ${profile.name} (${profile.settings.Transport}, ${profile.settings["Device ID"]})? This applies its saved endpoint to [WTP]. It does not enable transmission.`)) return;
-        fleetBusy = true; fleetRender();
-        try {
-            if (!hostRevision) {
-                const current = await root.fetch(fleetUrl("config"), {cache:"no-store"});
-                if (!current.ok) throw new Error("Could not read the current configuration revision.");
-                hostRevision = current.headers.get("ETag");
-            }
-            const response = await root.fetch(fleetUrl("devices/use"), {method:"POST", cache:"no-store",
-                headers:{"Content-Type":"application/json", "X-WsprryPico-Request":"1", "If-Match":hostRevision},
-                body:JSON.stringify({id:profile.id, catalog_revision:fleetRevision})});
-            const data = await readReply(response);
-            if (!response.ok) throw new Error(data.error?.message || data.error?.code || "Selection was rejected.");
-            hostRevision = response.headers.get("ETag") || hostRevision;
-            fleetFeedback(`${profile.name} was applied to the host. Review Pico status before transmitting.`);
-            root.populateConfig?.();
-            fleetBusy = false;
-            await fleetLoad();
-        } catch (error) { fleetFeedback(`${error.message} Review the active endpoint and status before another switch. Your drafts are preserved.`); }
-        finally { fleetBusy = false; fleetRender(); }
+        await fleetMutation(body, root.ControllerMode?.active
+            ? "Device profile saved. Assign it a schedule in Fleet to use it as a remote output."
+            : "Device profile saved. Use this device to apply it to the host.");
     }
     async function fleetRemove() {
         const profile = fleetSelection()?.profile;
-        if (!profile || !root.confirm(`Remove saved profile ${profile.name}? The active [WTP] endpoint, if this is selected, remains unchanged.`)) return;
+        if (!profile || !root.confirm(`Remove saved profile ${profile.name}? This does not change the device’s saved settings. Protected recovery history remains subject to its retirement checks.`)) return;
         await fleetMutation({operation:"remove", id:profile.id}, "Saved profile removed. The active host endpoint was not changed.");
     }
     function fleetInit() {
@@ -497,25 +360,27 @@
             const fleet = byId("fleet-tab")?.classList.contains("active");
             if (title) title.textContent = fleet ? "Fleet" : "Signal setup";
             if (saveHint) saveHint.textContent = fleet
-                ? "Fleet changes use Save buttons. This Pi's Use Pico and connection settings autosave."
+                ? root.ControllerMode?.active ? "Fleet changes use Save buttons. This controller has no local transmitter settings."
+                    : "Connection profiles use Save buttons. Each device runs its own native schedule."
                 : originalHint;
+            root.SetupTargets?.render?.();
         };
         byId("configTabs")?.addEventListener("shown.bs.tab", updateHeader);
         updateHeader();
         byId("fleet-refresh").addEventListener("click", fleetLoad);
+        byId("fleet-manage")?.addEventListener("click", () => {
+            const profile = fleetSelection()?.profile;
+            if (profile && !profile.legacy_unverified) {
+                if (!root.SetupTargets) {fleetFeedback("Shared Setup is unavailable. Reload the page before managing settings.");return;}
+                byId("setup-device").focus({preventScroll:true});
+                void root.SetupTargets.selectProfile(profile);
+            }
+        });
         byId("fleet-device").addEventListener("change", event => { fleetChoice = event.target.value; fleetRender(); });
         byId("fleet-add").addEventListener("click", () => fleetEditorOpen(false));
         byId("fleet-edit").addEventListener("click", () => fleetEditorOpen(true));
         byId("fleet-remove").addEventListener("click", fleetRemove);
-        byId("fleet-use").addEventListener("click", fleetUse);
         byId("fleet-save").addEventListener("click", fleetSave);
-        byId("fleet-uncertainty-default")?.addEventListener("click", () => {
-            if (fleetBusy || byId("fleet-editor").hidden) return;
-            byId("fleet-uncertainty").value = String(defaults["Start Uncertainty ns"]);
-            fleetObservedId = "";
-            editorFeedback("100 ms selected in this draft. Save the profile, then use it to update the active endpoint.");
-            byId("fleet-uncertainty").focus();
-        });
         byId("fleet-identify").addEventListener("click", fleetIdentify);
         byId("fleet-editor-cancel").addEventListener("click", () => {
             ++fleetProbeGeneration; fleetUsbId = "";
@@ -528,6 +393,10 @@
         byId("fleet-editor").addEventListener("input", () => { fleetObservedId = ""; });
     }
     root.WtpUi = { selected, read, validate, populate, refreshControls: render,
+        get catalogReady() {return !!fleetCatalog;},
+        get savedProfiles() {return structuredClone(fleetCatalog?.profiles || []);},
+        get nearbyDevices() {return structuredClone([...(fleetDiscovery?.candidates || []),...(fleetDiscovery?.usb?.candidates || [])]);},
+        explore(value) {fleetChoice = value;fleetRender();},
         get maximumJobDurationNs() {
             const value = snapshot?.capabilities?.max_job_duration_ns;
             const ns = typeof value === "string" && /^\d+$/.test(value) ? BigInt(value) : 0n;
@@ -540,62 +409,16 @@
         },
         get hostRevision() { return hostRevision; },
         setHostRevision(value) { if (typeof value === "string" && value) hostRevision = value; },
-        select(value) { if (byId("wtp_use")) byId("wtp_use").checked = value; render(); if (initialized && !busy) request(); },
-        unavailable() {
-            if (!selected()) return "";
-            if (!validate()) return "Complete the Pico endpoint settings before enabling transmission.";
-            return snapshot?.selected === true && snapshot.ready === true && snapshot.host_utc_valid === true
-                ? "" : "Pico and host UTC readiness are unconfirmed. Review Pico status before enabling transmission.";
-        }
+        select() { render(); },
+        unavailable(){return "";}
     };
-    async function cancelJob() {
-        const job = snapshot?.job_id;
-        if (byId("wtp-cancel").disabled || !job) return;
-        cancelling = true; render();
-        const feedback = byId("wtp-feedback");
-        feedback.textContent = "Cancelling the current Pico job…";
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000);
-        try {
-            if (!browserSession) browserSession = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
-            const requestId = Array.from(root.crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
-            const response = await root.fetch((root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/jobs", {
-                method: "POST", cache: "no-store", signal: controller.signal,
-                headers: { "Content-Type": "application/json", "X-WsprryPico-Request": "1" },
-                body: JSON.stringify({session_id: browserSession, request_id: requestId, operation: "ABORT", body: {job_id: job}})
-            });
-            const result = await readReply(response);
-            if (!response.ok || !result.ok) throw new Error(result.error?.code || "Cancellation was not confirmed");
-            feedback.textContent = "Cleanup confirmed. Review the job outcome and output observation above.";
-        } catch (error) {
-            snapshot = null;
-            feedback.textContent = `Cancellation is unconfirmed: ${error.message}. Review status and reconcile before further work.`;
-        } finally { clearTimeout(timeout); cancelling = false; render(); request(); }
-    }
     function init() {
-        if (!byId("wtp-controls")) return;
-        initialized = true;
+        if(!byId("wtp-controls"))return;
         fleetInit();
-        populate(saved);
-        byId("wtp_use").addEventListener("change", () => { render(); root.clickTransmitBackend?.(); root.updateCwMessageLengthEstimate?.(); root.validateCwMessage?.(); request(); });
-        const keepFleetTabVisible = () => {
-            const tab = byId("fleet-tab");
-            if (tab?.classList.contains("active")) tab.scrollIntoView({ block: "nearest", inline: "nearest" });
-        };
-        byId("fleet-tab")?.addEventListener("shown.bs.tab", keepFleetTabVisible);
-        root.addEventListener("resize", keepFleetTabVisible);
-        root.document.querySelectorAll("[data-wtp-key]").forEach(field => field.addEventListener("change", () => {
-            if (field.dataset.wtpKey === "Transport" && field.value === "network_plain" &&
-                Number(byId("wtp_tcp_port")?.value) === 0)
-                byId("wtp_tcp_port").value = "31417";
-            render(); validate();
-        }));
-        byId("wtp-cancel")?.addEventListener("click", cancelJob);
-        byId("wtp-recover").addEventListener("click", () => request(true));
-        root.addEventListener("pagehide", () => { closed = true; clearTimeout(timer); });
-        root.addEventListener("pageshow", () => { closed = false; request(); });
-        render();
-        request();
+        const refresh=()=>{void fleetLoad().finally(()=>{if(!closed)timer=setTimeout(refresh,5000);});};
+        root.addEventListener("pagehide",()=>{closed=true;clearTimeout(timer);});
+        root.addEventListener("pageshow",()=>{closed=false;clearTimeout(timer);refresh();});
+        render();refresh();
     }
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init);
     else init();

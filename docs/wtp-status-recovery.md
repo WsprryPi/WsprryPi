@@ -1,128 +1,27 @@
-# WTP runtime status and recovery
+# Legacy retirement and native recovery
 
-The runtime publishes coherent observations from the parent WTP
-Session/backend/controller/[early scheduler](wtp-scheduling.md) execution path.
-`WtpScheduler::status()` returns an owned `WtpRuntimeStatus` copy that can be read
-from another thread while `run()` blocks. `wtp_runtime_status_json()` serializes
-that copy using the existing parent JSON library. Neither reads the transport,
-invokes callbacks, changes ownership nor performs recovery.
 
-The [production integration](wtp-production-integration.md) connects
-this boundary to an owned runtime, CLI/INI selection, HTTP status and explicit
-recovery. Setup exposes Fleet on every page load. WTP ARM
-handoff never emits the legacy `starting` callback, which can assert local GPIO.
-The typed scheduler contract below remains applicable beneath that integration.
+External WTP execution is retired. There is no `backend=wtp`, Pi WTP listener, remote Fleet dispatch, Pico WTP TCP/TLS/USB/BLE carrier, or generic HTTP jobs API. No hidden downgrade or alternate job-submission path is supported. Existing WTP clients and Qualification Harness WTP campaigns are incompatible with this software; their adapters require separate work and are not replaced here.
 
-## Reading observations
+Each device executes its own native schedule. See [native execution and output safety](native-execution-safety.md), [migration and recovery](wtp-status-recovery.md), and [Pico USB management](wtp-usb-management.md). Do not replace WTP-capable software until its deployment’s legacy authorities and cleanup duties are resolved.
+## Before replacing WTP-capable software
 
-The scheduler owner publishes during waiting, after session polling, when a
-mutation invalidates observations, and at lifecycle boundaries. Snapshot copying
-is mutex protected; JSON serialization occurs after the copy, outside the lock.
-Only `status()`, `phase()`, `request_stop()` and `invalidate_pending()` are safe
-from another thread. Signals appear in the next owner publication. All transport,
-connect/submit/run/recover/disconnect operations and raw backend/session getters
-remain on one owner thread. No worker thread is created by this API.
+Complete retirement using the WTP-capable controller and target software before replacing either binary. The reviewed source pair is Pi `78c43577c80b45a56244fdb4536295d75e4538a7` and Pico `ad697eaf982f35f554ffd319694837e901a32205`; these identify source candidates, not published releases or installed-device qualification. Retain the actual working binaries, compatible configuration, credentials, and recovery records for the deployment until its duties are resolved.
 
-`revision` orders publications within this scheduler instance. `observed_ms` is
-the host monotonic time of publication, and `status_observed_ms` is the time the
-host accepted the most recent authoritative STATUS. Neither is a device sample
-time or an electrical measurement. The reader can retain a snapshot indefinitely;
-there is no automatic idle polling or freshness guarantee. An armed observation
-can arrive after the requested start, and an inactive observation cannot guarantee
-continued inactivity. Consumers must retain observation age and identity.
+1. Inventory each controller and target by full device and boot identity, profile, configuration revision, recurring assignment, ownership, and pending execution or cleanup duty. An offline target, stale observation, unknown controller inventory, or an already enabled native authority blocks that target's transition until explicitly resolved.
+2. Use the existing controller-retirement and target-migration controls to persist the legacy recurrence fence. Verify the saved result after restart or reconnect; a disabled checkbox alone is not a retirement receipt. Do not replace the software while the state is retiring, reconciling, or unknown.
+3. Let accepted work finish, or use the existing explicit stop action. Read terminal, inactive, and unowned output from the exact target. Timeout, lost acknowledgement, disconnect, process exit, or reboot does not establish cleanup. Keep uncertain work held without replaying LOAD or ARM.
+4. Complete authenticated retirement for every recorded controller and retain its durable receipt. Reconcile pending cleanup and protected journals through their owning software; do not delete records or credentials to make a check pass. Other targets remain independently manageable.
+5. Review the replacement against the original mode, message, frequency, period/phase, repetitions, timing limits, location/time prerequisites, and solar rules. Use only semantics supported by that target. An unsupported or lossy mapping needs an explicit supported operator choice; otherwise leave the replacement disabled. Never seed it from another controller's defaults.
+6. Save the reviewed native schedule disabled, then validate and read it back from the same device, boot, profile, and revision. Resolve any uncertain write through authoritative readback before a new deliberate action. Enable only through the separate explicit native enable action under current authority.
+7. Replace WTP-capable binaries only when the relevant deployment set has no remaining legacy dispatch authority or cleanup duty. Disable an inbound Pi WTP listener and remove active WTP backend selection explicitly while the old software can validate and preserve the configuration. Keep management, time, stop, credentials, receipts, and recovery access available throughout.
 
-| Field | Meaning |
-| --- | --- |
-| `phase` | Local worker phase: idle, waiting, invalidated, preparing, executing or blocked |
-| `session_phase` | Disconnected, negotiating, ready, changed identity or protocol fault |
-| `request_id`, `job_id`, start/dispatch | Current request, or most recently finished request when none is pending |
-| `arm_handed_off` | Local final ARM gate passed; does not establish bytes delivered, acknowledgement, start or RF |
-| `identity` | Last verified device/boot/product/firmware identity; retained offline, not evidence a device is reachable |
-| `session_id`, `owner_id` | This runtime's configured session and owner identities, not proof of ownership |
-| `capabilities` | Current ready-session negotiated CAPS; absent while disconnected/negotiating |
-| `remote` | Last reconciled STATUS for this session; absent while invalidated/disconnected |
-| `job` | Authoritative evidence matching the displayed request's job and verified device/boot; otherwise absent |
-| `owns`, `lease_valid` | Locally established ownership and lease at publication; false with unknown remote state is not proof of an unowned endpoint |
-| `uncertain`, `safety_fault` | Independent protocol-outcome and remote safety latches |
-| `recovery_required` | Scheduler Blocked latch, independent of reconnect and observed inactivity |
-| `adjustments` | Accepted LOAD per-event frequency evidence bound to this job, retained through cleanup/disconnect |
-| `last_report` | Historical execution result with request/job/device/boot, cleanup, evidence and adjustments |
-| `last_recovery` | Historical eligible recovery attempt with request/job/device/boot, cleanup and evidence |
-| `diagnostic`, `session_diagnostic` | Application failure and raw session diagnostic text; flags/evidence, not diagnostic text, determine state |
+Devices without the required native recurrence or management remain on the old software or need a separately authorized upgrade. A retirement build's refusal of active legacy state is a secondary guard, not evidence that this procedure has happened. Inactive connection settings are not dispatch authority and must not be erased or normalized by autosave.
 
-A local `executing` phase covers device clock checks, ARM, waiting and monitoring.
-Only `job.state == running` supplies an authoritative running observation for the
-selected request. `remote` may describe a different or foreign job and must not
-be substituted for selected-job evidence. CAPS and mode/range labels do not
-establish RF qualification or inhibition; WTP/1 does not advertise an inhibition
-flag. No qualification claim is derived from this snapshot.
+Rollback requires explicit native authority disable/retirement, confirmed output reconciliation, and compatible configuration and authority restoration. Restoring an older executable or INI alone does not authorize recurrence. Never automatically re-enable the legacy schedule or discard the last usable recovery binary while duties remain.
 
-Completion/cancellation requires the backend's existing identity-bound terminal
-and explicitly inactive job **and device** evidence. The snapshot retains the
-last report independently: disconnect clears current `remote`/`job` observations
-while historical evidence remains. A newly pending request cannot inherit the
-previous job's terminal evidence or frequency adjustments. A cancelled pending
-request has no remote job evidence or attempted cleanup; it is not an RF-off claim.
-A missed start remains a failure even after successful inactive cleanup.
+## Current recovery
 
-## Serialization
+Legacy rows and durable receipts are read-only in retirement software. They do not authorize reconnect, remote job inspection, or new dispatch. If prerequisite cleanup was not completed, keep the target held and restore compatible WTP-capable recovery software under an explicit authority restoration procedure. Do not delete records or automatically re-enable recurrence.
 
-`wtp_runtime_status_json(snapshot)` emits `wsprrypi.wtp-runtime/1`. All unsigned
-64-bit values, including request identity, monotonic times, UTC nanoseconds,
-frequencies and revision, are decimal strings to avoid JavaScript integer loss.
-Absent observations are JSON `null`; explicit inactive observations are `false`.
-Local flags and small bounded counts remain booleans/numbers. CAPS are serialized
-without treating their ranges as qualified. The `remote` JSON object contains the
-current state/owner/job/output projection; selected terminal history is represented
-in `job` and retained reports. The typed `remote` also retains the bounded wire
-terminal-record collection. Diagnostics are escaped by the JSON library.
-
-This serializer is an application data boundary, not a new WTP operation or a
-public web endpoint. It has no side effects; production integration exposes
-copied observations through the application. The UI presents unknown, blocked, pending and
-historical states distinctly and avoids reporting ARM as transmitting.
-
-## Explicit recovery
-
-After a blocked execution, the owning worker may reconnect the **same** Session
-through the explicitly selected transport, then call `recover()`. Reconnect
-performs HELLO, identity verification, STATUS and CAPS. It leaves Blocked intact.
-`recover()` uses bounded backend cleanup: fresh STATUS, ABORT only for this
-client's tracked owned job when allowed, and RELEASE only for its ownership.
-There is no automatic CLAIM, retransmission, LOAD, ARM or retry of uncertain bytes.
-A successful cleanup allows a separately submitted new job with a new identity.
-The original report remains Blocked; the recovery result is stored separately.
-
-Failed recovery retains Blocked and records the failed attempt and any current
-matching evidence. A missing/expired terminal record, unknown transaction or
-foreign owner cannot be cleared by a local reset, generic stop or elapsed time.
-Changed device/boot identity and safety faults remain latched. Later apparent
-inactivity does not clear a safety fault. Eligible recovery calls are those made
-while Blocked; calls in other phases return an error without replacing history.
-
-Only the most recent execution and most recent recovery report are retained in
-memory. There is no durable journal, process-restart adoption, automatic reconnect,
-operator fault-reset mechanism or historical audit archive. Destroying the runtime
-closes local state and cannot establish inactive output. Process interruption and
-operator recovery beyond same-session reconciliation require separately designed
-persistence and workflow; never reconstruct transmission authority from a status
-label or a reused owner string.
-
-## Hardware-free validation
-
-From `src`, `make wtp-status-test SUDO=` exercises the actual wire/Session/backend/ controller/scheduler with injected clocks and peers, including concurrent readers, mutation acknowledgement loss, changed identity, missing history, foreign ownership, missed starts, cancellation and fault persistence. The existing scheduler interop target also checks reports against the selected Pico endpoint sources with a software clock/engine. See the [development guide](development/README.md) for commands and validation boundaries.
-
-The [production integration](wtp-production-integration.md) now supplies endpoint,
-clock/configuration and operator controls. [Network integration](wtp-network.md)
-uses the same authority with TLS and shared API status/cancellation. No physical USB, timing, RF, installation or
-service behavior is qualified by these tests. Device UTC must satisfy admission
-limits; GET_CLOCK observes rather than sets it. Supporting firmware can receive
-qualified controller time through [USB management](wtp-usb-management.md).
-
-## Fleet observation and action recovery
-
-Fleet Operations distinguishes committed schedule state from device evidence and historical reports. Current observation expires at 15 seconds, measured conservatively from STATUS request or negotiation start. Refreshing the browser never reconnects a failed WTP session. A healthy foreign owner is observed without takeover; actual transport or identity failure requires explicit Reconcile.
-
-Use the correlated action result to establish completion. Accepted, pending, superseded and outcome-unconfirmed results do not prove output-off. A browser timeout releases navigation while preserving its action reference. After a controller restart or an unknown/expired action, read current state and explicitly review it; never infer the original result or blindly repeat it. Reconcile unresolved tracked work before Resume. A confirmed schedule Pause can coexist with foreign work or unknown output when no controller-owned cleanup was outstanding.
-
-The private `.wtp-fleet-contexts.json` beside the active INI preserves frozen removal/takeover recovery bindings across restart. Corrupt storage inhibits new fleet dispatch and edits, while an existing verified live owner retains its safe Pause path. Restore/review the actual recovery authority through maintenance; do not delete a journal or edit away an in-flight marker to resume.
+For native stop, preserve unknown state until an explicit authenticated readback verifies disabled schedules and inactive, unowned output. Use local Console safety recovery when the target cannot be reached. Settings drafts remain separate from saved or enabled schedules.

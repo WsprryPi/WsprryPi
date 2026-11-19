@@ -466,3 +466,18 @@
         justify-content: stretch;
     }
 }
+
+/* Pairing extends the existing Maintenance pane and native form controls. */
+.pairing-code-panel { padding-block: 1rem; border-block: 1px solid var(--bs-border-color); }
+.pairing-code { font-size: clamp(1.75rem, 5vw, 2.5rem); font-weight: 600; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; color: var(--bs-emphasis-color); }
+.pairing-device { flex: 1 1 16rem; width: auto; min-width: 0; }
+.pairing-input { max-width: 16rem; text-transform: uppercase; }
+#controllerAccess [hidden] { display: none !important; }
+
+#pairingState { overflow-wrap: anywhere; }
+
+/* Retained migration actions remain readable when their authority is held. */
+#recurrenceMigration .btn-outline-secondary {
+    --bs-btn-disabled-color: var(--bs-body-color);
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+}

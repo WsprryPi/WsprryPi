@@ -16,7 +16,7 @@ async function main() {
         const run = expression => client.evaluate(expression);
         await waitFor(() => run("document.readyState === 'complete' && !!window.FleetOperation && !!window.FleetClient"), "Operations scripts");
         await run(`(() => {
-            window.__posts=[];window.__reads=0;window.__actions={};window.__pending=false;window.__failPost=false;
+            window.__posts=[];window.__reads=0;window.__actions={};
             const schedule={mode:'tone',frequency_hz:14097100,duration_ms:1000,period_seconds:120,phase_seconds:0};
             const row=(c,name)=>({device_id:c.repeat(32),product:c==='a'?'WsprryPi':'WsprryPico',name,schedule:{...schedule},enabled:false,in_flight:false});
             const observation=(c)=>({assignment_generation:c.repeat(32),control_revision:'0',observation_revision:'1',observation_age_ms:'0',can_resume:true,revoked:false,boot_id:'d'.repeat(32),state:'idle',message:'',transport:c==='a'?'network_plain':'usb',identity:{device_id:c.repeat(32),boot_id:'d'.repeat(32),product:c==='a'?'WsprryPi':'WsprryPico',firmware_version:'test'},trust:'Expected identity match',retained_name:'Output',actions:[],pending_start:null,forecast:null,utc_anchor_ns:'1800000000000000000',utc_anchor_age_ms:'0',wtp:{identity:{device_id:c.repeat(32),boot_id:'d'.repeat(32)},remote:{state:'empty',output_active:false,owner_id:null,job_id:null},job:null,adjustments:[],last_report:null,last_recovery:null}});
@@ -25,15 +25,9 @@ async function main() {
                 const path=String(url);const reply=(value,status=200)=>({ok:status>=200&&status<300,status,headers:{get:()=> '"fleet-ui"'},json:async()=>structuredClone(value)});
                 if(window.__fleetUnavailable && path.includes('/host/fleet'))return reply({error:{code:'fleet_unavailable',message:'Invalid fleet assignment document'}},503);
                 if(path.includes('/host/fleet/actions'))return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,actions:Object.fromEntries(new URL(path,location.href).searchParams.get('ids').split(',').map(id=>[id,__actions[id]||{action_id:id,state:'unknown_or_expired'}]))});
-                if(path.endsWith('/host/fleet') && options.method==='POST') {
-                    const command=JSON.parse(options.body);__posts.push(command);
-                    if(__failPost)throw new Error('Lost response');
-                    const output=__fleet.outputs[command.device_id],row=__fleet.assignments.find(r=>r.device_id===command.device_id);
-                    output.control_revision=String(BigInt(output.control_revision)+1n);__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);
-                    const action={...command,control_revision:output.control_revision,state:__pending?'pending':'confirmed',work_pending:__pending,reason:__pending?'Waiting for owned work':'Schedule state committed'};
-                    __actions[command.action_id]=action;output.actions=[action];
-                    if(!__pending)row.enabled=command.operation==='enable';
-                    return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,action},__pending?202:200);
+                if(!['GET','HEAD'].includes(options.method || 'GET')) {
+                    __posts.push({path,method:options.method,body:options.body});
+                    throw new Error('Retired Fleet execution must never submit a mutation');
                 }
                 if(path.endsWith('/host/fleet/operations') || path.endsWith('/host/fleet')) {if(window.__churn){if(++window.__churnReads>3)throw new Error('Fixture stopped unbounded churn');return reply({...__fleet,controller_incarnation:(__churnReads%2?'a':'b').repeat(32)});}__reads++;__fleet.now_ms=String(BigInt(__fleet.now_ms)+1n);return reply(__fleet);}
                 return reply({});
@@ -72,38 +66,28 @@ async function main() {
         }
         await run(`__fleet.outputs['a'.repeat(32)].actions=[{action_id:'1'.repeat(32),operation:'enable',device_id:'a'.repeat(32),controller_incarnation:'f'.repeat(32),assignment_generation:'b'.repeat(32),control_revision:'1',reviewed_boot_id:'d'.repeat(32),state:'confirmed',work_pending:false}];__refresh().catch(()=>{})`);
         assert.equal(await run("FleetClient.snapshot().valid"), false, "cross-context completion evidence is refused before rendering or action admission");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), true);
         await run("__fleet.outputs['a'.repeat(32)].actions=[];__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);__refresh()");
-        // Cancellation has no POST and returns focus to the captured device control.
-        await run("document.getElementById('operationFleetPause').click()");
-        await waitFor(() => run("document.activeElement===document.getElementById('operationFleetCancel')"), "Pause confirmation");
-        await capture("confirmation");
-        await run("document.getElementById('operationFleetCancel').click()");
-        await waitFor(() => run("!document.getElementById('operationDevice').disabled"), "cancel releases selection");
-        assert.equal(await run("__posts.length"), 0);
-        // Pending Enable retains a distinct, usable Pause path while saved disabled.
-        await run("__pending=true;document.getElementById('operationFleetEnable').click()");
-        await waitFor(() => run("__posts.length===1 && !document.getElementById('operationDevice').disabled"), "pending Enable admission");
-        assert.equal(await run("document.getElementById('operationFleetPause').disabled"), false);
-        assert.equal(await run("__posts[0].reviewed_control_revision"), "0");
-        assert.match(await run("__posts[0].action_id"), /^[0-9a-f]{32}$/);
-        assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /Enabling/);
-        // Keep render state stable for the desktop/mobile visual batch.
+        for (const name of ["Enable", "Pause", "Recover", "Confirm", "Cancel"])
+            assert.equal(await run(`document.getElementById('operationFleet${name}')`), null, "retired execution control is absent: " + name);
+        assert.equal(await run("document.getElementById('operationFleetEdit').textContent"), "View migration status");
         await capture("operations");
-        for (const scene of ["stale", "foreign", "unavailable"]) {
+        for (const scene of ["migration_required", "retired", "stale", "foreign", "unavailable"]) {
             await run(`(()=>{const s=__fleet.outputs['a'.repeat(32)];s.observation_age_ms='${scene === "stale" ? "15000" : "0"}';s.state='${scene === "stale" ? "idle" : scene}';__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);return __refresh();})()`);
+            if (scene === "migration_required" || scene === "retired")
+                assert.equal(await run("document.getElementById('operationFleetState').textContent"), scene === "retired" ? "Controller retired" : "Migration required");
+            assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), false, "migration status remains readable for retained assignments");
             await capture(scene);
-            assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-            assert.equal(await run("document.getElementById('operationFleetPause').disabled"), false, "staleness cannot disable scoped Pause");
         }
         await run(`(()=>{const o=__fleet.outputs['a'.repeat(32)];o.state='recovery_required';o.can_resume=false;__fleet.assignments[0].in_flight=true;
-            const action=__actions[__posts[0].action_id];action.state='outcome_unconfirmed';action.work_pending=false;action.reason='Owned cleanup remains unknown';
+            const action={action_id:'1'.repeat(32),operation:'enable',device_id:'a'.repeat(32),controller_incarnation:'f'.repeat(32),assignment_generation:'a'.repeat(32),control_revision:'0',reviewed_boot_id:'d'.repeat(32),state:'outcome_unconfirmed',work_pending:false,reason:'Owned cleanup remains unknown'};
+            __actions[action.action_id]=action;o.actions=[action];
             __fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);return __refresh();})()`);
         await run("document.getElementById('operationFleetReview').click()");
-        assert.equal(await run("FleetClient.snapshot().actions.length"), 0, "quiescent uncertain results can be retired to free recovery capacity");
+        assert.equal(await run("FleetClient.snapshot().actions.length"), 0, "historical uncertain results can be reviewed locally");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Recovery required");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true, "review cannot clear the server's recovery barrier");
-        assert.equal(await run("__posts.length"), 1, "review is browser-local and submits no recovery or start");
+        assert.equal(await run("__fleet.outputs['a'.repeat(32)].can_resume"), false, "review cannot clear the server's recovery barrier");
+        assert.equal(await run("__posts.length"), 0, "review submits no recovery or start");
         assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /earlier action unconfirmed/);
         await capture("review-recovery");
         await run("__fleet.outputs['a'.repeat(32)].observation_age_ms='0'");
@@ -116,7 +100,7 @@ async function main() {
         // for this controller's earlier job, as in the coordinator regression.
         await run(`(()=>{window.__beforeForeignHistory=structuredClone(__fleet);const o=__fleet.outputs['a'.repeat(32)];__fleet.assignments[0].in_flight=false;o.state='foreign';o.can_resume=false;o.wtp.job.state='aborted';o.wtp.remote={boot_id:'d'.repeat(32),state:'empty',output_active:false,owner_id:'9'.repeat(32),job_id:null};o.wtp.last_report={outcome:'cancelled',job_id:o.wtp.job_id,error:''};__fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);return __refresh();})()`);
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Other job on device");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), false);
         assert.match(await run("document.getElementById('operationFleetRealized').textContent"), /No current job-bound/);
         assert.match(await run("document.getElementById('operationFleetHistory').textContent"), /Historical cancelled/);
         await capture("foreign-history");
@@ -129,10 +113,8 @@ async function main() {
         assert.equal(await run("FleetClient.snapshot().data.outputs['a'.repeat(32)].state"), "running", "the original scene is restored after the intervening read");
         await run("__fleetUnavailable=true;__refresh().catch(()=>{})");
         assert.equal(await run("FleetClient.snapshot().valid"), false, "failed controller initialization cannot leave a valid old snapshot");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
+        assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), true);
         assert.match(await run("document.getElementById('operationFleetFeedback').textContent"), /Invalid fleet assignment document/);
-        for (const control of ["Pause", "Recover", "Edit"])
-            assert.equal(await run(`document.getElementById('operationFleet${control}').disabled`), true, "controller failure disables " + control);
         await capture("controller-unavailable");
         await run("__fleetUnavailable=false;__refresh()");
         // Advance only the browser clock and replay the same cached body. A
@@ -142,8 +124,7 @@ async function main() {
             __fleet.publication_revision=String(BigInt(__fleet.publication_revision)+1n);__refresh()`);
         await run(`const nativeNow=performance.now.bind(performance);Object.defineProperty(performance,'now',{value:()=>nativeNow()+15000});__refresh()`);
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Device status stale");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        assert.equal(await run("document.getElementById('operationFleetPause').disabled"), false);
+        assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), false, "stale execution evidence does not hide retained migration status");
         await capture("cached-stale");
         await run("window.__churn=true;window.__churnReads=0;__refresh().catch(()=>{})");
         assert.equal(await run("__churnReads"), 2);
@@ -155,8 +136,9 @@ async function main() {
         // Same ID with a different assignment generation never retargets selection.
         await run("__fleet.outputs['a'.repeat(32)].assignment_generation='c'.repeat(32);__fleet.outputs['a'.repeat(32)].actions=[];__refresh()");
         assert.equal(await run("document.getElementById('operationFleetState').textContent"), "Removed output");
-        assert.equal(await run("document.getElementById('operationFleetEnable').disabled"), true);
-        console.log("Fleet Operations: scoped selection, local-handler isolation, freshness boundary, cancellation, pending Enable/Pause, uncertain-result review with preserved recovery, running evidence, explicit controller initialization failure, replacement safety, cached-reply expiry, bounded controller churn, foreign ownership alongside terminal history and forty visual captures passed.");
+        assert.equal(await run("document.getElementById('operationFleetEdit').disabled"), true);
+        assert.equal(await run("__posts.length"), 0, "all retained Fleet workflows are read-only");
+        console.log("Fleet Operations: read-only migration status, absent execution controls, scoped selection, local-handler isolation, freshness, historical review, initialization failure, replacement safety, cached expiry, bounded churn, and desktop/mobile captures in both themes passed.");
     } catch (error) {failure = error;}
     await finishFixture({client, browser: chrome, php, profile, failure});
 }

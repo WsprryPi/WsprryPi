@@ -53,6 +53,17 @@ void commit_runtime_config_candidate(const RuntimeConfigCandidate &candidate)
 
 void persist_runtime_transmit_disabled()
 {
+    if(persist_owned_transmit_disabled())return;
     iniFile.set_bool_value("Operation", "Transmit", false);
     iniFile.commit_changes();
+}
+
+namespace {std::function<wsprrypi::NativeSolarSnapshot()> solar_snapshot_provider;}
+void set_native_solar_snapshot_provider(std::function<wsprrypi::NativeSolarSnapshot()> provider){
+    std::lock_guard lock(config_update_mutex());solar_snapshot_provider=std::move(provider);
+}
+wsprrypi::NativeSolarSnapshot current_native_solar_snapshot(){
+    std::lock_guard lock(config_update_mutex());
+    if(!solar_snapshot_provider)throw std::runtime_error("solar_owner_unavailable");
+    return solar_snapshot_provider();
 }

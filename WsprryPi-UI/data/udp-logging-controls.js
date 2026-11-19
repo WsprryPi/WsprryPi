@@ -14,7 +14,7 @@ async function exchange(path,method='GET',body,revision){
 function init(){
  const common={inputClass:'form-control',buttonClass:'btn btn-outline-secondary',checkClass:'form-check'};
  const member=root.document.getElementById('member-udp-logging-controls');
- if(member){
+ if(member&&!root.PicoTargetEditors){
   root.WsprryMemberUdp=root.WsprryUdp.mount(member,{...common,exchange:(path,...rest)=>exchange(`member/${path}`,...rest),context:()=>{
    const s=root.WtpUi?.read()||{};return [s.Transport,s.Hostname,s['TCP Port'],s['USB Serial'],s['Device ID']].join('|');
   }});

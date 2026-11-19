@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iterator>
 #include <string_view>
+#include <stdexcept>
 #include <utility>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -207,12 +208,25 @@ bool run_privileged_network_command(const std::vector<std::string> &arguments) {
 }
 
 PrivilegedNetworkAdmin::PrivilegedNetworkAdmin(
-    PrivilegedNetworkAdminPaths paths, PrivilegedNetworkCommandRunner runner)
-    : paths_(std::move(paths)), runner_(std::move(runner)) {}
+    PrivilegedNetworkAdminPaths paths, PrivilegedNetworkCommandRunner runner,PrivilegedNetworkIniIO ini_io)
+    : paths_(std::move(paths)), runner_(std::move(runner)),ini_io_(std::move(ini_io)) {
+    if(bool(ini_io_.read)!=bool(ini_io_.write))throw std::invalid_argument("Install both INI read and write owners");
+}
+
+std::optional<std::string> PrivilegedNetworkAdmin::read_application_ini() const {
+    return ini_io_.read?ini_io_.read(paths_.ini_file):read_text_file(paths_.ini_file);
+}
+bool PrivilegedNetworkAdmin::write_application_ini(const std::string &contents){
+    try{
+        const auto current=read_application_ini();if(!current)return false;
+        if(ini_io_.write)return ini_io_.write(paths_.ini_file,*current,contents);
+        return write_text_file_atomically(paths_.ini_file,contents);
+    }catch(...){return false;}
+}
 
 PrivilegedNetworkTransactionSnapshot PrivilegedNetworkAdmin::snapshot() const {
     const auto runtime = privileged_network_runtime_state();
-    const auto ini = read_text_file(paths_.ini_file);
+    const auto ini = read_application_ini();
     const auto policy = read_text_file(paths_.apache_policy_file);
     const auto scan = ini ? scan_ini(*ini) : IniScan{};
     const bool ambiguous = scan.security_sections > 1 || scan.setting_lines > 1;
@@ -261,13 +275,13 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
             const auto rendered = render_privileged_network_ini(
                 previous.application_configuration, candidate.persisted_setting);
             return rendered.has_value() &&
-                write_text_file_atomically(paths_.ini_file, *rendered) &&
+                write_application_ini(*rendered) &&
                 write_text_file_atomically(paths_.apache_policy_file,
                                            candidate.apache_policy);
         },
         [&] { return runner_({paths_.system_control, "reload", "apache2"}); },
         [&](PrivilegedNetworkMode mode) {
-            const auto ini = read_text_file(paths_.ini_file);
+            const auto ini = read_application_ini();
             const auto policy = read_text_file(paths_.apache_policy_file);
             const auto parsed = ini
                 ? parse_privileged_network_mode(
@@ -282,8 +296,7 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
         },
         [&](const PrivilegedNetworkTransactionSnapshot &state) {
             return state.configured_known &&
-                write_text_file_atomically(paths_.ini_file,
-                                           state.application_configuration) &&
+                write_application_ini(state.application_configuration) &&
                 write_text_file_atomically(paths_.apache_policy_file,
                                            state.apache_policy);
         }};
