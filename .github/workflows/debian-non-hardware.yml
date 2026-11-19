@@ -141,7 +141,9 @@ jobs:
       matrix:
         runner: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # Intel cold physical and simulated pairing builds reached the 30-minute
+    # boundary after their assertions passed; retain time for final checks/cleanup.
+    timeout-minutes: 45
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
@@ -379,8 +381,9 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    # Six serial warning-as-error profiles exceeded 15 minutes on the runner.
-    timeout-minutes: 30
+    # Six cold warning-as-error profiles reached the final profile at 30 minutes.
+    # Keep every profile and allow the final build and CLI audits to complete.
+    timeout-minutes: 45
     steps:
       - name: Install release-build dependencies
         run: |
