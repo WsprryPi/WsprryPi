@@ -79,9 +79,15 @@ def configuration(data, require_runtime_backend=False):
 
 
 def edit(data, route):
-    configuration(data)
+    saved = configuration(data)
     if route not in ('gpio4', 'gpio20'):
         raise ValueError('invalid route')
+    # Native management binds the exact INI bytes. An already-correct idle
+    # route must not become an external edit merely to normalize spelling.
+    if (saved.get('Operation', 'Transmit Backend').lower() == 'rp1-gpclk' and
+            saved.getint('GPIO', 'Transmit Pin') == int(route[4:]) and
+            saved.getboolean('Operation', 'Transmit') is False):
+        return data
     replacements = {
         ('Operation', 'Transmit Backend'): 'rp1-gpclk',
         ('GPIO', 'Transmit Pin'): route[4:],

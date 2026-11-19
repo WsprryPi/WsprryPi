@@ -7648,6 +7648,7 @@ manage_config() {
     local source_path
     local stock_source_path=""
     local stock_config_path=""
+    local managed_config=false
     local retval=0
 
     # Ensure the configuration arguments are provided
@@ -7688,8 +7689,17 @@ manage_config() {
             stock_config_path="${config_path}.stock"
         fi
 
+        # Managed settings bind the exact active INI, including comments.
+        # Only the application owner may migrate that record. Publish current
+        # stock separately; never invalidate existing authority during update.
+        if [[ "$config_file" == "$WSPR_INI" &&
+              ( -e "${config_path}.managed-settings.json" ||
+                -e "${config_path}.pi-management" ) ]]; then
+            logI "Preserving managed active configuration for application validation."
+            managed_config=true
+        fi
         # If we are doing the INI file, see if we can merge
-        if [[ "${config_file}" == "$WSPR_INI" ]]; then
+        if [[ "${config_file}" == "$WSPR_INI" && "$managed_config" != true ]]; then
             local old_path=""
             local merged_ini=""
 
@@ -7718,7 +7728,9 @@ manage_config() {
         debug_print \
             "Copying configuration from $source_path to $config_path." \
             "$debug"
-        if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ "$managed_config" == true ]]; then
+            : # The managed owner retains the active image.
+        elif [[ "$DRY_RUN" == "true" ]]; then
             logD "Exec: cp -f $source_path $config_path"
         else
             exec_command \
@@ -7728,12 +7740,14 @@ manage_config() {
         fi
 
         # Update version in the active configuration
-        replace_string_in_script \
-            "$config_path" \
-            "SEMANTIC_VERSION" \
-            "$SEM_VER" \
-            "Set version in INI" \
-            "$debug" || retval=1
+        if [[ "$managed_config" != true ]]; then
+            replace_string_in_script \
+                "$config_path" \
+                "SEMANTIC_VERSION" \
+                "$SEM_VER" \
+                "Set version in INI" \
+                "$debug" || retval=1
+        fi
 
         # Install the stock configuration copy for the primary INI
         if [[ -n "$stock_source_path" && -n "$stock_config_path" ]]; then
