@@ -176,7 +176,7 @@ bool real_message(bool virtual_time,bool reject,bool force_late=false){
     // Include preparation and durable reservation in the scheduled delay;
     // loaded runners can spend much of the lead time in those operations.
     const auto before=std::chrono::steady_clock::now();
-    const auto start=utc()+300'000'000ULL;const std::array<std::uint64_t,1> starts{start};
+    const auto start=utc()+2'000'000'000ULL;const std::array<std::uint64_t,1> starts{start};
     plan=prepare_native_occurrence(config,starts);assert(plan->evaluation.outcome==SolarOutcome::Allowed);
     const auto &tones=plan->evaluation.intent->nominal_tones_nhz;
     assert(reserve_native_occurrence(plan,nlohmann::json{{"message","E"}},tones));
@@ -258,7 +258,10 @@ bool real_wspr(bool reject){
         transmitter_cb(event,level,message,value);
         if(ended){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
     });
-    const auto start=utc()+400'000'000ULL;const std::array<std::uint64_t,1> starts{start};plan=prepare_native_occurrence(config,starts);
+    // The production WSPR scheduler stages its worker two seconds before
+    // launch. Leave that lead plus preparation time instead of starting the
+    // fixture inside the worker's staging interval. The 50 ms deadline stays.
+    const auto start=utc()+3'000'000'000ULL;const std::array<std::uint64_t,1> starts{start};plan=prepare_native_occurrence(config,starts);
     PreparedWsprTransmission paired;std::size_t index=0;double dial=0;WsprFrequencyEntry entry;bool in_progress=false;std::optional<WsprPlanPlacement> placement;::TransmissionRequest request;
     const auto selected=*plan->evaluation.intent->wspr_entry;
     assert(configure_current_wspr_transmission(config,0,selected.dial_frequency_hz,selected,paired,index,dial,entry,in_progress,placement,request));
@@ -276,7 +279,8 @@ bool real_wspr(bool reject){
         std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(trace["mode"]=="WSPR");
         if(late){
             assert(std::all_of(trace["events"].begin(),trace["events"].end(),[](const auto &event){return !event.value("rf_on",false);}));
-            std::cout<<"PASS: late WSPR launch refused with output off and occurrence reconciled\n";
+            std::cout<<"PASS: late WSPR launch refused with output off and occurrence reconciled; lateness_ns="
+                     <<std::chrono::duration_cast<std::chrono::nanoseconds>(terminal_utc-when).count()<<'\n';
         }else{unsigned symbols=0;for(const auto &event:trace["events"])if(event["kind"]=="event")++symbols;assert(symbols==162);}
     }
     return started;
