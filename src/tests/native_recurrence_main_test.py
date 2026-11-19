@@ -110,6 +110,8 @@ def main():
                 'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision']}
             if digest:
                 body['candidate_digest'] = saved['candidate_digest']
+            if resource == 'stop':
+                body['observed_output'] = read(base + 'status')['observed_output']
             return mutate(base + resource, 'POST', body)
 
         try:
@@ -131,11 +133,15 @@ def main():
             self_id = read('/api/control/v1/targets')['targets'][0]['device_id']
             base = f'/api/control/v1/targets/{self_id}/'
             context, saved = read(base + 'context'), read(base + 'settings')
-            # Hosted runners can legitimately miss a guarded launch. Each
-            # attempt is a newly saved future occurrence; consumed slots are
-            # never retried. Require autonomous execution within the bound,
-            # and verify inactive cleanup for every refused occurrence.
-            for launch_attempt in range(8):
+            # Test disable/drain separately from autonomous execution. Reads or
+            # writes can legitimately contend with the fail-closed launch guard;
+            # an occurrence disabled before launch is not an execution promise.
+            # Each autonomous attempt is a fresh future slot, never a replay.
+            for launch_attempt in range(9):
+                if progress.exists():
+                    horizon = int(json.loads(progress.read_text())['record']['consumed_through_utc_ns']) / 1e9
+                    wait(lambda: time.time() > horizon, 'Consumed future slot passes before a new attempt',
+                         max(12, horizon - time.time() + 3))
                 context, saved = read(base + 'context'), read(base + 'settings')
                 candidate = copy.deepcopy(saved['saved'])
                 local = time.localtime(time.time() + 5)
@@ -146,22 +152,57 @@ def main():
                 mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
                     'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
                 assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
+                previous_trace = json.loads(trace.read_text()) if trace.exists() else None
+                previous_plan = previous_trace['plan_id'] if previous_trace else None
                 action('enable', 'target-enable', True)
                 reserved = wait(lambda: progress.exists() and json.loads(progress.read_text())['record']['in_flight'], 'Durable accepted occurrence')
-                status = read(base + 'status')
-                assert status['execution_owner'] == self_id and status['destination_id'] == self_id
-                assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
+                if launch_attempt == 0:
+                    status = read(base + 'status')
+                    assert status['execution_owner'] == self_id and status['destination_id'] == self_id
+                    assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
+                else:
+                    # Observe private fixture files only until this occurrence
+                    # completes/refuses. No API lock can perturb its launch.
+                    def terminal():
+                        try:
+                            observed = json.loads(trace.read_text())
+                        except (FileNotFoundError, json.JSONDecodeError):
+                            return False
+                        if observed['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed['events']):
+                            return observed
+                        record = json.loads(progress.read_text())['record']
+                        if record['in_flight'] is None and record['consumed_through_utc_ns'] == reserved['last_start_ns']:
+                            return observed
+                        return False
+                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', 10)
                 action('disable', 'target-action')
-                assert read(base + 'status')['phase'] == 'draining'
+                if launch_attempt == 0:
+                    assert read(base + 'status')['phase'] == 'draining'
+                else:
+                    # An enabled scheduler may already have accepted the next
+                    # future occurrence. Disable cannot abort it; explicit Stop
+                    # reconciles that work before the restart checks below.
+                    consumed_before_stop = json.loads(progress.read_text())['record']['consumed_through_utc_ns']
+                    action('stop', 'target-stop')
                 wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Accepted message drains', 10)
-                observed_trace = json.loads(trace.read_text())
-                if any(event['kind'] == 'execution_start' for event in observed_trace['events']):
+                if launch_attempt == 0:
+                    assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
+                    assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == reserved['last_start_ns']
+                    output = read(base + 'status')['observed_output']
+                    assert output['owner_id'] is None and output['job_id'] is None, output
+                    continue
+                assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == consumed_before_stop
+                if observed_trace['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed_trace['events']):
+                    assert any(event['kind'] == 'execution_start' for event in observed_trace['events'])
+                    assert any(event['rf_on'] for event in observed_trace['events'])
                     break
-                assert [event['kind'] for event in observed_trace['events']] == ['configure', 'configured', 'cleanup'], observed_trace
-                assert not any(event['rf_on'] for event in observed_trace['events']), observed_trace
-                assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == reserved['last_start_ns']
+                if observed_trace['plan_id'] == previous_plan:
+                    assert observed_trace == previous_trace, 'A refused preconfiguration slot cannot change prior trace evidence'
+                else:
+                    assert [event['kind'] for event in observed_trace['events']] == ['configure', 'configured', 'cleanup'], observed_trace
+                    assert not any(event['rf_on'] for event in observed_trace['events']), observed_trace
                 assert read(base + 'status')['phase'] == 'waiting'
-                assert launch_attempt < 7, {
+                assert launch_attempt < 8, {
                     'trace': observed_trace, 'progress': json.loads(progress.read_text()),
                     'status': read(base + 'status'), 'service_log': (root / 'service.log').read_text()[-12000:]}
                 print('Safe prelaunch refusal; testing a fresh future occurrence', launch_attempt + 1, flush=True)
@@ -178,8 +219,10 @@ def main():
             # launch. Startup must reconcile and consume it, never replay it.
             context, saved = read(base + 'context'), read(base + 'settings')
             candidate = copy.deepcopy(saved['saved'])
-            local = time.localtime(time.time() + 8)
-            candidate['configuration']['CW'].update({'Start Minute': local.tm_min, 'Start Second': local.tm_sec})
+            consumed_through = int(json.loads(progress.read_text())['record']['consumed_through_utc_ns']) / 1e9
+            local = time.localtime(max(time.time(), consumed_through) + 8)
+            candidate['configuration']['Operation']['Transmit'] = True
+            candidate['configuration']['CW'].update({'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': 60})
             mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
                 'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
             action('enable', 'target-enable', True)
