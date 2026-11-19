@@ -5,9 +5,21 @@
 #include "web_server.hpp"
 #include "application_simulation_fixture.hpp"
 #include <string_view>
+#ifdef __APPLE__
+#include <pthread/qos.h>
+#include <cstdio>
+#endif
 int pi_managed_production_main(int,char **);
 int main(int argc,char **argv){
     if(argc<4)return 2;
+#ifdef __APPLE__
+    // This fixture verifies a strict 50 ms realtime launch boundary. Request
+    // latency-sensitive scheduling before creating the simulated workers so
+    // hosted macOS timer coalescing does not turn every slot into a late refusal.
+    // No production thread policy or admission tolerance is changed.
+    const int qos_error=pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE,0);
+    if(qos_error){std::fprintf(stderr,"Fixture QoS request failed: %d\n",qos_error);return 2;}
+#endif
     bool simulated=false;
     for(int i=2;i<argc;++i){
         const std::string_view option(argv[i]);
