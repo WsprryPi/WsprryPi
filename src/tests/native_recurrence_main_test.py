@@ -166,15 +166,21 @@ def main():
                     def terminal():
                         try:
                             observed = json.loads(trace.read_text())
-                        except (FileNotFoundError, json.JSONDecodeError):
+                        except FileNotFoundError:
+                            observed = None
+                        except json.JSONDecodeError:
                             return False
-                        if observed['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed['events']):
-                            return observed
                         record = json.loads(progress.read_text())['record']
-                        if record['in_flight'] is None and record['consumed_through_utc_ns'] == reserved['last_start_ns']:
-                            return observed
+                        # Reservation advances the no-replay watermark before
+                        # launch. Completion additionally requires this exact
+                        # occurrence to leave the in-flight record; a different
+                        # future occurrence may already have replaced it.
+                        pending = record['in_flight']
+                        if (pending is None or pending['occurrence_id'] != reserved['occurrence_id']) and \
+                                int(record['consumed_through_utc_ns']) >= int(reserved['last_start_ns']):
+                            return {'trace': observed}
                         return False
-                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', 10)
+                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', 10)['trace']
                 action('disable', 'target-action')
                 if launch_attempt == 0:
                     assert read(base + 'status')['phase'] == 'draining'
@@ -192,11 +198,11 @@ def main():
                     assert output['owner_id'] is None and output['job_id'] is None, output
                     continue
                 assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == consumed_before_stop
-                if observed_trace['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed_trace['events']):
+                if observed_trace and observed_trace['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed_trace['events']):
                     assert any(event['kind'] == 'execution_start' for event in observed_trace['events'])
                     assert any(event['rf_on'] for event in observed_trace['events'])
                     break
-                if observed_trace['plan_id'] == previous_plan:
+                if observed_trace is None or observed_trace['plan_id'] == previous_plan:
                     assert observed_trace == previous_trace, 'A refused preconfiguration slot cannot change prior trace evidence'
                 else:
                     assert [event['kind'] for event in observed_trace['events']] == ['configure', 'configured', 'cleanup'], observed_trace
