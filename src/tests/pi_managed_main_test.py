@@ -11,6 +11,22 @@ import time
 from controller_only_test import free_port, request
 
 
+def target_read(port, path):
+    # Startup readback may briefly hold the management configuration gate.
+    # A refused read changes nothing; retain the exact target/path and bound
+    # the wait without retrying any other error or a mutation.
+    deadline = time.monotonic() + 5
+    while True:
+        status, body = request(port, "GET", path)
+        if status != 409:
+            return status, body
+        error = json.loads(body)
+        if error.get("schema") != "target-error" or error.get("error", {}).get("code") != "capacity":
+            return status, body
+        assert time.monotonic() < deadline, (status, body)
+        time.sleep(.025)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", required=True)
@@ -158,14 +174,14 @@ def main():
                     assert len(targets) == 1 and targets[0]["product"] == "WsprryPi"
                     self_id = targets[0]["device_id"]
                     for resource, schema in (("context", "target-context"), ("settings", "target-settings"), ("status", "target-status")):
-                        status, body = request(port, "GET", f"/api/control/v1/targets/{self_id}/{resource}")
+                        status, body = target_read(port, f"/api/control/v1/targets/{self_id}/{resource}")
                         assert status == 200 and json.loads(body)["schema"] == schema, body
                         assert json.loads(body)["binding"]["device_id"] == self_id
-                    status, context_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/context")
+                    status, context_body = target_read(port, f"/api/control/v1/targets/{self_id}/context")
                     assert status == 200
                     stop_context = json.loads(context_body)
                     assert any(cap["resource"] == "stop" and cap["write"] for cap in stop_context["capabilities"])
-                    status, settings_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/settings")
+                    status, settings_body = target_read(port, f"/api/control/v1/targets/{self_id}/settings")
                     assert status == 200
                     stop_settings = json.loads(settings_body)
                     # Deferred cross-target Pi management must not route to

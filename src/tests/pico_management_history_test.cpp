@@ -15,7 +15,7 @@ std::string bytes(const std::string &path){std::ifstream in(path);return {(std::
 WtpSettings settings(const std::string &device){WtpSettings s;s.transport="usb";s.path="/dev/fixture-wtp";s.usb_serial=device;s.vendor_id=0xcafe;s.product_id=0x4012;s.device_id=device;return s;}
 std::pair<std::string,std::string> add(WtpCatalog &catalog,const std::string &device){
  const auto [before,revision]=catalog.snapshot({});(void)before;
- const auto [after,next]=catalog.mutate({{"operation","add"},{"name","Test Pico"},{"method","manual"},{"discovery_id",""},{"settings",wtp_settings_json(settings(device))},{"consent_plain",false}},revision,{});
+ const auto [after,next]=catalog.mutate({{"operation","add"},{"name","Test Pico"},{"method","manual"},{"discovery_id",""},{"settings",management_profile_settings_json(settings(device))},{"consent_plain",false}},revision,{});
  CHECK(after["version"]==1&&after.size()==2&&!after["profiles"].back().contains("generation"));
  const auto id=after["profiles"].back()["id"].get<std::string>();return {id,catalog.profile(id,next,{}).generation};
 }

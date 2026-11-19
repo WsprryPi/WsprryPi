@@ -68,11 +68,13 @@ async function main() {
         await client.send("Page.navigate", {url:origin+"/index.php?page=config"});
         await waitFor(() => run("!!window.ControllerMode?.ready && document.getElementById('fleet-tab').classList.contains('active') && getComputedStyle(document.getElementById('fleet-pane')).opacity==='1'"), "controller Setup role",15000);
         assert.equal(await run("document.getElementById('controllerOnlyNotice').hidden"),false);
-        assert.equal(await run("document.getElementById('wtp_use').disabled"),true);
+        assert.equal(await run("document.getElementById('wtp_use')"),null,"Retired WTP backend selector is absent");
+        assert.equal(await run("document.getElementById('transmit_backend').disabled"),true);
         assert.equal(await run("document.getElementById('radio-tab').disabled"),true);
         assert.equal(await run("document.getElementById('radio-pane').inert"),true);
         assert.equal(await run("document.getElementById('fleet-add').disabled"),false);
-        assert.equal(await run("document.getElementById('fleet-listener').hidden"),true);
+        assert.equal(await run("document.getElementById('fleet-listener')"),null,"Retired listener controls are absent");
+        assert.match(await run("document.getElementById('fleet-schedules').textContent"),/read-only/);
         assert.equal(await run("document.getElementById('fleet-schedules').textContent.includes('local schedule remains available')"),false);
         await run("document.getElementById('callsign').value='UNSAVED DRAFT';scheduleAutosave();flushAutosave();patchTransmitControl();stopTransmission();WtpUi.refreshControls()");
         assert.equal(await run("document.getElementById('callsign').value"),"UNSAVED DRAFT");
@@ -92,7 +94,7 @@ async function main() {
         await capture("setup");
         await run("PicoFirmwareSafety.begin();PicoFirmwareSafety.observeFirmware({maintenance:false,running:false})");
         await waitFor(() => run("!PicoFirmwareSafety.locked"), "firmware hold released");
-        assert.equal(await run("document.getElementById('radio-tab').disabled && document.getElementById('wtp_use').disabled"),true,
+        assert.equal(await run("document.getElementById('radio-tab').disabled && document.getElementById('transmit_backend').disabled"),true,
             "Firmware guard restoration must preserve controller restrictions");
         await run("ControllerMode.accept({role:'controller-only',controller_ready:true,device_id:'f'.repeat(32),local_output:null,local_transmission_available:false})");
         assert.equal(await run("ControllerMode.ready"),false);

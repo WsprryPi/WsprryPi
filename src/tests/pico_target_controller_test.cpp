@@ -15,16 +15,15 @@ namespace {
 const std::string device(32,'a'), boot(32,'1');
 const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
 Json canonical_caps() {
-  Json result{{"wtp",{{"profiles",{"rf-events/1"}},{"modes",{"wspr","tone"}},{"engine","test"},
+  Json result{{"execution",{{"modes",{"wspr","tone"}},{"engine","test"},
     {"frequency_ranges",Json::array({{{"minimum_nhz","100000000000000"},{"maximum_nhz","30000000000000000"}}})},
-    {"max_payload_bytes",65536},{"max_events",512},{"max_job_duration_ns","3600000000000"},
+    {"max_events",512},{"max_job_duration_ns","3600000000000"},
     {"minimum_arm_lead_ns","1000000"},{"maximum_arm_ahead_ns","300000000000"},{"maximum_arm_uncertainty_ns","500000000"},
-    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"},{"minimum_lease_ms",5000},{"maximum_lease_ms",60000},
-    {"response_cache_entries",8},{"response_cache_ttl_seconds",300},{"terminal_record_entries",8},{"terminal_record_ttl_seconds",3600}}},
-    {"features",Json::object()},{"active_job_connections",false},{"max_network_connections",2},{"max_wtp_connections",1},
+    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"}}},
+    {"features",Json::object()},{"active_execution_connections",false},{"max_network_connections",2},
     {"max_pending_connections",1},{"max_handshakes",1},{"max_body_bytes",32768}};
-  for(const auto name:{"config","schedules","jobs","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
-  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line"})result[name]=Json::parse(control_descriptor(name));
+  for(const auto name:{"config","schedules","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
+  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line","schedule_stop"})result[name]=Json::parse(control_descriptor(name));
   return result;
 }
 Json management() {
@@ -54,7 +53,7 @@ int main() {
         for(char id:{'a','b'}) {
             const auto [before,revision]=catalog.snapshot({});(void)before;
             const auto [after,next]=catalog.mutate({{"operation","add"},{"name",std::string("Pico ")+id},{"method","manual"},
-                {"discovery_id",""},{"settings",wtp_settings_json(settings(id))},{"consent_plain",false}},revision,{});(void)next;
+                {"discovery_id",""},{"settings",management_profile_settings_json(settings(id))},{"consent_plain",false}},revision,{});(void)next;
             (id=='a'?a:b)=after["profiles"].back()["id"];
         }
         std::atomic<unsigned> reads{0},writes{0};
