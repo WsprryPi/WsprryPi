@@ -10,7 +10,7 @@ Remaining feature items:
 
 3. ✅ Review WTP's remaining role alongside device-owned scheduling and management APIs. Decision: retire WTP while preserving device-owned recurring scheduling, management APIs, and shared execution/safety machinery. Follow item 4 for implementation.
 
-4. ✅ Retire WTP while preserving device-owned recurring scheduling and management APIs. Implementation complete; merge CI pending. Follow the [WTP retirement implementation prompt](docs/development/wtp-retirement-implementation-prompt.md).
+4. ✅ Retire WTP while preserving device-owned recurring scheduling and management APIs.
 
 5. ▧ Review and propose automatic security for the browser-to-device hop, covering web pages, API requests and WebSockets, including pairing-code display and submission. Evaluate HTTPS/WSS, initial browser trust, device address changes and ownership transfer without manual certificate or key provisioning; define Linux/macOS packaging and recovery requirements before implementation.
 
