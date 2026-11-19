@@ -30,6 +30,9 @@ test -x "$installed_binary"
 cmp "$built_binary" "$installed_binary"
 test "$(stat -c '%a' "$installed_binary")" = 755
 test ! -e "$systemctl_marker"
+installed_license="${test_root}/prefix/share/licenses/wsprrypi/BOTAN-LICENSE.txt"
+cmp "${repository_root}/docs/licenses/botan/BSD-2-Clause.txt" "$installed_license"
+test "$(stat -c '%a' "$installed_license")" = 644
 
 "${repository_root}/scripts/tests/backend_capability_reporting_test.sh" \
     "$installed_binary" si5351 simulated disabled
@@ -39,8 +42,9 @@ if ldd "$installed_binary" | grep -i gpiod >/dev/null; then
     exit 1
 fi
 
-installed_entries=$(find "${test_root}/prefix" -mindepth 1 -type f -print)
-if [ "$installed_entries" != "$installed_binary" ]; then
+installed_entries=$(find "${test_root}/prefix" -mindepth 1 -type f -print | sort)
+expected_entries=$(printf '%s\n' "$installed_binary" "$installed_license" | sort)
+if [ "$installed_entries" != "$expected_entries" ]; then
     echo "install-binary wrote an unexpected file:" >&2
     printf '%s\n' "$installed_entries" >&2
     exit 1
