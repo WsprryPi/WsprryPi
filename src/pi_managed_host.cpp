@@ -4,6 +4,7 @@
 #include "wtp_integration/pi_pair_history.hpp"
 #include "scheduling.hpp"
 #include "wtp_integration/controller_contract.hpp"
+#include "logging.hpp"
 namespace wsprrypi {
 PiManagedHost::PiManagedHost(std::string ini,std::string self,std::string boot,
     PiLocalManagementService::Observe observe,std::function<void(PiPairInitializationProof)> pairing)
@@ -75,7 +76,13 @@ bool PiManagedHost::retry_saved_configuration(){
 }
 void PiManagedHost::activate(PiManagedStartup::ConfigurationGate gate){
     if(!ready_for_native_startup())throw std::runtime_error("host_startup_not_ready");
-    owner_.activate(std::move(gate));state_.store(PiHostReadiness::Ready);
+    owner_.activate(std::move(gate));
+    const auto policy=management_.install_local_scheduling_policy();
+    if(policy==PiLocalManagementService::PolicyInstallation::Completed)
+        llog.logS(INFO,"Migration completed; schedule disabled pending review.");
+    else if(policy==PiLocalManagementService::PolicyInstallation::Held)
+        llog.logS(WARN,"Migration required; scheduling held pending ownership or output recovery.");
+    state_.store(PiHostReadiness::Ready);
 }
 bool PiManagedHost::ready_for_native_startup(){
     std::lock_guard lock(config_update_mutex());

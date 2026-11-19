@@ -2,248 +2,93 @@
 
 Status: ⏳ execution started on 2026-11-17. Provider qualification and protected runtime foundations are in progress. Production pairing remains unavailable. Phase 7 remains not started.
 
-Execution **resumed at the user's request on 2026-11-17** after a reboot.
-The recorded pre-reboot jobs completed; fresh qualification continues below.
-Nothing has been staged, committed, or pushed for 6.2.
+Execution **resumed at the user's request on 2026-11-17** after a reboot. The recorded pre-reboot jobs completed; fresh qualification continues below. Nothing has been staged, committed, or pushed for 6.2.
 
 ## Authority and baseline
 
-The user authorized the saved phase-6.2 prompt, adversarial review/fix loops,
-commits/pushes on feature branches, and monitoring enabled CI. D62-01–D62-05 and
-the narrowly required phase-6.2 Pico companion changes were explicitly approved
-on 2026-11-17. This does not qualify Botan, waive packaging/security gates,
-authorize reusable-component changes outside their separate boundary, or permit
-hardware operations, installation, services, merging, or phase 7.
+The user authorized the saved phase-6.2 prompt, adversarial review/fix loops, commits/pushes on feature branches, and monitoring enabled CI. D62-01–D62-05 and the narrowly required phase-6.2 Pico companion changes were explicitly approved on 2026-11-17. This does not qualify Botan, waive packaging/security gates, authorize reusable-component changes outside their separate boundary, or permit hardware operations, installation, services, merging, or phase 7.
 
-- Pi: `4d2f0da9251f4801dc1f324518a89f86e11f5dcc`, branch
-  `codex/issue-473-device-owned-scheduling`.
-- Intended paired Pico: `2fdf078a5e379fd9fb329745150ca5005f39ad04`, clean
-  worktree restored after reboot at
-  `/Users/lbussy/GitHub/WsprryPico/build/issue473-phase62-candidate`. The ordinary Pico checkout is
-  on another revision and will be preserved.
-- Docs: `04ad4a7cd4884881bc1fa61f163278d341bcc366`, branch
-  `codex/issue-473-device-owned-scheduling`.
-- Phase 6.1's recorded final source pair, completed implementation, and successful
-  carrier/semantics gates are present. Current tracked source is unchanged from
-  those accepted commits. The unrelated untracked SQLite prompt is preserved.
+- Pi: `4d2f0da9251f4801dc1f324518a89f86e11f5dcc`, branch `codex/issue-473-device-owned-scheduling`.
+- Intended paired Pico: `2fdf078a5e379fd9fb329745150ca5005f39ad04`, clean worktree restored after reboot at `/Users/lbussy/GitHub/WsprryPico/build/issue473-phase62-candidate`. The ordinary Pico checkout is on another revision and will be preserved.
+- Docs: `04ad4a7cd4884881bc1fa61f163278d341bcc366`, branch `codex/issue-473-device-owned-scheduling`.
+- Phase 6.1's recorded final source pair, completed implementation, and successful carrier/semantics gates are present. Current tracked source is unchanged from those accepted commits. The unrelated untracked SQLite prompt is preserved.
 
 ## Decisions
 
-D62-01 permits qualification of the pinned Botan PAKE-only SPAKE2+ profile and its
-version-1 amendment. It does not permit a substitute suite, custom group math,
-BoringSSL, or replacement of existing OpenSSL/Mbed TLS roles. D62-02 retains
-existing Pico IP login and makes verified direct USB and managed-Pi attached-Pico
-negotiation automatic without extra grants. D62-03 separates assignment identity
-from HTTP concurrency. D62-04 requires a durable current-pair resume grant and
-retained disabled-target hold. D62-05 requires target-owned inventory and isolated
-retirement-only TLS purpose. The full approved register remains normative for
-these amendments; owning contracts must be coordinated before implementation.
+D62-01 permits qualification of the pinned Botan PAKE-only SPAKE2+ profile and its version-1 amendment. It does not permit a substitute suite, custom group math, BoringSSL, or replacement of existing OpenSSL/Mbed TLS roles. D62-02 retains existing Pico IP login and makes verified direct USB and managed-Pi attached-Pico negotiation automatic without extra grants. D62-03 separates assignment identity from HTTP concurrency. D62-04 requires a durable current-pair resume grant and retained disabled-target hold. D62-05 requires target-owned inventory and isolated retirement-only TLS purpose. The full approved register remains normative for these amendments; owning contracts must be coordinated before implementation.
 
 ## Current work and acceptance
 
-Inspect the exact provider source, maintenance/security evidence, platform matrix,
-ordinary packaging/loading, resource bounds, and update rehearsal. Provider tests
-alone are not security qualification. Keep production remote management unavailable
-until its gates pass. No pairing implementation, security qualification, carrier
-result, or completion claim is made by this initial record.
+Inspect the exact provider source, maintenance/security evidence, platform matrix, ordinary packaging/loading, resource bounds, and update rehearsal. Provider tests alone are not security qualification. Keep production remote management unavailable until its gates pass. No pairing implementation, security qualification, carrier result, or completion claim is made by this initial record.
 
 ## Reboot checkpoint — 2026-11-17
 
-The provider gate is **not yet closed**. The application, UI, authoritative
-shared schemas, Pico handlers, and Docs source have not been modified in this
-phase. Production pairing and remote Pi management remain unavailable.
+The provider gate is **not yet closed**. The application, UI, authoritative shared schemas, Pico handlers, and Docs source have not been modified in this phase. Production pairing and remote Pi management remain unavailable.
 
 Saved work:
 
-- Recorded the actual decision approvals, updated the in-progress indicator,
-  and amended the owning written Pair/1 profile to the approved SPAKE2+ mapping.
-  Coordinated schema/generated-consumer materialization still comes later.
-- Added the pinned maintainer SDK recipe `scripts/build_pairing_provider.py`,
-  its one source pin in `scripts/pairing_provider.json`, archive-boundary tests,
-  public profile fixtures under `src/tests/pairing_provider/`, and the upstream
-  license/maintenance guidance under `docs/licenses/botan/`. These are
-  qualification work, not an enabled application dependency or finished package.
-- Created the clean paired Pico branch
-  `codex/issue-473-phase62-paired-candidate` in
-  `/private/tmp/issue473-pico-candidate`; its base remains
-  `2fdf078a5e379fd9fb329745150ca5005f39ad04`. The ordinary Pico checkout was
-  preserved and must not substitute for this candidate.
-- Saved [provider probe evidence](phase-6-2-provider-evidence.json) with exact
-  source revisions, immutable Linux image identities, final profile source hashes,
-  compile commands, runtime results, and upstream configured-vector output.
+- Recorded the actual decision approvals, updated the in-progress indicator, and amended the owning written Pair/1 profile to the approved SPAKE2+ mapping. Coordinated schema/generated-consumer materialization still comes later.
+- Added the pinned maintainer SDK recipe `scripts/build_pairing_provider.py`, its one source pin in `scripts/pairing_provider.json`, archive-boundary tests, public profile fixtures under `src/tests/pairing_provider/`, and the upstream license/maintenance guidance under `docs/licenses/botan/`. These are qualification work, not an enabled application dependency or finished package.
+- Created the clean paired Pico branch `codex/issue-473-phase62-paired-candidate` in `/private/tmp/issue473-pico-candidate`; its base remains `2fdf078a5e379fd9fb329745150ca5005f39ad04`. The ordinary Pico checkout was preserved and must not substitute for this candidate.
+- Saved [provider probe evidence](phase-6-2-provider-evidence.json) with exact source revisions, immutable Linux image identities, final profile source hashes, compile commands, runtime results, and upstream configured-vector output.
 
 Completed software checks:
 
-- `python3 scripts/tests/pairing_provider_build_test.py`: five tests passed.
-  Cached archive corruption, path escape, external/chained links, internal-link
-  materialization, duplicate paths, and extraction bounds were covered.
-- `python3 scripts/build_pairing_provider.py --root
-  /private/tmp/issue473-phase62-provider/recipe-native-2 --cache
-  /private/tmp/issue473-phase62-provider/recipe-cache --vectors`: passed;
-  135 configured upstream PAKE/scrypt checks passed with explicit P-256 support.
-  This fresh recipe used the checksum-verified pinned archive.
-- Staged static SDK/profile probes passed on ARMv6 Bookworm/Trixie, AArch64
-  Bookworm/Trixie, macOS ARM64, and macOS Intel/Rosetta, for both 3.14.0 and
-  3.14.1. Each final probe passed 26 checks, or 25 for Intel without the separate
-  OpenSSL coexistence check. Observed elapsed times were 92–626 ms and peak RSS
-  37,257,216–50,728,960 bytes; scrypt reports 33,555,456 bytes. These measurements
-  include two serialized derivations and negative cases, not physical-Pi timing.
-- ELF inspection confirmed ARMv6/VFPv2/hard-float; loader checks found no Botan
-  shared-library dependency. Native macOS and Linux probes linked the existing
-  OpenSSL too. The Intel probe used only Botan/system runtime; complete application
-  packaging/TLS and production-role validation remain outstanding.
+- `python3 scripts/tests/pairing_provider_build_test.py`: five tests passed. Cached archive corruption, path escape, external/chained links, internal-link materialization, duplicate paths, and extraction bounds were covered.
+- `python3 scripts/build_pairing_provider.py --root /private/tmp/issue473-phase62-provider/recipe-native-2 --cache /private/tmp/issue473-phase62-provider/recipe-cache --vectors`: passed; 135 configured upstream PAKE/scrypt checks passed with explicit P-256 support. This fresh recipe used the checksum-verified pinned archive.
+- Staged static SDK/profile probes passed on ARMv6 Bookworm/Trixie, AArch64 Bookworm/Trixie, macOS ARM64, and macOS Intel/Rosetta, for both 3.14.0 and 3.14.1. Each final probe passed 26 checks, or 25 for Intel without the separate OpenSSL coexistence check. Observed elapsed times were 92–626 ms and peak RSS 37,257,216–50,728,960 bytes; scrypt reports 33,555,456 bytes. These measurements include two serialized derivations and negative cases, not physical-Pi timing.
+- ELF inspection confirmed ARMv6/VFPv2/hard-float; loader checks found no Botan shared-library dependency. Native macOS and Linux probes linked the existing OpenSSL too. The Intel probe used only Botan/system runtime; complete application packaging/TLS and production-role validation remain outstanding.
 - Python syntax checks and `git diff --check`/`git diff --cached --check` passed.
 
-The first provider selection lacked the P-256 module; its round-trip failure was
-fixed by selecting upstream `pcurves_secp256r1`, and the successful vector runs
-include it. The archive recipe initially refused upstream's internal CI symlink;
-it now materializes only validated links to extracted regular files, with tests.
-One matrix orchestrator stopped on the not-yet-built old ARMv6 Trixie package;
-that package completed, and all remaining final cases subsequently passed. None
-of these intermediate results is substituted for the final successful probes.
+The first provider selection lacked the P-256 module; its round-trip failure was fixed by selecting upstream `pcurves_secp256r1`, and the successful vector runs include it. The archive recipe initially refused upstream's internal CI symlink; it now materializes only validated links to extracted regular files, with tests. One matrix orchestrator stopped on the not-yet-built old ARMv6 Trixie package; that package completed, and all remaining final cases subsequently passed. None of these intermediate results is substituted for the final successful probes.
 
-Upstream source/security inspection covered the SPAKE2+ implementation, the
-standard transcript/constants and confirmation state machine, zero-secret and
-failed-decode hardening in 3.14.0, scrypt/RNG advisories fixed before the selected
-pin, supported platforms, license, and published maintenance history. Upstream
-human review comments inspected so far concern bindings; they do not establish
-an independent cryptographic audit of the new PAKE. Security qualification still
-needs its explicit evidence/disposition record; vectors alone cannot close it.
+Upstream source/security inspection covered the SPAKE2+ implementation, the standard transcript/constants and confirmation state machine, zero-secret and failed-decode hardening in 3.14.0, scrypt/RNG advisories fixed before the selected pin, supported platforms, license, and published maintenance history. Upstream human review comments inspected so far concern bindings; they do not establish an independent cryptographic audit of the new PAKE. Security qualification still needs its explicit evidence/disposition record; vectors alone cannot close it.
 
 ### Exact resume point
 
-1. Reinspect all three branches, working trees, instructions, and saved approvals.
-   Preserve the unrelated SQLite prompt. Do not start 6.2 from the ordinary
-   stale Pico checkout, and do not reset any checkout.
-2. Finish work-package 0: adversarially review the new dependency recipe/fixtures,
-   settle the security qualification record, and demonstrate ordinary integrated
-   build/package loading and update maintenance. The standalone SDK/probe matrix
-   does not establish final executable packaging or complete phase acceptance.
-3. Only after its gate passes, proceed in saved-prompt order with synchronized
-   contracts/principals/storage, pairing/TLS lifecycle, remote Pi/attached-Pico
-   management, retirement/rollback, UI, operator docs, and acceptance tests.
-4. Complete the required full assessment/fix loops, both actual paired carrier
-   suites, platform/production-role/browser/packaging gates, and Docs validation.
-   Then mark complete, commit/push the authorized feature branches, and monitor
-   enabled CI. No merge or phase 7 is authorized.
+1. Reinspect all three branches, working trees, instructions, and saved approvals. Preserve the unrelated SQLite prompt. Do not start 6.2 from the ordinary stale Pico checkout, and do not reset any checkout.
+2. Finish work-package 0: adversarially review the new dependency recipe/fixtures, settle the security qualification record, and demonstrate ordinary integrated build/package loading and update maintenance. The standalone SDK/probe matrix does not establish final executable packaging or complete phase acceptance.
+3. Only after its gate passes, proceed in saved-prompt order with synchronized contracts/principals/storage, pairing/TLS lifecycle, remote Pi/attached-Pico management, retirement/rollback, UI, operator docs, and acceptance tests.
+4. Complete the required full assessment/fix loops, both actual paired carrier suites, platform/production-role/browser/packaging gates, and Docs validation. Then mark complete, commit/push the authorized feature branches, and monitor enabled CI. No merge or phase 7 is authorized.
 
-Scratch sources/builds/logs and matrix runners are in
-`/private/tmp/issue473-phase62-provider`. Recheck their existence after reboot;
-the tracked-source pin, profile fixtures, SDK recipe, and saved evidence above
-allow reconstruction if temporary files are lost. Qualification scratch contains
-only public fixture codes/keys, not operator credentials. All jobs and temporary
-containers launched for this phase have exited; unrelated existing containers
-were left untouched. No hardware, services, installation, GPIO, or RF were used.
+Scratch sources/builds/logs and matrix runners are in `/private/tmp/issue473-phase62-provider`. Recheck their existence after reboot; the tracked-source pin, profile fixtures, SDK recipe, and saved evidence above allow reconstruction if temporary files are lost. Qualification scratch contains only public fixture codes/keys, not operator credentials. All jobs and temporary containers launched for this phase have exited; unrelated existing containers were left untouched. No hardware, services, installation, GPIO, or RF were used.
 
 ## Documentation Impact
 
-Updated the phase indicator and engineering decision/progress records. Operator
-pages and screenshots are considered but unchanged while product behavior is
-unchanged. Concomitant operator/API/security/package documentation and rendered
-Impeccable review remain required with the implementation.
+Updated the phase indicator and engineering decision/progress records. Operator pages and screenshots are considered but unchanged while product behavior is unchanged. Concomitant operator/API/security/package documentation and rendered Impeccable review remain required with the implementation.
 
 ## Resumed after reboot — 2026-11-17
 
-The temporary worktree and provider scratch directory were absent after reboot.
-The saved Pico feature branch still resolves to the exact accepted base. A new
-persistent worktree was added at `WsprryPico/build/issue473-phase62-candidate`
-without removing stale Git metadata or changing the ordinary Pico checkout.
-Provider reconstruction now uses the verified source pin and checked-in recipe
-under `WsprryPi/build/issue473-phase62-provider`; saved pre-reboot evidence remains
-historical evidence, not a substitute for final-source acceptance.
+The temporary worktree and provider scratch directory were absent after reboot. The saved Pico feature branch still resolves to the exact accepted base. A new persistent worktree was added at `WsprryPico/build/issue473-phase62-candidate` without removing stale Git metadata or changing the ordinary Pico checkout. Provider reconstruction now uses the verified source pin and checked-in recipe under `WsprryPi/build/issue473-phase62-provider`; saved pre-reboot evidence remains historical evidence, not a substitute for final-source acceptance.
 
 ### Resumed provider assessment and results
 
-The ordinary Make provider target now passes on native macOS and ARMv6
-Bookworm/Trixie plus AArch64 Bookworm/Trixie, with existing OpenSSL linked.
-Six archive/build-boundary tests pass, and the corrected fresh native upstream
-run passes all 135 configured checks. Final Linux Make results and exact commands
-are saved in the provider evidence; this is SDK/profile acceptance, not completed
-application packaging or production-role acceptance. The explicit source/security
-review is recorded in `phase-6-2-provider-qualification.md`.
+The ordinary Make provider target now passes on native macOS and ARMv6 Bookworm/Trixie plus AArch64 Bookworm/Trixie, with existing OpenSSL linked. Six archive/build-boundary tests pass, and the corrected fresh native upstream run passes all 135 configured checks. Final Linux Make results and exact commands are saved in the provider evidence; this is SDK/profile acceptance, not completed application packaging or production-role acceptance. The explicit source/security review is recorded in `phase-6-2-provider-qualification.md`.
 
-Adversarial findings fixed during this slice: upstream archive configuration
-inherited the parent Pi Git revision; it now has a bounded Git-discovery
-environment and a regression test. The first read-only Docker Make fixture lacked
-its exact safe-directory and isolated metadata settings; corrected runs passed
-without those diagnostics. Native Make requires the explicit simulated-only
-profile on this Mac; the corrected invocation passed. No validation rule,
-cryptographic source, installed dependency, or hardware policy was relaxed.
+Adversarial findings fixed during this slice: upstream archive configuration inherited the parent Pi Git revision; it now has a bounded Git-discovery environment and a regression test. The first read-only Docker Make fixture lacked its exact safe-directory and isolated metadata settings; corrected runs passed without those diagnostics. Native Make requires the explicit simulated-only profile on this Mac; the corrected invocation passed. No validation rule, cryptographic source, installed dependency, or hardware policy was relaxed.
 
-The next slice materializes approved closed contracts and typed authorization.
-Production remote management remains unavailable. Complete application package,
-role, TLS, lifecycle, browser, carrier, and documentation gates remain required.
+The next slice materializes approved closed contracts and typed authorization. Production remote management remains unavailable. Complete application package, role, TLS, lifecycle, browser, carrier, and documentation gates remain required.
 
 ## P62-01 — protected state and context closure (approved 2026-11-17)
 
-The approved UI must show current controller access and recovery, but the saved
-route table defines its three POST commands and public bootstrap state only.
-The public state deliberately cannot disclose the manager. The existing exact
-Control/1 target context also has no fields for the authorization/gateway binding
-required by D62-02. The user approved these concrete interface closures on 2026-11-17:
+The approved UI must show current controller access and recovery, but the saved route table defines its three POST commands and public bootstrap state only. The public state deliberately cannot disclose the manager. The existing exact Control/1 target context also has no fields for the authorization/gateway binding required by D62-02. The user approved these concrete interface closures on 2026-11-17:
 
-- Add protected `GET /api/control/v1/host/pairing`, returning exactly
-  `{contract:"Wsprry-Control/1",schema:"pairing-state",device_id:ID,boot_id:ID,
-  authorization_generation:U64,state:unpaired|paired|access_recovery|unavailable,
-  manager:{device_id:ID,name:Name}|null,
-  window:{window_id:ID,expires_in_ms:uint32[0..120000]}|null}`.
-  This is an observation only: no code/key, opening a window, initialization,
-  recovery, or mutation. Preserve existing protected browser/LAN/Host/Origin/
-  proxy/session policy. Pairing codes still appear only in the initiating
-  session's successful protected window POST response.
-- Add required nullable `authorization` and `gateway` fields to the one current
-  `target-context` response. Authorization is null for existing local/direct-Pico
-  contexts, or exactly `{pair_id:ID,authorization_generation:Generation}` for
-  the current paired path. A gateway is null or exactly
-  `{parent:Binding,pair_id:ID,authorization_generation:Generation,child:Binding,
-  resources:[Resource]}`, where Binding is the current four-field target binding
-  and Resource is the existing typed Pico management resource allowlist. Bound
-  the resource list to 128 distinct entries. The child equals the outer target
-  binding; parent and child identities differ; authorization equals the gateway's
-  pair/generation. Actual negotiated capabilities further restrict that list.
-- These fields describe server-issued context; a document cannot select a
-  principal, supply keys, or grant access. Enforce actual TLS authorization,
-  profile/connection checks, operation scoping, and pre-dispatch revocation.
-  Settings/action request bodies and native Pico payloads remain unchanged.
-- Update the authoritative shared schema, generators, strict validators,
-  consumers, vectors, and documentation together. Keep Control/1 and Pair/1 at
-  version 1. Add no grant, second pairing step, WTP dispatch, or scheduling UI.
+- Add protected `GET /api/control/v1/host/pairing`, returning exactly `{contract:"Wsprry-Control/1",schema:"pairing-state",device_id:ID,boot_id:ID, authorization_generation:U64,state:unpaired|paired|access_recovery|unavailable, manager:{device_id:ID,name:Name}|null, window:{window_id:ID,expires_in_ms:uint32[0..120000]}|null}`. This is an observation only: no code/key, opening a window, initialization, recovery, or mutation. Preserve existing protected browser/LAN/Host/Origin/ proxy/session policy. Pairing codes still appear only in the initiating session's successful protected window POST response.
+- Add required nullable `authorization` and `gateway` fields to the one current `target-context` response. Authorization is null for existing local/direct-Pico contexts, or exactly `{pair_id:ID,authorization_generation:Generation}` for the current paired path. A gateway is null or exactly `{parent:Binding,pair_id:ID,authorization_generation:Generation,child:Binding, resources:[Resource]}`, where Binding is the current four-field target binding and Resource is the existing typed Pico management resource allowlist. Bound the resource list to 128 distinct entries. The child equals the outer target binding; parent and child identities differ; authorization equals the gateway's pair/generation. Actual negotiated capabilities further restrict that list.
+- These fields describe server-issued context; a document cannot select a principal, supply keys, or grant access. Enforce actual TLS authorization, profile/connection checks, operation scoping, and pre-dispatch revocation. Settings/action request bodies and native Pico payloads remain unchanged.
+- Update the authoritative shared schema, generators, strict validators, consumers, vectors, and documentation together. Keep Control/1 and Pair/1 at version 1. Add no grant, second pairing step, WTP dispatch, or scheduling UI.
 
-This closes missing readback/metadata interfaces for already approved behavior;
-it does not qualify production pairing. AGENTS.md's protocol/workflow ambiguity
-rule required direction on these shapes; the user supplied that approval.
+This closes missing readback/metadata interfaces for already approved behavior; it does not qualify production pairing. AGENTS.md's protocol/workflow ambiguity rule required direction on these shapes; the user supplied that approval.
 
 ### Contracts and initial production crypto — 2026-11-17
 
-P62-01 was explicitly approved. The authoritative Pico Control/1 schema, strict
-lifecycle registry, C++/JS generators, assets, and vectors now include the approved
-protected pairing commands/state and nullable authorization/gateway context.
-Local Pi contexts emit explicit nulls. This defines interfaces; no browser pairing
-handler, TLS listener, gateway dispatch, or paired access is exposed yet.
+P62-01 was explicitly approved. The authoritative Pico Control/1 schema, strict lifecycle registry, C++/JS generators, assets, and vectors now include the approved protected pairing commands/state and nullable authorization/gateway context. Local Pi contexts emit explicit nulls. This defines interfaces; no browser pairing handler, TLS listener, gateway dispatch, or paired access is exposed yet.
 
-The independently owned Pi Pair/1 schema/parser has exact closed current messages,
-canonical encodings, bounds, and separate bootstrap/management/retirement route
-registries. No WTP or Pico authentication format changed. The initial production
-PAKE wrapper uses the pinned provider, serializes scrypt per process, binds the
-approved transcript/roles, requires confirmations, uses separate transport/commit/
-retirement keys, and gives secret/code values explicit wiping lifetimes without
-JSON/stream conversion. It remains unconnected to startup and management APIs.
+The independently owned Pi Pair/1 schema/parser has exact closed current messages, canonical encodings, bounds, and separate bootstrap/management/retirement route registries. No WTP or Pico authentication format changed. The initial production PAKE wrapper uses the pinned provider, serializes scrypt per process, binds the approved transcript/roles, requires confirmations, uses separate transport/commit/ retirement keys, and gives secret/code values explicit wiping lifetimes without JSON/stream conversion. It remains unconnected to startup and management APIs.
 
-Focused checks passed: 236 shared controller vectors in C++ and JS; 45 Pair/1
-parser/purpose checks; 73 production PAKE checks against independent fixture-scalar
-peers in both directions; existing local Pi service tests; source-pair parity;
-current-version lifecycle policy; and the full UI unit suite. UI unit HTTP fixtures
-needed loopback socket permission after the default sandbox refused a bind; the
-rerun passed. macOS native-classification probes in the local service test report
-missing Linux `/proc`/`/sys` files; no transmitter is constructed or operated.
+Focused checks passed: 236 shared controller vectors in C++ and JS; 45 Pair/1 parser/purpose checks; 73 production PAKE checks against independent fixture-scalar peers in both directions; existing local Pi service tests; source-pair parity; current-version lifecycle policy; and the full UI unit suite. UI unit HTTP fixtures needed loopback socket permission after the default sandbox refused a bind; the rerun passed. macOS native-classification probes in the local service test report missing Linux `/proc`/`/sys` files; no transmitter is constructed or operated.
 
-An actual Clang strict compile reproduced the generated controller literal over
-65,536 bytes. The generator now assembles bounded chunks once without disabling
-compiler diagnostics; strict header compilation and the runtime vector tests pass.
-Crypto review also corrected temporary code/binary-buffer wiping, early RNG
-initialization, and terminal handling of invalid crypto-step reuse. Complete
-lifecycle, principal/storage, TLS, gateway, handover, production-role/packaging,
-paired carrier, browser/visual, and documentation acceptance remain unfinished.
+An actual Clang strict compile reproduced the generated controller literal over 65,536 bytes. The generator now assembles bounded chunks once without disabling compiler diagnostics; strict header compilation and the runtime vector tests pass. Crypto review also corrected temporary code/binary-buffer wiping, early RNG initialization, and terminal handling of invalid crypto-step reuse. Complete lifecycle, principal/storage, TLS, gateway, handover, production-role/packaging, paired carrier, browser/visual, and documentation acceptance remain unfinished.
 
 ### Private history and external-PSK TLS foundations — 2026-11-17
 

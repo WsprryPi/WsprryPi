@@ -16,7 +16,7 @@ Run the production scheduler and compiler regression without hardware from Linux
 WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make wspr-plan-placement-test SUDO=
 ```
 
-The target is also part of full and portable semantics coverage. It uses controlled terminal callbacks rather than waiting through WSPR slots. `ScopedWsprRandomPlacementForTest` is a transient typed developer seam; installation, provider calls and restoration use the scheduler configuration mutex. Providers must not re-enter scheduler configuration. Exception unwinding restores the previous provider. Override lifetimes serialize across threads and nest on the owning thread so an expired callback cannot be restored. No CLI, environment or persisted setting selects it.
+The target is also part of full and portable semantics coverage. It uses controlled terminal callbacks rather than waiting through WSPR slots. `ScopedWsprRandomPlacementForTest` is a transient typed developer seam; installation, provider calls and restoration use the scheduler configuration mutex. Providers must not re-enter scheduler configuration. Exception unwinding restores the previous provider. Override lifetimes serialize across threads and nest on the owning thread so an expired callback cannot be restored. No CLI, environment, or persisted setting selects it.
 
 The configuration interoperability target compares test-exported native compiler events with an actual Pico standalone scheduler plan through typed internal fixture calls. This is a software frequency-grid comparison, not a replacement remote job API. It checks paired placement, independent subsequent plans, the native standalone grid, immutable settings, and calibration isolation.
 
@@ -25,4 +25,4 @@ WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j4 wtp-config-interop-test SUDO= \
   PICO_SOURCE=/path/to/selected/WsprryPico MBEDTLS_SOURCE=/path/to/pinned/mbedtls
 ```
 
-The recipe builds a separate `wspr_scheduler_frequency_export` test binary with explicit `BACKENDS=simulated ANCILLARY_GPIO=0`. It does not require physical-backend build dependencies or replace the ordinary placement-test binary. The selected Pico sources may include edits; the separate MbedTLS dependency policy still applies. No physical transport, RF, installation or service qualification is established.
+The recipe builds a separate `wspr_scheduler_frequency_export` test binary with explicit `BACKENDS=simulated ANCILLARY_GPIO=0`. It does not require physical-backend build dependencies or replace the ordinary placement-test binary. The selected Pico sources may include edits; the separate MbedTLS dependency policy still applies. No physical transport, RF, installation, or service qualification is established.

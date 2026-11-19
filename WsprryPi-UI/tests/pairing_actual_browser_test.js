@@ -93,7 +93,7 @@ const {waitForExit}=require('./browser_fixture_process.js');
   await waitFor(()=>run("!document.getElementById('recurrenceMigrationRetry').hidden&&!document.getElementById('recurrenceMigrationRetry').disabled"),'actual accepted migration with interrupted browser reply');
   actor.stdin.write('ADVANCE_NATIVE\n');assert.equal(await line(),'ACK');
   await run("document.getElementById('recurrenceMigrationRetry').click()");
-  await waitFor(()=>run("document.getElementById('recurrenceMigrationRetry').hidden&&document.getElementById('recurrenceMigrationState').textContent.includes('saved and disabled')"),'actual native atomic disabled staging and receipt recovery',15000);
+  await waitFor(()=>run("document.getElementById('recurrenceMigrationRetry').hidden&&document.getElementById('recurrenceMigrationState').textContent.includes('schedule disabled pending review')"),'actual native atomic disabled staging and receipt recovery',15000);
   assert.equal(requests.filter(item=>item.method==='POST'&&item.path.endsWith('/migration')).length,migrationPosts+1,'Migration recovery never repeats the accepted command');
   console.log('PASS actual paired Maintenance migration: protected browser, current normal TLS, native configuration/authority/WAL, interrupted accepted reply, explicit progress reconciliation and receipt-only disabled staging');
   selected=ports.controller_port;await client.send('Page.navigate',{url:origin+'/index.php?page=config'});

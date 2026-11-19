@@ -166,7 +166,10 @@ void PiManagedStartup::prepare(){
         const auto authority=state->store.recurrence_authority();
         if(authority["state"]=="native")return LegacyRecurrenceAdmission::Native;
         if(recurrence_remote_resume_active(authority))return LegacyRecurrenceAdmission::Held;
-        if(authority["state"]=="unclassified"||authority["state"]=="legacy"||authority["state"]=="rollback")
+        // Installing native policy cannot reopen the previous scheduler before
+        // the target owner has durably staged its mandatory local handover.
+        // Rollback is a separately reviewed restoration after that handover.
+        if(authority["state"]=="rollback")
             return state->store.settings()["scheduling"]["enabled"]==true?LegacyRecurrenceAdmission::Open:LegacyRecurrenceAdmission::DrainAcceptedPair;
         return authority["state"]=="retiring"?LegacyRecurrenceAdmission::DrainAcceptedPair:LegacyRecurrenceAdmission::Held;
     });

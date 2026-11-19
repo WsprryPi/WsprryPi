@@ -1,52 +1,17 @@
 # Si5351 readiness and qualification limits
 
-The Si5351 backend attempts all-output inhibition before ordinary programming.
-It checks SYS_INIT before RAM programming and PLLA/XA readiness afterward.
-Each stage permits at most 50 reads with interruptible 1 ms waits. These limits
-do not bound a blocking kernel I2C transaction. A non-ready status and a transport
-failure remain distinct errors. Either during output fails execution and enters
-disable cleanup without re-enabling RF.
+The Si5351 backend attempts all-output inhibition before ordinary programming. It checks SYS_INIT before RAM programming and PLLA/XA readiness afterward. Each stage permits at most 50 reads with interruptible 1 ms waits. These limits do not bound a blocking kernel I2C transaction. A non-ready status and a transport failure remain distinct errors. Either during output fails execution and enters disable cleanup without re-enabling RF.
 
-Cleanup retains its own error separately from the primary fault, including an
-uncertain output state. Repeated cleanup returns the retained job receipt
-without further I2C access. A successful disable write or register readback does
-not establish measured RF inactivity. See the
-[component contract](../src/WSPR-Transmitter/README.md#si5351-comparison-capabilities).
+Cleanup retains its own error separately from the primary fault, including an uncertain output state. Repeated cleanup returns the retained job receipt without further I2C access. A successful disable write or register readback does not establish measured RF inactivity. See the [component contract](../src/WSPR-Transmitter/README.md#si5351-comparison-capabilities).
 
-The readiness release gate was accepted on October 15, 2026 after software
-repairs and two consecutive inhibited wspr1 I2C checks of 1,000 reads each.
-The implementation review baseline was
-`50097e652b4af70d510f4a29d4edf1ffa24d3f0a`. This disposition covers that bounded
-I2C observation. It does not establish general hardware reliability, timing or
-RF qualification. Earlier wspr4 CLK0 SYS_INIT failures remain unexplained;
-later successful observations do not establish their cause.
+The readiness release gate was accepted on October 15, 2026 after software repairs and two consecutive inhibited wspr1 I2C checks of 1,000 reads each. The implementation review baseline was `50097e652b4af70d510f4a29d4edf1ffa24d3f0a`. This disposition covers that bounded I2C observation. It does not establish general hardware reliability, timing, or RF qualification. Earlier wspr4 CLK0 SYS_INIT failures remain unexplained; later successful observations do not establish their cause.
 
-The application retains fixed-PLL HF planning and full inhibited 2 m tone
-transitions. Typed maintainer experiments for PLL-only updates, integer
-MultiSynth selection and burst programming remain opt-in. They are not saved
-settings or operator controls. Duty-cycle fades switch output fully on/off;
-an envelope name does not establish spectral improvement.
+The application retains fixed-PLL HF planning and full inhibited 2 m tone transitions. Typed maintainer experiments for PLL-only updates, integer MultiSynth selection and burst programming remain opt-in. They are not saved settings or operator controls. Duty-cycle fades switch output fully on/off; an envelope name does not establish spectral improvement.
 
-Current physical support claims remain bounded by board, reference clock,
-output, drive, mode, frequency and measurement setup. Neither a software check
-nor these inhibited I2C observations qualify another setup, a complete encoded
-WSPR transmission, calibrated power/frequency/spectrum or temperature extremes.
-The [active release evidence](../release_tools/4.0.0-Release-Evidence.md)
-records the selected candidate and its remaining acceptance gates.
+Current physical support claims remain bounded by board, reference clock, output, drive, mode, frequency, and measurement setup. Neither a software check nor these inhibited I2C observations qualify another setup, a complete encoded WSPR transmission, calibrated power/frequency/spectrum or temperature extremes. The [active release evidence](../release_tools/4.0.0-Release-Evidence.md) records the selected candidate and its remaining acceptance gates.
 
 ## Native macOS transport
 
-`SI5351_TRANSPORT=mcp2221a-hid` selects the native macOS MCP2221A HID path
-beneath this same backend. It does not select a new RF backend. The
-[transport guide](development/macos-mcp2221a.md) covers build prerequisites,
-exact adapter identity, 100 kHz transactions, and bounded transport deadlines.
-Native CLI configuration and explicit selected-address validation are available;
-native web adapter selection, selected-address checks, and binding-scoped cached
-status use the same transport.
+`SI5351_TRANSPORT=mcp2221a-hid` selects the native macOS MCP2221A HID path beneath this same backend. It does not select a new RF backend. The [transport guide](development/macos-mcp2221a.md) covers build prerequisites, exact adapter identity, 100 kHz transactions, and bounded transport deadlines. Native CLI configuration and explicit selected-address validation are available; native web adapter selection, selected-address checks, and binding-scoped cached status use the same transport.
 
-A lost or faulted HID session cannot prove that a separately powered Si5351
-stopped generating clocks. Adapter transfer cancellation is not output disable.
-The backend retains primary and cleanup failures, and no adapter, transport,
-bus, or simulated fallback is automatic. Accepted hardware work retains its
-recorded platform/setup scope; software builds and fake-channel tests do not
-extend physical or RF qualification.
+A lost or faulted HID session cannot prove that a separately powered Si5351 stopped generating clocks. Adapter transfer cancellation is not output disable. The backend retains primary and cleanup failures, and no adapter, transport, bus, or simulated fallback is automatic. Accepted hardware work retains its recorded platform/setup scope; software builds and fake-channel tests do not extend physical or RF qualification.

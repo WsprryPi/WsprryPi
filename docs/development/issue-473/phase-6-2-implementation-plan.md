@@ -1,79 +1,30 @@
 # Phase 6.2 implementation plan: automatic Pi security and remote management
 
-Status: phase-6.2 execution authorized on 2026-11-17; software acceptance completed on 2026-11-18. See the [final evidence](phase-6-2-final-acceptance.json).
-Prepared 2026-11-16. See [execution progress](phase-6-2-progress.md).
-This plan does not authorize implementation, companion edits, hardware operation,
-staging, commits, pushes, merging, publication, or phase 7. It expands the
-[6.2 execution prompt](06-2-pi-security.md), the [security gate](deferred-pi-security.md),
-and approved [pairing](phase-1-pairing.md), [decisions](phase-1-decisions.md), and
-[normative contracts](phase-1-contract-details.md); it does not supersede them.
+Status: phase-6.2 execution authorized on 2026-11-17; software acceptance completed on 2026-11-18. See the [final evidence](phase-6-2-final-acceptance.json). Prepared 2026-11-16. See [execution progress](phase-6-2-progress.md). This plan does not authorize implementation, companion edits, hardware operation, staging, commits, pushes, merging, publication, or phase 7. It expands the [6.2 execution prompt](06-2-pi-security.md), the [security gate](deferred-pi-security.md), and approved [pairing](phase-1-pairing.md), [decisions](phase-1-decisions.md), and [normative contracts](phase-1-contract-details.md); it does not supersede them.
 
-Research update (2026-11-16): the five previously open questions now have concrete
-[D62-01–D62-05 recommendations](phase-6-2-decisions.md), approved by the user on 2026-11-17.
-They include a conditional PAKE-provider/profile amendment, explicit Pico scope,
-revision clarification, current-pair rollback, and target-owned authority history.
-The approved amendments now govern their owning contracts.
-Approving a recommendation does not itself qualify a provider or authorize execution.
+Research update (2026-11-16): the five previously open questions now have concrete [D62-01–D62-05 recommendations](phase-6-2-decisions.md), approved by the user on 2026-11-17. They include a conditional PAKE-provider/profile amendment, explicit Pico scope, revision clarification, current-pair rollback, and target-owned authority history. The approved amendments now govern their owning contracts. Approving a recommendation does not itself qualify a provider or authorize execution.
 
 ## Outcome and boundaries
 
-An operator pairs a controller from the target's own web UI using a temporary
-code entered on the controller. Device backends generate, retain, renew, and
-revoke keys. The operator sees device names and access state, never certificates,
-keys, fingerprints, credential paths, imports, or downloads. Replacement works
-without the previous manager online. An enrolled controller manages the intended
-remote Pi through its existing target editor. Scheduling handover uses verified,
-durable authority rather than discovery, silence, or pairing alone.
+An operator pairs a controller from the target's own web UI using a temporary code entered on the controller. Device backends generate, retain, renew, and revoke keys. The operator sees device names and access state, never certificates, keys, fingerprints, credential paths, imports, or downloads. Replacement works without the previous manager online. An enrolled controller manages the intended remote Pi through its existing target editor. Scheduling handover uses verified, durable authority rather than discovery, silence, or pairing alone.
 
-Included: provider qualification; automatic Pi pairing/TLS and recovery;
-authenticated remote Pi management; deferred target/editor integration;
-authenticated known-controller retirement and guarded rollback; coordinated
-contracts, tests, packaging support, and documentation. Apply the approved D62-02 Pico/USB dispositions when implementing each affected flow.
+Included: provider qualification; automatic Pi pairing/TLS and recovery; authenticated remote Pi management; deferred target/editor integration; authenticated known-controller retirement and guarded rollback; coordinated contracts, tests, packaging support, and documentation. Apply the approved D62-02 Pico/USB dispositions when implementing each affected flow.
 
-Excluded: phase-6.1 recurrence development, phase-7 Scheduling UI, new Pico
-scheduling, multiple simultaneous management owners, a new human-login system,
-public/Internet management, new WTP messages/carriers/claim policy, wholesale
-TLS-library replacement, unrelated refactoring, and hardware deployment or RF
-qualification. Pairing never changes output, Transmit, boot preference, saved
-schedules, or accepted jobs. Explicit authenticated Stop and migration/rollback
-retain their separately approved runtime effects and safety checks.
+Excluded: phase-6.1 recurrence development, phase-7 Scheduling UI, new Pico scheduling, multiple simultaneous management owners, a new human-login system, public/Internet management, new WTP messages/carriers/claim policy, wholesale TLS-library replacement, unrelated refactoring, and hardware deployment or RF qualification. Pairing never changes output, Transmit, boot preference, saved schedules, or accepted jobs. Explicit authenticated Stop and migration/rollback retain their separately approved runtime effects and safety checks.
 
 ## Starting evidence and prerequisites
 
-Inspected baseline: Pi `6f77f04c6aa5db628c9ba852dac3d73ea856a0d4`, paired Pico
-`f7c4fad280c811755b2e1619ae90f438eb06d49b`, and Docs
-`e5a28a0bb8af713c2a8efb3864d2c3b479797270`. Existing uncommitted changes are
-planning edits, including the 6.1/6.2 subdivision and recorded pairing proposals;
-preserve them and the unrelated SQLite prompt. Reinspect all sources and dirty
-changes at execution; these revisions are observations, not permanent pins.
+Inspected baseline: Pi `6f77f04c6aa5db628c9ba852dac3d73ea856a0d4`, paired Pico `f7c4fad280c811755b2e1619ae90f438eb06d49b`, and Docs `e5a28a0bb8af713c2a8efb3864d2c3b479797270`. Existing uncommitted changes are planning edits, including the 6.1/6.2 subdivision and recorded pairing proposals; preserve them and the unrelated SQLite prompt. Reinspect all sources and dirty changes at execution; these revisions are observations, not permanent pins.
 
-Phases 1–6.1 are accepted. Phase-6.2 execution and its required Pico companion
-scope were authorized on 2026-11-17. The dated planning baseline above is
-historical; the execution record identifies the current accepted sources.
-Required Pico changes need fresh, phase-6.2 companion authority; phase-5 permission
-does not carry forward. Operator-docs work follows the plan's cross-repository
-authority and that repository's instructions. Reusable component changes require
-their separate scope approval. Work stays on feature branches and preserves
-unrelated changes. Git delivery requires an explicit request.
+Phases 1–6.1 are accepted. Phase-6.2 execution and its required Pico companion scope were authorized on 2026-11-17. The dated planning baseline above is historical; the execution record identifies the current accepted sources. Required Pico changes need fresh, phase-6.2 companion authority; phase-5 permission does not carry forward. Operator-docs work follows the plan's cross-repository authority and that repository's instructions. Reusable component changes require their separate scope approval. Work stays on feature branches and preserves unrelated changes. Git delivery requires an explicit request.
 
-Current reusable foundations are the target-owned Pi store/WAL, protected browser
-sessions and request guards, catalog and private management resolver, local target
-service, existing Pico target contexts, and phase-5 retirement book. Current Pi
-management is local: `PiLocalManagementService` uses a local authorization boolean
-and host principal/generation for receipts. Its self-only migration path is not
-an authenticated remote service. Existing `tls.cpp` serves the certificate-based
-WTP/Pico path; do not change those credential semantics to implement Pi pairing.
-The WAL accepts a `pair` image kind, but that is not a pairing implementation.
+Current reusable foundations are the target-owned Pi store/WAL, protected browser sessions and request guards, catalog and private management resolver, local target service, existing Pico target contexts, and phase-5 retirement book. Current Pi management is local: `PiLocalManagementService` uses a local authorization boolean and host principal/generation for receipts. Its self-only migration path is not an authenticated remote service. Existing `tls.cpp` serves the certificate-based WTP/Pico path; do not change those credential semantics to implement Pi pairing. The WAL accepts a `pair` image kind, but that is not a pairing implementation.
 
 ## 0. Close execution decisions and qualify the provider
 
 Produce a concrete decision/conformance record before affected implementation:
 
-Use the researched decision register as the proposed disposition, not as an
-invitation to invent behavior. D62-01 covers provider/packaging; D62-02 covers
-Pico/USB; D62-03 covers retirement revision identity; D62-04 covers rollback;
-D62-05 covers inventory/reachability. Typed machine-principal design remains a
-bounded engineering deliverable within those approved behaviors.
+Use the researched decision register as the proposed disposition, not as an invitation to invent behavior. D62-01 covers provider/packaging; D62-02 covers Pico/USB; D62-03 covers retirement revision identity; D62-04 covers rollback; D62-05 covers inventory/reachability. Typed machine-principal design remains a bounded engineering deliverable within those approved behaviors.
 
 | Gate | Required resolution and evidence |
 | --- | --- |
@@ -84,294 +35,101 @@ bounded engineering deliverable within those approved behaviors.
 | Authority inventory and reachability | Define how each target retains the complete, authenticated prior-controller inventory and validated peer endpoint bindings. A current manager or browser catalog cannot establish completeness. Old/legacy peers without a verified path remain pending. Do not assume a one-way management connection automatically creates reverse authority. |
 | Pico flows | For attached Picos, use the existing authenticated Pi connection to automatically negotiate management, without a separate delegation grant or pairing step. Bind both Pi/Pico identities and contexts and retain physical USB checks and typed resources. Resolve the remaining direct-USB/IP-code proposals, key ownership, revocation/recovery, and resource costs without assuming USB identifiers are cryptographic proof. No raw HTTP/USB tunnel or unapproved new carrier/authentication system is introduced; any exclusion/deferment still needs explicit disposition. |
 
-Keep existing wire details and numeric bounds. Any conflict with the approved
-contract needs a narrow proposal before code. A failed provider gate holds new
-remote management; it does not justify insecure fallback or declaring 6.2 complete.
-If no conforming automatic solution qualifies, report the evidence and obtain
-direction on the approved omission/redesign rule. Do not silently waive the gate.
+Keep existing wire details and numeric bounds. Any conflict with the approved contract needs a narrow proposal before code. A failed provider gate holds new remote management; it does not justify insecure fallback or declaring 6.2 complete. If no conforming automatic solution qualifies, report the evidence and obtain direction on the approved omission/redesign rule. Do not silently waive the gate.
 
-Exit: decisions affecting each implementation slice are resolved, provider and
-packaging evidence is reproducible, and required repository authority is present.
-No dependency is selected or qualified merely by this plan.
+Exit: decisions affecting each implementation slice are resolved, provider and packaging evidence is reproducible, and required repository authority is present. No dependency is selected or qualified merely by this plan.
 
-If D62-01 is approved, replace the old PAKE profile only through its coordinated
-prerelease amendment: Botan is PAKE-only, TLS stays OpenSSL/Mbed TLS, and the new
-SPAKE2+ profile must pass the same security, maintenance, and packaging gates.
-There is no algorithm fallback. If rejected, the current RFC 9382 contract remains
-and provider selection stays held. Qualification is later authorized execution,
-not evidence supplied by this research task.
+If D62-01 is approved, replace the old PAKE profile only through its coordinated prerelease amendment: Botan is PAKE-only, TLS stays OpenSSL/Mbed TLS, and the new SPAKE2+ profile must pass the same security, maintenance, and packaging gates. There is no algorithm fallback. If rejected, the current RFC 9382 contract remains and provider selection stays held. Qualification is later authorized execution, not evidence supplied by this research task.
 
 ## 1. Materialize contracts and define ownership
 
-Inventory producer, controller proxy, target handler, UI consumer, journal,
-descriptor, discovery advertisement, and paired fixture for every changed shape.
-Materialize missing browser pairing documents/routes in the authoritative Pico
-Control/1 schema with fresh companion authority. Keep one current closed control
-view, major/namespace 1. Keep `Wsprry-Pair/1`, transport, and storage independent;
-do not increment versions merely because implementation begins.
+Inventory producer, controller proxy, target handler, UI consumer, journal, descriptor, discovery advertisement, and paired fixture for every changed shape. Materialize missing browser pairing documents/routes in the authoritative Pico Control/1 schema with fresh companion authority. Keep one current closed control view, major/namespace 1. Keep `Wsprry-Pair/1`, transport, and storage independent; do not increment versions merely because implementation begins.
 
-Implement exact bootstrap, operation lookup, rotation, and retirement shapes from
-the normative supplement. Generate C++/JS consumers and negative vectors together.
-Reject unsupported versions, duplicate/missing/extra fields, invalid UTF-8 and
-encodings, malformed points, changed limits, and identity/boot/profile/generation
-mismatches before secret work or mutation. Pairing discovery advertises only
-availability and approved public fields. It never enrolls or grants capability.
+Implement exact bootstrap, operation lookup, rotation, and retirement shapes from the normative supplement. Generate C++/JS consumers and negative vectors together. Reject unsupported versions, duplicate/missing/extra fields, invalid UTF-8 and encodings, malformed points, changed limits, and identity/boot/profile/generation mismatches before secret work or mutation. Pairing discovery advertises only availability and approved public fields. It never enrolls or grants capability.
 
 Apply approved P62-06/P62-07's exact separate management DNS-SD locator and bounded protected discovery projection, and P62-08's nullable public-window action binding, as specified in the [normative supplement](phase-1-contract-details.md). Preserve the actual configurable bootstrap web port, current schema digest and private-address/self checks; a controller copies the target's explicit window action rather than guessing or adding an operator step. Native publication must match the actual listener address families and readiness.
 
-Keep route trust distinct: protected browser commands require existing session/
-CSRF controls; LAN public bootstrap has only its bounded operator-opened PAKE
-window, never cookie or settings authority; the paired machine listener requires
-the authenticated principal; retirement-only proofs permit only their exact
-reviewed retirement/recovery operations. Do not broaden any browser-guard exemption
-to unrelated routes. Public availability never grants a pairing window or access.
+Keep route trust distinct: protected browser commands require existing session/ CSRF controls; LAN public bootstrap has only its bounded operator-opened PAKE window, never cookie or settings authority; the paired machine listener requires the authenticated principal; retirement-only proofs permit only their exact reviewed retirement/recovery operations. Do not broaden any browser-guard exemption to unrelated routes. Public availability never grants a pairing window or access.
 
-Place new application-owned pairing/transport/authorization code beside the
-existing management modules. Reuse the Pi store and retirement owners through
-explicit interfaces; avoid a parallel settings database or copied scheduler.
-Document lock ordering and which owner publishes each durable decision. Do not
-hold a configuration/admission lock across DNS, network waits, or costly PAKE work.
+Place new application-owned pairing/transport/authorization code beside the existing management modules. Reuse the Pi store and retirement owners through explicit interfaces; avoid a parallel settings database or copied scheduler. Document lock ordering and which owner publishes each durable decision. Do not hold a configuration/admission lock across DNS, network waits, or costly PAKE work.
 
-Exit: synchronized registries/descriptors, strict validators and vector tests;
-clear ownership and lock order; unqualified remote resources still unavailable.
+Exit: synchronized registries/descriptors, strict validators and vector tests; clear ownership and lock order; unqualified remote resources still unavailable.
 
 ## 2. Implement durable pairing authority before exposing it
 
-Establish device-owned pairing initialization/history before accepting pairing or
-machine management. Distinguish first initialization, active/pending/revoked state,
-and previously initialized missing/corrupt storage. Absence, reset, discovery, or
-an empty catalog cannot silently grant a manager. Reuse stable production identity
-and private-path ownership on Linux/macOS; introduce no development identity fallback.
+Establish device-owned pairing initialization/history before accepting pairing or machine management. Distinguish first initialization, active/pending/revoked state, and previously initialized missing/corrupt storage. Absence, reset, discovery, or an empty catalog cannot silently grant a manager. Reuse stable production identity and private-path ownership on Linux/macOS; introduce no development identity fallback.
 
-Publish the exact `pi-management-pairs/1` catalog as one pair-kind WAL image,
-including active/revoked state, authorization generation, receipts, and required
-retirement verifier material. Use service-owned 0700 directories/0600 regular
-files, bounded no-follow reads/writes, checksums, file/directory sync, and retained
-recovery decisions. Preserve WAL version 1, existing image meanings, and the
-six-image transaction limit. Never erase recurrence authority during Pair again.
+Publish the exact `pi-management-pairs/1` catalog as one pair-kind WAL image, including active/revoked state, authorization generation, receipts, and required retirement verifier material. Use service-owned 0700 directories/0600 regular files, bounded no-follow reads/writes, checksums, file/directory sync, and retained recovery decisions. Preserve WAL version 1, existing image meanings, and the six-image transaction limit. Never erase recurrence authority during Pair again.
 
-Target commit is the authorization linearization point. Serialize replacement,
-removal, rotation, and settings commit admission so an old session/prepared write
-cannot commit after revocation. A committed earlier write remains committed;
-revocation is not rollback. Check receipt access against the authenticated
-principal and generation, not just an operation ID. Paired operation records use
-pair ID and its current authorization generation; local operations retain their
-server-owned local context. Preserve the 256 terminal/32 unresolved receipt limits;
-unresolved operations are not evictable. Define recovery for committed but
-unpublished state before accepting new writes and refuse competing storage owners.
+Target commit is the authorization linearization point. Serialize replacement, removal, rotation, and settings commit admission so an old session/prepared write cannot commit after revocation. A committed earlier write remains committed; revocation is not rollback. Check receipt access against the authenticated principal and generation, not just an operation ID. Paired operation records use pair ID and its current authorization generation; local operations retain their server-owned local context. Preserve the 256 terminal/32 unresolved receipt limits; unresolved operations are not evictable. Define recovery for committed but unpublished state before accepting new writes and refuse competing storage owners.
 
-Keep at most 32 retained revoked records, with only still-required retirement
-verifiers/receipts; erase their TLS secrets. Reclaim only completed reconciled
-records, never uncertainty to make room. Include secrets in pending/old WAL images
-in the retention analysis: release obsolete secret-bearing images only through
-verified completed recovery, without deleting unresolved retirement evidence.
-Clear ephemeral secrets with the qualified provider's supported mechanisms.
-Storage uncertainty holds management writes and reports access recovery;
-pairing-only failure does not stop autonomous
-recurrence. Existing scheduling-storage failures keep their existing safety policy.
+Keep at most 32 retained revoked records, with only still-required retirement verifiers/receipts; erase their TLS secrets. Reclaim only completed reconciled records, never uncertainty to make room. Include secrets in pending/old WAL images in the retention analysis: release obsolete secret-bearing images only through verified completed recovery, without deleting unresolved retirement evidence. Clear ephemeral secrets with the qualified provider's supported mechanisms. Storage uncertainty holds management writes and reports access recovery; pairing-only failure does not stop autonomous recurrence. Existing scheduling-storage failures keep their existing safety policy.
 
-Exit: fresh-process crash tests at every prepare/commit/publication boundary;
-missing-file/directory, symlink, stale-image, full-storage, and concurrent
-revocation tests; no browser/log/support-bundle secret leakage.
+Exit: fresh-process crash tests at every prepare/commit/publication boundary; missing-file/directory, symlink, stale-image, full-storage, and concurrent revocation tests; no browser/log/support-bundle secret leakage.
 
 ## 3. Implement the bounded pairing exchange and UI
 
-Use the approved target-local **Pair a controller**, **Replace controller**,
-**Remove controller**, and **Pair again** workflow. The controller Fleet view
-selects the expected discovered Pi and accepts its temporary code. Apply existing
-LAN/loopback, Host/Origin, proxy-client, request-intent, rate, and CSRF/session
-guards to browser actions. New remote management is unavailable when network
-safety is Off; existing independently protected local recovery remains intact.
-Show the target's code only to the target-local browser session that opened the
-window, never discovery, public window/status reads, or another browser session.
+Use the approved target-local **Pair a controller**, **Replace controller**, **Remove controller**, and **Pair again** workflow. The controller Fleet view selects the expected discovered Pi and accepts its temporary code. Apply existing LAN/loopback, Host/Origin, proxy-client, request-intent, rate, and CSRF/session guards to browser actions. New remote management is unavailable when network safety is Off; existing independently protected local recovery remains intact. Show the target's code only to the target-local browser session that opened the window, never discovery, public window/status reads, or another browser session.
 
-Preserve the exact eight-symbol/40-bit code alphabet, 120-second monotonic window,
-five-failure budget, one reserved attempt per target, 30-second whole exchange,
-4096-byte/depth-8 messages, and one serialized 32-MiB scrypt derivation per process
-plus measured bounded overhead. No unbounded handshake/derivation queues. Reads
-and reconnects do not reset budgets or open windows. Reboot/cancel/expiry clears
-ephemeral material without enabling another attempt automatically. Pairing's
-30-second exchange budget is distinct from normal management's 24-second budget.
+Preserve the exact eight-symbol/40-bit code alphabet, 120-second monotonic window, five-failure budget, one reserved attempt per target, 30-second whole exchange, 4096-byte/depth-8 messages, and one serialized 32-MiB scrypt derivation per process plus measured bounded overhead. No unbounded handshake/derivation queues. Reads and reconnects do not reset budgets or open windows. Reboot/cancel/expiry clears ephemeral material without enabling another attempt automatically. Pairing's 30-second exchange budget is distinct from normal management's 24-second budget.
 
-Use the specified password mapping, role-bound transcript, official suite/constants,
-mutual confirmation, and separate HKDF labels for transport, commit, and retirement.
-The code entered on the controller is sent only to its own protected backend,
-never public bootstrap, URLs, persistent storage, analytics, or ordinary logs.
-Stage the controller's pending record
-before target commit. Show Paired only after authenticated durable target readback;
-unknown means unknown, including after controller/browser restart.
+Use the specified password mapping, role-bound transcript, official suite/constants, mutual confirmation, and separate HKDF labels for transport, commit, and retirement. The code entered on the controller is sent only to its own protected backend, never public bootstrap, URLs, persistent storage, analytics, or ordinary logs. Stage the controller's pending record before target commit. Show Paired only after authenticated durable target readback; unknown means unknown, including after controller/browser restart.
 
-Cancellation cannot undo an already committed replacement. If commit may have
-occurred, retain the pending binding and resolve it through authenticated readback;
-never restore the old manager on a browser timeout. The inherited target-local
-browser/LAN interface remains the trusted operator boundary, not protection from
-an attacker able to alter that UI or steal its displayed code. Add no new human
-login or unsupported public-exposure security claim.
+Cancellation cannot undo an already committed replacement. If commit may have occurred, retain the pending binding and resolve it through authenticated readback; never restore the old manager on a browser timeout. The inherited target-local browser/LAN interface remains the trusted operator boundary, not protection from an attacker able to alter that UI or steal its displayed code. Add no new human login or unsupported public-exposure security claim.
 
-Use Impeccable and existing bench-instrument/Bootstrap patterns. Keep expiry,
-progress, errors, and Check saved result beside the action; retain unrelated
-drafts and immutable pending operation bindings. Support paste, native keyboard
-submission, labels, focus recovery, and a single live status region. Pair selection
-must not change execution backend or output. No new credential-administration UI.
+Use Impeccable and existing bench-instrument/Bootstrap patterns. Keep expiry, progress, errors, and Check saved result beside the action; retain unrelated drafts and immutable pending operation bindings. Support paste, native keyboard submission, labels, focus recovery, and a single live status region. Pair selection must not change execution backend or output. No new credential-administration UI.
 
-Exit: actual backend/browser tests for successful/wrong/expired/busy codes,
-replay and ID reuse, confirmation failure, resource exhaustion, cancellation,
-lost commits/replies, target/controller reboot, and old-manager-offline replacement.
+Exit: actual backend/browser tests for successful/wrong/expired/busy codes, replay and ID reuse, confirmation failure, resource exhaustion, cancellation, lost commits/replies, target/controller reboot, and old-manager-offline replacement.
 
 ## 4. Implement paired TLS and automatic lifecycle
 
-Create a separate Pi machine listener on the approved port 31418 and a bounded
-controller client. Require TLS 1.3, `psk_dhe_ke`, fresh P-256 ECDHE,
-`TLS_AES_128_GCM_SHA256`, exact PSK identity and `wsprry-management/1` ALPN,
-mutual Finished verification, current authorization/epoch checks, and no 0-RTT,
-PSK-only, certificate fallback, or unchecked session-ticket resumption. Public
-bootstrap remains on the guarded LAN HTTP listener; never accept unauthenticated
-HTTP on the paired TLS listener. Machine requests use key authority, not cookies.
-Wire listener/client startup, restart recovery, and bounded shutdown into the
-existing transmitter and controller-only application roles on Linux/macOS.
-Opening management must not initialize a transmitter in a zero-output controller.
-Port conflicts and pairing storage faults leave remote management unavailable,
-without silently selecting another port, carrier, identity, or TLS mode. Include
-necessary production build/installer supporting assets in isolated package tests;
-do not create an unrelated service or run a live installer.
+Create a separate Pi machine listener on the approved port 31418 and a bounded controller client. Require TLS 1.3, `psk_dhe_ke`, fresh P-256 ECDHE, `TLS_AES_128_GCM_SHA256`, exact PSK identity and `wsprry-management/1` ALPN, mutual Finished verification, current authorization/epoch checks, and no 0-RTT, PSK-only, certificate fallback, or unchecked session-ticket resumption. Public bootstrap remains on the guarded LAN HTTP listener; never accept unauthenticated HTTP on the paired TLS listener. Machine requests use key authority, not cookies. Wire listener/client startup, restart recovery, and bounded shutdown into the existing transmitter and controller-only application roles on Linux/macOS. Opening management must not initialize a transmitter in a zero-output controller. Port conflicts and pairing storage faults leave remote management unavailable, without silently selecting another port, carrier, identity, or TLS mode. Include necessary production build/installer supporting assets in isolated package tests; do not create an unrelated service or run a live installer.
 
-Implement automatic reconnect, scoped operation lookup, and two-epoch rotation
-after 30 days accumulated monotonic service time or 2^20 authenticated connections.
-An unclean restart makes renewal due before the next settings mutation. Persist
-counters at approved transaction/shutdown boundaries, not on polls/connections.
-The previous epoch permits only the exact unresolved rotation's recovery, never
-settings writes; new-epoch acknowledgement retires it. Revocation overrides all
-epochs. Offline time does not expire the pair or require operator key repair.
+Implement automatic reconnect, scoped operation lookup, and two-epoch rotation after 30 days accumulated monotonic service time or 2^20 authenticated connections. An unclean restart makes renewal due before the next settings mutation. Persist counters at approved transaction/shutdown boundaries, not on polls/connections. The previous epoch permits only the exact unresolved rotation's recovery, never settings writes; new-epoch acknowledgement retires it. Revocation overrides all epochs. Offline time does not expire the pair or require operator key repair.
 
-Replace keeps the old manager effective until target commit, then revokes it and
-closes sessions without requiring cooperation. Remove retains the tombstone and
-leaves schedules/jobs untouched. Pair again is explicit target-local recovery;
-irrecoverable counters create the specified new pair namespace rather than
-trusting old receipts or changing WTP identity. Address changes require validated
-resolution and the same cryptographic peer; identity replacement requires pairing.
+Replace keeps the old manager effective until target commit, then revokes it and closes sessions without requiring cooperation. Remove retains the tombstone and leaves schedules/jobs untouched. Pair again is explicit target-local recovery; irrecoverable counters create the specified new pair namespace rather than trusting old receipts or changing WTP identity. Address changes require validated resolution and the same cryptographic peer; identity replacement requires pairing.
 
-Exit: real TLS endpoints pass identity/ALPN/suite/epoch rejection, connection limits,
-rotation thresholds, crash/lost-reply recovery, replacement racing writes/rotation,
-revoked-owner reboot/reconnect, wall-clock changes, and no-expiry-offline tests.
+Exit: real TLS endpoints pass identity/ALPN/suite/epoch rejection, connection limits, rotation thresholds, crash/lost-reply recovery, replacement racing writes/rotation, revoked-owner reboot/reconnect, wall-clock changes, and no-expiry-offline tests.
 
 ## 5. Add authenticated remote Pi routing and existing editors
 
-Extend target routing with a typed local/remote boundary. Local Pi requests still
-use the owning local adapter; remote IDs must never fall through to host settings,
-Stop, initialization, receipts, or recovery. Use the authenticated principal for
-target authorization and receipt scoping. Verify runtime ownership and resource
-capability at the target for every operation, including direct API bypasses.
+Extend target routing with a typed local/remote boundary. Local Pi requests still use the owning local adapter; remote IDs must never fall through to host settings, Stop, initialization, receipts, or recovery. Use the authenticated principal for target authorization and receipt scoping. Verify runtime ownership and resource capability at the target for every operation, including direct API bypasses.
 
-Use exact enrolled host/port, validate every resolution, and pin the chosen address
-for that connection. Permit only approved RFC1918 IPv4/ULA IPv6 unicast; reject
-self, loopback, link-local/metadata, multicast, public/mapped ambiguity, redirects,
-environment proxies, arbitrary URL/path overrides, and peer/carrier fallback.
-Retirement reachability receives the same protection; it is not an SSRF exception.
+Use exact enrolled host/port, validate every resolution, and pin the chosen address for that connection. Permit only approved RFC1918 IPv4/ULA IPv6 unicast; reject self, loopback, link-local/metadata, multicast, public/mapped ambiguity, redirects, environment proxies, arbitrary URL/path overrides, and peer/carrier fallback. Retirement reachability receives the same protection; it is not an SSRF exception.
 
-Enforce approved bounds: DNS 3 s, connect 3 s, handshake 10 s, I/O 8 s, whole normal
-operation 24 s; one mutation/target; four concurrent controller connections and
-four live target connections including handshakes; 64 profiles; 32 unresolved
-operations; 10 requests/s/client with burst 20; observation polling at most 1 Hz.
-Propagate cancellation, response-size limits, and bounded queues. Budget exhaustion
-refuses or leaves an uncertain operation for readback, not blind mutation retry.
+Enforce approved bounds: DNS 3 s, connect 3 s, handshake 10 s, I/O 8 s, whole normal operation 24 s; one mutation/target; four concurrent controller connections and four live target connections including handshakes; 64 profiles; 32 unresolved operations; 10 requests/s/client with burst 20; observation polling at most 1 Hz. Propagate cancellation, response-size limits, and bounded queues. Budget exhaustion refuses or leaves an uncertain operation for readback, not blind mutation retry.
 
-Expose only supported current target capabilities after authenticated negotiation.
-Bind contexts and replies to device, boot, profile/connection generation,
-authorization, capability revision, resource, operation, and settings revision.
-Freeze accepted-write recovery context across target switches and browser restarts;
-revoke/invalidate stale contexts without discarding their retained evidence.
-Enable the existing remote Pi target editors only after their security gate passes.
-Do not add the phase-7 Scheduling editor. Explicit remote Stop uses existing
-observation/reservation/receipt semantics; no management operation gains RF ownership.
+Expose only supported current target capabilities after authenticated negotiation. Bind contexts and replies to device, boot, profile/connection generation, authorization, capability revision, resource, operation, and settings revision. Freeze accepted-write recovery context across target switches and browser restarts; revoke/invalidate stale contexts without discarding their retained evidence. Enable the existing remote Pi target editors only after their security gate passes. Do not add the phase-7 Scheduling editor. Explicit remote Stop uses existing observation/reservation/receipt semantics; no management operation gains RF ownership.
 
-Under approved D62-02, direct USB Pico management reuses existing physical/local
-authority without adding a PAKE bond; network Pico login remains unchanged.
+Under approved D62-02, direct USB Pico management reuses existing physical/local authority without adding a PAKE bond; network Pico login remains unchanged.
 
-The user's attached-Pico clarification requires automatic management negotiation
-over the existing authenticated Pi connection, with no separate delegation switch,
-child-scope approval, or additional pairing prompt. Use verified typed gateway
-contexts and the existing resource allowlist. Normal Pi replacement automatically
-negotiates fresh child contexts; revocation closes the old manager's path. No direct
-network selection of Pico USB authority, raw tunnel, firmware updater, or WTP
-dispatch is granted. The approved D62-02 dispositions retain existing Pico IP login and exclude a new
-Pico IP-code pairing protocol.
+The user's attached-Pico clarification requires automatic management negotiation over the existing authenticated Pi connection, with no separate delegation switch, child-scope approval, or additional pairing prompt. Use verified typed gateway contexts and the existing resource allowlist. Normal Pi replacement automatically negotiates fresh child contexts; revocation closes the old manager's path. No direct network selection of Pico USB authority, raw tunnel, firmware updater, or WTP dispatch is granted. The approved D62-02 dispositions retain existing Pico IP login and exclude a new Pico IP-code pairing protocol.
 
-Exit: a zero-output controller and two separate simulated target processes prove
-isolated persistence, direct-API refusal, independent drafts/receipts, late-reply
-binding, revocation, DNS/SSRF/redirect refusal before contact, and unchanged local/Pico use.
+Exit: a zero-output controller and two separate simulated target processes prove isolated persistence, direct-API refusal, independent drafts/receipts, late-reply binding, revocation, DNS/SSRF/redirect refusal before contact, and unchanged local/Pico use.
 
 ## 6. Finish authenticated handover and guarded rollback
 
-Connect the phase-5 retirement book to the approved machine retirement/status
-contracts using the resolved revision mapping and authenticated peer registry.
-The target orchestrates only its verified complete prior-authority inventory;
-the browser cannot submit retirement proof or redefine that inventory. Use the
-pair-specific retirement verifier and exact target/controller/assignment/transition/
-generation bindings. A retirement-only verifier grants no ordinary management TLS or settings authority; its separately approved retirement-only TLS purpose is confined to retirement/status.
+Connect the phase-5 retirement book to the approved machine retirement/status contracts using the resolved revision mapping and authenticated peer registry. The target orchestrates only its verified complete prior-authority inventory; the browser cannot submit retirement proof or redefine that inventory. Use the pair-specific retirement verifier and exact target/controller/assignment/transition/ generation bindings. A retirement-only verifier grants no ordinary management TLS or settings authority; its separately approved retirement-only TLS purpose is confined to retirement/status.
 
-Persist dispatch inhibition before retirement acknowledgement. Preserve accepted
-complete work and unresolved jobs; reconcile with fresh target evidence before
-issuing a MAC-bound retired receipt. Keep phase 5's pre-publication fence pending
-until a durable decision exists. Exact repeats/status reads recover the same
-transition and never enable or repeat unrelated work. Pair replacement, a returning
-page, idle discovery, deleted journals, or WTP traffic cannot prove retirement.
+Persist dispatch inhibition before retirement acknowledgement. Preserve accepted complete work and unresolved jobs; reconcile with fresh target evidence before issuing a MAC-bound retired receipt. Keep phase 5's pre-publication fence pending until a durable decision exists. Exact repeats/status reads recover the same transition and never enable or repeat unrelated work. Pair replacement, a returning page, idle discovery, deleted journals, or WTP traffic cannot prove retirement.
 
-After all proofs and pending/unknown work are resolved, atomically save the target
-candidate disabled with its authority and receipt, then verify readback. Missing,
-offline, unauthenticated, or ambiguous old authorities leave migration pending;
-management-owner replacement can nevertheless complete independently. A controller
-without a verified historical path requires the approved local pairing/migration
-workflow; do not manufacture a retirement key or complete inventory for it.
+After all proofs and pending/unknown work are resolved, atomically save the target candidate disabled with its authority and receipt, then verify readback. Missing, offline, unauthenticated, or ambiguous old authorities leave migration pending; management-owner replacement can nevertheless complete independently. A controller without a verified historical path requires the approved local pairing/migration workflow; do not manufacture a retirement key or complete inventory for it.
 
-Rollback first verifies native scheduling disabled and accepted work reconciled,
-then resumes only the explicitly selected old assignment through the contract
-closed in step 0. Retain tombstones/receipts and binding to the original intent;
-no generic clear-fence endpoint or automatic resume. A lost reply stays pending.
-Preserve ordinary fresh Plain-LAN WTP claims under existing Transmit-off rules;
-no claim-lane closure or permanent exclusion promise is added.
+Rollback first verifies native scheduling disabled and accepted work reconciled, then resumes only the explicitly selected old assignment through the contract closed in step 0. Retain tombstones/receipts and binding to the original intent; no generic clear-fence endpoint or automatic resume. A lost reply stays pending. Preserve ordinary fresh Plain-LAN WTP claims under existing Transmit-off rules; no claim-lane closure or permanent exclusion promise is added.
 
-Approved D62-04 uses a target-issued resume grant over the old controller's current
-paired TLS connection. Revoked managers must first be paired again through normal
-UI; retirement-only keys cannot resume. Persist the target's native/local-legacy
-hold before releasing the grant, then atomically publish the old controller's
-resumed disposition, assignment, anchor, and receipt before dispatch. Unknown
-delivery retains the hold; returning to native requires fresh retirement of the
-resumed generation. The decision register specifies route and context bindings.
+Approved D62-04 uses a target-issued resume grant over the old controller's current paired TLS connection. Revoked managers must first be paired again through normal UI; retirement-only keys cannot resume. Persist the target's native/local-legacy hold before releasing the grant, then atomically publish the old controller's resumed disposition, assignment, anchor, and receipt before dispatch. Unknown delivery retains the hold; returning to native requires fresh retirement of the resumed generation. The decision register specifies route and context bindings.
 
-Approved D62-05 requires authenticated registration into the target-owned authority image,
-preserved across replacement/reset. It does not infer complete preexisting history
-from one paired controller or a browser assertion. Unknown legacy installations
-can remain in existing valid legacy mode with native migration unavailable.
-This limit is necessary under unchanged WTP; ordinary WTP/manual work gains no
-registration requirement. D62-03 keeps assignment digests separate from HTTP ETags
-and controller-versus-target generation counters.
+Approved D62-05 requires authenticated registration into the target-owned authority image, preserved across replacement/reset. It does not infer complete preexisting history from one paired controller or a browser assertion. Unknown legacy installations can remain in existing valid legacy mode with native migration unavailable. This limit is necessary under unchanged WTP; ordinary WTP/manual work gains no registration requirement. D62-03 keeps assignment digests separate from HTTP ETags and controller-versus-target generation counters.
 
-Approved D62-05 also requires a separately scoped retirement-only TLS purpose on the same
-bounded listener, deriving a purpose-specific transport key from retained
-retirement-verifier material. It accepts retirement/status only, never ordinary
-management or resume; revoked normal TLS keys stay erased. This ALPN/purpose amendment was approved on 2026-11-17 and requires
-coordinated exact validation. No plaintext
-retirement callback or transport fallback is introduced.
+Approved D62-05 also requires a separately scoped retirement-only TLS purpose on the same bounded listener, deriving a purpose-specific transport key from retained retirement-verifier material. It accepts retirement/status only, never ordinary management or resume; revoked normal TLS keys stay erased. This ALPN/purpose amendment was approved on 2026-11-17 and requires coordinated exact validation. No plaintext retirement callback or transport fallback is introduced.
 
-Exit: actual authenticated multi-process handover/rollback, offline old manager,
-replacement without retirement, restored old assignment, stale revision/proof,
-recreated assignment, direct-enable bypass, crash/reboot at every durable boundary,
-and lost replies prove no overlapping recurrence authorities or evidence deletion.
+Exit: actual authenticated multi-process handover/rollback, offline old manager, replacement without retirement, restored old assignment, stale revision/proof, recreated assignment, direct-enable bypass, crash/reboot at every durable boundary, and lost replies prove no overlapping recurrence authorities or evidence deletion.
 
 ## 7. Validate, document, and assess the complete candidate
 
-Use isolated storage/processes, explicit `--backend simulated` for actual application
-tests, and `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`. Read the simulator guide first.
-Test at least a controller with no local output, two independent targets, and an
-old manager for replacement/handover. Use typed resolver/clock/fault seams for
-deterministic races; do not add production bypass flags or replace production
-crypto, TLS, framing, handlers, or WAL with mocks for acceptance.
+Use isolated storage/processes, explicit `--backend simulated` for actual application tests, and `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`. Read the simulator guide first. Test at least a controller with no local output, two independent targets, and an old manager for replacement/handover. Use typed resolver/clock/fault seams for deterministic races; do not add production bypass flags or replace production crypto, TLS, framing, handlers, or WAL with mocks for acceptance.
 
-The new Pi PAKE/TLS client and listener need their own actual network multi-process
-integration tests; existing Pico network/USB suites are additional mandatory
-regression gates, not evidence that Pi pairing works. Test confirmed target
-recurrence through browser closure, controller loss/restart, pairing revocation,
-and offline rotation without changing phase-6.1 semantics or inventing a scheduler.
+The new Pi PAKE/TLS client and listener need their own actual network multi-process integration tests; existing Pico network/USB suites are additional mandatory regression gates, not evidence that Pi pairing works. Test confirmed target recurrence through browser closure, controller loss/restart, pairing revocation, and offline rotation without changing phase-6.1 semantics or inventing a scheduler.
 
 Required evidence groups:
 
@@ -383,76 +141,24 @@ Required evidence groups:
 | Handover | Complete inventory, active/accepted/unknown jobs, durable old-controller fencing, retirement-only key scope, unavailable legacy peer, interrupted disabled staging, guarded rollback, no WTP-policy change, no overlap or implicit enable. |
 | Browser/visual | Actual Pair/Replace/Remove/Pair again, accessible confirmation, expired/busy/unavailable/revoked/unknown states, old manager returning, two-target switching and draft preservation; desktop/mobile and light/dark Impeccable review. |
 
-Run the complete checked-in `wtp-network-loopback` and `wtp-usb-management-pair`
-workflow recipes with explicit intended Pico and pinned dependencies. Required
-network targets are `wtp-network-runtime-test`, `wtp-network-interop-test`, and
-`wtp-config-interop-test`. USB requires the actual Pico `usb_management_driver`,
-`wtp-usb-pair-client-build`, `wtp-usb-management-test`, and production
-`WsprryPi-UI/tests/wtp_usb_pair_test.js`; retain additional required recipe stages.
-Run new focused pairing/authorization/handover tests, existing management/Fleet/
-recovery suites, UI npm/source regressions, and host-appropriate semantics from
-`src`. On qualified Linux run full semantics with hardware access disabled; on
-macOS run explicit portable semantics and the production Mac fixtures. Portable
-results do not claim full physical-backend semantics.
+Run the complete checked-in `wtp-network-loopback` and `wtp-usb-management-pair` workflow recipes with explicit intended Pico and pinned dependencies. Required network targets are `wtp-network-runtime-test`, `wtp-network-interop-test`, and `wtp-config-interop-test`. USB requires the actual Pico `usb_management_driver`, `wtp-usb-pair-client-build`, `wtp-usb-management-test`, and production `WsprryPi-UI/tests/wtp_usb_pair_test.js`; retain additional required recipe stages. Run new focused pairing/authorization/handover tests, existing management/Fleet/ recovery suites, UI npm/source regressions, and host-appropriate semantics from `src`. On qualified Linux run full semantics with hardware access disabled; on macOS run explicit portable semantics and the production Mac fixtures. Portable results do not claim full physical-backend semantics.
 
-Document supported behavior in WsprryPi engineering/browser/Fleet/Pi operation
-guides and authorized Docs Setup/Transmitter/Maintenance/API/troubleshooting pages.
-Keep operator prose certificate-free and distinguish management replacement from
-scheduling retirement. Update Pico documentation only for approved Pico changes.
-Build Docs through its virtual environment/Sphinx workflow; render and review
-affected UI guidance, replacing screenshots only if materially inaccurate.
-Review dependency notices, build/package/installer documentation, discovery,
-support-bundle redaction, and lifecycle teardown. No live installation/service
-operation is authorized by this validation plan; use isolated packaging fixtures.
+Document supported behavior in WsprryPi engineering/browser/Fleet/Pi operation guides and authorized Docs Setup/Transmitter/Maintenance/API/troubleshooting pages. Keep operator prose certificate-free and distinguish management replacement from scheduling retirement. Update Pico documentation only for approved Pico changes. Build Docs through its virtual environment/Sphinx workflow; render and review affected UI guidance, replacing screenshots only if materially inaccurate. Review dependency notices, build/package/installer documentation, discovery, support-bundle redaction, and lifecycle teardown. No live installation/service operation is authorized by this validation plan; use isolated packaging fixtures.
 
-Perform an adversarial assessment across every requirement and owning boundary,
-fix findings, rerun affected checks, and repeat a full assessment after the fixes.
-Acceptance requires no actionable issue or required evidence gap for the actual
-final source pair. Failed, skipped, cancelled, or timed-out required tests remain
-unresolved. Hash/pin intended sources and generated provenance; prior green tests
-or a missing companion ref are not delivery evidence.
+Perform an adversarial assessment across every requirement and owning boundary, fix findings, rerun affected checks, and repeat a full assessment after the fixes. Acceptance requires no actionable issue or required evidence gap for the actual final source pair. Failed, skipped, cancelled, or timed-out required tests remain unresolved. Hash/pin intended sources and generated provenance; prior green tests or a missing companion ref are not delivery evidence.
 
-Exit report: provider qualification and resolved decisions; source revisions and
-dirty changes; exact commands/results and CI links when applicable; changed
-components and standalone/integration tests; browser/visual evidence;
-Documentation Impact; working-tree and delivery state; remaining qualification
-limits. This plan authorizes no commit/push. Overall phase 6 requires both 6.1 and
-6.2 acceptance; stop before phase 7. Software evidence does not qualify physical
-USB, GPIO/timing, installation, services, or RF.
+Exit report: provider qualification and resolved decisions; source revisions and dirty changes; exact commands/results and CI links when applicable; changed components and standalone/integration tests; browser/visual evidence; Documentation Impact; working-tree and delivery state; remaining qualification limits. This plan authorizes no commit/push. Overall phase 6 requires both 6.1 and 6.2 acceptance; stop before phase 7. Software evidence does not qualify physical USB, GPIO/timing, installation, services, or RF.
 
 ## Planning review record
 
-Planning review is separate from future implementation/security qualification.
-Execution decisions in step 0 remain explicit gates, not completed features.
+Planning review is separate from future implementation/security qualification. Execution decisions in step 0 remain explicit gates, not completed features.
 
-1. First adversarial pass checked scope, source assumptions, dependencies,
-   revocation ordering, persistence, UI recovery, and acceptance coverage. Fixed
-   missing cancellation-after-commit handling, journal-secret retention, application
-   startup/shutdown and packaging boundaries, explicit principal/receipt scoping,
-   and dedicated production Pi PAKE/TLS tests.
-2. Full reassessment checked all approved numeric bounds and formats, route trust,
-   provider evidence, Pico delegation, authority inventory, retirement revision
-   mapping, rollback, and platform/docs coverage. Clarified browser/bootstrap/
-   machine/retirement authority separation, maintenance versus test evidence,
-   code routing/session privacy, and unchanged recurrence under management loss.
-3. Final full reassessment checked every step and exit against the owning contracts,
-   prerequisite/permission boundaries, negative/failure cases, and completion
-   evidence. No further actionable planning issues were found. Provider selection,
-   the recorded contract decisions, and actual implementation evidence remain
-   future execution gates; this review does not claim they have passed.
+1. First adversarial pass checked scope, source assumptions, dependencies, revocation ordering, persistence, UI recovery, and acceptance coverage. Fixed missing cancellation-after-commit handling, journal-secret retention, application startup/shutdown and packaging boundaries, explicit principal/receipt scoping, and dedicated production Pi PAKE/TLS tests.
+2. Full reassessment checked all approved numeric bounds and formats, route trust, provider evidence, Pico delegation, authority inventory, retirement revision mapping, rollback, and platform/docs coverage. Clarified browser/bootstrap/ machine/retirement authority separation, maintenance versus test evidence, code routing/session privacy, and unchanged recurrence under management loss.
+3. Final full reassessment checked every step and exit against the owning contracts, prerequisite/permission boundaries, negative/failure cases, and completion evidence. No further actionable planning issues were found. Provider selection, the recorded contract decisions, and actual implementation evidence remain future execution gates; this review does not claim they have passed.
 
-Planning checks: relative links resolve; the changed documentation passes
-`git diff --check`; current source/contract references and phase boundaries were
-reviewed. No code, dependency, UI, sibling repository, or phase indicator changed.
-No application tests or UI rendering were run for this planning-only task.
+Planning checks: relative links resolve; the changed documentation passes `git diff --check`; current source/contract references and phase boundaries were reviewed. No code, dependency, UI, sibling repository, or phase indicator changed. No application tests or UI rendering were run for this planning-only task.
 
-Documentation Impact: this plan and links from the 6.2 prompt/security gate are
-updated. Operator documentation and existing UI imagery are unchanged because
-no product behavior changed; their implementation-time updates are specified in
-step 7. Existing unrelated planning changes and the SQLite prompt are preserved.
+Documentation Impact: this plan and links from the 6.2 prompt/security gate are updated. Operator documentation and existing UI imagery are unchanged because no product behavior changed; their implementation-time updates are specified in step 7. Existing unrelated planning changes and the SQLite prompt are preserved.
 
-The later research decision register was reviewed for provider/profile mismatch,
-unproved package/audit claims, USB authority escalation, resumed-generation replay,
-revoked-key privilege escalation, unknown rollback delivery, inventory completeness,
-and callback SSRF. Its recommendations remain pending approval. Research updated
-this plan and added the decision register only; no code or dependencies changed.
+The later research decision register was reviewed for provider/profile mismatch, unproved package/audit claims, USB authority escalation, resumed-generation replay, revoked-key privilege escalation, unknown rollback delivery, inventory completeness, and callback SSRF. Its recommendations remain pending approval. Research updated this plan and added the decision register only; no code or dependencies changed.

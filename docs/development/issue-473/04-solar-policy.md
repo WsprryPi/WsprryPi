@@ -1,89 +1,29 @@
 # Phase 4 prompt: Pi solar evaluator and configuration lifecycle
 
-Execute only phase 4 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473)
-when separately authorized. Read the [execution rules](execution-rules.md), the full
-[plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions.
-Require phases 1–3 gates. Implement the evaluator and configuration, not recurrence
-admission, authority migration, or the Scheduling UI.
+Execute only phase 4 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473) when separately authorized. Read the [execution rules](execution-rules.md), the full [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions. Require phases 1–3 gates. Implement the evaluator and configuration, not recurrence admission, authority migration, or the Scheduling UI.
 
 ## Deferred Pi security boundary
 
-Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2
-acceptance covers local Pi and existing Pico management. Implement independently
-eligible paths only; controller-to-remote-Pi enrollment, editors, management, and
-associated migration remain unavailable until the phase-6.2 security gate.
-Carry their acceptance obligations into that gate; do not substitute unsecured
-transport, fabricated capability, or host writes for remote target operations.
-Existing security and target-local authority checks remain enforced.
+Apply the approved [sequencing amendment](deferred-pi-security.md). Phase 2 acceptance covers local Pi and existing Pico management. Implement independently eligible paths only; controller-to-remote-Pi enrollment, editors, management, and associated migration remain unavailable until the phase-6.2 security gate. Carry their acceptance obligations into that gate; do not substitute unsecured transport, fabricated capability, or host writes for remote target operations. Existing security and target-local authority checks remain enforced.
 
 ## Objective and inspection
 
-Build a pure Pi-owned policy evaluator with injected UTC, transmitter-site location,
-and immutable configuration inputs. Inspect `src/config_types.hpp`, configuration
-handlers, runtime configuration bridge, persistence/serialization/API paths, and
-Pico `src/standalone/gray_line.hpp` for geometry and provenance. Preserve attribution
-and source references. Prefer parent-owned code; reusable component edits require
-separate scope approval and must remain independently buildable/testable.
+Build a pure Pi-owned policy evaluator with injected UTC, transmitter-site location, and immutable configuration inputs. Inspect `src/config_types.hpp`, configuration handlers, runtime configuration bridge, persistence/serialization/API paths, and Pico `src/standalone/gray_line.hpp` for geometry and provenance. Preserve attribution and source references. Prefer parent-owned code; reusable component edits require separate scope approval and must remain independently buildable/testable.
 
 ## Required work
 
-1. Port the geometric solar-center calculation with deterministic reference
-   vectors. Day is elevation >= -0.833 degrees. Gray-line defaults are -6 to +6
-   degrees, lower inclusive and upper exclusive; store integer millidegrees in
-   -90000..90000 with lower < upper. Compare unrounded elevation. Use solar hour
-   angle for morning/evening, including noon/midnight and polar cases. Represent
-   prolonged windows truthfully without inventing sunrise events.
-2. Apply qualifying morning/evening gray-line override first, otherwise independent
-   day/night allow/skip and optional frequency override. Both ordinary periods may
-   be disallowed for gray-line-only operation. Blank overrides inherit saved mode
-   settings. Do not add mode/message/timing profiles or timezone/DST dependencies.
-3. Preserve Pi WSPR lists, explicit skip entries, selector metadata, and backend-
-   qualified frequency rules. Model independent progression for explicit period
-   lists and shared ordinary progression for inherited lists. Evaluation is pure;
-   progress advancement belongs to accepted occurrences/skips in phase 6.1. CW uses
-   current base-frequency/shift semantics; validate every derived tone.
-4. Add defaults, parsing, strict validation, internal structures/copies, atomic
-   persistence, serialization, target API adapters, and reload propagation together.
-   Reject malformed types, unknown fields/versions, invalid bounds, nonfinite values,
-   arithmetic overflow, and invalid locators. Preserve existing valid configurations
-   and feature-disabled behavior. Do not import Pico engine limits into Pi backends.
-5. Validate changed overrides even for disabled periods. Retain existing well-formed
-   but newly unsupported saved values only where the current contract permits;
-   allow disabling/repair without silent normalization. Retention never permits
-   admission of an invalid tone. Keep UI presets from rewriting custom settings.
-6. Use transmitter-site location only. Support saved locator center and only
-   approved target-owned GPS providers; do not add Pi receiver ingestion implicitly.
-   Enforce approved time/date readiness and GPS source/freshness rules without
-   GPS-to-manual fallback. Missing required time/location returns a held result,
-   including ordinary fallback while solar evaluation is enabled. Solar disabled
-   removes only its added prerequisites.
-7. Define typed evaluator results with selected policy, allowed/frozen frequency
-   intent, waiting reason, observation context, and clock/config/location generation.
-   Keep preview/forecast observations separate from runtime execution evidence.
-   No evaluator operation obtains ownership, prepares selectors, writes progress,
-   enables schedules, or dispatches work. Return ordinary waiting/refusal as typed
-   outcomes, not fatal CW setup errors or daemon shutdown requests.
+1. Port the geometric solar-center calculation with deterministic reference vectors. Day is elevation >= -0.833 degrees. Gray-line defaults are -6 to +6 degrees, lower inclusive and upper exclusive; store integer millidegrees in -90000..90000 with lower < upper. Compare unrounded elevation. Use solar hour angle for morning/evening, including noon/midnight and polar cases. Represent prolonged windows truthfully without inventing sunrise events.
+2. Apply qualifying morning/evening gray-line override first, otherwise independent day/night allow/skip and optional frequency override. Both ordinary periods may be disallowed for gray-line-only operation. Blank overrides inherit saved mode settings. Do not add mode/message/timing profiles or timezone/DST dependencies.
+3. Preserve Pi WSPR lists, explicit skip entries, selector metadata, and backend- qualified frequency rules. Model independent progression for explicit period lists and shared ordinary progression for inherited lists. Evaluation is pure; progress advancement belongs to accepted occurrences/skips in phase 6.1. CW uses current base-frequency/shift semantics; validate every derived tone.
+4. Add defaults, parsing, strict validation, internal structures/copies, atomic persistence, serialization, target API adapters, and reload propagation together. Reject malformed types, unknown fields/versions, invalid bounds, nonfinite values, arithmetic overflow, and invalid locators. Preserve existing valid configurations and feature-disabled behavior. Do not import Pico engine limits into Pi backends.
+5. Validate changed overrides even for disabled periods. Retain existing well-formed but newly unsupported saved values only where the current contract permits; allow disabling/repair without silent normalization. Retention never permits admission of an invalid tone. Keep UI presets from rewriting custom settings.
+6. Use transmitter-site location only. Support saved locator center and only approved target-owned GPS providers; do not add Pi receiver ingestion implicitly. Enforce approved time/date readiness and GPS source/freshness rules without GPS-to-manual fallback. Missing required time/location returns a held result, including ordinary fallback while solar evaluation is enabled. Solar disabled removes only its added prerequisites.
+7. Define typed evaluator results with selected policy, allowed/frozen frequency intent, waiting reason, observation context, and clock/config/location generation. Keep preview/forecast observations separate from runtime execution evidence. No evaluator operation obtains ownership, prepares selectors, writes progress, enables schedules, or dispatches work. Return ordinary waiting/refusal as typed outcomes, not fatal CW setup errors or daemon shutdown requests.
 
 ## Tests and acceptance gate
 
-Add focused targets using existing infrastructure. Test exact bounds and precedence,
-precision, noon/midnight, hemispheres, longitude/date rollover, leap years, poles,
-prolonged windows, supported date edges, nonfinite input, invalid locators, stale/
-future GPS timestamps, and Pico-derived reference vectors. Cover frequency lists,
-metadata, skips, CW derived tones, inheritance, malformed inputs, round trips,
-failed atomic writes, reload propagation, and feature-off baseline equivalence.
-Test direct API, configuration-file, and reload paths to prove that storing the
-new schema cannot activate an unimplemented policy or bypass authority fencing.
-Preserve legacy recurrence rather than globally disabling existing schedules.
+Add focused targets using existing infrastructure. Test exact bounds and precedence, precision, noon/midnight, hemispheres, longitude/date rollover, leap years, poles, prolonged windows, supported date edges, nonfinite input, invalid locators, stale/ future GPS timestamps, and Pico-derived reference vectors. Cover frequency lists, metadata, skips, CW derived tones, inheritance, malformed inputs, round trips, failed atomic writes, reload propagation, and feature-off baseline equivalence. Test direct API, configuration-file, and reload paths to prove that storing the new schema cannot activate an unimplemented policy or bypass authority fencing. Preserve legacy recurrence rather than globally disabling existing schedules.
 
-Inspect recipes, run relevant configuration/evaluator/source regressions and host-
-appropriate semantics coverage. Run both complete paired suites when the shared
-configuration/control interface changes, updating every producer and consumer.
-Review/update INI configuration, supported location/time policy, frequency override
-semantics, and troubleshooting guidance for implemented behavior; do not advertise
-runtime solar admission or UI controls before their phases exist.
+Inspect recipes, run relevant configuration/evaluator/source regressions and host- appropriate semantics coverage. Run both complete paired suites when the shared configuration/control interface changes, updating every producer and consumer. Review/update INI configuration, supported location/time policy, frequency override semantics, and troubleshooting guidance for implemented behavior; do not advertise runtime solar admission or UI controls before their phases exist.
 
-The gate requires deterministic geometry, strict round-trip configuration, preserved
-baseline behavior, failed-write safety, and all applicable shared-interface checks.
-New scheduling enablement must remain unavailable until phase 5 authority fencing
-and phase 6.1 admission exist. End with the shared report and review loop; stop here.
+The gate requires deterministic geometry, strict round-trip configuration, preserved baseline behavior, failed-write safety, and all applicable shared-interface checks. New scheduling enablement must remain unavailable until phase 5 authority fencing and phase 6.1 admission exist. End with the shared report and review loop; stop here.

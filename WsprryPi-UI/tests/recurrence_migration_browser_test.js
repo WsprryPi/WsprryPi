@@ -127,6 +127,8 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   assert.equal(JSON.stringify(previous.settings.saved),beforeReview);assert.equal(calls.filter(call=>call.resource==='migration/rollback'&&call.method==='POST').length,restoreWrites);
   previous.migration.state='staged';previous.migration.staged_revision=previous.settings.revision;
   await click('Refresh');await waitFor(()=>run("!document.getElementById('recurrenceMigrationReview').disabled"),'newly recorded remote authority can migrate from disabled staging');
+  assert.equal(await run("document.getElementById('recurrenceMigrationState').textContent"),'Migration completed; schedule disabled pending review.');
+  await capture('staged-policy-review');
   withdraw=true;await click('Refresh');await waitFor(()=>run("document.getElementById('recurrenceMigrationFeedback').textContent.includes('unavailable')"),'withdrawn target');
   assert.equal(await run("document.getElementById('recurrenceMigrationReview').disabled&&document.getElementById('recurrenceMigrationRollback').disabled"),true);
   const remoteOutput=targets.get(c);remoteOutput.settings.saved.configuration.Operation['Transmit Backend']='wtp';

@@ -17,6 +17,11 @@ class PiLocalManagementService {
 public:
     using Observe=std::function<std::optional<PiManagementObservation>()>;
     PiLocalManagementService(PiManagedStore &,std::string self,std::string name,Observe);
+    enum class PolicyInstallation {Current,Completed,Held};
+    // Trusted startup only, after native quiescence and before scheduler entry.
+    // Reuses the target's existing local migration transaction; no HTTP caller
+    // can request this installation authority or supply its principal/binding.
+    PolicyInstallation install_local_scheduling_policy();
     PicoHttpResponse handle(const BrowserRequest &,bool authorized_local);
     PicoHttpResponse handle(const BrowserRequest &,const PiPairPrincipal &,PiPairHistory &,std::string *readback_revision=nullptr);
     PicoHttpResponse handle(const BrowserRequest &,const LocalBrowserPrincipal &,PiPairHistory &);

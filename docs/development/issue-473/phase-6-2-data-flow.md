@@ -1,6 +1,6 @@
 # Phase 6.2 annotated data flow
 
-Snapshot: 2026-11-18, phase 6.2 software acceptance completed on the #473 feature branches. The [final evidence](phase-6-2-final-acceptance.json) identifies the exact tested sources and commands. Paths describe implemented mechanisms and remain subject to their current admission checks. The software fixtures do not qualify physical USB, LAN discovery, installation, services, timing or RF. Nothing is installed by this work.
+Snapshot: 2026-11-18, phase 6.2 software acceptance completed on the #473 feature branches. The [final evidence](phase-6-2-final-acceptance.json) identifies the exact tested sources and commands. Paths describe implemented mechanisms and remain subject to their current admission checks. The software fixtures do not qualify physical USB, LAN discovery, installation, services, timing, or RF. Nothing is installed by this work.
 
 ![Overview of browser, controller, managed Pi, Pico, persistence and transmission paths](phase-6-2-data-flow.svg)
 

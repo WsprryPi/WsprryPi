@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--fixture", required=True)
     parser.add_argument("--network-safety-off", action="store_true")
     parser.add_argument("--initialization", action="store_true")
+    parser.add_argument("--policy-upgrade", action="store_true")
     args = parser.parse_args()
     executable = str(Path(args.fixture).resolve())
     with tempfile.TemporaryDirectory(prefix="pi-managed-main-") as temporary:
@@ -63,7 +64,12 @@ def main():
         source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1",
                               "TCP Port": "31417", "Device ID": "b" * 32})
         source["WTP Server"]["Enabled"] = "false"
-        source["CW"]["Fade Shape"] = "raised_cosine" if args.initialization else "invalid"
+        source["CW"]["Fade Shape"] = "raised_cosine" if args.initialization or args.policy_upgrade else "invalid"
+        if args.policy_upgrade:
+            start = time.localtime(time.time() + 3)
+            source["Operation"].update({"Transmit": "true", "Enable on Boot": "Always", "Mode": "QRSS"})
+            source["CW"].update({"Message": "E", "Dot Seconds": "0.02", "Start Minute": str(start.tm_min),
+                                  "Start Second": str(start.tm_sec), "Repeat Minutes": "1"})
         port = free_port()
         source["Operation"]["Web Port"] = str(port)
         source["Operation"]["Socket Port"] = str(port + 1)
@@ -80,6 +86,35 @@ def main():
         with (root / "service.log").open("w") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
             try:
+                if args.policy_upgrade:
+                    deadline = time.monotonic() + 10
+                    while True:
+                        assert process.poll() is None, (root / "service.log").read_text()
+                        try:
+                            status, reply = request(port, "GET", "/api/control/v1/host/readiness")
+                            ready = json.loads(reply)
+                            if status == 200 and ready["state"] == "ready":
+                                break
+                        except OSError:
+                            pass
+                        assert time.monotonic() < deadline, "Mandatory migration startup deadline"
+                        time.sleep(.03)
+                    base = "/api/control/v1/targets/" + ready["device_id"] + "/"
+                    status, reply = request(port, "GET", base + "settings")
+                    saved = json.loads(reply)
+                    assert status == 200 and saved["saved"]["scheduling"]["enabled"] is False, reply
+                    assert saved["saved"]["configuration"]["Operation"]["Transmit"] is True
+                    assert saved["saved"]["configuration"]["Operation"]["Enable on Boot"] == "Always"
+                    status, reply = request(port, "GET", base + "migration")
+                    authority = json.loads(reply)
+                    assert status == 200 and authority["state"] == "staged"
+                    assert authority["staged_revision"] == saved["revision"] and len(authority["retirements"]) == 1
+                    time.sleep(3.5)
+                    events = json.loads(trace.read_text())["events"] if trace.exists() else []
+                    assert not any(event["kind"] == "execution_start" or event.get("rf_on") for event in events), events
+                    assert "Migration completed; schedule disabled pending review." in (root / "service.log").read_text()
+                    print("PASS: first native policy installation stages an enabled Always-boot local schedule disabled before any recurrence; saved Transmit and boot intent retained; no output")
+                    return
                 deadline = time.monotonic() + 10
                 while True:
                     assert process.poll() is None, (root / "service.log").read_text()
@@ -138,6 +173,16 @@ def main():
                     assert time.monotonic() < deadline, (root / "service.log").read_text()
                     time.sleep(0.03)
                 assert json.loads(body)["Operation"]["Transmit"] is False
+                native_authority = Path(str(ledger) + ".recurrence-" + doc["binding"]["device_id"]) / "authority.json"
+                installed = json.loads(native_authority.read_text())
+                installed_settings = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
+                assert installed["state"] == "staged", installed
+                assert installed_settings["scheduling"]["enabled"] is False
+                assert installed["staged_revision"] == installed_settings["revision"]
+                if not args.initialization:
+                    assert len(installed["retirements"]) == 1, installed
+                if trace.exists():
+                    assert not any(event["kind"] == "execution_start" for event in json.loads(trace.read_text())["events"])
                 if args.network_safety_off:
                     # Off remains the ordinary policy. Only exact native-host
                     # recovery/session observations have independent protection.

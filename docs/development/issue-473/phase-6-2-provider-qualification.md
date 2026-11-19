@@ -4,112 +4,42 @@ Status: the approved PAKE-only candidate passed security/source review, conforma
 
 ## Exact candidate and boundary
 
-Botan 3.14.1, commit `01af88c039fcfaedc418b1af4d6d3a139674e591`, is the
-approved PAKE-only candidate. The single machine-readable source pin, archive
-checksum, and module request live in `scripts/pairing_provider.json`. Original
-cryptographic source is unmodified. The upstream BSD-2-Clause notice is retained
-under `docs/licenses/botan/` and copied into the isolated SDK.
+Botan 3.14.1, commit `01af88c039fcfaedc418b1af4d6d3a139674e591`, is the approved PAKE-only candidate. The single machine-readable source pin, archive checksum, and module request live in `scripts/pairing_provider.json`. Original cryptographic source is unmodified. The upstream BSD-2-Clause notice is retained under `docs/licenses/botan/` and copied into the isolated SDK.
 
-Use only RFC 9383 P-256/SHA-256/HKDF/HMAC, the approved 96-byte scrypt mapping,
-provider scalar reduction, locally derived ephemeral registration, role/context
-bindings, and mutual confirmation. Do not use the provider's Argon2 defaults,
-custom parameters, externally supplied registration records, FFI, or
-`skip_confirmation()`. Existing OpenSSL and Mbed TLS roles remain unchanged.
+Use only RFC 9383 P-256/SHA-256/HKDF/HMAC, the approved 96-byte scrypt mapping, provider scalar reduction, locally derived ephemeral registration, role/context bindings, and mutual confirmation. Do not use the provider's Argon2 defaults, custom parameters, externally supplied registration records, FFI, or `skip_confirmation()`. Existing OpenSSL and Mbed TLS roles remain unchanged.
 
-The minimized upstream dependency closure explicitly includes P-256. It includes
-supporting algorithms required by upstream; that does not negotiate another
-application profile. The recipe rejects Botan TLS, X.509, HTTP, and Asio modules.
-No copied arithmetic, local cryptographic patches, or alternate-provider fallback
-are part of this qualification.
+The minimized upstream dependency closure explicitly includes P-256. It includes supporting algorithms required by upstream; that does not negotiate another application profile. The recipe rejects Botan TLS, X.509, HTTP, and Asio modules. No copied arithmetic, local cryptographic patches, or alternate-provider fallback are part of this qualification.
 
 ## Reviewable security evidence
 
 Source inspection of the exact pin covered:
 
-- `src/lib/pake/spake2p/spake2p.cpp`: standard P-256 M/N constants, length-framed
-  transcript including both identities and context, standard confirmation/shared
-  key derivation, authenticated completion, and failed-state transitions.
-- `src/lib/pubkey/ec_group/ec_apoint.{h,cpp}` and the selected `pcurves` path:
-  validated uncompressed point decoding and the constant-time secret-scalar
-  multiplication API, rather than the separate variable-time verification API.
-  The PAKE passes RNGs for blinding and marks secret operations for upstream's
-  constant-time analysis support. This is source review, not a side-channel audit.
-- `src/lib/pbkdf/scrypt/scrypt.cpp`: checked memory arithmetic and the explicit
-  fixed-parameter entry point. No tuning or peer-supplied work factor is used.
-- Secret buffers, nonzero prover-secret admission, terminal malformed-message
-  handling, constant-time confirmation comparison, and refusal to expose a shared
-  secret before the required confirmation state.
+- `src/lib/pake/spake2p/spake2p.cpp`: standard P-256 M/N constants, length-framed transcript including both identities and context, standard confirmation/shared key derivation, authenticated completion, and failed-state transitions.
+- `src/lib/pubkey/ec_group/ec_apoint.{h,cpp}` and the selected `pcurves` path: validated uncompressed point decoding and the constant-time secret-scalar multiplication API, rather than the separate variable-time verification API. The PAKE passes RNGs for blinding and marks secret operations for upstream's constant-time analysis support. This is source review, not a side-channel audit.
+- `src/lib/pbkdf/scrypt/scrypt.cpp`: checked memory arithmetic and the explicit fixed-parameter entry point. No tuning or peer-supplied work factor is used.
+- Secret buffers, nonzero prover-secret admission, terminal malformed-message handling, constant-time confirmation comparison, and refusal to expose a shared secret before the required confirmation state.
 
-The [upstream API](https://botan.randombit.net/handbook/api_ref/spake2p.html),
-[side-channel guidance](https://botan.randombit.net/handbook/side_channels.html),
-[PAKE introduction](https://github.com/randombit/botan/pull/5711), and
-[validation hardening](https://github.com/randombit/botan/pull/5976) make that
-implementation and its evolution reviewable. Human comments inspected on the
-introduction concern bindings; they are not evidence of an independent review of
-the cryptographic implementation. No independent audit of this new PAKE is
-claimed. Its recent introduction remains a maintenance consideration.
+The [upstream API](https://botan.randombit.net/handbook/api_ref/spake2p.html), [side-channel guidance](https://botan.randombit.net/handbook/side_channels.html), [PAKE introduction](https://github.com/randombit/botan/pull/5711), and [validation hardening](https://github.com/randombit/botan/pull/5976) make that implementation and its evolution reviewable. Human comments inspected on the introduction concern bindings; they are not evidence of an independent review of the cryptographic implementation. No independent audit of this new PAKE is claimed. Its recent introduction remains a maintenance consideration.
 
-The [advisory history](https://botan.randombit.net/security.html) includes the
-32-bit scrypt overflow and RNG reseeding issues fixed before this pin. The selected
-release also contains zero-secret and failed-decode PAKE hardening. Recent Botan
-TLS/HTTP advisories do not justify importing those excluded modules. The
-[release history](https://botan.randombit.net/news.html) and exact selected source
-must be reviewed again before release; success here cannot qualify an unknown
-future source or establish that the complete application uses the API correctly.
+The [advisory history](https://botan.randombit.net/security.html) includes the 32-bit scrypt overflow and RNG reseeding issues fixed before this pin. The selected release also contains zero-secret and failed-decode PAKE hardening. Recent Botan TLS/HTTP advisories do not justify importing those excluded modules. The [release history](https://botan.randombit.net/news.html) and exact selected source must be reviewed again before release; success here cannot qualify an unknown future source or establish that the complete application uses the API correctly.
 
-This evidence supports using the maintained, reviewable implementation for the
-approved fixed profile, with the completed packaging and application gates recorded below.
-It does not substitute test vectors for security review or promise protection
-against a compromised trusted UI, OS, or administrator. Those remain outside the
-approved pairing trust boundary.
+This evidence supports using the maintained, reviewable implementation for the approved fixed profile, with the completed packaging and application gates recorded below. It does not substitute test vectors for security review or promise protection against a compromised trusted UI, OS, or administrator. Those remain outside the approved pairing trust boundary.
 
 ## Conformance and resource evidence
 
-[Saved pre-reboot evidence](phase-6-2-provider-evidence.json) identifies the tested
-source pair, twelve provider-version/platform runs, fixture hashes, exact compile
-commands, and limits. It includes the 3.14.0 to 3.14.1 patch-update rehearsal on
-all four maintained Linux userspaces and macOS ARM64/Intel. The Intel probes ran
-through Rosetta and did not include the OpenSSL coexistence check. The final complete application and role evidence below supersedes that intermediate limitation.
+[Saved pre-reboot evidence](phase-6-2-provider-evidence.json) identifies the tested source pair, twelve provider-version/platform runs, fixture hashes, exact compile commands, and limits. It includes the 3.14.0 to 3.14.1 patch-update rehearsal on all four maintained Linux userspaces and macOS ARM64/Intel. The Intel probes ran through Rosetta and did not include the OpenSSL coexistence check. The final complete application and role evidence below supersedes that intermediate limitation.
 
-The fresh post-reboot corrected native recipe again passed 135 configured
-upstream checks, including P-256 known-answer and round-trip coverage. Public
-application-profile fixtures independently check the approved scrypt output and
-scalar mapping, confirmations, wrong password/roles/context, malformed points,
-failed-context reuse, zero secrets, and secret-extraction admission. Fixtures use
-only public artificial codes and key material. Reference scalar arithmetic occurs
-only in the independent fixture generator, never production cryptography.
+The fresh post-reboot corrected native recipe again passed 135 configured upstream checks, including P-256 known-answer and round-trip coverage. Public application-profile fixtures independently check the approved scrypt output and scalar mapping, confirmations, wrong password/roles/context, malformed points, failed-context reuse, zero secrets, and secret-extraction admission. Fixtures use only public artificial codes and key material. Reference scalar arithmetic occurs only in the independent fixture generator, never production cryptography.
 
-The pre-reboot profiles observed 92–626 ms and 37–51 MB peak process RSS, including
-two serialized scrypt derivations and negative cases. The algorithm reports
-33,555,456 bytes. These are software-fixture measurements; emulation is not
-physical-Pi timing, and a standalone probe is not whole-application memory
-qualification. Application code must still serialize derivations and enforce all
-window, failure, message, and absolute deadline bounds.
+The pre-reboot profiles observed 92–626 ms and 37–51 MB peak process RSS, including two serialized scrypt derivations and negative cases. The algorithm reports 33,555,456 bytes. These are software-fixture measurements; emulation is not physical-Pi timing, and a standalone probe is not whole-application memory qualification. Application code must still serialize derivations and enforce all window, failure, message, and absolute deadline bounds.
 
 ## Ordinary builds, maintenance, and completed software acceptance
 
-`make pairing-provider-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=` now builds
-the pinned static SDK automatically in a source/toolchain-specific build root and
-runs the profile alongside existing OpenSSL. Python 3 and the existing compiler
-are used; there is no second toolchain, system library installation, runtime
-download, or operator dependency repair. SDK output includes the notice and exact
-source manifest. The archive is checksum-verified before extraction or execution.
+`make pairing-provider-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=` now builds the pinned static SDK automatically in a source/toolchain-specific build root and runs the profile alongside existing OpenSSL. Python 3 and the existing compiler are used; there is no second toolchain, system library installation, runtime download, or operator dependency repair. SDK output includes the notice and exact source manifest. The archive is checksum-verified before extraction or execution.
 
-Six build-boundary tests cover corrupt cache refusal, unsafe archive paths/links,
-bounded extraction, and preventing the upstream archive from inheriting the Pi
-repository's revision. The latter defect was reproduced after reconstruction
-inside the repository and fixed with a bounded Git-discovery environment, without
-changing upstream source. Native Make/profile checks and all four ordinary ARMv6/AArch64 Make checks pass;
-exact results and commands are recorded in the provider evidence.
+Six build-boundary tests cover corrupt cache refusal, unsafe archive paths/links, bounded extraction, and preventing the upstream archive from inheriting the Pi repository's revision. The latter defect was reproduced after reconstruction inside the repository and fixed with a bounded Git-discovery environment, without changing upstream source. Native Make/profile checks and all four ordinary ARMv6/AArch64 Make checks pass; exact results and commands are recorded in the provider evidence.
 
-The [maintainer process](../../licenses/botan/README.md) requires monthly and
-pre-release advisory/release review, a single reviewed pin/checksum, fresh builds
-through the maintained matrix, application-profile vectors, packaging/loading,
-and paired integration after an update. The recorded patch-update rehearsal used
-unmodified upstream sources without API shims or operator intervention. It
-demonstrates the update path; it cannot promise that future maintenance has already
-happened. Upstream's [support policy](https://botan.randombit.net/handbook/support.html)
-and tier-2 limitations remain relevant to each update.
+The [maintainer process](../../licenses/botan/README.md) requires monthly and pre-release advisory/release review, a single reviewed pin/checksum, fresh builds through the maintained matrix, application-profile vectors, packaging/loading, and paired integration after an update. The recorded patch-update rehearsal used unmodified upstream sources without API shims or operator intervention. It demonstrates the update path; it cannot promise that future maintenance has already happened. Upstream's [support policy](https://botan.randombit.net/handbook/support.html) and tier-2 limitations remain relevant to each update.
 
 The final intended source pair passes both complete network/USB recipes, strict compilation and the broad pairing/storage/lifecycle foundations. Ordinary complete default Linux application packages pass on AArch64 and ARMv6 for Bookworm and Trixie. Final-source incremental rebuilds use those exact normal images, digest-check and touch changed inputs, and run the unchanged normal Make/artifact recipe and exporter verification. All four final artifacts pass architecture checks, dependency loading and exact notice/provider-manifest checks; their real controller-only processes pass isolated initialization, unchanged transmitter INI and clean shutdown. No provider source patches, relaxed build flags, extra operator toolchain or runtime dependency downloads are used.
 

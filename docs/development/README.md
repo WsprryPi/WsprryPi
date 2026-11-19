@@ -1,15 +1,10 @@
 # Development guide
 
-WsprryPi's application, first-party web UI and reusable components are ordinary
-content in one Git repository. Follow [AGENTS.md](../../AGENTS.md) and preserve
-the [component boundaries](../components/README.md), standalone tests, licenses
-and attribution.
+WsprryPi's application, first-party web UI and reusable components are ordinary content in one Git repository. Follow [AGENTS.md](../../AGENTS.md) and preserve the [component boundaries](../components/README.md), standalone tests, licenses and attribution.
 
 ## Builds and safe validation
 
-Run application tests from `src`. Inspect a target before executing it; the
-ordinary `make test` target can operate hardware. Installation, services, GPIO,
-transmissions and other device operations require separate authorization.
+Run application tests from `src`. Inspect a target before executing it; the ordinary `make test` target can operate hardware. Installation, services, GPIO, transmissions and other device operations require separate authorization.
 
 On Linux with libgpiod C++ development headers, the hardware-disabled profile is:
 
@@ -23,16 +18,9 @@ The explicit subset for a non-Linux host or Linux without those headers is:
 make semantics-test-portable SUDO=
 ```
 
-This selects simulated-only coverage with ancillary GPIO disabled. It excludes
-tests requiring physical backend capabilities. Do not retry a known broken
-macOS C++ toolchain without explicit repair or local-build authorization.
-Use an identified Linux environment for affected C++ validation when needed.
+This selects simulated-only coverage with ancillary GPIO disabled. It excludes tests requiring physical backend capabilities. Do not retry a known broken macOS C++ toolchain without explicit repair or local-build authorization. Use an identified Linux environment for affected C++ validation when needed.
 
-Read the [simulation contract](../simulated-backend.md) before exercising the
-application without hardware. The [Debian CI workflow](../../.github/workflows/debian-non-hardware.yml)
-defines the canonical unprivileged suite. Use [container builds](../container-builds.md)
-and the [precompiled-installation contract](../precompiled-installation.md) for
-artifact production. Building an executable does not qualify installation or RF.
+Read the [simulation contract](../simulated-backend.md) before exercising the application without hardware. The [Debian CI workflow](../../.github/workflows/debian-non-hardware.yml) defines the canonical unprivileged suite. Use [container builds](../container-builds.md) and the [precompiled-installation contract](../precompiled-installation.md) for artifact production. Building an executable does not qualify installation or RF.
 
 On its selected branches, the non-hardware workflow starts with a lightweight change-classification job. It inspects the complete Git diff rather than GitHub's bounded path-filter list. Only ordinary documentation skips the full jobs: the root `README.md`, prose under `docs/` or `release_tools/`, and images/PDFs under `docs/`. Other paths, including Markdown in source or test directories, require full validation. The exact policy lives in `scripts/ci/change_scope.py`.
 
@@ -55,27 +43,13 @@ Both production network and USB pairs exercise all four GPIO drive strengths and
 
 ## Maintained contracts and tools
 
-- [Native execution plans](../wtp-execution-plan.md), [Pico management](../wtp-backend.md),
-  [scheduling](../wtp-scheduling.md), [status/recovery](../wtp-status-recovery.md),
-  [USB management](../wtp-usb-management.md) and [network transport](../wtp-network.md).
-- [Pico configuration compatibility](../wtp-configuration-compatibility.md),
-  [browser API](../wtp-browser-api.md), [Pi authority](../wtp-pi-endpoint-contract.md)
-  and [Fleet](../wtp-fleet.md).
-- [RP1 installation](../rp1-gpclk-dkms-installation.md),
-  [provider acceptance](../rp1-provider-acceptance.md),
-  [qualification metadata](../rp1-qualification-metadata.md) and
-  [Si5351 support limits](../si5351-support.md).
-- [Installer/support tools](../../scripts/README.md) and
-  [maintainer runbook](../../release_tools/WsprryPi%20Full%20Regression%20Test%20Runbook.md).
-- [Release artifact preparation](../../release_tools/Build%20Orchestration.md)
-  and [calibration authority and scope](../../release_tools/Calibration%20Scope%20Decisions.md).
+- [Native execution plans](../wtp-execution-plan.md), [Pico management](../wtp-backend.md), [scheduling](../wtp-scheduling.md), [status/recovery](../wtp-status-recovery.md), [USB management](../wtp-usb-management.md) and [network transport](../wtp-network.md).
+- [Pico configuration compatibility](../wtp-configuration-compatibility.md), [browser API](../wtp-browser-api.md), [Pi authority](../wtp-pi-endpoint-contract.md) and [Fleet](../wtp-fleet.md).
+- [RP1 installation](../rp1-gpclk-dkms-installation.md), [provider acceptance](../rp1-provider-acceptance.md), [qualification metadata](../rp1-qualification-metadata.md) and [Si5351 support limits](../si5351-support.md).
+- [Installer/support tools](../../scripts/README.md) and [maintainer runbook](../../release_tools/WsprryPi%20Full%20Regression%20Test%20Runbook.md).
+- [Release artifact preparation](../../release_tools/Build%20Orchestration.md) and [calibration authority and scope](../../release_tools/Calibration%20Scope%20Decisions.md).
 
-The CI rollback regression and its imported helper remain at
-`wtp-reply-routing-results/rollback_test.py` and `live_target.py`. The regression
-mocks commands and network recovery against a private temporary filesystem;
-run it with `python3 -B ../docs/development/wtp-reply-routing-results/rollback_test.py`
-from `src`. The helper contains host-specific service/network operations and is
-not an ordinary test entry point. Its live commands require separate authorization.
+The CI rollback regression and its imported helper remain at `wtp-reply-routing-results/rollback_test.py` and `live_target.py`. The regression mocks commands and network recovery against a private temporary filesystem; run it with `python3 -B ../docs/development/wtp-reply-routing-results/rollback_test.py` from `src`. The helper contains host-specific service/network operations and is not an ordinary test entry point. Its live commands require separate authorization.
 
 ## CI ownership, synchronization and build reuse
 
@@ -93,33 +67,15 @@ Compatible network test binaries share object compilation through `scripts/netwo
 
 Software checks do not qualify physical USB, installation, services, GPIO, transmitter timing or RF. Native inventory delays and historical tracer failures without a demonstrated cause remain diagnostic limitations; a later successful run alone does not establish a repair. Keep manual/component entry points and recovery assets unless their present duties and equivalent replacements are established.
 
-The production TLS pair uses a logical UTC epoch advanced by one monotonic clock;
-it does not repeatedly correlate independently sampled host wall/steady clocks.
-Its future scheduled-job case selects a full UTC second at least 60 seconds ahead.
-The actual Pico dry-run engine retains its UTC-second launch window and 1-ms
-uncertainty policy. `wtp_fixture_clock_test` checks exact projection, a valid
-start, and narrow-window, late-start, and inconsistent-clock refusals without
-sleeping. Host results do not qualify UTC accuracy or physical launch timing.
+The production TLS pair uses a logical UTC epoch advanced by one monotonic clock; it does not repeatedly correlate independently sampled host wall/steady clocks. Its future scheduled-job case selects a full UTC second at least 60 seconds ahead. The actual Pico dry-run engine retains its UTC-second launch window and 1-ms uncertainty policy. `wtp_fixture_clock_test` checks exact projection, a valid start, and narrow-window, late-start, and inconsistent-clock refusals without sleeping. Host results do not qualify UTC accuracy or physical launch timing.
 
-The USB pair lane uses the named Ubuntu 24.04 runner's installed CMake, Python,
-Node, C++ compiler, Make, and OpenSSL development tools. It checks executable
-availability, records versions and OpenSSL flags, then performs the actual CMake
-configure, compiled endpoint/client builds, and production pair checks. Missing
-or unusable tools fail the lane; setup does not silently install alternative
-CMake or Node packages. These image tools are inventoried inputs, not a claim of
-byte-reproducible system libraries.
+The USB pair lane uses the named Ubuntu 24.04 runner's installed CMake, Python, Node, C++ compiler, Make, and OpenSSL development tools. It checks executable availability, records versions and OpenSSL flags, then performs the actual CMake configure, compiled endpoint/client builds, and production pair checks. Missing or unusable tools fail the lane; setup does not silently install alternative CMake or Node packages. These image tools are inventoried inputs, not a claim of byte-reproducible system libraries.
 
 ## Work and cleanup
 
-The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected
-work authority. Beta 1 preparation retains its exact candidate identities,
-artifacts and unfinished acceptance gates; a later source commit does not
-replace that candidate or establish release readiness.
+The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected work authority. Beta 1 preparation retains its exact candidate identities, artifacts and unfinished acceptance gates; a later source commit does not replace that candidate or establish release readiness.
 
-Follow the [repository and work-harness cleanup instructions](repository-cleanup-prompt.md)
-for an explicit cleanup request. Inventory exact deletion, rewrite, retention
-and hold decisions first. Preserve current dependencies, active work and
-recovery assets; retire obsolete prompts and evidence without creating an archive.
+Follow the [repository and work-harness cleanup instructions](repository-cleanup-prompt.md) for an explicit cleanup request. Inventory exact deletion, rewrite, retention and hold decisions first. Preserve current dependencies, active work and recovery assets; retire obsolete prompts and evidence without creating an archive.
 
 ## Selected coordinated logging work
 

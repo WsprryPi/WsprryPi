@@ -1,87 +1,27 @@
 # Phase 2 prompt: target management and controller-only separation
 
-Execute only phase 2 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473)
-when separately authorized. Read the [execution rules](execution-rules.md), the full
-[plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions.
-Require the phase 1 gate before implementation; report missing approvals explicitly.
+Execute only phase 2 of [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473) when separately authorized. Read the [execution rules](execution-rules.md), the full [plan](../device-owned-solar-scheduling-plan.md), and approved phase 1 decisions. Require the phase 1 gate before implementation; report missing approvals explicitly.
 
 ## Objective and inspection
 
-Implement bounded, protected local Pi and existing authenticated Pico management
-adapters, with explicit controller-only operation. Under the approved
-[sequencing amendment](deferred-pi-security.md), new Pi pairing/TLS and the
-controller-to-remote-Pi adapter/lifecycle move to the mandatory phase-6.2
-security milestone. Preserve their approved design; keep those paths unavailable.
-Management context must be independent of the controller's output backend, active claims, and jobs.
+Implement bounded, protected local Pi and existing authenticated Pico management adapters, with explicit controller-only operation. Under the approved [sequencing amendment](deferred-pi-security.md), new Pi pairing/TLS and the controller-to-remote-Pi adapter/lifecycle move to the mandatory phase-6.2 security milestone. Preserve their approved design; keep those paths unavailable. Management context must be independent of the controller's output backend, active claims, and jobs.
 
-Trace `src/wtp_integration/{browser_api,configuration,fleet_runtime,fleet_store,
-fleet_schedule}.*`, `src/wtp_pi_control.*`, `src/wtp_runtime_bridge.cpp`, startup
-configuration, and corresponding Pico handlers and consumers. Verify actual paths,
-interfaces, current schemas, and existing tests before editing. Identify each
-application and reusable component boundary; follow the shared approval rules.
+Trace `src/wtp_integration/{browser_api,configuration,fleet_runtime,fleet_store, fleet_schedule}.*`, `src/wtp_pi_control.*`, `src/wtp_runtime_bridge.cpp`, startup configuration, and corresponding Pico handlers and consumers. Verify actual paths, interfaces, current schemas, and existing tests before editing. Identify each application and reusable component boundary; follow the shared approval rules.
 
 ## Required work
 
-1. Implement the phase 1 approved local Pi and existing Pico service/adapter
-   contracts end to end. Defer the remote Pi security/adapter requirements to the
-   named milestone. Eventual remote reads/writes must reach that Pi's service.
-   Never translate remote edits into host configuration saves or treat execution credentials as management
-   permission. Apply approved provisioning, authorization, secret storage/redaction,
-   browser origin/CSRF, proxy address/redirect limits, and resource/time bounds.
-2. Bind every operation to verified stable identity, authorized enrollment,
-   profile/connection generation, boot/session context, and configuration revision.
-   Reject missing/extra/wrong-type fields, unsupported carriers/versions/capabilities,
-   inconsistent descriptors, and stale contexts before mutation. Validate document
-   shape before accessing fields. Reconnect/reboot requires fresh negotiation.
-3. Implement approved atomic writes, revision conflicts, idempotency, readback, and
-   recovery after lost replies. Retire stale read contexts on selection changes;
-   continue tracking accepted old-target writes against that target. An uncertain
-   result inhibits further writes until authoritative reconciliation.
-4. Decouple managing/selecting a Pico from selecting it as the host WTP backend.
-   Keep active execution sessions, ownership, and accepted jobs unchanged by
-   background reads or edit-context selection. Management does not claim RF or
-   indefinitely inhibit target autonomy. Preserve explicit backend-selection flows.
-5. Implement explicit controller-only startup without local hardware initialization,
-   local station identity, local backend, or fabricated output. Never enter this
-   mode automatically after physical initialization fails. Distinguish controller
-   readiness from readiness of each managed target and unavailable targets.
-6. Keep admission inhibited at startup until durable configuration and ownership
-   state are loaded and validated. Implement only the readiness foundation here;
-   do not enable new recurrence or bypass the phase 5 authority interlock.
-7. Update all required paired contract consumers, advertisements, descriptors,
-   validation, serialization, generated assets, and test adapters together. Existing
-   Pico resources may be mapped only when their verified semantics fit. Missing
-   firmware authority blocks the affected change; it is not a follow-up after
-   claiming the interface complete.
+1. Implement the phase 1 approved local Pi and existing Pico service/adapter contracts end to end. Defer the remote Pi security/adapter requirements to the named milestone. Eventual remote reads/writes must reach that Pi's service. Never translate remote edits into host configuration saves or treat execution credentials as management permission. Apply approved provisioning, authorization, secret storage/redaction, browser origin/CSRF, proxy address/redirect limits, and resource/time bounds.
+2. Bind every operation to verified stable identity, authorized enrollment, profile/connection generation, boot/session context, and configuration revision. Reject missing/extra/wrong-type fields, unsupported carriers/versions/capabilities, inconsistent descriptors, and stale contexts before mutation. Validate document shape before accessing fields. Reconnect/reboot requires fresh negotiation.
+3. Implement approved atomic writes, revision conflicts, idempotency, readback, and recovery after lost replies. Retire stale read contexts on selection changes; continue tracking accepted old-target writes against that target. An uncertain result inhibits further writes until authoritative reconciliation.
+4. Decouple managing/selecting a Pico from selecting it as the host WTP backend. Keep active execution sessions, ownership, and accepted jobs unchanged by background reads or edit-context selection. Management does not claim RF or indefinitely inhibit target autonomy. Preserve explicit backend-selection flows.
+5. Implement explicit controller-only startup without local hardware initialization, local station identity, local backend, or fabricated output. Never enter this mode automatically after physical initialization fails. Distinguish controller readiness from readiness of each managed target and unavailable targets.
+6. Keep admission inhibited at startup until durable configuration and ownership state are loaded and validated. Implement only the readiness foundation here; do not enable new recurrence or bypass the phase 5 authority interlock.
+7. Update all required paired contract consumers, advertisements, descriptors, validation, serialization, generated assets, and test adapters together. Existing Pico resources may be mapped only when their verified semantics fit. Missing firmware authority blocks the affected change; it is not a follow-up after claiming the interface complete.
 
 ## Tests and acceptance gate
 
-Exercise production management paths with zero local outputs and at least two
-independent targets, including local/Pico configuration isolation and direct refusal of unavailable
-remote Pi routes without host persistence. Remote Pi authentication, enrollment,
-transfer, renewal, and lifecycle tests move to the named security gate. Test failed
-authentication, credential redaction, malformed documents/descriptors, stale identity,
-boot/profile/revision, capability loss, reconnect, bounded retry/timeouts, lost
-replies, concurrent writes, and refusal before persistence. Show that selecting or
-reading another target does not change backend, claims, jobs, or target ownership.
-Prove failed physical initialization cannot select controller-only mode. Exercise
-origin/CSRF rejection, forbidden proxy destinations and redirects, oversized inputs,
-and authorization revocation through the approved production security boundary.
-Nearby discovery alone must never enroll a device or grant write access. Verify
-failures and rejected requests leave both targets' configuration and journals
-unchanged except for explicitly documented recovery bookkeeping.
+Exercise production management paths with zero local outputs and at least two independent targets, including local/Pico configuration isolation and direct refusal of unavailable remote Pi routes without host persistence. Remote Pi authentication, enrollment, transfer, renewal, and lifecycle tests move to the named security gate. Test failed authentication, credential redaction, malformed documents/descriptors, stale identity, boot/profile/revision, capability loss, reconnect, bounded retry/timeouts, lost replies, concurrent writes, and refusal before persistence. Show that selecting or reading another target does not change backend, claims, jobs, or target ownership. Prove failed physical initialization cannot select controller-only mode. Exercise origin/CSRF rejection, forbidden proxy destinations and redirects, oversized inputs, and authorization revocation through the approved production security boundary. Nearby discovery alone must never enroll a device or grant write access. Verify failures and rejected requests leave both targets' configuration and journals unchanged except for explicitly documented recovery bookkeeping.
 
-Use isolated software services and temporary configuration/journals, never installed
-services or live devices. Run both full network and USB recipes for shared interface
-changes, plus focused management, startup, and configuration regressions. Update
-engineering/security and applicable controller/remote-management operator guidance
-concomitantly, following sibling authority and build rules.
+Use isolated software services and temporary configuration/journals, never installed services or live devices. Run both full network and USB recipes for shared interface changes, plus focused management, startup, and configuration regressions. Update engineering/security and applicable controller/remote-management operator guidance concomitantly, following sibling authority and build rules.
 
-The amended gate requires production-path local Pi/existing Pico management
-evidence, refusal of unavailable remote Pi routes before host mutation, a
-functioning explicit no-local-output controller, and both paired suites where
-applicable. New Pi pairing/TLS and dependent remote-management implementation,
-tests, and docs remain explicit obligations of the named security milestone.
-Do not add Fleet recurrence dispatch, solar runtime, new schedule enablement, or
-shared Setup layout in this phase. End with the shared report and review loop;
-stop before phase 3.
+The amended gate requires production-path local Pi/existing Pico management evidence, refusal of unavailable remote Pi routes before host mutation, a functioning explicit no-local-output controller, and both paired suites where applicable. New Pi pairing/TLS and dependent remote-management implementation, tests, and docs remain explicit obligations of the named security milestone. Do not add Fleet recurrence dispatch, solar runtime, new schedule enablement, or shared Setup layout in this phase. End with the shared report and review loop; stop before phase 3.

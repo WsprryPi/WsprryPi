@@ -58,6 +58,40 @@ PicoHttpResponse operation_document(const Json &receipt){
     return response;
 }
 }
+PiLocalManagementService::PolicyInstallation PiLocalManagementService::install_local_scheduling_policy(){
+    std::lock_guard operation(mutex_);
+    std::lock_guard configuration(config_update_mutex());
+    const auto authority=store_.recurrence_authority();
+    // Durable authority is the installation marker. Reinstall/restart must not
+    // disable an enabled native schedule or undo explicit local restoration.
+    if(authority["state"]=="staged"||authority["state"]=="native"||authority["state"]=="rollback")
+        return PolicyInstallation::Current;
+    if(authority["state"]!="legacy"||!local_migration_inventory(authority,self_)||!authority["jobs"].empty())
+        return PolicyInstallation::Held;
+    const auto saved=store_.settings();
+    if(saved["configuration"]["Operation"]["Transmit Backend"]=="wtp")return PolicyInstallation::Held;
+    const auto state=observe();
+    if(!state||!migration_idle(*state)||!state->reserve_configuration())return PolicyInstallation::Held;
+    struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
+    const auto current=observe();
+    if(!current||binding(*current)!=binding(*state)||!migration_idle(*current)||
+        store_.recurrence_authority()!=authority||store_.settings()!=saved)return PolicyInstallation::Held;
+    const auto route="/api/control/v1/targets/"+self_+"/migration";
+    // This principal is the target's trusted installation owner, not a browser
+    // or paired controller. The current closed contract and WAL still apply.
+    const PiManagedStore::Operation intent{self_,"0",route,{
+        {"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",binding(*current)},
+        {"capability_revision",PiManagementJournal::digest(canonical_pi_management_json(capabilities(*current)))},
+        {"operation_id",WtpPiBootIdentity{}.new_boot_id()},{"expected_revision",saved["revision"]},
+        {"expected_authority_generation",authority["generation"]},{"controllers",authority["controllers"]}}};
+    store_.persist_migration(jConfig,[]{},intent,false);
+    const auto receipt=store_.replay(intent);
+    const auto after=store_.recurrence_authority(),settings=store_.settings();
+    if(!receipt||(*receipt)["state"]!="committed"||after["state"]!="staged"||
+        settings["scheduling"]["enabled"]!=false||after["staged_revision"]!=settings["revision"])
+        throw std::runtime_error("scheduling_policy_installation_unconfirmed");
+    return PolicyInstallation::Completed;
+}
 PiLocalManagementService::PiLocalManagementService(PiManagedStore &store,std::string self,std::string name,Observe observe)
     :store_(store),self_(std::move(self)),name_(std::move(name)),connection_(connection()),observe_(std::move(observe)){
     if(!identity(self_)||self_!=store_.device_id()||!observe_||!valid_controller_document(Json{{"contract","Wsprry-Control/1"},{"schema","targets"},

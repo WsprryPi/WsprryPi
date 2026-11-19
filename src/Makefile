@@ -2069,6 +2069,7 @@ pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture"
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --network-safety-off
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --initialization
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/pi_managed_main_test.py --fixture "$(BIN_DIR)/pi_managed_main_fixture" --policy-upgrade
 
 $(BIN_DIR)/shared_setup_main_fixture: tests/shared_setup_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)

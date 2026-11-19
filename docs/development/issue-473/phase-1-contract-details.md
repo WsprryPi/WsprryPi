@@ -1,62 +1,20 @@
 # Phase 1 normative contract details
 
-Status: design specification for approved D01–D12; not a production API, firmware
-change, migration, or security qualification. This closes the encoding, field-set,
-and handover details left implicit in the [decision document](phase-1-decisions.md)
-and [pairing workflow](phase-1-pairing.md). No phase-2 implementation is authorized.
+Status: design specification for approved D01–D12; not a production API, firmware change, migration, or security qualification. This closes the encoding, field-set, and handover details left implicit in the [decision document](phase-1-decisions.md) and [pairing workflow](phase-1-pairing.md). No phase-2 implementation is authorized.
 
-Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS
-and controller-to-remote-Pi management are deferred to the
-[phase-6.2 security milestone](deferred-pi-security.md). These approved
-design contracts remain unchanged; phase 2 no longer claims their implementation.
-Existing WTP/Pico TLS and the requirement for an automatic certificate-free
-operator workflow remain unchanged.
+Implementation sequencing amendment (approved 2026-11-16): new Pi pairing/TLS and controller-to-remote-Pi management are deferred to the [phase-6.2 security milestone](deferred-pi-security.md). These approved design contracts remain unchanged; phase 2 no longer claims their implementation. Existing WTP/Pico TLS and the requirement for an automatic certificate-free operator workflow remain unchanged.
 
 ## Interpretation and version boundaries
 
-Closed object notation lists every required key; nullable fields are still
-required. Reject duplicate/extra/missing keys and wrong types before access.
-`ID` is 32 lowercase hexadecimal characters; `Digest` is 64 lowercase hexadecimal
-characters. `U64` is a canonical unsigned decimal string in 0..18446744073709551615;
-`Generation` is U64 greater than zero. Overflow holds/refuses; it never wraps.
-`B32` below means 32 bytes in unpadded base64url (43 characters), **not** a
-32-symbol pairing-code alphabet. Re-encode to require canonical binary encodings.
-`Point` is 65 bytes of uncompressed P-256 SEC1, unpadded base64url (87 characters),
-validated on-curve, nonidentity, and in the required group. `Name` is 1..80 UTF-8
-bytes without control characters. Digest hashing and response bindings follow
-the decision document. Field limits are UTF-8 byte limits, not JS character counts.
+Closed object notation lists every required key; nullable fields are still required. Reject duplicate/extra/missing keys and wrong types before access. `ID` is 32 lowercase hexadecimal characters; `Digest` is 64 lowercase hexadecimal characters. `U64` is a canonical unsigned decimal string in 0..18446744073709551615; `Generation` is U64 greater than zero. Overflow holds/refuses; it never wraps. `B32` below means 32 bytes in unpadded base64url (43 characters), **not** a 32-symbol pairing-code alphabet. Re-encode to require canonical binary encodings. `Point` is 65 bytes of uncompressed P-256 SEC1, unpadded base64url (87 characters), validated on-curve, nonidentity, and in the required group. `Name` is 1..80 UTF-8 bytes without control characters. Digest hashing and response bindings follow the decision document. Field limits are UTF-8 byte limits, not JS character counts.
 
-Current control stays `Wsprry-Control/1` under `/api/control/v1/`; the current
-Pico-owned policy/schema and its checker remain authoritative for shared control.
-The new Pi-only auth exchange uses `Wsprry-Pair/1` and `/api/pair/v1/`. It is not
-a WTP operation or a second settings/control view. Pairing and migration record
-versions do not change WTP, existing TLS/USB transport formats, INI semantics,
-Pico storage, Fleet assignment v1, or the Fleet recovery journal format. Existing
-formats are extended only through their owning implementation slice and tests;
-no arbitrary object extension, downgrade, or hidden legacy view is permitted.
+Current control stays `Wsprry-Control/1` under `/api/control/v1/`; the current Pico-owned policy/schema and its checker remain authoritative for shared control. The new Pi-only auth exchange uses `Wsprry-Pair/1` and `/api/pair/v1/`. It is not a WTP operation or a second settings/control view. Pairing and migration record versions do not change WTP, existing TLS/USB transport formats, INI semantics, Pico storage, Fleet assignment v1, or the Fleet recovery journal format. Existing formats are extended only through their owning implementation slice and tests; no arbitrary object extension, downgrade, or hidden legacy view is permitted.
 
 ## Existing Pi configuration incorporated by reference
 
-The existing field/value contract is incorporated from Pi revision
-`505c6ddc12196c7b31c393f9ca01050faafd1737`:
-`src/config_handler_serialization.cpp`, `config_handler_deserialization.cpp`,
-`config_handler.cpp`, `arg_parser.cpp:validate_config_candidate`,
-`wtp_settings.hpp`, `wtp_settings_json.hpp`, `wtp_server_settings_json.hpp`, and
-mode/planner/frequency validators invoked by them. Those sources define existing
-value/semantic limits, not an implementer's later choice. Generated production
-schema code is later implementation of this fixed contract, not deferred design.
-Reinspect source drift before implementation; incompatible drift requires review.
+The existing field/value contract is incorporated from Pi revision `505c6ddc12196c7b31c393f9ca01050faafd1737`: `src/config_handler_serialization.cpp`, `config_handler_deserialization.cpp`, `config_handler.cpp`, `arg_parser.cpp:validate_config_candidate`, `wtp_settings.hpp`, `wtp_settings_json.hpp`, `wtp_server_settings_json.hpp`, and mode/planner/frequency validators invoked by them. Those sources define existing value/semantic limits, not an implementer's later choice. Generated production schema code is later implementation of this fixed contract, not deferred design. Reinspect source drift before implementation; incompatible drift requires review.
 
-New `saved.configuration` and `candidate.configuration` have exactly these keys:
-`Operation`, `GPIO`, `Calibration`, `Si5351`, `WSPR`, `CW`, `Band GPIO`, `WTP`,
-`WTP Server`. They describe saved settings, not the whole legacy `/config`
-observation response. `Platform`, legacy `Meta`, and internal `Experimental`
-are excluded from this new candidate. They cannot be injected as write authority.
-Existing server-owned values for excluded sections are preserved by revision lock.
-Mode is canonically `WSPR|QRSS|FSKCW|DFCW` and persisted backend is
-`gpio|rp1-gpclk|si5351|wtp`; a transient simulated backend cannot be persisted.
-Read-only platform/capability observations are obtained separately and are never
-compared as mutable configuration or included in candidate_digest.
+New `saved.configuration` and `candidate.configuration` have exactly these keys: `Operation`, `GPIO`, `Calibration`, `Si5351`, `WSPR`, `CW`, `Band GPIO`, `WTP`, `WTP Server`. They describe saved settings, not the whole legacy `/config` observation response. `Platform`, legacy `Meta`, and internal `Experimental` are excluded from this new candidate. They cannot be injected as write authority. Existing server-owned values for excluded sections are preserved by revision lock. Mode is canonically `WSPR|QRSS|FSKCW|DFCW` and persisted backend is `gpio|rp1-gpclk|si5351|wtp`; a transient simulated backend cannot be persisted. Read-only platform/capability observations are obtained separately and are never compared as mutable configuration or included in candidate_digest.
 
 | Section | Exact required keys and structural types |
 | --- | --- |
@@ -70,117 +28,33 @@ compared as mutable configuration or included in candidate_digest.
 | WTP | Exactly the 14 fields returned by pinned `wtp_settings_json`: Transport, Hostname, TCP Port, TLS Server Identity, TLS CA File, TLS Client Certificate, TLS Client Key, Endpoint, USB Serial, USB Vendor ID, USB Product ID, Device ID, Allow Frequency Adjustment, Start Uncertainty ns; types/bounds from that pinned function/validator |
 | WTP Server | `Enabled`: boolean; `Port`: integer 1..65535; `Interface`: `auto` or existing validated interface string |
 
-Band keys: `2200m,630m,160m,80m,60m,40m,30m,20m,17m,15m,12m,10m,8m,6m,5m,4m,2m,1.25m,70cm`.
-`Band Preferences` has only these allowed band keys, no required entries; each
-value is an existing qualified preset string or positive integral Hz <=2^53-1,
-validated by the existing band/frequency policy. Per-period `WsprList` has exactly
-`Frequency:string`, `Frequency Profile:existing_common|wrc15`, and
-`Band Preferences` of that same type. Frequency is the current serialized token
-list with its existing skip grammar; no new parser or Pico dial limit is implied.
-Strings and arrays remain within the 32768-byte complete-document bound, with
-additional existing parser/backend limits mandatory. No new smaller list limit
-silently truncates existing valid settings. A body exceeding the management bound
-is refused with 413, never truncated; its existing saved value remains intact. Unsupported unchanged values retain
-the decision document's disable/repair exception, never an admission exception.
+Band keys: `2200m,630m,160m,80m,60m,40m,30m,20m,17m,15m,12m,10m,8m,6m,5m,4m,2m,1.25m,70cm`. `Band Preferences` has only these allowed band keys, no required entries; each value is an existing qualified preset string or positive integral Hz <=2^53-1, validated by the existing band/frequency policy. Per-period `WsprList` has exactly `Frequency:string`, `Frequency Profile:existing_common|wrc15`, and `Band Preferences` of that same type. Frequency is the current serialized token list with its existing skip grammar; no new parser or Pico dial limit is implied. Strings and arrays remain within the 32768-byte complete-document bound, with additional existing parser/backend limits mandatory. No new smaller list limit silently truncates existing valid settings. A body exceeding the management bound is refused with 413, never truncated; its existing saved value remains intact. Unsupported unchanged values retain the decision document's disable/repair exception, never an admission exception.
 
-These are canonical saved/readback types. Valid legacy INI/raw local inputs,
-including accepted alternate numeric/string representations, continue through
-existing parsers before serialization into these canonical types. This stricter
-new envelope is not a change to legacy `/config` or INI acceptance.
+These are canonical saved/readback types. Valid legacy INI/raw local inputs, including accepted alternate numeric/string representations, continue through existing parsers before serialization into these canonical types. This stricter new envelope is not a change to legacy `/config` or INI acceptance.
 
-WTP file references remain opaque existing strings: the new adapter echoes them
-unchanged under revision checks and never dereferences a browser-supplied path
-for management authentication. They are not new pairing credentials. New UI
-management pairing never displays credential paths. Existing advanced WTP profile
-editing stays under its existing independent contract. Operation Web/Socket Port
-are read-only echoes in this new resource, matching their existing public-write
-adapter behavior. Changing any read-only echo is a refusal, not silent omission.
-Transmit changes still use existing explicit takeover confirmation; an ordinary
-settings save cannot silently confirm a takeover. A conflict requiring that
-existing workflow returns 409 without settings mutation. No scheduler-enable call
-changes Transmit or boot preference.
+WTP file references remain opaque existing strings: the new adapter echoes them unchanged under revision checks and never dereferences a browser-supplied path for management authentication. They are not new pairing credentials. New UI management pairing never displays credential paths. Existing advanced WTP profile editing stays under its existing independent contract. Operation Web/Socket Port are read-only echoes in this new resource, matching their existing public-write adapter behavior. Changing any read-only echo is a refusal, not silent omission. Transmit changes still use existing explicit takeover confirmation; an ordinary settings save cannot silently confirm a takeover. A conflict requiring that existing workflow returns 409 without settings mutation. No scheduler-enable call changes Transmit or boot preference.
 
 ## Management type closures
 
-`observed_output` always has `{generation:Generation,owner_id:ID|null,job_id:ID|null}`.
-`authority_state` is exactly
-`unclassified|legacy|retiring|reconciling|staged|native|rollback|held`.
-`revision`/`active_revision` are saved/active digests, not observation timestamps.
-Status `destination_id` is self ID for a verified local output, verified peer ID
-for WTP output, null when unknown. `selected_frequencies_hz` lists actual frozen
-RF tones as positive canonical decimal Hz strings with at most nine fractional
-digits, not WSPR dial frequencies; maximum is the negotiated backend tone limit.
-For an unknown/unselected intent it is empty. Unbounded observation age becomes
-null (unknown), never a wrapped uint32. `Stop` acknowledged as committed means
-the bound cancellation was accepted; inactive output still requires observation.
+`observed_output` always has `{generation:Generation,owner_id:ID|null,job_id:ID|null}`. `authority_state` is exactly `unclassified|legacy|retiring|reconciling|staged|native|rollback|held`. `revision`/`active_revision` are saved/active digests, not observation timestamps. Status `destination_id` is self ID for a verified local output, verified peer ID for WTP output, null when unknown. `selected_frequencies_hz` lists actual frozen RF tones as positive canonical decimal Hz strings with at most nine fractional digits, not WSPR dial frequencies; maximum is the negotiated backend tone limit. For an unknown/unselected intent it is empty. Unbounded observation age becomes null (unknown), never a wrapped uint32. `Stop` acknowledged as committed means the bound cancellation was accepted; inactive output still requires observation.
 
-Settings errors use the HTTP/status schema already specified. `error.code` is
-one of `invalid_json,invalid_shape,unsupported_contract,unsupported_resource,
-unauthenticated,unauthorized,origin_required,csrf_failed,target_mismatch,
-boot_changed,profile_changed,connection_changed,capability_changed,
-revision_required,revision_conflict,request_id_reuse,candidate_invalid,
-read_only_field,authority_pending,output_changed,confirmation_required,
-payload_too_large,rate_limited,capacity,storage_unavailable,recovery_required,
-transport_unavailable,operation_unknown`. `retryable` is boolean: it means a new
-read/recovery may help, never permission to replay an uncertain mutation blindly.
-No raw exception, private path, code, key, or arbitrary peer body is echoed.
+Settings errors use the HTTP/status schema already specified. `error.code` is one of `invalid_json,invalid_shape,unsupported_contract,unsupported_resource, unauthenticated,unauthorized,origin_required,csrf_failed,target_mismatch, boot_changed,profile_changed,connection_changed,capability_changed, revision_required,revision_conflict,request_id_reuse,candidate_invalid, read_only_field,authority_pending,output_changed,confirmation_required, payload_too_large,rate_limited,capacity,storage_unavailable,recovery_required, transport_unavailable,operation_unknown`. `retryable` is boolean: it means a new read/recovery may help, never permission to replay an uncertain mutation blindly. No raw exception, private path, code, key, or arbitrary peer body is echoed.
 
-The controller validates its local profile/connection binding under the adapter
-lock. Target identity, boot, pairing authorization generation, and resource
-permissions are independently enforced by the target before mutation. The target
-associates the authenticated TLS session with the current pair, generation and
-boot; this is server-owned channel context, not an extra caller-controlled JSON
-token. Local profile generations are not trusted as target authorization. All
-writes check both adapter context and target-authoritative context. Changing
-management owner changes capability_revision and retires old contexts/receipts'
-write authority. Settings reads do not hold output ownership.
+The controller validates its local profile/connection binding under the adapter lock. Target identity, boot, pairing authorization generation, and resource permissions are independently enforced by the target before mutation. The target associates the authenticated TLS session with the current pair, generation and boot; this is server-owned channel context, not an extra caller-controlled JSON token. Local profile generations are not trusted as target authorization. All writes check both adapter context and target-authoritative context. Changing management owner changes capability_revision and retires old contexts/receipts' write authority. Settings reads do not hold output ownership.
 
-Capability schema_id is exactly `urn:wsprry:control:1:` followed by its resource
-enum; schema_digest binds the complete current closed resource schema including
-its value-policy dependencies. A producer/consumer pair must recognize the exact
-current ID/digest/descriptor, not accept a matching-looking arbitrary namespace.
-Do not declare a Pico resource supported from a Pi resource's descriptor.
+Capability schema_id is exactly `urn:wsprry:control:1:` followed by its resource enum; schema_digest binds the complete current closed resource schema including its value-policy dependencies. A producer/consumer pair must recognize the exact current ID/digest/descriptor, not accept a matching-looking arbitrary namespace. Do not declare a Pico resource supported from a Pi resource's descriptor.
 
-Controller-only startup is explicit `--controller-only`; omission keeps the
-existing local-transmitter startup path. That role initializes identity, protected
-browser/management/catalog and permitted legacy Fleet management, but no local
-transmitter backend, selector/GPIO, local WTP execution listener, or local station
-readiness prerequisite. It advertises no local RF output and refuses local
-transmission actions. A failed physical startup never selects this role. Switching
-a process into or out of the role is an explicit restart choice, not Device
-selection or an automatic runtime fallback. Startup must still load/validate
-controller-owned catalog/auth/recovery state before accepting management writes.
+Controller-only startup is explicit `--controller-only`; omission keeps the existing local-transmitter startup path. That role initializes identity, protected browser/management/catalog and permitted legacy Fleet management, but no local transmitter backend, selector/GPIO, local WTP execution listener, or local station readiness prerequisite. It advertises no local RF output and refuses local transmission actions. A failed physical startup never selects this role. Switching a process into or out of the role is an explicit restart choice, not Device selection or an automatic runtime fallback. Startup must still load/validate controller-owned catalog/auth/recovery state before accepting management writes.
 
 ## Phase-6.2 approved amendments
 
-On 2026-11-17 the user approved D62-01–D62-05 and required companion scope.
-The exact current pairing profile below incorporates D62-01; provider security,
-maintenance, platform, and packaging qualification remains mandatory. D62-03
-clarifies assignment identity below. The approved decision register specifies
-the additional gateway, registration, retirement-purpose, and remote-resume
-closures to be materialized together before their implementation is accepted.
-No WTP, existing Pico authentication, or control-major change is authorized.
+On 2026-11-17 the user approved D62-01–D62-05 and required companion scope. The exact current pairing profile below incorporates D62-01; provider security, maintenance, platform, and packaging qualification remains mandatory. D62-03 clarifies assignment identity below. The approved decision register specifies the additional gateway, registration, retirement-purpose, and remote-resume closures to be materialized together before their implementation is accepted. No WTP, existing Pico authentication, or control-major change is authorized.
 
 ## Exact pairing bootstrap and UI command shapes
 
-All auth messages are closed JSON, <=4096 bytes and depth <=8, no compressed body,
-query, redirect, or multiple header interpretation. The new TLS management
-listener admits at most four live connections, including handshakes, with the
-approved deadlines; no unbounded handshake or pairing-work queue is permitted. Responses repeat contract and
-schema. Public bootstrap is available only on the target's guarded LAN HTTP
-listener during an operator-opened window; the paired TLS management listener
-on 31418 does not accept unauthenticated HTTP fallback. UI routes use normal
-protected same-origin browser access; machine routes cannot create a window.
+All auth messages are closed JSON, <=4096 bytes and depth <=8, no compressed body, query, redirect, or multiple header interpretation. The new TLS management listener admits at most four live connections, including handshakes, with the approved deadlines; no unbounded handshake or pairing-work queue is permitted. Responses repeat contract and schema. Public bootstrap is available only on the target's guarded LAN HTTP listener during an operator-opened window; the paired TLS management listener on 31418 does not accept unauthenticated HTTP fallback. UI routes use normal protected same-origin browser access; machine routes cannot create a window.
 
-`P = {contract:"Wsprry-Pair/1"}` is expanded into each shape below; each
-shape then has exactly its one explicitly listed schema field.
-`Suite` is exactly `SPAKE2+-P256-SHA256-HKDF-HMAC`; it is not a negotiated range.
-Reject missing, unknown, or inconsistent advertised/returned suites before PAKE
-work or mutation. No body contains a key supplied by browser JS. The code alphabet is exactly
-`0123456789ABCDEFGHJKMNPQRSTVWXYZ`; input may remove the displayed hyphen and
-ASCII spaces and uppercase ASCII, then must have exactly eight alphabet symbols.
-The normalized code is passed only from the controller's trusted browser session
-to its own backend, not as a URL or a public-bootstrap field.
+`P = {contract:"Wsprry-Pair/1"}` is expanded into each shape below; each shape then has exactly its one explicitly listed schema field. `Suite` is exactly `SPAKE2+-P256-SHA256-HKDF-HMAC`; it is not a negotiated range. Reject missing, unknown, or inconsistent advertised/returned suites before PAKE work or mutation. No body contains a key supplied by browser JS. The code alphabet is exactly `0123456789ABCDEFGHJKMNPQRSTVWXYZ`; input may remove the displayed hyphen and ASCII spaces and uppercase ASCII, then must have exactly eight alphabet symbols. The normalized code is passed only from the controller's trusted browser session to its own backend, not as a URL or a public-bootstrap field.
 
 | Route | Request body | Success body |
 | --- | --- | --- |
@@ -193,260 +67,55 @@ to its own backend, not as a URL or a public-bootstrap field.
 | Public `POST /api/pair/v1/confirm` | `{P,schema:"confirm",pair_id:ID,cA:B32}` | `{P,schema:"confirmed",pair_id:ID}` |
 | Public `POST /api/pair/v1/commit` | `{P,schema:"commit",pair_id:ID,request_digest:Digest,proof:B32}` | `{P,schema:"committed",pair_id:ID,authorization_generation:Generation,receipt_digest:Digest,proof:B32}` |
 
-Initial key_epoch is 1. Successful normal pair/replace advances the target authorization
-generation by exactly one; remove also advances it and persists a tombstone.
-The controller stages the expected next generation before commit. Overflow
-refuses without reviving old authority. Scrypt work is serialized to one active
-derivation per process (32 MiB algorithm memory plus bounded worker overhead);
-exhaustion returns busy rather than an unbounded crypto queue.
+Initial key_epoch is 1. Successful normal pair/replace advances the target authorization generation by exactly one; remove also advances it and persists a tombstone. The controller stages the expected next generation before commit. Overflow refuses without reviving old authority. Scrypt work is serialized to one active derivation per process (32 MiB algorithm memory plus bounded worker overhead); exhaustion returns busy rather than an unbounded crypto queue.
 
 P62-06/P62-07 define separate LAN-only `_wsprry-mgmt._tcp.local.` discovery, with fixed SRV port 31418 and dedicated target `wsprry-management-<device_id>.local.` publishing only reachable RFC1918 IPv4 and ULA IPv6 addresses supported by the actual bootstrap listener. TXT is exactly `txtvers=1` first, `binding=Wsprry-Pair/1`, `id=<device_id>`, `boot=<boot_id>`, `http-port=<actual guarded HTTP port>`, `suite=SPAKE2+-P256-SHA256-HKDF-HMAC`, and `control-sha256=<current canonical Control/1 digest>`. No code, key, window, owner or paired state is advertised. Native DNS instance labels obey the 63-byte wire limit. No name, port, address scope or WTP advertisement fallback is added.
 
 Protected `GET /api/control/v1/host/pairing/discovery` returns exactly `{contract:"Wsprry-Control/1",schema:"pair-discovery",available:boolean,discoveries:[Discovery]}`. `Discovery` is exactly `{discovery_id:ID,device_id:ID,boot_id:ID,name:string,host:string,bootstrap_port:integer,management_port:31418,suite:"SPAKE2+-P256-SHA256-HKDF-HMAC",control_schema_digest:Digest}`; name is at most 64 Unicode scalars/256 UTF-8 bytes without controls, host is the dedicated identity hostname, and bootstrap port is 1–65535. At most 64 unique device/handle observations are returned, expiring after 30 seconds without live resolution; withdrawals remove their observations immediately. Unavailable discovery has no observations. Reads never start discovery or pairing, and the saved Off policy blocks this new route. The backend maps its discovery IDs to exact validated observations and rechecks identities, boot, suite, digest, every resolved address and self refusal before connection. Discovery remains an unauthenticated locator and never enrolls or grants management authority. P62-08's public window action is copied into the existing hello; a stale or changed action refuses without guessing.
 
-Auth refusals and pending replies have exactly
-`{P,schema:"result",pair_id:ID|null,state:pending|rejected|unknown,
-code:Code,retryable:boolean}`. Code is one of
-`pairing_closed,expired,busy,invalid_shape,invalid_proof,identity_changed,
-generation_changed,request_id_reuse,storage_unavailable,capacity,operation_unknown`.
-Use HTTP 400 for shape, 403 for proof, 409 for context/state conflicts, 429 for
-rate/capacity, and 503 for storage/unavailability. A known pending retirement is
-202 with this shape; it is not a retired receipt. Never echo a supplied name,
-code, point, or raw failure detail. A pair_id is returned only after successful
-shape/context parsing; earlier refusals use null. Browser-side pairing commands
-use the existing control error/receipt envelopes instead.
+Auth refusals and pending replies have exactly `{P,schema:"result",pair_id:ID|null,state:pending|rejected|unknown, code:Code,retryable:boolean}`. Code is one of `pairing_closed,expired,busy,invalid_shape,invalid_proof,identity_changed, generation_changed,request_id_reuse,storage_unavailable,capacity,operation_unknown`. Use HTTP 400 for shape, 403 for proof, 409 for context/state conflicts, 429 for rate/capacity, and 503 for storage/unavailability. A known pending retirement is 202 with this shape; it is not a retired receipt. Never echo a supplied name, code, point, or raw failure detail. A pair_id is returned only after successful shape/context parsing; earlier refusals use null. Browser-side pairing commands use the existing control error/receipt envelopes instead.
 
-A window with action pair requires no active manager; replace requires an active
-manager and target-local intent. Recover is the existing proposed **Pair again**
-workflow for lost/corrupt pairing storage: the target-local UI explicitly confirms
-access replacement, closes old management sessions, and atomically installs an
-empty pairing catalog/revocation tombstone before opening a new code window.
-Use the known next authorization generation if the initialization record remains
-valid. If all authorization counters are irrecoverable, recover explicitly creates
-a new pair namespace (never reuses a pair_id), with committed generation starting at 1 (the empty recovery catalog has
-generation 0 until its confirmed pairing commit); zero is the expected-generation sentinel for this guarded recovery action only.
-Generation comparisons are always scoped to pair identity, never trusted alone.
-Prior pairing keys/receipts are never imported or scanned back into authority.
-The target-local recurrence-authority record is not cleared: any lost retirement
-proof leaves migration pending. This UI recovery changes no WTP identity,
-configuration, Transmit state, accepted job, or schedule enablement. Discovery or
-an unauthenticated machine request cannot trigger recovery. Concurrent/stale action or generation is 409.
-The target preallocates a CSPRNG pair_id for its current window offer and
-returns it from the public window read; hello must echo that exact ID. A failed
-attempt retires it and creates a fresh offer if the window/failure budget remains.
-Reads never create an offer or reset the budget. Thus even access recovery cannot
-let a caller reuse an old pair namespace. Hello reserves one pairing attempt; duplicate exact requests return their pending
-response, conflicting IDs consume a failure and fail closed. Code stays valid
-only within its 120-second window; the entire reserved exchange must finish
-within 30 seconds and before window expiry. Consume the code atomically at
-successful authorization commit. Cancel, failure exhaustion, reboot, and timeout
-clear ephemeral material. A new window is an explicit target-UI action.
+A window with action pair requires no active manager; replace requires an active manager and target-local intent. Recover is the existing proposed **Pair again** workflow for lost/corrupt pairing storage: the target-local UI explicitly confirms access replacement, closes old management sessions, and atomically installs an empty pairing catalog/revocation tombstone before opening a new code window. Use the known next authorization generation if the initialization record remains valid. If all authorization counters are irrecoverable, recover explicitly creates a new pair namespace (never reuses a pair_id), with committed generation starting at 1 (the empty recovery catalog has generation 0 until its confirmed pairing commit); zero is the expected-generation sentinel for this guarded recovery action only. Generation comparisons are always scoped to pair identity, never trusted alone. Prior pairing keys/receipts are never imported or scanned back into authority. The target-local recurrence-authority record is not cleared: any lost retirement proof leaves migration pending. This UI recovery changes no WTP identity, configuration, Transmit state, accepted job, or schedule enablement. Discovery or an unauthenticated machine request cannot trigger recovery. Concurrent/stale action or generation is 409. The target preallocates a CSPRNG pair_id for its current window offer and returns it from the public window read; hello must echo that exact ID. A failed attempt retires it and creates a fresh offer if the window/failure budget remains. Reads never create an offer or reset the budget. Thus even access recovery cannot let a caller reuse an old pair namespace. Hello reserves one pairing attempt; duplicate exact requests return their pending response, conflicting IDs consume a failure and fail closed. Code stays valid only within its 120-second window; the entire reserved exchange must finish within 30 seconds and before window expiry. Consume the code atomically at successful authorization commit. Cancel, failure exhaustion, reboot, and timeout clear ephemeral material. A new window is an explicit target-UI action.
 
-Let `J` be the decision document's canonical JSON and `C` the hello object plus
-the challenge's target_nonce, omitting contract/schema only where explicitly
-shown. The single current SPAKE2+ profile uses A=controller/prover and
-B=target/verifier with RFC 9383 P-256/SHA-256/HKDF/HMAC parameters and constants.
-C includes hello's fixed suite and the challenge's target nonce; the returned
-challenge suite must equal hello's suite. Role identities are UTF-8
-`Wsprry-Pair/1/controller/` + J(C) and `Wsprry-Pair/1/target/` + J(C).
+Let `J` be the decision document's canonical JSON and `C` the hello object plus the challenge's target_nonce, omitting contract/schema only where explicitly shown. The single current SPAKE2+ profile uses A=controller/prover and B=target/verifier with RFC 9383 P-256/SHA-256/HKDF/HMAC parameters and constants. C includes hello's fixed suite and the challenge's target nonce; the returned challenge suite must equal hello's suite. Role identities are UTF-8 `Wsprry-Pair/1/controller/` + J(C) and `Wsprry-Pair/1/target/` + J(C).
 
-Frame the normalized ASCII code and both role identities as
-`LE64(len(code)) || code || LE64(len(prover_id)) || prover_id || LE64(len(verifier_id)) || verifier_id`,
-where lengths count bytes. Apply scrypt with salt SHA256(J(C)), N=32768,r=8,p=1,
-output 96 bytes. Split into two big-endian 48-byte halves and use the provider's
-supported reduction modulo the P-256 group order for w0/w1. Reject either zero,
-consume the failed attempt, and use the supported prehashed API. Do not use the
-provider's different default Argon2 mapping or implement group arithmetic locally.
-The target derives the ephemeral registration record from that same local code;
-it never accepts an operator/network-provisioned registration record.
+Frame the normalized ASCII code and both role identities as `LE64(len(code)) || code || LE64(len(prover_id)) || prover_id || LE64(len(verifier_id)) || verifier_id`, where lengths count bytes. Apply scrypt with salt SHA256(J(C)), N=32768,r=8,p=1, output 96 bytes. Split into two big-endian 48-byte halves and use the provider's supported reduction modulo the P-256 group order for w0/w1. Reject either zero, consume the failed attempt, and use the supported prehashed API. Do not use the provider's different default Argon2 mapping or implement group arithmetic locally. The target derives the ephemeral registration record from that same local code; it never accepts an operator/network-provisioned registration record.
 
-Pass both nonempty role identities and J(C) through the provider's standard
-context/transcript API. Both ends use OS-CSPRNG ephemeral scalars and reject
-invalid/nonidentity peer points in the selected group. The exchange response
-contains the verifier share pB and verifier confirmation cB. The controller checks
-cB before sending prover confirmation cA; the target checks cA before permitting
-commit. The confirmed reply is an acknowledgement, not another PAKE confirmation.
-Never call a skip-confirmation API. Failure destroys the attempt's ephemeral
-context; an exact retained response is recovery, not a second protocol attempt.
-See [RFC 9383 §§3–4](https://www.rfc-editor.org/rfc/rfc9383.html).
+Pass both nonempty role identities and J(C) through the provider's standard context/transcript API. Both ends use OS-CSPRNG ephemeral scalars and reject invalid/nonidentity peer points in the selected group. The exchange response contains the verifier share pB and verifier confirmation cB. The controller checks cB before sending prover confirmation cA; the target checks cA before permitting commit. The confirmed reply is an acknowledgement, not another PAKE confirmation. Never call a skip-confirmation API. Failure destroys the attempt's ephemeral context; an exact retained response is recovery, not a second protocol attempt. See [RFC 9383 §§3–4](https://www.rfc-editor.org/rfc/rfc9383.html).
 
-From confirmed K_shared, derive 32-byte keys using HKDF-SHA256 with salt
-SHA256(J(C)) and distinct UTF-8 info labels `Wsprry-Pair/1/spake2plus/tls-psk`,
-`Wsprry-Pair/1/spake2plus/commit`, and `Wsprry-Pair/1/spake2plus/retirement`. Commit request_digest hashes
-J(C); proof is HMAC-SHA256(commit_key, UTF-8 `request/` + request_digest).
-Response proof covers UTF-8 `response/` + J(response without proof).
-Unpadded base64url encodes MAC bytes. TLS PSK identity is ASCII
-`Wsprry-Management/1/` + pair_id + `/` + authorization_generation + `/` + key_epoch.
-ALPN is `wsprry-management/1`; TLS 1.3 requires TLS_AES_128_GCM_SHA256 and fresh
-P-256 ECDHE with psk_dhe_ke; reject all other suites/modes, 0-RTT, and resumption
-that bypasses a current authorization/epoch check. No certificate fallback.
+From confirmed K_shared, derive 32-byte keys using HKDF-SHA256 with salt SHA256(J(C)) and distinct UTF-8 info labels `Wsprry-Pair/1/spake2plus/tls-psk`, `Wsprry-Pair/1/spake2plus/commit`, and `Wsprry-Pair/1/spake2plus/retirement`. Commit request_digest hashes J(C); proof is HMAC-SHA256(commit_key, UTF-8 `request/` + request_digest). Response proof covers UTF-8 `response/` + J(response without proof). Unpadded base64url encodes MAC bytes. TLS PSK identity is ASCII `Wsprry-Management/1/` + pair_id + `/` + authorization_generation + `/` + key_epoch. ALPN is `wsprry-management/1`; TLS 1.3 requires TLS_AES_128_GCM_SHA256 and fresh P-256 ECDHE with psk_dhe_ke; reject all other suites/modes, 0-RTT, and resumption that bypasses a current authorization/epoch check. No certificate fallback.
 
-The controller stages the confirmed pair before commit and reads its durable
-receipt over the new paired TLS channel after any uncertain response. Public
-commit replay can return only its MAC-bound receipt for that attempt and expires
-with its ephemeral cache; it cannot grant another manager or mutate settings.
-After reboot, historical receipts are available only through authenticated pair/
-recovery paths. Paired TLS status/context carries current authorization generation
-and boot; a copied hostname is insufficient to authenticate a different target.
+The controller stages the confirmed pair before commit and reads its durable receipt over the new paired TLS channel after any uncertain response. Public commit replay can return only its MAC-bound receipt for that attempt and expires with its ephemeral cache; it cannot grant another manager or mutate settings. After reboot, historical receipts are available only through authenticated pair/ recovery paths. Paired TLS status/context carries current authorization generation and boot; a copied hostname is insufficient to authenticate a different target.
 
 ## Automatic rotation and durable pairing record
 
-`pi-management-pair/1` is a private file containing exactly
-`{schema,self_id,peer_id,pair_id,authorization_generation,role,state,current,
-pending,previous,receipt,retirement_verifier}`. IDs/generations use types above;
-role is `manager`; state is `pending|active|revoked`; current/pending/previous
-are null or `{epoch:Generation,tls_psk:B32,service_ms:U64,connections:U64}`.
-receipt is null or `{operation_id:ID,request_digest:Digest,result_digest:Digest}`;
-retirement_verifier is a B32 key or null. Unpaired absence is permitted only with
-an authoritative first-initialization or explicit UI access-recovery record; corrupt/lost previously initialized
-state is access recovery, never a silently new manager. Revoked records retain
-no settings access. Tombstones survive restart. Secret fields never enter APIs.
+`pi-management-pair/1` is a private file containing exactly `{schema,self_id,peer_id,pair_id,authorization_generation,role,state,current, pending,previous,receipt,retirement_verifier}`. IDs/generations use types above; role is `manager`; state is `pending|active|revoked`; current/pending/previous are null or `{epoch:Generation,tls_psk:B32,service_ms:U64,connections:U64}`. receipt is null or `{operation_id:ID,request_digest:Digest,result_digest:Digest}`; retirement_verifier is a B32 key or null. Unpaired absence is permitted only with an authoritative first-initialization or explicit UI access-recovery record; corrupt/lost previously initialized state is access recovery, never a silently new manager. Revoked records retain no settings access. Tombstones survive restart. Secret fields never enter APIs.
 
-Rotation uses existing authenticated TLS, `POST /api/pair/v1/rotate/prepare` with
-`{P,schema:"rotate-prepare",operation_id:ID,pair_id:ID,expected_epoch:Generation,
-pA:Point,nonce:B32}` and response
-`{P,schema:"rotate-prepared",operation_id:ID,next_epoch:Generation,pB:Point,nonce:B32}`.
-Use fresh P-256 ECDH validated points; derive the next TLS PSK with HKDF-SHA256,
-salt=current PSK, IKM=the 32-byte big-endian P-256 ECDH shared x-coordinate,
-and info=J([rotate-prepare request, rotate-prepared response]), in that order with all existing fields, prefixed
-`Wsprry-Pair/1/rotation/`. Confirm preparation through current TLS, persist next
-on both ends, then POST `/api/pair/v1/rotate/commit` with
-`{P,schema:"rotate-commit",operation_id:ID,pair_id:ID,expected_epoch:Generation,
-next_epoch:Generation}`. Response is
-`{P,schema:"rotate-committed",operation_id:ID,pair_id:ID,epoch:Generation}`.
-Read-only authenticated `GET /api/pair/v1/operations/{operation_id}` returns
-`{P,schema:"operation",operation_id:ID,pair_id:ID,
-authorization_generation:Generation,request_digest:Digest,
-state:pending|committed|rejected|unknown,result_digest:Digest|null}`.
-Initial pair-commit uses operation_id=pair_id; the controller maps its browser
-operation ID to that pair ID locally. Rotation uses its specified operation ID.
-Only the current pair or a previous epoch restricted to that exact unresolved
-rotation receipt may read it. Unknown never means not committed. No read can
-repeat a commit. This is the automatic lost-reply recovery path.
+Rotation uses existing authenticated TLS, `POST /api/pair/v1/rotate/prepare` with `{P,schema:"rotate-prepare",operation_id:ID,pair_id:ID,expected_epoch:Generation, pA:Point,nonce:B32}` and response `{P,schema:"rotate-prepared",operation_id:ID,next_epoch:Generation,pB:Point,nonce:B32}`. Use fresh P-256 ECDH validated points; derive the next TLS PSK with HKDF-SHA256, salt=current PSK, IKM=the 32-byte big-endian P-256 ECDH shared x-coordinate, and info=J([rotate-prepare request, rotate-prepared response]), in that order with all existing fields, prefixed `Wsprry-Pair/1/rotation/`. Confirm preparation through current TLS, persist next on both ends, then POST `/api/pair/v1/rotate/commit` with `{P,schema:"rotate-commit",operation_id:ID,pair_id:ID,expected_epoch:Generation, next_epoch:Generation}`. Response is `{P,schema:"rotate-committed",operation_id:ID,pair_id:ID,epoch:Generation}`. Read-only authenticated `GET /api/pair/v1/operations/{operation_id}` returns `{P,schema:"operation",operation_id:ID,pair_id:ID, authorization_generation:Generation,request_digest:Digest, state:pending|committed|rejected|unknown,result_digest:Digest|null}`. Initial pair-commit uses operation_id=pair_id; the controller maps its browser operation ID to that pair ID locally. Rotation uses its specified operation ID. Only the current pair or a previous epoch restricted to that exact unresolved rotation receipt may read it. Unknown never means not committed. No read can repeat a commit. This is the automatic lost-reply recovery path.
 
-Only increment by one and only for the exact prepared operation. Lost replies
-query the same authenticated operation receipt. New-epoch connection acknowledges
-commit; old epoch is then removed. At most two epochs are authorized during
-recovery, and the previous epoch can retrieve/finish only this rotation's receipt,
-not settings. Revocation generation always overrides every epoch, including
-pending/previous; it never resurrects through a receipt or failed rotation.
+Only increment by one and only for the exact prepared operation. Lost replies query the same authenticated operation receipt. New-epoch connection acknowledges commit; old epoch is then removed. At most two epochs are authorized during recovery, and the previous epoch can retrieve/finish only this rotation's receipt, not settings. Revocation generation always overrides every epoch, including pending/previous; it never resurrects through a receipt or failed rotation.
 
-One active manager and its revoked recovery records are published as a single
-`pi-management-pairs/1` catalog with exactly
-`{schema,self_id:ID,authorization_generation:U64,active:PairRecord|null,
-retired:[PairRecord]}`; PairRecord is `pi-management-pair/1` above. At most 32
-retired records. Replacement updates active, revocation, and generation in one
-pair-kind WAL image, not independent per-key renames. Retired TLS secrets are
-removed; only still-required retirement-verifier material and receipts survive.
-Completed reconciled retirement records are reclaimed automatically; unresolved
-ones cannot be discarded to make room. Capacity is an explicit safe refusal.
+One active manager and its revoked recovery records are published as a single `pi-management-pairs/1` catalog with exactly `{schema,self_id:ID,authorization_generation:U64,active:PairRecord|null, retired:[PairRecord]}`; PairRecord is `pi-management-pair/1` above. At most 32 retired records. Replacement updates active, revocation, and generation in one pair-kind WAL image, not independent per-key renames. Retired TLS secrets are removed; only still-required retirement-verifier material and receipts survive. Completed reconciled retirement records are reclaimed automatically; unresolved ones cannot be discarded to make room. Capacity is an explicit safe refusal.
 
-Counters persist on rotation/settings transactions and orderly shutdown, never
-per connection/poll. Unclean restart counts the prior epoch as due for rotation
-before its next settings mutation; offline startup can continue autonomous
-recurrence. Thus counter-checkpoint loss cannot indefinitely postpone renewal.
-A due epoch can authenticate recovery/rotation until the peer returns; no expiry
-requires user intervention. Exact PSK possession remains mandatory.
+Counters persist on rotation/settings transactions and orderly shutdown, never per connection/poll. Unclean restart counts the prior epoch as due for rotation before its next settings mutation; offline startup can continue autonomous recurrence. Thus counter-checkpoint loss cannot indefinitely postpone renewal. A due epoch can authenticate recovery/rotation until the peer returns; no expiry requires user intervention. Exact PSK possession remains mandatory.
 
 ## Durable automatic handover (D07)
 
-`pi-recurrence-authority/1` is independent of settings/control, and contains exactly
-`{schema,device_id,generation,state,transition_id,controllers,retirements,jobs,
-staged_revision,clean_proof}`. state uses authority_state above; transition_id is
-ID or null. controllers is at most 32 unique
-`{controller_id:ID,assignment_id:ID,assignment_revision:Digest}` rows. retirements
-is at most 32 unique `{controller_id:ID,assignment_id:ID,transition_id:ID,
-retirement_generation:Generation,receipt_digest:Digest}` rows. jobs is at most 32
-`{controller_id:ID,job_id:ID,boot_id:ID,state:pending|accepted|unknown}` rows.
-staged_revision is Digest or null. clean_proof is null or
-`{installation_id:ID,kind:never_initialized,attestation_id:ID}`. Bounded full
-records and their WAL are private/synced; capacity holds, never evicts uncertainty.
-P5-03 amends the meaning of clean proof: it records an installation that has
-accepted no work since its target-owned authority record was established, not
-hardware that has never been used. The owner establishes that boundary before
-admission, generates identifiers locally, and requires explicit protected local
-setup on Maintenance before staging validated settings disabled. The wire/storage
-version remains 1. Updates and ordinary configuration resets preserve history;
-missing or damaged established history requires recovery. Existing prior-authority
-evidence still requires retirement. A completely erased device cannot prove
-previous-controller retirement, and unchanged Plain-LAN WTP permits fresh external
-claims under its existing rules. No browser catalog can create proof, and no
-operator manages keys, certificates, or proof files.
+`pi-recurrence-authority/1` is independent of settings/control, and contains exactly `{schema,device_id,generation,state,transition_id,controllers,retirements,jobs, staged_revision,clean_proof}`. state uses authority_state above; transition_id is ID or null. controllers is at most 32 unique `{controller_id:ID,assignment_id:ID,assignment_revision:Digest}` rows. retirements is at most 32 unique `{controller_id:ID,assignment_id:ID,transition_id:ID, retirement_generation:Generation,receipt_digest:Digest}` rows. jobs is at most 32 `{controller_id:ID,job_id:ID,boot_id:ID,state:pending|accepted|unknown}` rows. staged_revision is Digest or null. clean_proof is null or `{installation_id:ID,kind:never_initialized,attestation_id:ID}`. Bounded full records and their WAL are private/synced; capacity holds, never evicts uncertainty. P5-03 amends the meaning of clean proof: it records an installation that has accepted no work since its target-owned authority record was established, not hardware that has never been used. The owner establishes that boundary before admission, generates identifiers locally, and requires explicit protected local setup on Maintenance before staging validated settings disabled. The wire/storage version remains 1. Updates and ordinary configuration resets preserve history; missing or damaged established history requires recovery. Existing prior-authority evidence still requires retirement. A completely erased device cannot prove previous-controller retirement, and unchanged Plain-LAN WTP permits fresh external claims under its existing rules. No browser catalog can create proof, and no operator manages keys, certificates, or proof files.
 
-The target's own legacy local recurrence is represented by a ControllerRow
-with controller_id=self ID and a target-generated persistent assignment ID;
-retire it in process under its existing scheduling/admission lock, never by
-sending a Fleet request to itself. The target-local inventory is confirmed from
-identified prior authorities and recovery evidence, not guessed from discovery.
-If completeness cannot be established, state remains unclassified/held.
+The target's own legacy local recurrence is represented by a ControllerRow with controller_id=self ID and a target-generated persistent assignment ID; retire it in process under its existing scheduling/admission lock, never by sending a Fleet request to itself. The target-local inventory is confirmed from identified prior authorities and recovery evidence, not guessed from discovery. If completeness cannot be established, state remains unclassified/held.
 
-The old controller initiating **Move schedule to device** through its own UI
-can retire its own assignment without authenticating an arbitrary new controller.
-Retirement means durable dispatch inhibition/tombstone tied to transition ID,
-then reconciliation of pending/accepted work, then a receipt. A name/address alone
-cannot authorize retirement of somebody else's controller. Existing paired peers
-can exchange a narrowly scoped retirement proof automatically; a legacy peer
-without any authenticated management path stays migration pending until the
-normal UI pairing/migration workflow is available, never “assumed retired.”
-This preserves the approved unavailable-controller-path boundary.
+The old controller initiating **Move schedule to device** through its own UI can retire its own assignment without authenticating an arbitrary new controller. Retirement means durable dispatch inhibition/tombstone tied to transition ID, then reconciliation of pending/accepted work, then a receipt. A name/address alone cannot authorize retirement of somebody else's controller. Existing paired peers can exchange a narrowly scoped retirement proof automatically; a legacy peer without any authenticated management path stays migration pending until the normal UI pairing/migration workflow is available, never “assumed retired.” This preserves the approved unavailable-controller-path boundary.
 
-`POST /api/control/v1/targets/{id}/migration` uses
-`{contract,schema:"target-migration",binding,capability_revision,operation_id,
-expected_revision,expected_authority_generation:Generation,
-controllers:[ControllerRow]}`. The submitted controller set must equal the
-target's verified complete legacy-authority inventory; omitted/extra/unknown
-authority holds migration rather than redefining that inventory. Ordinary settings binding and mutation guards apply;
-max 32 unique ControllerRows, no caller-supplied proof of retirement.
-`GET .../migration` returns
-`{contract,schema:"target-migration",binding,authority_generation:Generation,
-transition_id:ID|null,state,controllers:[ControllerRow],retirements:[RetirementRow],
-jobs:[JobRow],staged_revision:Digest|null}`. POST success is the ordinary durable
-operation receipt; migration may remain pending. `POST .../migration/rollback`
-uses the same fields except controllers is replaced by
-`resume_controller_id:ID,resume_assignment_id:ID`. Unknown transitions/identities,
-wrong revisions, additional fields, or a mismatched rollback selection refuse.
+`POST /api/control/v1/targets/{id}/migration` uses `{contract,schema:"target-migration",binding,capability_revision,operation_id, expected_revision,expected_authority_generation:Generation, controllers:[ControllerRow]}`. The submitted controller set must equal the target's verified complete legacy-authority inventory; omitted/extra/unknown authority holds migration rather than redefining that inventory. Ordinary settings binding and mutation guards apply; max 32 unique ControllerRows, no caller-supplied proof of retirement. `GET .../migration` returns `{contract,schema:"target-migration",binding,authority_generation:Generation, transition_id:ID|null,state,controllers:[ControllerRow],retirements:[RetirementRow], jobs:[JobRow],staged_revision:Digest|null}`. POST success is the ordinary durable operation receipt; migration may remain pending. `POST .../migration/rollback` uses the same fields except controllers is replaced by `resume_controller_id:ID,resume_assignment_id:ID`. Unknown transitions/identities, wrong revisions, additional fields, or a mismatched rollback selection refuse.
 
-Authenticated old-controller retirement endpoint
-`POST /api/pair/v1/retirement` accepts
-`{P,schema:"retirement",target_id:ID,controller_id:ID,assignment_id:ID,
-transition_id:ID,assignment_revision:Digest,retirement_generation:Generation,
-pair_id:ID,authorization_generation:Generation,proof:B32}`. The exact pair ID/generation selects its active or retirement-only verifier;
-no credential search or fallback is allowed. The proof authenticates J(body without proof) using the pair's
-retirement key, distinct from TLS/config authority. It only asks the named
-controller to retire its own assignment; it cannot enable, change settings, or
-resurrect pairing. Response replaces schema with `retired`, removes the request proof, and adds
-`receipt_digest:Digest` plus the response `proof:B32` exactly once; that proof
-covers the complete response without proof.
-The response is generated only after durable inhibition and job reconciliation;
-unresolved work returns a typed pending operation, not a retirement receipt.
+Authenticated old-controller retirement endpoint `POST /api/pair/v1/retirement` accepts `{P,schema:"retirement",target_id:ID,controller_id:ID,assignment_id:ID, transition_id:ID,assignment_revision:Digest,retirement_generation:Generation, pair_id:ID,authorization_generation:Generation,proof:B32}`. The exact pair ID/generation selects its active or retirement-only verifier; no credential search or fallback is allowed. The proof authenticates J(body without proof) using the pair's retirement key, distinct from TLS/config authority. It only asks the named controller to retire its own assignment; it cannot enable, change settings, or resurrect pairing. Response replaces schema with `retired`, removes the request proof, and adds `receipt_digest:Digest` plus the response `proof:B32` exactly once; that proof covers the complete response without proof. The response is generated only after durable inhibition and job reconciliation; unresolved work returns a typed pending operation, not a retirement receipt.
 
-Read-only `POST /api/pair/v1/retirement/status` takes
-`{P,schema:"retirement-status",target_id:ID,controller_id:ID,assignment_id:ID,
-transition_id:ID,pair_id:ID,authorization_generation:Generation,proof:B32}`.
-Its MAC covers that exact body without proof using the scoped retirement key.
-It returns the stored authenticated retired response or the typed pending/unknown
-result, never repeats retirement or grants settings access. This lets reconnecting
-peers resolve a lost reply without automatically retrying a mutation.
+Read-only `POST /api/pair/v1/retirement/status` takes `{P,schema:"retirement-status",target_id:ID,controller_id:ID,assignment_id:ID, transition_id:ID,pair_id:ID,authorization_generation:Generation,proof:B32}`. Its MAC covers that exact body without proof using the scoped retirement key. It returns the stored authenticated retired response or the typed pending/unknown result, never repeats retirement or grants settings access. This lets reconnecting peers resolve a lost reply without automatically retrying a mutation.
 
 For the approved retirement-only TLS callback, P62-04 fixes the exact closed derivation context to `{purpose:"Wsprry-Pair/1/retirement-tls",target_id:ID,controller_id:ID,pair_id:ID,authorization_generation:Generation,client_role:"target",server_role:"controller"}`. The target is the TLS client and the controller is the server; their stable IDs must differ. Both endpoints use that same target/controller order. Derive 32 bytes with HKDF-SHA256, using the exact retained 32-byte retirement verifier as IKM, SHA256 of UTF-8 `J(context)` as salt, and UTF-8 `Wsprry-Pair/1/retirement-tls-psk` as info. The resulting transport PSK is ephemeral and is not another persisted credential. Identity remains `Wsprry-Retirement/1/{pair_id}/{authorization_generation}` and ALPN remains `wsprry-retirement/1`, under the same TLS 1.3 PSK-DHE and shared connection/deadline limits. Only the two retirement/status POST messages are admitted; their existing body MACs and current transition/assignment checks remain required. This purpose authorizes no normal management, rotation, registration, pairing or resume.
 
-When replacing a manager, retain up to 32 revocation-tombstone retirement keys
-solely for authenticating these retirement receipts/requests, with IDs/generations
-and transition bindings. They authorize no settings/TLS management access.
-Revocation invalidates normal sessions immediately, independent of these
-recovery-only proofs. A recreated assignment revision does not match a retired
-receipt. This narrow path permits old-peer reconciliation without asking users
-to reinstall keys; if missing/unreachable/unverifiable, migration stays pending.
-Retirement_generation is the target recurrence-authority generation captured
-for this transition; assignment_revision is the phase-5 immutable per-assignment digest, computed
-from its existing deterministic row serialization after excluding enabled,
-in_flight, and last_start_ns. Preserve that exact projection and retained proofs;
-it is not the controller's whole-store/context ETag. HTTP If-Match still uses the
-current context ETag independently. The durable tombstone/receipt binds the frozen
-assignment digest even when pausing or unrelated rows change the context ETag. Exact duplicate requests return the same pending
-state or receipt; same transition ID with changed fields refuses. Later unrelated
-Fleet edits cannot resume that retired row or invalidate a genuine stored receipt.
-No unchanged WTP traffic is treated as an authenticated retirement proof.
+When replacing a manager, retain up to 32 revocation-tombstone retirement keys solely for authenticating these retirement receipts/requests, with IDs/generations and transition bindings. They authorize no settings/TLS management access. Revocation invalidates normal sessions immediately, independent of these recovery-only proofs. A recreated assignment revision does not match a retired receipt. This narrow path permits old-peer reconciliation without asking users to reinstall keys; if missing/unreachable/unverifiable, migration stays pending. Retirement_generation is the target recurrence-authority generation captured for this transition; assignment_revision is the phase-5 immutable per-assignment digest, computed from its existing deterministic row serialization after excluding enabled, in_flight, and last_start_ns. Preserve that exact projection and retained proofs; it is not the controller's whole-store/context ETag. HTTP If-Match still uses the current context ETag independently. The durable tombstone/receipt binds the frozen assignment digest even when pausing or unrelated rows change the context ETag. Exact duplicate requests return the same pending state or receipt; same transition ID with changed fields refuses. Later unrelated Fleet edits cannot resume that retired row or invalidate a genuine stored receipt. No unchanged WTP traffic is treated as an authenticated retirement proof.
 
 | State/transition | Target-local durable condition | Admission and failure behavior |
 | --- | --- | --- |
@@ -461,100 +130,33 @@ No unchanged WTP traffic is treated as an authenticated retirement proof.
 | any interrupted transition | Recover target/controller WAL, original IDs, receipts, jobs, staged revision | Continue read/reconcile; no replay of enable or fabricated retirement |
 | native/staged → rollback → legacy | Disable/read back new recurrence, drain/reconcile, verify output safe, then resume only explicit old controller/assignment | Lost reply stays rollback pending; never resume the old authority before native disable is confirmed |
 
-Target admission enforces the authority record on every new native enable and
-occurrence, including local API, file/reload, recovery, and startup paths. Direct
-INI edits cannot bypass staged/pending status. Restoring a retired saved controller
-assignment automatically is forbidden by its durable tombstone; a new legitimate WTP claim still follows unchanged WTP policy. This does not
-authorize the new Fleet UI to create controller-owned recurrence; the plan still
-requires its new assignments to be target-owned.
+Target admission enforces the authority record on every new native enable and occurrence, including local API, file/reload, recovery, and startup paths. Direct INI edits cannot bypass staged/pending status. Restoring a retired saved controller assignment automatically is forbidden by its durable tombstone; a new legitimate WTP claim still follows unchanged WTP policy. This does not authorize the new Fleet UI to create controller-owned recurrence; the plan still requires its new assignments to be target-owned.
 
-A later legitimate WTP owner can create work after local Transmit is off. On
-subsequent local enable use the current observed-job takeover workflow and guards;
-do not infer indefinite reservation or auto-stop that owner's job from the
-migration receipt. Unknown outstanding work always holds new recurrence.
+A later legitimate WTP owner can create work after local Transmit is off. On subsequent local enable use the current observed-job takeover workflow and guards; do not infer indefinite reservation or auto-stop that owner's job from the migration receipt. Unknown outstanding work always holds new recurrence.
 
 ## Phase boundaries and remaining implementation evidence
 
-The design contracts above are complete phase-1 definitions. Production schema
-materialization, protocol code, dependency selection/builds, official PAKE/TLS
-vectors, automated migration, crash injection, production-path network and USB
-integration, UI rendering, and operator documentation belong to separately
-authorized later phases. No change to the approved external behavior, numeric
-limits, current-control policy, or WTP contract may be hidden in those choices.
-A conforming cryptographic implementation with auditable provenance and published
-vector support is a dependency gate, not permission to hand-roll primitives or
-fall back to manual credentials. If unavailable, hold the affected slice and
-apply the approved omission/review rule.
+The design contracts above are complete phase-1 definitions. Production schema materialization, protocol code, dependency selection/builds, official PAKE/TLS vectors, automated migration, crash injection, production-path network and USB integration, UI rendering, and operator documentation belong to separately authorized later phases. No change to the approved external behavior, numeric limits, current-control policy, or WTP contract may be hidden in those choices. A conforming cryptographic implementation with auditable provenance and published vector support is a dependency gate, not permission to hand-roll primitives or fall back to manual credentials. If unavailable, hold the affected slice and apply the approved omission/review rule.
 
 ## Atomic settings/operation publication
 
-Use a parent-owned write-ahead transaction coordinator for managed saves; multiple
-unrelated file renames are not an atomic save. `pi-managed-settings/1` has exactly
-`{schema,device_id,configuration_generation,configuration,scheduling,
-candidate_digest,revision}`. Configuration and scheduling follow the exact shapes
-above; digests use the decision document's canonicalization. Revision hashes
-`{device_id,configuration_generation,candidate_digest,private_state_digest}`;
-private_state_digest covers the preserved server-owned configuration fields but
-is never a credential. Every committed settings/enable/disable mutation increments
-the durable configuration generation, including A→B→A writes, preventing ABA
-revision reuse. Observation/polling does not increment it. Initial managed state
-starts at generation 1 only after its approved migration/initialization gate.
+Use a parent-owned write-ahead transaction coordinator for managed saves; multiple unrelated file renames are not an atomic save. `pi-managed-settings/1` has exactly `{schema,device_id,configuration_generation,configuration,scheduling, candidate_digest,revision}`. Configuration and scheduling follow the exact shapes above; digests use the decision document's canonicalization. Revision hashes `{device_id,configuration_generation,candidate_digest,private_state_digest}`; private_state_digest covers the preserved server-owned configuration fields but is never a credential. Every committed settings/enable/disable mutation increments the durable configuration generation, including A→B→A writes, preventing ABA revision reuse. Observation/polling does not increment it. Initial managed state starts at generation 1 only after its approved migration/initialization gate.
 
-`pi-management-operations/1` is `{schema,device_id,receipts:[PrivateReceipt]}`
-with the specified 256 terminal/32 unresolved limits. PrivateReceipt is exactly
-`{principal_id:ID,route:string,authorization_generation:U64,request_digest:Digest,
-receipt:Receipt}`; Receipt is the public shape. Local operations use self ID and
-server-owned local authorization context; paired operations use pair ID and its
-current authorization generation. Route must be one of the specified mutation
-paths, not an arbitrary URL. These fields cannot be supplied to grant authority
-by a browser. Pending
-mutation reservations are not evictable and cannot run a different request.
+`pi-management-operations/1` is `{schema,device_id,receipts:[PrivateReceipt]}` with the specified 256 terminal/32 unresolved limits. PrivateReceipt is exactly `{principal_id:ID,route:string,authorization_generation:U64,request_digest:Digest, receipt:Receipt}`; Receipt is the public shape. Local operations use self ID and server-owned local authorization context; paired operations use pair ID and its current authorization generation. Route must be one of the specified mutation paths, not an arbitrary URL. These fields cannot be supplied to grant authority by a browser. Pending mutation reservations are not evictable and cannot run a different request.
 
-The coordinator stages the complete INI representation through its existing
-owning parser/serializer APIs plus the managed settings, operation receipt,
-and any required authority/progress record. If component APIs cannot support
-correct isolated staging, hold that implementation slice for the repository's
-component-scope authorization; do not silently modify a reusable component.
-The runtime must not call the legacy live-file save and then pretend a later
-settings-record rename made that first mutation atomic.
+The coordinator stages the complete INI representation through its existing owning parser/serializer APIs plus the managed settings, operation receipt, and any required authority/progress record. If component APIs cannot support correct isolated staging, hold that implementation slice for the repository's component-scope authorization; do not silently modify a reusable component. The runtime must not call the legacy live-file save and then pretend a later settings-record rename made that first mutation atomic.
 
-`pi-management-transaction/1` is a private, <=1048576-byte WAL with exactly
-`{schema,transaction_id:ID,device_id:ID,state:prepared|committed,
-records:[{kind,old_digest:Digest|null,new_digest:Digest,staged_name:string}]}`.
-Kinds are `ini|settings|operations|authority|progress|pair`, with P62-05's additional `peers` kind confined to the new private pairing owner; at most six unique
-kinds per transaction. staged_name is a coordinator-generated 32-hex stem within the private state
-directory, never a caller path; its images are exactly `<stem>.old` and
-`<stem>.new`. A null old_digest records authoritative prior absence; recovery
-removes only that transaction-created destination when restoring absence. Old/new private images
-and checksums are retained until recovery completes. Pair commits use the same
-protocol with their own private paired-record directory; no staged secrets enter
-operator receipts or logs. Directory/path ownership and regular-file/no-symlink
-rules apply to every image, WAL, and final path.
+`pi-management-transaction/1` is a private, <=1048576-byte WAL with exactly `{schema,transaction_id:ID,device_id:ID,state:prepared|committed, records:[{kind,old_digest:Digest|null,new_digest:Digest,staged_name:string}]}`. Kinds are `ini|settings|operations|authority|progress|pair`, with P62-05's additional `peers` kind confined to the new private pairing owner; at most six unique kinds per transaction. staged_name is a coordinator-generated 32-hex stem within the private state directory, never a caller path; its images are exactly `<stem>.old` and `<stem>.new`. A null old_digest records authoritative prior absence; recovery removes only that transaction-created destination when restoring absence. Old/new private images and checksums are retained until recovery completes. Pair commits use the same protocol with their own private paired-record directory; no staged secrets enter operator receipts or logs. Directory/path ownership and regular-file/no-symlink rules apply to every image, WAL, and final path.
 
 P62-05 adds the private `pi-management-peers/1` outgoing index with the exact profile/revocation shapes and pre-commit staging rules recorded in [phase-6.2 progress](phase-6-2-progress.md#p62-05--bounded-outgoing-pair-storage-image-approved-2026-11-17). It is distinct from the one-active-manager incoming `pi-management-pairs/1` catalog. A pairing owner registers exactly `pair`, `peers`, `operations` and `authority` destinations; the authoritative selector seals the exact bytes of both catalogs and the operation book. A complete coordinated publication contains four images under WAL version 1, preserving the six-image bound and all existing image meanings. The outgoing target's authorization generation is independent of this device's incoming-manager generation. No initial code or commit key is persisted; the pending outgoing TLS/retirement keys grant only authenticated exact-operation readback until the target's commit is confirmed.
 
-1. Under the owning transaction/admission lock, validate complete candidate,
-   current bindings/generations, authority, active-work restrictions, and the
-   original configuration/file signature. Any detected external edit retires the
-   candidate and requires fresh readback; never merge a stale complete candidate.
+1. Under the owning transaction/admission lock, validate complete candidate, current bindings/generations, authority, active-work restrictions, and the original configuration/file signature. Any detected external edit retires the candidate and requires fresh readback; never merge a stale complete candidate.
 2. Stage and sync all old/new images and the prepared WAL; no final path changes.
-3. Persist and sync the committed decision. This is the durable linearization
-   point. Apply final images idempotently and sync directories while admission
-   and externally visible managed snapshots remain held.
-4. Publish the new in-memory snapshot only after final images are verified.
-   A response loss still leaves the same durable operation receipt.
-5. Before accepting any managed read/write or new recurrence after failure/boot,
-   recover prepared transactions to the old images and committed transactions to
-   all new images; verify digests and complete required directory syncs. Corrupt
-   or ambiguous recovery holds, never selects whichever file looks newer.
+3. Persist and sync the committed decision. This is the durable linearization point. Apply final images idempotently and sync directories while admission and externally visible managed snapshots remain held.
+4. Publish the new in-memory snapshot only after final images are verified. A response loss still leaves the same durable operation receipt.
+5. Before accepting any managed read/write or new recurrence after failure/boot, recover prepared transactions to the old images and committed transactions to all new images; verify digests and complete required directory syncs. Corrupt or ambiguous recovery holds, never selects whichever file looks newer.
 
-Saved-state changes may still await existing runtime apply/restart semantics;
-a complete durable save is not proof of hardware application. Legacy `/config`,
-INI reload, and new management paths must enter the same parent transaction/
-admission owner for managed targets. A noncooperating external editor is not an
-atomic management client; detected file disagreement inhibits admission until a
-fresh valid configuration/recovery decision. Trusted OS administrators remain
-outside the threat boundary; no promise is made against root racing file writes.
+Saved-state changes may still await existing runtime apply/restart semantics; a complete durable save is not proof of hardware application. Legacy `/config`, INI reload, and new management paths must enter the same parent transaction/ admission owner for managed targets. A noncooperating external editor is not an atomic management client; detected file disagreement inhibits admission until a fresh valid configuration/recovery decision. Trusted OS administrators remain outside the threat boundary; no promise is made against root racing file writes.
 
 P62-09 adds the required private `uncertain` array to `pi-management-peers/1`. It contains frozen awaiting-commit OutgoingProfile records with their original pending epoch-1 pair, endpoint, profile identity/generation, target, initiating operation and context digest. Current profiles remain unique per target and limited to 64; uncertain plus retired rows are limited to 32. Each uncertain row requires its exact unresolved device-owned operation mapping, and pair/operation IDs cannot alias another current or uncertain record. A newer current profile for the same target retains the profile identity and advances its generation. Only explicit protected new intent followed by mutual PAKE may supersede a pending profile. Ordinary lookup excludes uncertain rows; their keys can serve only exact original-operation readback and cannot re-enroll a superseded profile. Authenticated confirmation of the new durable current pair removes obsolete old TLS authority while preserving required unknown operation, retirement and receipt evidence. Unknown records are not capacity-evictable. Image count, WAL version 1, selector binding and operator workflow are unchanged.
 

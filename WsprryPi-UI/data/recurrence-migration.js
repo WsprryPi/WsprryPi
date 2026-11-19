@@ -36,11 +36,11 @@
         if(!current){node('Device').textContent=selected?selected+' · status unavailable':'Choose a device';node('State').textContent='Current scheduling authority is unknown. Refresh status before a transition.';controls();return;}
         node('').hidden=false;
         node('Device').textContent=current.context.target.name+' · '+selected;
-        const messages={legacy:'This device retains its existing schedule. Migration retires recorded prior schedules and saves the device-owned schedule disabled.',
+        const messages={legacy:'Migration required; scheduling is held. Resolve ownership or output recovery, then review migration to save the device-owned schedule disabled.',
             rollback:'The selected previous controller may run its saved schedule. Local device-owned recurrence remains disabled.',
             retiring:'Prior controllers and accepted work are being reconciled. New recurring work is blocked until verified retirement.',
             reconciling:'Restoration is unconfirmed. This device’s recurring schedules remain blocked while the previous controller confirms its saved result.',
-            staged:'The device-owned schedule is saved and disabled.',native:'This device owns its recurring schedule.',
+            staged:'Migration completed; schedule disabled pending review.',native:'This device owns its recurring schedule.',
             unclassified:'Previous scheduling history cannot be verified. Migration remains unavailable.',held:'Scheduling history or outstanding work requires recovery.'};
         node('State').textContent=messages[current.migration.state]||'Scheduling authority requires review before a transition.';
         if(remoteOutput())node('State').textContent='This Pi sends transmissions to another device. Retire its remote schedule and reconcile accepted work with WTP-capable software. Then configure the transmitting device’s own schedule; migration cannot turn this remote output into a local schedule.';

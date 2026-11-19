@@ -6,6 +6,7 @@
 #include "config_handler_serialization.hpp"
 #include "controller_runtime.hpp"
 #include "scheduling.hpp"
+#include "recurrence_admission.hpp"
 #include "wtp_pi_control.hpp"
 #include "WTP-Server/include/wtp_server/inhibited_rf_engine.hpp"
 #include <filesystem>
@@ -110,6 +111,50 @@ int main(){
         PiManagedHost host(blocked,self,boot,observe);host.prepare();host.parsed();
         check(host.state()==PiHostReadiness::StorageRecovery&&!wtp_pi_management_ready()&&!view(host)["writable"].get<bool>(),"Corrupt history keeps protected read-only recovery available");
         refuses([&]{validate_config_ini_input(blocked);});
+    }
+    const auto policy_ini=root+"/policy.ini";fixture(policy_ini);
+    bool uncertain=true;Json migrated,enabled;
+    const auto policy_observe=[&]()->std::optional<PiManagementObservation>{
+        auto current=observe();current->authority.output_unknown=uncertain;return current;
+    };
+    {
+        PiManagedHost host(policy_ini,self,boot,policy_observe);host.prepare();std::string error;
+        check(load_json(policy_ini,&error,nullptr),"Saved local policy is valid");host.parsed();
+        check(legacy_recurrence_admission()==LegacyRecurrenceAdmission::Held,"First native policy cannot run the old scheduler before handover");
+        host.activate([](const auto &action){action();});
+        const auto reply=host.management({"GET","/api/control/v1/targets/"+self+"/migration"},true);
+        check(reply.status==200&&Json::parse(reply.body)["state"]=="legacy"&&legacy_recurrence_admission()==LegacyRecurrenceAdmission::Held,
+            "Unknown output preserves authority while mandatory migration stays held");
+    }
+    uncertain=false;
+    const auto original_policy=bytes(policy_ini);
+    {
+        PiManagedHost host(policy_ini,self,boot,policy_observe);host.prepare();std::string error;
+        check(load_json(policy_ini,&error,nullptr),"Held policy can be read on a safe restart");host.parsed();host.activate([](const auto &action){action();});
+        const auto prefix="/api/control/v1/targets/"+self+"/";
+        const auto read=[&](const char *resource){const auto reply=host.management({"GET",prefix+resource},true);check(reply.status==200,"Policy resource read");return Json::parse(reply.body);};
+        const auto migration=read("migration");migrated=read("settings");
+        check(migration["state"]=="staged"&&migration["staged_revision"]==migrated["revision"]&&
+            migrated["saved"]["scheduling"]["enabled"]==false&&migration["retirements"].size()==1&&bytes(policy_ini)==original_policy,
+            "First safe native startup retires local recurrence and atomically saves it disabled without rewriting INI");
+        check(legacy_recurrence_admission()==LegacyRecurrenceAdmission::Held&&!config.transmit,
+            "Disabled staging cannot admit recurrence or turn on transmission");
+        const auto context=read("context");
+        Json enable{{"contract","Wsprry-Control/1"},{"schema","target-enable"},{"binding",context["binding"]},
+            {"capability_revision",context["capability_revision"]},{"operation_id",std::string(32,'9')},
+            {"expected_revision",migrated["revision"]},{"candidate_digest",migrated["candidate_digest"]}};
+        const auto result=host.management({"POST",prefix+"enable",enable.dump(),"\""+migrated["revision"].get<std::string>()+"\"",true},true);
+        check(result.status==200&&read("migration")["state"]=="native","Operator explicitly enables the confirmed saved native policy");
+        enabled=read("settings");
+    }
+    {
+        PiManagedHost host(policy_ini,self,boot,policy_observe);host.prepare();std::string error;
+        check(load_json(policy_ini,&error,nullptr),"Enabled native policy survives restart");host.parsed();host.activate([](const auto &action){action();});
+        const auto reply=host.management({"GET","/api/control/v1/targets/"+self+"/settings"},true);
+        const auto saved=Json::parse(reply.body);
+        check(reply.status==200&&saved["saved"]==enabled["saved"]&&saved["revision"]==enabled["revision"]&&
+            saved["saved"]["scheduling"]["enabled"]==true&&legacy_recurrence_admission()==LegacyRecurrenceAdmission::Native,
+            "Later startup preserves explicit native enable and does not repeat migration");
     }
     check(!config.transmit&&!authority.snapshot().remote.owner_id&&!authority.snapshot().remote.output_active,"Fixture never enabled or acquired RF");
     std::cout<<"PASS: process-owned protected recovery, staged save, automatic saved readback, explicit native readiness, durable receipt continuity, unchanged-input retry bound, output/storage holds, and no controller-role fallback\n";
