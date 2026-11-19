@@ -194,13 +194,19 @@ def main():
                     status, body, revision = request(port, "GET", devices_path, with_revision=True)
                     assert status == 200 and revision
                     settings = {"Transport": "network_plain", "Hostname": "127.0.0.1",
-                                "TCP Port": 40000 + index, "Device ID": str(index) * 32}
+                                "TCP Port": 40000 + index, "Device ID": str(index) * 32,
+                                "TLS Server Identity": "", "TLS CA File": "",
+                                "TLS Client Certificate": "", "TLS Client Key": "",
+                                "Endpoint": "", "USB Serial": "",
+                                "USB Vendor ID": 0, "USB Product ID": 0}
                     command = {"operation": "add", "name": f"Saved target {index}",
                                "method": "manual", "discovery_id": "", "settings": settings,
                                "consent_plain": True}
                     headers = {"If-Match": revision, "Content-Type": "application/json",
                                "Origin": f"http://127.0.0.1:{port}", "X-WsprryPico-Request": "1"}
-                    assert request(port, "POST", devices_path, json.dumps(command), headers)[0] == 200
+                    code, reply = request(port, "POST", devices_path, json.dumps(command), headers)
+                    assert code == 200, reply
+                    assert json.loads(reply)["profiles"][-1]["settings"] == settings
                 status, body = request(port, "GET", devices_path)
                 assert len(json.loads(body)["profiles"]) == 2
                 assert ini.read_text() == original
@@ -213,7 +219,6 @@ def main():
                                      ("POST", "/control/stop"), ("POST", "/api/wtp/recover"),
                                      ("POST", "/api/control/v1/host/devices/use"),
                                      ("POST", "/api/control/v1/host/wtp-endpoint/enable"),
-                                     ("POST", "/api/control/v1/jobs"),
                                      ("POST", "/api/rp1-gpclk-route"),
                                      ):
                     status, body = request(port, method, path, "{}", {"Content-Type": "application/json"})
@@ -247,6 +252,11 @@ def main():
                 assert request(port, "POST", retirement_path, '{}', authorized)[0] == 400
                 assert request(port, "GET", retirement_path + "?proof=forged")[0] == 400
                 assert request(port, "GET", retirement_path, headers={"X-WsprryPi-Client-Address": "not-an-address"})[0] == 403
+                # Removed jobs are outside the mutation allowlist, even for
+                # an otherwise valid controller browser session.
+                assert request(port, "POST", "/api/control/v1/jobs", '{}', intent)[0] == 403
+                code, payload = request(port, "POST", "/api/control/v1/jobs", '{}', authorized)
+                assert code == 403 and payload == b"Forbidden", (code, payload)
                 # A valid CSRF session grants no target identity or enrollment.
                 assert request(port, "POST", target_path, '{}', authorized)[0] == 400
                 assert request(port, "GET", "/api/control/v1/targets")[0] == 200

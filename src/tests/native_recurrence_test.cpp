@@ -148,19 +148,33 @@ void state_matrix(){
     }
     clear_wtp_pi_control_hooks();set_wtp_pi_management_readiness({});set_legacy_recurrence_admission([]{return LegacyRecurrenceAdmission::Native;});
 }
-void real_message(bool virtual_time,bool reject){
+bool real_message(bool virtual_time,bool reject,bool force_late=false){
     Fixture f;config.mode=ModeType::QRSS;config.qrss.message="E";config.qrss.frequency_hz=14097000;config.modulation_dot_seconds=config.qrss.dot_seconds=.02;resolve_backend_specific_config(config);
     WsprTransmitter::SimulatedRuntimeConfig sim;sim.virtual_time=virtual_time;sim.trace_path=f.root+"/trace.json";
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);
     set_scheduler_execution_suppressed_for_test(false);
-    std::mutex mutex;std::condition_variable cv;bool done=false,started=false;std::string terminal;
+    std::mutex mutex;std::condition_variable cv;bool done=false,started=false,terminal_current=false;std::string terminal;
+    std::chrono::system_clock::time_point terminal_utc;
+    std::shared_ptr<NativeOccurrence> plan;
+    if(force_late){
+        f.snapshot.policy.solar_enabled=true;f.snapshot.policy.locator="EM18";
+        f.snapshot.policy.day.allow=f.snapshot.policy.night.allow=true;
+        testing::set_native_clock_reader([&](bool fresh){
+            // An actual slow admission observation must not move the production
+            // launch window. The transmitter rechecks lateness after the guard.
+            if(fresh&&plan&&plan->accepted)std::this_thread::sleep_for(std::chrono::milliseconds(80));
+            return SolarClockObservation{SolarClockState::Synchronized,utc(),f.clock_generation,1000,0,true};
+        });
+    }
     transmitter_set_callbacks([&](auto event,auto level,const auto &message,double value){
         if(event==WsprTransmissionCallbackEvent::STARTING)started=true;
+        const bool ended=event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED;
+        if(ended){terminal_utc=std::chrono::system_clock::now();terminal_current=native_launch_current(plan);}
         transmitter_cb(event,level,message,value);
-        if(event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
+        if(ended){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
     });
     const auto start=utc()+300'000'000ULL;const std::array<std::uint64_t,1> starts{start};
-    const auto plan=prepare_native_occurrence(config,starts);assert(plan->evaluation.outcome==SolarOutcome::Allowed);
+    plan=prepare_native_occurrence(config,starts);assert(plan->evaluation.outcome==SolarOutcome::Allowed);
     const auto &tones=plan->evaluation.intent->nominal_tones_nhz;
     assert(reserve_native_occurrence(plan,nlohmann::json{{"message","E"}},tones));
     const auto when=std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(start)));
@@ -171,15 +185,34 @@ void real_message(bool virtual_time,bool reject){
         if(reject)f.snapshot.intent_revision=std::string(64,'f');
     }
     {std::unique_lock lock(mutex);assert(cv.wait_for(lock,std::chrono::seconds(4),[&]{return done;}));}
-    if(started==reject||native_occurrence_active())
+    // Reap the worker before callback captures or fixture state can be destroyed.
+    transmitter_stop_and_join();transmitter_set_callbacks({});
+    const bool late=!reject&&!started&&terminal_current&&terminal=="Prepared occurrence is no longer current."&&
+        terminal_utc>=when&&!ScheduledLaunch{when,{}}.current(terminal_utc);
+    if((started==reject&&!late)||native_occurrence_active())
         std::cerr<<"Native message result: virtual="<<virtual_time<<" reject="<<reject
                  <<" started="<<started<<" active="<<native_occurrence_active()
                  <<" terminal="<<terminal<<" observation="<<native_recurrence_observation(f.self).dump()<<'\n';
-    assert(started!=reject&&!native_occurrence_active());
+    assert((started!=reject||late)&&!native_occurrence_active());
+    if(force_late)assert(late&&!started);
     const auto elapsed=std::chrono::steady_clock::now()-before;
     assert(elapsed>=std::chrono::milliseconds(200)&&elapsed<std::chrono::seconds(4));
-    if(!reject){std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(!trace.is_null());}
+    if(!reject){
+        std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(!trace.is_null());
+        if(late){
+            assert(std::all_of(trace["events"].begin(),trace["events"].end(),[](const auto &event){return !event.value("rf_on",false);}));
+            std::cout<<"PASS: host missed the unchanged launch window; refusal kept output off and reconciled the occurrence\n";
+        }
+    }
     assert(f.snapshot.progress->publication_count()==3);
+    return started;
+}
+void real_message_launch(bool virtual_time){
+    // Each late refusal must independently prove safe cleanup. Never retry a
+    // committed occurrence: each attempt owns a fresh private fixture/slot.
+    // A successful actual launch is still mandatory; unexplained refusals fail.
+    for(unsigned attempt=0;attempt<8;++attempt)if(real_message(virtual_time,false))return;
+    assert(false&&"No actual native message launch completed within eight fresh occurrences");
 }
 void scheduled_override(ModeType mode){
     Fixture f;config.mode=mode;config.modulation_dot_seconds=.02;config.modulation_fsk_offset_hz=2;
@@ -289,4 +322,4 @@ void complete_pair_refusal_before_effects(){
     assert(native_recurrence_observation(f.self)["waiting_reason"]=="solar");
 }
 }
-int main(){pair_and_disable();holds_and_generations();refused_committed_launch_and_file_fence();disabled_poll_has_no_preparation();state_matrix();real_message(true,false);real_message(false,false);real_message(true,true);for(auto mode:{ModeType::QRSS,ModeType::FSKCW,ModeType::DFCW})scheduled_override(mode);real_wspr(false);real_wspr(true);rotations_skip_and_fault();explicit_skip();queued_callback_binding();complete_pair_refusal_before_effects();std::cout<<"PASS: native production planner, pair freeze/drain/refusal before effects, state matrix, reservation races, bounded writes, rotations/skips/faults, callback binding, and virtual/real-time simulated launch\n";}
+int main(){pair_and_disable();holds_and_generations();refused_committed_launch_and_file_fence();disabled_poll_has_no_preparation();state_matrix();real_message_launch(true);real_message_launch(false);assert(!real_message(true,true));assert(!real_message(true,false,true));for(auto mode:{ModeType::QRSS,ModeType::FSKCW,ModeType::DFCW})scheduled_override(mode);real_wspr(false);real_wspr(true);rotations_skip_and_fault();explicit_skip();queued_callback_binding();complete_pair_refusal_before_effects();std::cout<<"PASS: native production planner, pair freeze/drain/refusal before effects, state matrix, reservation races, bounded writes, rotations/skips/faults, callback binding, and virtual/real-time simulated launch\n";}
