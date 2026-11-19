@@ -10,7 +10,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css', 'operation.css'],
-        'js' => ['fleet-client.js', 'local-wtp.js', 'operation.js', 'fleet-operation.js'],
+        'js' => ['fleet-client.js', 'local-wtp.js', 'operation.js', 'pi-target-client.js', 'pico-target-client.js', 'target-operation.js', 'fleet-operation.js'],
         'partial' => __DIR__ . '/views/operation.php',
     ],
     'config' => [

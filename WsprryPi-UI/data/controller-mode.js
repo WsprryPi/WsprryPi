@@ -21,7 +21,7 @@
             notice.hidden = false;
             const detail = notice.querySelector(".page-warning__message");
             detail.textContent = changed ? "The controller identity changed. Reload this page before managing devices."
-                : ready ? "This controller has no local transmitter. Manage saved devices and assignments in Fleet, or select an assigned output in Operations."
+                : ready ? "This controller has no local transmitter. Select a managed device in Operations to read status and use its controls, or manage device settings in Setup."
                 : "The controller is starting. Device management remains unavailable until it is ready.";
         }
         for (const id of ["radio-pane", "transmitter-hardware-pane", "pi-hardware-pane", "local-wtp-control"]) {

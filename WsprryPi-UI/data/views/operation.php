@@ -8,8 +8,8 @@ unset($cardFleetSelector);
 
             <div class="card-body operation-card-body">
                 <section id="operationControllerView" hidden aria-labelledby="operationControllerHeading">
-                    <h2 id="operationControllerHeading" class="h5">Select an assigned output</h2>
-                    <p id="operationControllerDetail" class="form-text">This controller has no local transmitter. Choose an assigned output above or manage outputs in Fleet.</p>
+                    <h2 id="operationControllerHeading" class="h5">Select a device</h2>
+                    <p id="operationControllerDetail" class="form-text">This controller has no local transmitter. Choose a managed device above, or add a device in Setup.</p>
                     <div class="d-flex flex-wrap gap-2">
                         <a class="btn btn-primary" href="index.php?page=config&amp;setup_tab=%23fleet-pane">Manage Fleet</a>
                         <button id="operationControllerRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
@@ -128,4 +128,34 @@ unset($cardFleetSelector);
                 <div id="backendStatus" class="alert operation-backend-status" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
                 </div>
                 <?php require __DIR__ . '/fleet-operation.php'; ?>
+                <section id="operationTargetView" hidden aria-labelledby="operationTargetName">
+                    <div class="operation-hero">
+                        <div class="operation-hero__status">
+                            <h2 id="operationTargetName" class="h4 text-break">Selected device</h2>
+                            <p id="operationTargetIdentity" class="form-text text-break"></p>
+                            <div id="operationTargetState" class="operation-hero__state-value" role="status" aria-live="polite">Device state unknown</div>
+                            <p id="operationTargetDetail" class="operation-hero__detail"></p>
+                            <p id="operationTargetAge" class="form-text"></p>
+                        </div>
+                        <div class="operation-hero__controls" aria-label="Selected device controls">
+                            <div class="d-flex flex-wrap gap-2">
+                                <button id="operationTargetRead" type="button" class="btn btn-outline-secondary">Read status</button>
+                                <button id="operationTargetTransmit" type="button" class="btn btn-primary" disabled>Enable transmission</button>
+                                <button id="operationTargetEnable" type="button" class="btn btn-outline-primary" disabled>Enable saved schedule</button>
+                                <button id="operationTargetDisable" type="button" class="btn btn-outline-secondary" disabled>Pause schedule</button>
+                                <button id="operationTargetStop" type="button" class="btn btn-danger" disabled>Stop transmission</button>
+                                <button id="operationTargetStopRead" type="button" class="btn btn-outline-secondary" hidden>Read stop status</button>
+                                <button id="operationTargetCheck" type="button" class="btn btn-outline-secondary" hidden>Check earlier request</button>
+                                <button id="operationTargetReadReview" type="button" class="btn btn-outline-secondary" hidden>Read current values for review</button>
+                                <button id="operationTargetReview" type="button" class="btn btn-outline-secondary" hidden>I reviewed these values</button>
+                                <button id="operationTargetSetup" type="button" class="btn btn-outline-secondary">Edit device settings</button>
+                            </div>
+                            <p id="operationTargetFeedback" class="form-text text-break mt-2" role="status" aria-live="polite"></p>
+                            <p id="operationTargetLimit" class="form-text"></p>
+                            <pre id="operationTargetReviewValues" class="text-break"></pre>
+                        </div>
+                    </div>
+                    <dl id="operationTargetSummary" class="operation-summary-grid"></dl>
+                    <p class="form-text mt-3">Clocks in the header belong to this controller. Device controls apply only to the selected device.</p>
+                </section>
             </div>

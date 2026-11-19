@@ -5,7 +5,7 @@
     <div id="local-wtp-confirmation" class="mt-2" role="group" aria-labelledby="local-wtp-confirm-title" hidden>
         <h3 id="local-wtp-confirm-title" class="h6">Take local control</h3>
         <p id="local-wtp-confirm-detail" class="text-break mb-2"></p>
-        <p class="form-text">This Pi takes priority. Future assignments saved on its controller will be removed when the controller reconnects.</p>
+        <p class="form-text">This Pi takes local control. Any unresolved legacy ownership or output cleanup must be reconciled before local transmission can begin.</p>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" id="local-wtp-end-now" class="btn btn-danger">End now</button>
             <button type="button" id="local-wtp-finish" class="btn btn-outline-primary">Let it finish</button>

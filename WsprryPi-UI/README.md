@@ -125,6 +125,10 @@ report locations, and actual replacement status as its final output block.
 
 ### Fleet access
 
+Operations **Device** uses the current managed-target inventory, including paired Pis and supported Picos managed through them. Selecting a device reads its status without changing settings or selecting a transmitter backend. Pi controls separately enable Transmit permission, enable or pause saved scheduling, and stop output. Pico Stop disables both native schedules and requires target- and boot-bound inactive, unowned readback; schedule editing remains in Setup. **Edit device settings** opens the selected device in Setup. Unconfirmed requests remain attached to their original target across selection changes, with receipt checking and explicit readback/review before another mutation. Local transmitter and controller power actions are unavailable while another device is selected. Legacy Fleet assignments remain separately labeled migration history and cannot control current devices.
+
+The Setup **Device** selector lists local settings, saved Pico profiles, paired Pis, Picos managed through paired Pis, and supported nearby Picos. Nearby Wi-Fi entries require a current, valid WsprryPico management advertisement; USB entries come from WsprryPico management-interface discovery. Repeated observations of the same endpoint appear once, and an endpoint already represented by a saved profile is omitted from nearby entries. Different saved profiles and retained drafts remain distinct. Connection labels distinguish Wi-Fi advertisements, USB, TLS network profiles, unencrypted network profiles, and USB through a paired Pi. Nearby advertisements remain unverified hints until identification and enrollment.
+
 The Setup > Fleet tab groups saved devices, nearby management advertisements,
 and read-only legacy controller schedules. It is available without a console
 command or visibility preference. Browsing does not select a transmitter

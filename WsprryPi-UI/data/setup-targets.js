@@ -15,20 +15,49 @@
     let localDraft = false, sequence = 0, lastTab = tabs[0], loading = false, initialized = false, localReady = false;
     function activeTab() {return tabs.find(id => node(id)?.classList.contains('active'));}
     function retainedPis() {return [...(root.PiTargetEditors?.retainedTargets?.()||[]),...(root.SchedulingEditor?.retainedTargets?.({remoteOnly:true})||[])];}
+    const connectionLabel = transport => ({usb:'USB',consumer:'Wi-Fi',network:'Network (TLS)',network_plain:'Network (unencrypted)'})[transport] || 'Connection unavailable';
+    const networkHost = host => typeof host === 'string' ? host.toLowerCase().replace(/\.$/,'') : '';
+    function endpointKey(settings) {
+        if (settings?.Transport === 'usb') return settings['USB Serial'] && settings['USB Vendor ID'] && settings['USB Product ID']
+            ? JSON.stringify(['usb',settings['USB Serial'],settings['USB Vendor ID'],settings['USB Product ID']]) : null;
+        return settings?.Transport === 'network_plain' && networkHost(settings.Hostname) && settings['TCP Port']
+            ? JSON.stringify(['consumer',networkHost(settings.Hostname),settings['TCP Port']]) : null;
+    }
+    function nearbyOptions() {
+        const saved = new Set(profiles.map(profile => profile.discovery_id).filter(Boolean));
+        const endpoints = new Set(profiles.map(profile => endpointKey(profile.settings)).filter(Boolean));
+        const seen = new Set(), result = [];
+        // Prefer the selected observation when an endpoint is seen on multiple links.
+        const ordered = [...candidates].sort((a,b) => Number('nearby:'+b.id === choice)-Number('nearby:'+a.id === choice));
+        for (const candidate of ordered) {
+            if (candidate.state !== 'online' || typeof candidate.id !== 'string') continue;
+            const key = candidate.binding === 'usb' && candidate.settings?.Transport === 'usb' ? endpointKey(candidate.settings)
+                : candidate.binding === 'consumer' && networkHost(candidate.target) && candidate.port === 80
+                    ? JSON.stringify(['consumer',networkHost(candidate.target),candidate.port]) : null;
+            if (!key || saved.has(candidate.id) || endpoints.has(key) || seen.has(key)) continue;
+            seen.add(key);
+            result.push(candidate);
+        }
+        return result.map(candidate => {
+            const name = candidate.instance || 'WsprryPico';
+            const sameName = result.some(other => other !== candidate && (other.instance || 'WsprryPico') === name);
+            const endpoint = candidate.binding === 'usb' ? candidate.settings['USB Serial'] : networkHost(candidate.target);
+            return ['nearby:'+candidate.id,`${name} · ${connectionLabel(candidate.binding)}${sameName ? ' · '+endpoint : ''} · not enrolled`];
+        });
+    }
     function options() {
         const select = node('setup-device');if (!select) return;
         const focused = root.document.activeElement === select;
         const values = [['local',root.ControllerMode?.active ? 'Controller · no local transmitter' : 'This Pi · local settings']];
         for (const profile of profiles) if (identity(profile.id) && identity(profile.settings?.['Device ID']))
-            values.push(['known:'+profile.id,`${profile.name} · ${profile.settings.Transport} · ${profile.legacy_unverified ? 'unverified' : 'saved device'}`]);
-        for (const profile of managedProfiles) values.push([selectionValue(profile),`${profile.name} · through paired Pi`]);
+            values.push(['known:'+profile.id,`${profile.name} · ${connectionLabel(profile.settings.Transport)} · ${profile.legacy_unverified ? 'unverified' : 'saved device'}`]);
+        for (const profile of managedProfiles) if (!values.some(([id]) => id === selectionValue(profile))) values.push([selectionValue(profile),`${profile.name} · USB · through paired Pi`]);
         for (const profile of root.PicoTargetEditors?.retainedProfiles?.() || [])
             if (!values.some(([id]) => id === selectionValue(profile))) values.push([selectionValue(profile),`${profile.name} · unavailable source · retained draft`]);
-        for (const target of managedPis) values.push(['pi:'+target.device_id,`${target.name} · paired Pi`]);
+        for (const target of managedPis) if (!values.some(([id]) => id === 'pi:'+target.device_id)) values.push(['pi:'+target.device_id,`${target.name} · Network · paired Pi`]);
         for (const target of retainedPis())
             if (!values.some(([id]) => id === 'pi:'+target.device_id)) values.push(['pi:'+target.device_id,`${target.name} · unavailable Pi · retained draft`]);
-        for (const candidate of candidates) if (typeof candidate.id === 'string')
-            values.push(['nearby:'+candidate.id,`${candidate.instance || 'Nearby device'} · ${candidate.binding || 'USB'} · not enrolled`]);
+        values.push(...nearbyOptions());
         const signature = JSON.stringify(values);
         if (select.dataset.options !== signature) {
             select.replaceChildren(...values.map(([value,label]) => {const option = root.document.createElement('option');option.value = value;option.textContent = label;return option;}));
@@ -72,7 +101,7 @@
         }
         const detail = node('setup-device-detail'),status = node('setup-device-state');
         if (pico) {
-            detail.textContent = `${current?.name || 'Saved device'} · ${state?.connected ? 'Pico' : 'Pico management not verified'} · ${current?.managed ? 'through paired Pi' : current?.settings?.Transport || 'unavailable'} · device ${current?.settings?.['Device ID'] || 'unavailable'}`;
+            detail.textContent = `${current?.name || 'Saved device'} · ${state?.connected ? 'Pico' : 'Pico management not verified'} · ${current?.managed ? 'USB through paired Pi' : connectionLabel(current?.settings?.Transport)} · device ${current?.settings?.['Device ID'] || 'unavailable'}`;
             status.textContent = loading ? 'Checking the selected device. No configuration or output change was requested.'
                 : state?.unconfirmed ? 'Unconfirmed change on this Pico. Read and review its saved settings before another change.'
                 : state?.paused ? 'Connection or profile changed. Draft retained; reconnect before editing.'
@@ -88,11 +117,13 @@
             status.textContent = 'Identify and add this device in Fleet before managing settings. Selection does not enroll it.';
         } else {
             detail.textContent = root.ControllerMode?.active ? `Controller · ${root.ControllerMode.ready ? 'ready' : 'not ready'} · no local transmitter`
-                : `This Pi · local settings${local ? ' · device '+local.device_id : ''}`;
+                : '';
             status.textContent = localDraft ? 'Local draft retained. Review it and choose Save retained local draft to resume saving.'
                 : root.ControllerMode?.active ? 'Choose a saved Pico to manage its settings. Paired Pis are available from the Device selector.'
-                : !localReady ? 'Reading this Pi’s saved settings. Editing remains unavailable until they load.' : 'Local settings keep their existing save behavior. Selecting another device never changes this Pi’s output.';
+                : !localReady ? 'Reading this Pi’s saved settings. Editing remains unavailable until they load.' : '';
         }
+        detail.hidden = !detail.textContent;
+        status.hidden = !status.textContent;
         if(pi&&!scheduling){root.PiTargetEditors?.showTab?.([0,-1,1,2][Math.max(0,tabs.indexOf(activeTab()))]);node('setup-pi-workspace')?.setAttribute('aria-labelledby',activeTab()||tabs[0]);}
         const schedulePanel=node('setup-scheduling');
         if(schedulePanel){
@@ -187,6 +218,12 @@
             managedProfiles=value.targets.filter(target=>target.product==='WsprryPico'&&!profiles.some(profile=>profile.settings['Device ID']===target.device_id))
                 .map(target=>({id:target.device_id,name:target.name,managed:true,settings:{'Device ID':target.device_id,Transport:'usb'}}));
             root.PicoTargetEditors?.managedTargetsChanged?.(managedProfiles);
+            let handoff=null;
+            try{handoff=JSON.parse(root.sessionStorage.getItem('wsprrypi.setup.target')||'null');}catch(_){/* Navigation hints cannot invalidate verified inventory. */}
+            if(handoff&&Object.keys(handoff).join(',')==='device_id'&&identity(handoff.device_id)){
+                const pi=managedPis.find(target=>target.device_id===handoff.device_id),profile=availableProfiles().find(profile=>profile.settings['Device ID']===handoff.device_id);
+                if(pi||profile&&root.WtpUi?.catalogReady){root.sessionStorage.removeItem('wsprrypi.setup.target');await select(pi?'pi:'+pi.device_id:selectionValue(profile));}
+            }
         } catch (_) {
             // Discovery/absence cannot authorize an alternate owner. Retain
             // drafts, withdraw these paired observations, and await fresh data.
