@@ -8,22 +8,29 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
-from controller_only_test import free_port, request
+from controller_only_test import free_port, request as raw_request
 
 
-def target_read(port, path):
-    # Startup readback may briefly hold the management configuration gate.
-    # A refused read changes nothing; retain the exact target/path and bound
-    # the wait without retrying any other error or a mutation.
+def request(port, method, path, body=None, headers=None, with_revision=False, with_headers=False):
+    # The production service deliberately refuses admission rather than waiting
+    # for its gates. Exercise the requested operation once a gate is available,
+    # keeping every byte, identity, revision, and operation ID unchanged. This
+    # fixture never retries a lost response or any other refusal.
+    captured_headers = dict(headers) if headers is not None else None
+    capacity = {"contract": "Wsprry-Control/1", "schema": "target-error",
+                "error": {"code": "capacity", "retryable": False}}
     deadline = time.monotonic() + 5
     while True:
-        status, body = request(port, "GET", path)
-        if status != 409:
-            return status, body
-        error = json.loads(body)
-        if error.get("schema") != "target-error" or error.get("error", {}).get("code") != "capacity":
-            return status, body
-        assert time.monotonic() < deadline, (status, body)
+        result = raw_request(port, method, path, body, captured_headers,
+                             with_revision=with_revision, with_headers=with_headers)
+        if result[0] != 409:
+            return result
+        try:
+            if json.loads(result[1]) != capacity:
+                return result
+        except ValueError:
+            return result
+        assert time.monotonic() < deadline, (method, path, result)
         time.sleep(.025)
 
 
@@ -160,28 +167,28 @@ def main():
                     renewed = {**unprotected, "Cookie": new_session["Set-Cookie"].split(";")[0],
                         "X-WsprryPi-CSRF": new_session["X-WsprryPi-CSRF"]}
                     status, replay = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, renewed)
-                    assert status == 200 and replay == reply
+                    assert status == 200 and replay == reply, (status, replay, reply)
                     new_operation = json.loads(mutation);new_operation["operation_id"] = "f" * 32
                     assert request(port, "PUT", "/api/control/v1/host/configuration-recovery", json.dumps(new_operation), renewed)[0] == 503
                     assert request(port, "GET", "/api/control/v1/targets/" + doc["binding"]["device_id"] + "/settings")[0] == 403
                     assert all(path.read_bytes() == content for path, content in before.items()), "Off-mode refusal/replay must not write saved history"
                 else:
                     status, replay = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, context)
-                    assert status == 200 and replay == reply
+                    assert status == 200 and replay == reply, (status, replay, reply)
                     status, body = request(port, "GET", "/api/control/v1/targets")
                     assert status == 200
                     targets = json.loads(body)["targets"]
                     assert len(targets) == 1 and targets[0]["product"] == "WsprryPi"
                     self_id = targets[0]["device_id"]
                     for resource, schema in (("context", "target-context"), ("settings", "target-settings"), ("status", "target-status")):
-                        status, body = target_read(port, f"/api/control/v1/targets/{self_id}/{resource}")
+                        status, body = request(port, "GET", f"/api/control/v1/targets/{self_id}/{resource}")
                         assert status == 200 and json.loads(body)["schema"] == schema, body
                         assert json.loads(body)["binding"]["device_id"] == self_id
-                    status, context_body = target_read(port, f"/api/control/v1/targets/{self_id}/context")
+                    status, context_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/context")
                     assert status == 200
                     stop_context = json.loads(context_body)
                     assert any(cap["resource"] == "stop" and cap["write"] for cap in stop_context["capabilities"])
-                    status, settings_body = target_read(port, f"/api/control/v1/targets/{self_id}/settings")
+                    status, settings_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/settings")
                     assert status == 200
                     stop_settings = json.loads(settings_body)
                     # Deferred cross-target Pi management must not route to
@@ -221,18 +228,8 @@ def main():
                     status, stop_receipt = request(port, "POST", stop_path, stop_command, stop_headers)
                     assert status == 200 and json.loads(stop_receipt)["state"] == "committed", stop_receipt
                     stop_bytes = ini.read_bytes()
-                    replay_deadline = time.monotonic() + 5
-                    while True:
-                        status, retry_stop = request(port, "POST", stop_path, stop_command, stop_headers)
-                        if status == 200:
-                            break
-                        # The owning-parser readback can briefly reserve the
-                        # configuration gate. Retry only this exact accepted
-                        # operation, never a fresh STOP or a changed payload.
-                        error = json.loads(retry_stop)
-                        assert status == 409 and error.get("schema") == "target-error" and error.get("error", {}).get("code") == "capacity", (status, retry_stop)
-                        assert time.monotonic() < replay_deadline, (status, retry_stop)
-                        time.sleep(0.02)
+                    status, retry_stop = request(port, "POST", stop_path, stop_command, stop_headers)
+                    assert status == 200, (status, retry_stop)
                     assert retry_stop == stop_receipt and ini.read_bytes() == stop_bytes, (status, retry_stop, stop_receipt, ini.read_bytes() == stop_bytes)
                 before_stop = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
                 status, stopped = request(port, "POST", "/control/stop", json.dumps({"command": "stop"}), context)
@@ -244,7 +241,7 @@ def main():
                 status, readiness = request(port, "GET", "/api/control/v1/host/readiness")
                 assert status == 200 and json.loads(readiness)["state"] == "ready", readiness
                 status, replay = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, context)
-                assert status == 200 and replay == reply, "Existing Stop must preserve the accepted recovery receipt"
+                assert status == 200 and replay == reply, ("Existing Stop must preserve the accepted recovery receipt", status, replay, reply)
                 state = json.loads(trace.read_bytes())
                 assert all(not event["rf_on"] for event in state["events"])
                 process.terminate()
