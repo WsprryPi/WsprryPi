@@ -116,12 +116,12 @@ jobs:
         working-directory: src
         run: |
           pkg-config --modversion openssl
-          make wtp-tls-test SUDO=
+          make wtp-tls-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test wtp-usb-management-test native-recurrence-test SUDO=
+          make wtp-protocol-test wtp-usb-test wtp-usb-management-test native-recurrence-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-production-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \

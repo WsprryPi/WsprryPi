@@ -96,17 +96,31 @@ int main() {
         "return true;", wspr_confirmation);
     const auto scheduler_set_config = scheduling.find(
         "bool set_config(bool force)");
+    const auto native_wspr_branch = scheduling.find(
+        "std::shared_ptr<wsprrypi::NativeOccurrence> native_plan;", scheduler_set_config);
+    const auto native_wspr_preparation_gate = scheduling.find(
+        "if(!runtime_transmit_preparation_enabled(working_config))return true;", native_wspr_branch);
+    const auto native_wspr_configuration = scheduling.find(
+        "if(!configure_current_wspr_transmission(", native_wspr_preparation_gate);
+    const auto native_wspr_reservation = scheduling.find(
+        "if(!wsprrypi::reserve_native_occurrence(native_plan", native_wspr_configuration);
     const auto wspr_preparation_gate = scheduling.find(
         "if (!runtime_transmit_preparation_enabled(working_config))",
-        scheduler_set_config);
+        native_wspr_reservation);
     const auto scheduler_wspr_configuration = scheduling.find(
-        "if (!configure_current_wspr_transmission(", wspr_preparation_gate);
+        "if (!native_request_prepared&&!configure_current_wspr_transmission(", wspr_preparation_gate);
     const auto wspr_post_confirmation_gate = scheduling.find(
         "if (!runtime_transmit_enabled(working_config))",
         scheduler_wspr_configuration);
     const auto scheduler_wspr_commit = scheduling.find(
         "commit_execution_request(next_transmission_request)",
         wspr_post_confirmation_gate);
+    const auto native_wspr_commit = scheduling.find(
+        "commit_execution_request(next_transmission_request,native_start,", wspr_post_confirmation_gate);
+    const auto native_wspr_launch_guard = scheduling.find(
+        "wsprrypi::native_launch_current(native_plan)", native_wspr_commit);
+    const auto native_wspr_acceptance = scheduling.find(
+        "wsprrypi::accept_native_occurrence(native_plan,commit)", native_wspr_launch_guard);
     assert(arg_parser.find("rp1-development-confirmation-json") != std::string::npos);
     assert(direct_confirmation != std::string::npos);
     assert(tone_request_builder != std::string::npos);
@@ -130,6 +144,14 @@ int main() {
     assert(wspr_request < wspr_confirmation);
     assert(wspr_confirmation < wspr_request_return);
     assert(scheduler_set_config != std::string::npos);
+    assert(native_wspr_branch != std::string::npos);
+    assert(native_wspr_preparation_gate != std::string::npos);
+    assert(native_wspr_configuration != std::string::npos);
+    assert(native_wspr_reservation != std::string::npos);
+    assert(native_wspr_branch < native_wspr_preparation_gate);
+    assert(native_wspr_preparation_gate < native_wspr_configuration);
+    assert(native_wspr_configuration < native_wspr_reservation);
+    assert(native_wspr_reservation < wspr_preparation_gate);
     assert(wspr_preparation_gate != std::string::npos);
     assert(scheduler_wspr_configuration != std::string::npos);
     assert(wspr_post_confirmation_gate != std::string::npos);
@@ -137,6 +159,13 @@ int main() {
     assert(wspr_preparation_gate < scheduler_wspr_configuration);
     assert(scheduler_wspr_configuration < wspr_post_confirmation_gate);
     assert(wspr_post_confirmation_gate < scheduler_wspr_commit);
+    assert(native_wspr_commit != std::string::npos);
+    assert(native_wspr_launch_guard != std::string::npos);
+    assert(native_wspr_acceptance != std::string::npos);
+    assert(wspr_post_confirmation_gate < native_wspr_commit);
+    assert(native_wspr_commit < native_wspr_launch_guard);
+    assert(native_wspr_launch_guard < native_wspr_acceptance);
+    assert(native_wspr_acceptance < scheduler_wspr_commit);
     assert(scheduling.find("physical_connection_confirmed") != std::string::npos);
     assert(scheduling.find("confirmation_operation_id") != std::string::npos);
     assert(scheduling.find("? cfg.rp1_gpio_drive_ma") != std::string::npos);
