@@ -20,7 +20,7 @@
 namespace wsprrypi {
 namespace {
 using Clock=std::chrono::steady_clock;
-void require(bool value){if(!value)throw std::runtime_error("pair_discovery_unavailable");}
+[[maybe_unused]] void require(bool value){if(!value)throw std::runtime_error("pair_discovery_unavailable");}
 bool local_domain(const std::string &value){return value=="local"||value=="local.";}
 [[maybe_unused]] bool service_type(std::string value){for(auto &c:value)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');
     if(!value.empty()&&value.back()=='.')value.pop_back();
