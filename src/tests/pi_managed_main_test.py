@@ -10,6 +10,8 @@ import tempfile
 import time
 from controller_only_test import free_port, request as raw_request
 
+_last_request = {}
+
 
 def request(port, method, path, body=None, headers=None, with_revision=False, with_headers=False):
     # The production service deliberately refuses admission rather than waiting
@@ -21,6 +23,12 @@ def request(port, method, path, body=None, headers=None, with_revision=False, wi
                 "error": {"code": "capacity", "retryable": False}}
     deadline = time.monotonic() + 5
     while True:
+        # Setup and negative probes share the production ten-request/second
+        # budget. Pacing must not depend on the runner's execution speed.
+        delay = .12 - (time.monotonic() - _last_request.get(port, 0))
+        if delay > 0:
+            time.sleep(delay)
+        _last_request[port] = time.monotonic()
         result = raw_request(port, method, path, body, captured_headers,
                              with_revision=with_revision, with_headers=with_headers)
         if result[0] != 409:
@@ -225,6 +233,20 @@ def main():
                     targets = json.loads(body)["targets"]
                     assert len(targets) == 1 and targets[0]["product"] == "WsprryPi"
                     self_id = targets[0]["device_id"]
+                    # Native configuration readiness and the independently
+                    # supervised management listener have separate lifecycles.
+                    # Read the closed window; never open pairing as a probe.
+                    transport_deadline = time.monotonic() + 10
+                    while True:
+                        status, body = request(port, "GET", "/api/pair/v1/window", headers=context)
+                        if status == 200:
+                            window = json.loads(body)
+                            assert window["schema"] == "window" and window["device_id"] == self_id
+                            assert window["open"] is False
+                            break
+                        assert status == 503, body
+                        assert time.monotonic() < transport_deadline, "Native management listener readiness"
+                        time.sleep(.03)
                     for resource, schema in (("context", "target-context"), ("settings", "target-settings"), ("status", "target-status")):
                         status, body = request(port, "GET", f"/api/control/v1/targets/{self_id}/{resource}")
                         assert status == 200 and json.loads(body)["schema"] == schema, body
