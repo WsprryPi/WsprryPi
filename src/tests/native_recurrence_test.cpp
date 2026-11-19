@@ -217,8 +217,10 @@ void real_message_launch(bool virtual_time){
 void scheduled_override(ModeType mode){
     Fixture f;config.mode=mode;config.modulation_dot_seconds=.02;config.modulation_fsk_offset_hz=2;
     config.qrss={"E",14097000,.02};config.fskcw={"E",14097002,14097000,.02};config.dfcw={"E",14097000,14097002,.02};
-    const auto now=std::time(nullptr);std::tm local{};localtime_r(&now,&local);
-    config.schedule_start_minute=local.tm_min;config.schedule_start_second=(local.tm_sec+1)%60;config.schedule_repeat_minutes=1;
+    // Keep minute/hour rollover in the same future timestamp and leave room
+    // for the production planner to prepare before admission closes.
+    const auto start=std::time(nullptr)+3;std::tm local{};localtime_r(&start,&local);
+    config.schedule_start_minute=local.tm_min;config.schedule_start_second=local.tm_sec;config.schedule_repeat_minutes=1;
     f.snapshot.policy.solar_enabled=true;f.snapshot.policy.locator="EM18";
     f.snapshot.policy.day.cw_base_nhz=f.snapshot.policy.night.cw_base_nhz=14'098'000'000'000'000ULL;
     WsprTransmitter::SimulatedRuntimeConfig sim;sim.trace_path=f.root+"/override.json";
@@ -232,23 +234,28 @@ void scheduled_override(ModeType mode){
     assert(set_config(true));const auto plan=active_native_occurrence();assert(plan&&plan->accepted);
     assert(current_transmission_request.actual_rf_frequency_hz==(mode==ModeType::FSKCW?14098002:14098000));
     {std::lock_guard lock(config_update_mutex());f.snapshot.policy.schedule_enabled=false;}
-    {std::unique_lock lock(mutex);assert(cv.wait_for(lock,std::chrono::seconds(4),[&]{return done;}));}
+    {std::unique_lock lock(mutex);assert(cv.wait_for(lock,std::chrono::seconds(6),[&]{return done;}));}
+    transmitter_stop_and_join();transmitter_set_callbacks({});
     assert(!native_occurrence_active()&&f.snapshot.progress->publication_count()==3);
     std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;
     assert(trace["mode"]==(mode==ModeType::QRSS?"QRSS":mode==ModeType::FSKCW?"FSKCW":"DFCW"));
 }
-void real_wspr(bool reject){
+bool real_wspr(bool reject){
     Fixture f;config.callsign=config.wspr.callsign="AA0NT";config.grid_square=config.wspr.grid_square="EM18";
     config.wspr_planner_preference=config.wspr.planner_preference=WsprPlannerPreference::Auto;
     WsprTransmitter::SimulatedRuntimeConfig sim;sim.trace_path=f.root+"/wspr.json";
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);set_scheduler_execution_suppressed_for_test(false);
-    std::mutex mutex;std::condition_variable cv;bool done=false,started=false;
+    std::mutex mutex;std::condition_variable cv;bool done=false,started=false,terminal_current=false;
+    std::chrono::system_clock::time_point terminal_utc;std::string terminal;
+    std::shared_ptr<NativeOccurrence> plan;
     transmitter_set_callbacks([&](auto event,auto level,const auto &message,double value){
         if(event==WsprTransmissionCallbackEvent::STARTING)started=true;
+        const bool ended=event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED;
+        if(ended){terminal_utc=std::chrono::system_clock::now();terminal_current=native_launch_current(plan);}
         transmitter_cb(event,level,message,value);
-        if(event==WsprTransmissionCallbackEvent::COMPLETE||event==WsprTransmissionCallbackEvent::CANCELLED||event==WsprTransmissionCallbackEvent::FAILED){std::lock_guard lock(mutex);done=true;cv.notify_all();}
+        if(ended){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
     });
-    const auto start=utc()+400'000'000ULL;const std::array<std::uint64_t,1> starts{start};auto plan=prepare_native_occurrence(config,starts);
+    const auto start=utc()+400'000'000ULL;const std::array<std::uint64_t,1> starts{start};plan=prepare_native_occurrence(config,starts);
     PreparedWsprTransmission paired;std::size_t index=0;double dial=0;WsprFrequencyEntry entry;bool in_progress=false;std::optional<WsprPlanPlacement> placement;::TransmissionRequest request;
     const auto selected=*plan->evaluation.intent->wspr_entry;
     assert(configure_current_wspr_transmission(config,0,selected.dial_frequency_hz,selected,paired,index,dial,entry,in_progress,placement,request));
@@ -258,8 +265,22 @@ void real_wspr(bool reject){
     {std::lock_guard lock(config_update_mutex());f.snapshot.policy.schedule_enabled=false;if(reject)f.snapshot.intent_revision=std::string(64,'f');}
     transmitter_start_async();
     {std::unique_lock lock(mutex);assert(cv.wait_for(lock,std::chrono::seconds(4),[&]{return done;}));}
-    assert(started!=reject&&!native_occurrence_active()&&f.snapshot.progress->publication_count()==3);
-    if(!reject){std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(trace["mode"]=="WSPR");unsigned symbols=0;for(const auto &event:trace["events"])if(event["kind"]=="event")++symbols;assert(symbols==162);}
+    transmitter_stop_and_join();transmitter_set_callbacks({});
+    const bool late=!reject&&!started&&terminal_current&&terminal=="Prepared occurrence is no longer current."&&
+        terminal_utc>=when&&!ScheduledLaunch{when,{}}.current(terminal_utc);
+    assert((started!=reject||late)&&!native_occurrence_active()&&f.snapshot.progress->publication_count()==3);
+    if(!reject){
+        std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(trace["mode"]=="WSPR");
+        if(late){
+            assert(std::all_of(trace["events"].begin(),trace["events"].end(),[](const auto &event){return !event.value("rf_on",false);}));
+            std::cout<<"PASS: late WSPR launch refused with output off and occurrence reconciled\n";
+        }else{unsigned symbols=0;for(const auto &event:trace["events"])if(event["kind"]=="event")++symbols;assert(symbols==162);}
+    }
+    return started;
+}
+void real_wspr_launch(){
+    for(unsigned attempt=0;attempt<8;++attempt)if(real_wspr(false))return;
+    assert(false&&"No actual native WSPR launch completed within eight fresh occurrences");
 }
 void rotations_skip_and_fault(){
     Fixture f;f.snapshot.policy.solar_enabled=true;f.snapshot.policy.locator="EM18";
@@ -322,4 +343,4 @@ void complete_pair_refusal_before_effects(){
     assert(native_recurrence_observation(f.self)["waiting_reason"]=="solar");
 }
 }
-int main(){pair_and_disable();holds_and_generations();refused_committed_launch_and_file_fence();disabled_poll_has_no_preparation();state_matrix();real_message_launch(true);real_message_launch(false);assert(!real_message(true,true));assert(!real_message(true,false,true));for(auto mode:{ModeType::QRSS,ModeType::FSKCW,ModeType::DFCW})scheduled_override(mode);real_wspr(false);real_wspr(true);rotations_skip_and_fault();explicit_skip();queued_callback_binding();complete_pair_refusal_before_effects();std::cout<<"PASS: native production planner, pair freeze/drain/refusal before effects, state matrix, reservation races, bounded writes, rotations/skips/faults, callback binding, and virtual/real-time simulated launch\n";}
+int main(){pair_and_disable();holds_and_generations();refused_committed_launch_and_file_fence();disabled_poll_has_no_preparation();state_matrix();real_message_launch(true);real_message_launch(false);assert(!real_message(true,true));assert(!real_message(true,false,true));for(auto mode:{ModeType::QRSS,ModeType::FSKCW,ModeType::DFCW})scheduled_override(mode);real_wspr_launch();assert(!real_wspr(true));rotations_skip_and_fault();explicit_skip();queued_callback_binding();complete_pair_refusal_before_effects();std::cout<<"PASS: native production planner, pair freeze/drain/refusal before effects, state matrix, reservation races, bounded writes, rotations/skips/faults, callback binding, and virtual/real-time simulated launch\n";}
