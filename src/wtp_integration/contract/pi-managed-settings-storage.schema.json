@@ -1,0 +1,1387 @@
+{
+  "title": "pi-managed-settings/1 stored candidate recognition; never an HTTP control view",
+  "$defs": {
+    "pi-candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration",
+        "scheduling"
+      ],
+      "properties": {
+        "configuration": {
+          "$ref": "#/$defs/pi-config"
+        },
+        "scheduling": {
+          "$ref": "#/$defs/pi-scheduling"
+        }
+      }
+    },
+    "pi-config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Operation",
+        "GPIO",
+        "Calibration",
+        "Si5351",
+        "WSPR",
+        "CW",
+        "Band GPIO",
+        "WTP",
+        "WTP Server"
+      ],
+      "properties": {
+        "Operation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "LED Pin",
+            "Amp Pin",
+            "Web Port",
+            "Socket Port",
+            "Shutdown Button",
+            "Transmit",
+            "Use LED",
+            "Use Amp",
+            "Amp Pin Active High",
+            "Use Shutdown",
+            "Mode",
+            "Transmit Backend",
+            "Enable on Boot"
+          ],
+          "properties": {
+            "LED Pin": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Amp Pin": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Web Port": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Socket Port": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Shutdown Button": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Transmit": {
+              "type": "boolean"
+            },
+            "Use LED": {
+              "type": "boolean"
+            },
+            "Use Amp": {
+              "type": "boolean"
+            },
+            "Amp Pin Active High": {
+              "type": "boolean"
+            },
+            "Use Shutdown": {
+              "type": "boolean"
+            },
+            "Mode": {
+              "enum": [
+                "WSPR",
+                "QRSS",
+                "FSKCW",
+                "DFCW"
+              ]
+            },
+            "Transmit Backend": {
+              "enum": [
+                "gpio",
+                "rp1-gpclk",
+                "si5351",
+                "wtp"
+              ]
+            },
+            "Enable on Boot": {
+              "enum": [
+                "Never",
+                "Follow",
+                "Always"
+              ]
+            }
+          }
+        },
+        "GPIO": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Transmit Pin",
+            "Power Level",
+            "RP1 Drive mA",
+            "Frequency Residual PPM",
+            "Manual PPM",
+            "Use System Clock Frequency Estimate",
+            "Use Direct PPS Calibration"
+          ],
+          "properties": {
+            "Transmit Pin": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Power Level": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "RP1 Drive mA": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Frequency Residual PPM": {
+              "type": "number"
+            },
+            "Manual PPM": {
+              "type": "number"
+            },
+            "Use System Clock Frequency Estimate": {
+              "type": "boolean"
+            },
+            "Use Direct PPS Calibration": {
+              "type": "boolean"
+            }
+          }
+        },
+        "Calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "PPM"
+          ],
+          "properties": {
+            "PPM": {
+              "type": "number"
+            }
+          }
+        },
+        "Si5351": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Adapter Identity",
+            "I2C Address",
+            "Reference Source",
+            "TX Output",
+            "I2C Bus",
+            "Reference Frequency",
+            "Crystal Load Capacitance",
+            "Power Level"
+          ],
+          "properties": {
+            "Adapter Identity": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "I2C Address": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Reference Source": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TX Output": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "I2C Bus": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Reference Frequency": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Crystal Load Capacitance": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Power Level": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            }
+          }
+        },
+        "WSPR": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Call Sign",
+            "Grid Square",
+            "Frequency",
+            "Frequency Profile",
+            "Planner Preference",
+            "TX Power",
+            "Use Random Offset",
+            "Band Preferences"
+          ],
+          "properties": {
+            "Call Sign": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Grid Square": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Frequency": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Frequency Profile": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Planner Preference": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TX Power": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Use Random Offset": {
+              "type": "boolean"
+            },
+            "Band Preferences": {
+              "$ref": "#/$defs/pi-band-preferences"
+            }
+          }
+        },
+        "CW": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Message",
+            "Fade In Ms",
+            "Fade Out Ms",
+            "Fade Slice Ms",
+            "Start Minute",
+            "Start Second",
+            "Repeat Minutes",
+            "Base Frequency",
+            "Shift Hz",
+            "Dot Seconds",
+            "Intra Element Gap",
+            "Inter Character Gap",
+            "Inter Word Gap",
+            "DFCW Intra Element Gap",
+            "DFCW Inter Character Gap",
+            "DFCW Inter Word Gap",
+            "Fade Shape"
+          ],
+          "properties": {
+            "Message": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Fade In Ms": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Fade Out Ms": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Fade Slice Ms": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Start Minute": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Start Second": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Repeat Minutes": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Base Frequency": {
+              "type": "number"
+            },
+            "Shift Hz": {
+              "type": "number"
+            },
+            "Dot Seconds": {
+              "type": "number"
+            },
+            "Intra Element Gap": {
+              "type": "number"
+            },
+            "Inter Character Gap": {
+              "type": "number"
+            },
+            "Inter Word Gap": {
+              "type": "number"
+            },
+            "DFCW Intra Element Gap": {
+              "type": "number"
+            },
+            "DFCW Inter Character Gap": {
+              "type": "number"
+            },
+            "DFCW Inter Word Gap": {
+              "type": "number"
+            },
+            "Fade Shape": {
+              "enum": [
+                "none",
+                "linear",
+                "raised_cosine"
+              ]
+            }
+          }
+        },
+        "Band GPIO": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "2200m",
+            "630m",
+            "160m",
+            "80m",
+            "60m",
+            "40m",
+            "30m",
+            "20m",
+            "17m",
+            "15m",
+            "12m",
+            "10m",
+            "8m",
+            "6m",
+            "5m",
+            "4m",
+            "2m",
+            "1.25m",
+            "70cm"
+          ],
+          "properties": {
+            "2200m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "630m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "160m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "80m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "60m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "40m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "30m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "20m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "17m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "15m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "12m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "10m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "8m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "6m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "5m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "4m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "2m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "1.25m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "70cm": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "GPIO",
+                "Enabled",
+                "Active High"
+              ],
+              "properties": {
+                "GPIO": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "Active High": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "WTP": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Transport",
+            "Hostname",
+            "TLS Server Identity",
+            "TLS CA File",
+            "TLS Client Certificate",
+            "TLS Client Key",
+            "Endpoint",
+            "USB Serial",
+            "Device ID",
+            "Allow Frequency Adjustment",
+            "TCP Port",
+            "USB Vendor ID",
+            "USB Product ID",
+            "Start Uncertainty ns"
+          ],
+          "properties": {
+            "Transport": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Hostname": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TLS Server Identity": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TLS CA File": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TLS Client Certificate": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "TLS Client Key": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Endpoint": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "USB Serial": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Device ID": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            "Allow Frequency Adjustment": {
+              "type": "boolean"
+            },
+            "TCP Port": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "USB Vendor ID": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "USB Product ID": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "Start Uncertainty ns": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
+            }
+          }
+        },
+        "WTP Server": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "Enabled",
+            "Port",
+            "Interface"
+          ],
+          "properties": {
+            "Enabled": {
+              "type": "boolean"
+            },
+            "Port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "Interface": {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            }
+          }
+        }
+      }
+    },
+    "pi-band-preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "2200m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "630m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "160m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "80m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "60m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "40m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "30m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "20m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "17m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "15m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "12m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "10m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "8m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "6m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "5m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "4m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "2m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "1.25m": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "70cm": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          ]
+        }
+      }
+    },
+    "pi-scheduling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "solar"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "solar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "location",
+            "day",
+            "night",
+            "morning",
+            "evening"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "location": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "locator"
+              ],
+              "properties": {
+                "source": {
+                  "const": "locator"
+                },
+                "locator": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[A-R]{2}[0-9]{2}(?:[A-X]{2}(?:[0-9]{2})?)?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "day": {
+              "$ref": "#/$defs/pi-solar-ordinary"
+            },
+            "night": {
+              "$ref": "#/$defs/pi-solar-ordinary"
+            },
+            "morning": {
+              "$ref": "#/$defs/pi-solar-gray"
+            },
+            "evening": {
+              "$ref": "#/$defs/pi-solar-gray"
+            }
+          }
+        }
+      }
+    },
+    "pi-solar-ordinary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow",
+        "wspr_override",
+        "cw_base_hz"
+      ],
+      "properties": {
+        "allow": {
+          "type": "boolean"
+        },
+        "wspr_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pi-wspr-list"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cw_base_hz": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]*|(?:0|[1-9][0-9]*)\\.[0-9]{0,8}[1-9])$",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "pi-wspr-list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Frequency",
+        "Frequency Profile",
+        "Band Preferences"
+      ],
+      "properties": {
+        "Frequency": {
+          "type": "string",
+          "maxLength": 32768,
+          "x-maxUtf8Bytes": 32768
+        },
+        "Frequency Profile": {
+          "enum": [
+            "existing_common",
+            "wrc15"
+          ]
+        },
+        "Band Preferences": {
+          "$ref": "#/$defs/pi-band-preferences"
+        }
+      }
+    },
+    "pi-solar-gray": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "lower_mdeg",
+        "upper_mdeg",
+        "wspr_override",
+        "cw_base_hz"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "lower_mdeg": {
+          "type": "integer",
+          "minimum": -90000,
+          "maximum": 90000
+        },
+        "upper_mdeg": {
+          "type": "integer",
+          "minimum": -90000,
+          "maximum": 90000
+        },
+        "wspr_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/pi-wspr-list"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cw_base_hz": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[1-9][0-9]*|(?:0|[1-9][0-9]*)\\.[0-9]{0,8}[1-9])$",
+              "maxLength": 32768,
+              "x-maxUtf8Bytes": 32768
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

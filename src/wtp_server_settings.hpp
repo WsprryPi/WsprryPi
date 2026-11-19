@@ -4,7 +4,7 @@
 #include <string>
 
 struct WtpServerSettings {
-    bool enabled = true;
+    bool enabled = false;
     std::uint16_t port = 31417;
     std::string interface = "auto";
     bool operator==(const WtpServerSettings&) const = default;

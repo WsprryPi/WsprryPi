@@ -112,12 +112,12 @@ jobs:
           pkg-config --modversion openssl
           make wtp-tls-test SUDO=
 
-      - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
+      - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test SUDO=
-          make wtp-production-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
+          make wtp-protocol-test wtp-usb-test wtp-usb-management-test native-recurrence-test SUDO=
+          make wtp-production-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
             wtp-fleet-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -210,9 +210,9 @@ jobs:
           submodules: recursive
       - name: Select bounded build budget
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-      - name: Validate 32 independent Fleet outputs with deterministic clocks
+      - name: Validate retained Fleet records without execution
         run: |
-          make -C src wtp-fleet-test wtp-fleet-capacity-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make -C src wtp-fleet-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Parent TLS, shared API and actual Pico interoperability
         working-directory: src
         run: |
@@ -241,13 +241,14 @@ jobs:
           node src/build/network-reference/pico/tests/consumer_recovery_browser.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
           node src/build/network-reference/pico/tests/organization_routes.test.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver src/build/network-reference/pico-browser/generated/web_assets.cpp
           node src/build/network-reference/pico/tests/organization_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
+      - name: Current shared Setup through the actual Pi and Pico handlers
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          make -C src -j2 build/bin/shared_setup_main_fixture BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          WSPRRYPI_SHARED_SETUP_MAIN_FIXTURE="$PWD/src/build/bin/shared_setup_main_fixture" node WsprryPi-UI/tests/pico_controller_http_pair_test.js "$PWD/src/build/wtp-network" "$PWD/src/build/bin/pico_controller_pair_fixture" --browser --shared-browser
       - name: Prove edited Pico source selection and genuine build failures
         run: python3 -B scripts/tests/pico_source_selection_test.py src/build/network-reference/pico src/build/network-reference/mbedtls
-      - name: Verify selected-interface WTP replies under equal-metric route changes
-        working-directory: src
-        run: |
-          make wtp-pi-routing-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=sudo
-          python3 -B ../docs/development/wtp-reply-routing-results/rollback_test.py
       - name: Render network controls with mocked responses
         working-directory: WsprryPi-UI
         env:
@@ -261,6 +262,8 @@ jobs:
           node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
+          node tests/pico_target_editor_state_browser_test.js
+          node tests/recurrence_migration_browser_test.js
       - name: Retain failed network browser captures
         if: failure()
         uses: actions/upload-artifact@v7
@@ -314,7 +317,7 @@ jobs:
       - name: Build actual production Pico USB endpoint without SDK or network
         run: |
           cmake -S src/build/usb-reference/pico -B src/build/usb-reference/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-          cmake --build src/build/usb-reference/pico-host --target usb_management_driver endpoint_driver -j2
+          cmake --build src/build/usb-reference/pico-host --target usb_management_driver -j2
       - name: Build Pi USB clients and negative contract checks
         run: make -C src wtp-usb-pair-client-build wtp-usb-management-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Actual UI producer through production Pi and Pico USB handlers
@@ -322,7 +325,7 @@ jobs:
           node WsprryPi-UI/tests/wtp_usb_settings_test.js
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
-          WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/endpoint_driver" "$PWD/src/build/wtp-network/credentials-v3"
+          WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
 
   strict-i2c-profile:
     needs: change_scope
@@ -445,15 +448,15 @@ jobs:
           make build-metadata-regression-test build-metadata-make-regression-test SUDO=
           make debug SUDO=
 
-      - name: Run WTP component, plan, USB adapter, backend, scheduler and status tests
+      - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-plan-test wtp-usb-test wtp-usb-management-test wtp-backend-test wtp-scheduler-test wtp-status-test wtp-application-test wtp-production-cpp-test SUDO=
-          make wtp-pi-authority-test wtp-pi-listener-test wtp-pi-revocation-test \
+          make wtp-protocol-test wtp-usb-test wtp-usb-management-test wtp-production-cpp-test native-recurrence-test SUDO=
+          make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
             wtp-fleet-test SUDO=
-          make pi-managed-records-test pi-management-journal-test pi-management-anchor-test \
+          make wtp-retirement-config-test pi-managed-records-test pi-management-journal-test pi-management-anchor-test \
             pi-config-persistence-coordinator-test pi-managed-store-test pi-management-service-test \
             pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test \
             pi-private-network-persistence-test pi-managed-main-test wtp-managed-output-test SUDO=

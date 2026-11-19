@@ -6,21 +6,18 @@
 #include "transmitter_runtime_bridge.hpp"
 
 #include "wspr_transmit.hpp"
-#include "wtp_runtime_bridge.hpp"
 #include "wtp_pi_control.hpp"
 #include "logging.hpp"
 #include "scheduling.hpp"
 #include <mutex>
-#include <deque>
-#include <algorithm>
 #include <stdexcept>
-namespace { std::mutex callback_mutex; TransmitterRuntimeCallback runtime_callback;std::deque<std::pair<std::uint64_t,TransmitterRuntimeCallback>> execution_callbacks; }
+namespace { std::mutex callback_mutex; TransmitterRuntimeCallback runtime_callback; }
 
 #include <utility>
 
 WsprTransmitState transmitter_state() noexcept
 {
-    return wtp_runtime_selected() ? wtp_runtime_state() : wsprTransmitter.getState();
+    return wsprTransmitter.getState();
 }
 
 std::string transmitter_state_string_lower(WsprTransmitState state)
@@ -30,32 +27,27 @@ std::string transmitter_state_string_lower(WsprTransmitState state)
 
 bool transmitter_active_execution_is_tone() noexcept
 {
-    return wtp_runtime_selected() ? wtp_runtime_mode() == wsprrypi::TransmissionMode::TONE : wsprTransmitter.activeExecutionIsTone();
+    return wsprTransmitter.activeExecutionIsTone();
 }
 
 TransmitterRuntimeStatus transmitter_runtime_status()
 {
-    if (wtp_runtime_selected()) return {wtp_runtime_mode(), {}, -1};
     const auto status = wsprTransmitter.runtimeExecutionStatusSnapshot();
     return {status.mode, status.cw_message, status.cw_active_char_index};
 }
 
 std::string transmitter_reload_defer_debug_state()
 {
-    return wtp_runtime_selected() ? wtp_runtime_json() : wsprTransmitter.reloadDeferDebugState();
+    return wsprTransmitter.reloadDeferDebugState();
 }
 
 void transmitter_clear_execution_state_after_stop() noexcept
 {
-    if (!wtp_runtime_selected()) wsprTransmitter.clearExecutionStateAfterStop();
+    wsprTransmitter.clearExecutionStateAfterStop();
 }
 
 void transmitter_configure_execution(const TransmissionRequest &request)
 {
-    if (wtp_runtime_selected()) {
-        if (request.isSkipWindow()) { wtp_runtime_prepare_skip(); return; }
-        throw std::runtime_error("Pico requires a complete canonical finite job");
-    }
     wsprTransmitter.setTransmissionCallbacks(transmitter_callbacks());
     wsprTransmitter.configureExecution(request);
 }
@@ -65,14 +57,6 @@ void transmitter_configure_execution(
     const TransmissionRequest &legacy_request,std::function<bool()> launch_guard,TransmitterRuntimeCallback callback)
 {
     if(!callback)callback=transmitter_callbacks();
-    if (wtp_runtime_selected()) {
-        wtp_runtime_prepare(request,std::move(launch_guard));
-        const auto request_id=wtp_runtime_prepared_request_id();std::lock_guard lock(callback_mutex);
-        std::erase_if(execution_callbacks,[&](const auto &entry){return entry.first==request_id;});
-        execution_callbacks.emplace_back(request_id,std::move(callback));
-        while(execution_callbacks.size()>2)execution_callbacks.pop_front();
-        return;
-    }
     wsprTransmitter.setTransmissionCallbacks(std::move(callback));
     wsprTransmitter.configureExecution(request, legacy_request,std::move(launch_guard));
 }
@@ -80,7 +64,7 @@ TransmitterRuntimeCallback transmitter_callbacks(){std::lock_guard lock(callback
 
 wsprrypi::StartupQuiesceResult transmitter_quiesce_for_startup()
 {
-    return wtp_runtime_selected() ? wtp_runtime_inspect() : wsprTransmitter.quiesceForStartup();
+    return wsprTransmitter.quiesceForStartup();
 }
 
 void transmitter_set_thread_scheduling(int policy, int priority)
@@ -90,7 +74,7 @@ void transmitter_set_thread_scheduling(int policy, int priority)
 
 void transmitter_set_callbacks(TransmitterRuntimeCallback callback)
 {
-    { std::lock_guard lock(callback_mutex); runtime_callback = callback;if(!callback)execution_callbacks.clear(); }
+    { std::lock_guard lock(callback_mutex); runtime_callback = callback; }
     wsprTransmitter.setTransmissionCallbacks(std::move(callback));
 }
 
@@ -101,7 +85,6 @@ std::string transmitter_format_frequency_mhz(double frequency_hz)
 
 void transmitter_start_async()
 {
-    if (wtp_runtime_selected()) { wtp_runtime_start(); return; }
     if (!wtp_pi_begin_scheduled())
         throw std::runtime_error("Local output is not available for transmission");
     try {
@@ -115,11 +98,6 @@ void transmitter_start_async()
 
 wsprrypi::CleanupResult transmitter_stop_and_join()
 {
-    if (wtp_runtime_selected()) {
-        auto result = wtp_runtime_stop();
-        if (!result.ok) llog.logS(ERROR, "Pico output remains unresolved: ", result.error);
-        return result;
-    }
     wsprTransmitter.stopAndJoin();
     wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
     return wsprTransmitter.lastCleanupResult();
@@ -127,48 +105,19 @@ wsprrypi::CleanupResult transmitter_stop_and_join()
 
 bool transmitter_output_inactive_confirmed() noexcept
 {
-    if (wtp_runtime_selected()) return wtp_runtime_output_inactive_confirmed();
     return wsprTransmitter.lastCleanupResult().ok &&
            wsprTransmitter.getState() != WsprTransmitState::TRANSMITTING;
 }
 
 void transmitter_shutdown_for_process_exit()
 {
-    if (wtp_runtime_selected()) { transmitter_stop_and_join(); return; }
     wsprTransmitter.shutdownForProcessExit();
     wtp_pi_end_scheduled(transmitter_output_inactive_confirmed());
 }
 
 void transmitter_clear_soft_off() noexcept
 {
-    if (!wtp_runtime_selected()) wsprTransmitter.clearSoftOff();
+    wsprTransmitter.clearSoftOff();
 }
 
-void transmitter_poll_events()
-{
-    // USB time has its own serialized channel. Service it before acquiring the
-    // lifecycle mutex so STOP can enter, cancel its I/O, then take operation
-    // authority even when the USB peer is silent.
-    wtp_runtime_poll_usb_time();
-    // Pair completion consumption and callback dispatch with the scheduler
-    // owner. Otherwise an old WTP report could be delivered after Start has
-    // installed a successor's generation-capturing callback.
-    std::unique_lock transaction(test_tone_lifecycle_mutex(), std::try_to_lock);
-    if (!transaction.owns_lock()) return;
-    wtp_runtime_poll_idle();
-    auto result = wtp_runtime_completion();
-    if (!result) return;
-    TransmitterRuntimeCallback callback;
-    { std::lock_guard lock(callback_mutex);
-        const auto binding=std::find_if(execution_callbacks.begin(),execution_callbacks.end(),[&](const auto &entry){return entry.first==result->request_id.value;});
-        if(binding!=execution_callbacks.end()){callback=binding->second;execution_callbacks.erase(binding);}
-        else if(result->skipped)callback=runtime_callback;
-    }
-    if (!callback) return;
-    const auto outcome = result->outcome;
-    callback(result->skipped ? WsprTransmissionCallbackEvent::SKIPPED
-             : outcome == wsprrypi::WtpScheduleOutcome::Complete ? WsprTransmissionCallbackEvent::COMPLETE
-             : outcome == wsprrypi::WtpScheduleOutcome::Cancelled || outcome == wsprrypi::WtpScheduleOutcome::Invalidated
-                 ? WsprTransmissionCallbackEvent::CANCELLED : WsprTransmissionCallbackEvent::FAILED,
-             WsprTransmitLogLevel::INFO, result->error, 0);
-}
+void transmitter_poll_events() {}

@@ -1,90 +1,77 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "identity_probe.hpp"
-#include "application.hpp"
-#include "tls.hpp"
-#include "plain_tcp.hpp"
-#include "usb_cdc.hpp"
-#include "pico_usb_installer_state.hpp"
+#include "browser_api.hpp"
+#include "configuration.hpp"
+#include "consumer_radio.hpp"
+#include "management_resolver.hpp"
+#include "pico_usb_management_channel.hpp"
+#include <chrono>
 #include <cstdlib>
 #include <stdexcept>
 
 namespace wsprrypi {
+namespace {
+std::uint64_t now_ms() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+void require_probe_allowed() {
+  if (const char *disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
+      disabled && std::string(disabled)=="1")
+    throw std::runtime_error("Device identification is disabled in hardware-free validation");
+}
+nlohmann::json identify(const WtpSettings &settings,const PicoManagementExchange &exchange,
+                        const std::string &carrier,const std::string &binding,bool authenticated) {
+  const auto management=exchange("management","GET",{},{});
+  if (management.status!=200) throw std::runtime_error("Management identification unavailable");
+  const auto document=strict_browser_json(management.body,16);
+  if (!document.is_object() || !document.contains("target") || !document["target"].is_object())
+    throw std::runtime_error("Invalid management identity");
+  const auto &target=document["target"];
+  if (!target.contains("device_id") || !target["device_id"].is_string() ||
+      !target.contains("boot_id") || !target["boot_id"].is_string())
+    throw std::runtime_error("Invalid management identity");
+  const auto device=target["device_id"].get<std::string>(),boot=target["boot_id"].get<std::string>();
+  if ((!settings.device_id.empty() && settings.device_id!=device) ||
+      !valid_management_contract(document,carrier,device,boot))
+    throw std::runtime_error("Management identity or carrier mismatch");
+  const auto caps=exchange("capabilities","GET",{},{});
+  if (caps.status!=200 || !pico_management_capabilities_valid(strict_browser_json(caps.body,16),carrier))
+    throw std::runtime_error("Unsupported management capabilities");
+  const auto response=exchange("status","GET",{},{});
+  if (response.status!=200) throw std::runtime_error("Native output observation unavailable");
+  const auto status=strict_browser_json(response.body,16);
+  if (!pico_native_status_valid(status,device,boot))
+    throw std::runtime_error("Invalid native output observation");
+  return {{"device_id",device},{"boot_id",boot},{"binding",binding},
+      {"authenticated",authenticated},{"output_active",status["job"]["output_active"]}};
+}
+}
 nlohmann::json wtp_probe_usb_identity(const WtpSettings &settings) {
-  if (settings.transport != "usb") throw std::runtime_error("USB endpoint required");
-  if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-      disabled && std::string(disabled) == "1")
-    throw std::runtime_error("USB identification is disabled in hardware-free validation");
-  validate_wtp_settings(settings, true);
-  auto lease = pico_usb_runtime_lease(settings.usb_serial);
-  if (pico_usb_update_blocked(settings.usb_serial))
-    throw std::runtime_error("Resolve this Pico's firmware update before identification");
-  WtpSystemScheduleClock clock(wtp_host_utc_valid);
-  PosixCdcSystem system;
-  UsbCdcStream stream(system);
-  const PicoCdcSelection selection{settings.path, settings.usb_serial,
-      static_cast<std::uint16_t>(settings.vendor_id),
-      static_cast<std::uint16_t>(settings.product_id)};
-  auto reopen = [&] {
-    if (!stream.begin_open(selection, clock.now_ms())) return false;
-    while (stream.state() == CdcState::Resetting) {
-      stream.poll_open(clock.now_ms());
-      if (stream.state() == CdcState::Resetting) clock.wait_ms(5);
-    }
-    return stream.state() == CdcState::Ready;
-  };
-  wtp::SessionOptions options{wtp_random_identity(), wtp_random_identity(), settings.device_id};
-  options.learn_device_identity = settings.device_id.empty();
-  WtpApplication app(clock, stream, settings, options, reopen);
-  const auto result = app.inspect();
-  if (!result.ok) throw std::runtime_error("USB identification failed: " + result.error);
-  const auto observation = app.status();
-  if (!observation.identity || !observation.capabilities || !observation.remote)
-    throw std::runtime_error("Incomplete USB Pico identity or status");
-  return {{"device_id", observation.identity->device_id},
-      {"boot_id", observation.identity->boot_id}, {"binding", "usb"},
-      {"authenticated", false}, {"output_active", observation.remote->output_active}};
+  require_probe_allowed();
+  if (settings.transport!="usb") throw std::runtime_error("USB management endpoint required");
+  validate_wtp_settings(settings,true);
+  // A temporary read-only owner does not start the periodic time worker.
+  auto channel=pico_usb_management_channel(settings,false);
+  std::lock_guard lock(channel->mutex);
+  if (!channel->ensure(settings.device_id)) throw std::runtime_error("USB management identification unavailable");
+  auto selected=settings;selected.device_id=channel->client->device();
+  return identify(selected,[&](const auto &resource,const auto &method,const auto &,const auto &){
+      return channel->client->request("/api/control/v1/"+resource,method);
+    },"usb_physical","usb",false);
 }
 nlohmann::json wtp_probe_network_identity(const WtpSettings &settings) {
-  if (settings.transport != "network" && settings.transport != "network_plain")
-    throw std::runtime_error("Identification requires a network endpoint");
-  if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-      disabled && std::string(disabled) == "1")
-    throw std::runtime_error("Network identification is disabled in hardware-free validation");
-  validate_wtp_settings(settings, true);
-  WtpSystemScheduleClock clock(wtp_host_utc_valid);
-  TlsStream tls([&] { return clock.now_ms(); });
-  PlainTcpStream plain([&] { return clock.now_ms(); });
-  std::shared_ptr<TlsCredentials> credentials;
-  TlsSelection selection{settings.hostname, settings.tls_identity, settings.tls_ca,
-      settings.tls_certificate, settings.tls_key, static_cast<unsigned>(settings.tcp_port)};
-  if (settings.transport == "network")
-    credentials = std::make_shared<TlsCredentials>(selection);
-  auto reopen = [&] {
-    if (settings.transport == "network") {
-      if (!tls.begin_open(selection, credentials)) return false;
-      while (tls.opening()) { tls.poll_open(); if (tls.opening()) clock.wait_ms(5); }
-      return tls.ready();
-    }
-    if (!plain.begin_open(settings.hostname, static_cast<unsigned>(settings.tcp_port))) return false;
-    while (plain.opening()) { plain.poll_open(); if (plain.opening()) clock.wait_ms(5); }
-    return plain.ready();
-  };
-  wtp::SessionOptions options{wtp_random_identity(), wtp_random_identity(), settings.device_id};
-  options.learn_device_identity = settings.transport == "network_plain" &&
-                                  settings.device_id.empty();
-  WtpApplication app(clock, settings.transport == "network"
-      ? static_cast<wtp::ByteStream &>(tls) : static_cast<wtp::ByteStream &>(plain),
-      settings, options, reopen);
-  const auto result = app.inspect();
-  if (!result.ok) throw std::runtime_error("Read-only WTP identification failed: " + result.error);
-  const auto observation = app.status();
-  if (!observation.identity || !observation.capabilities || !observation.remote)
-    throw std::runtime_error("Incomplete WTP identity, capabilities or status");
-  return {{"device_id", observation.identity->device_id},
-      {"boot_id", observation.identity->boot_id},
-      {"binding", settings.transport == "network" ? "tls" : "plain"},
-      {"authenticated", settings.transport == "network"},
-      {"output_active", observation.remote->output_active}};
+  require_probe_allowed();
+  if (settings.transport!="network")
+    throw std::runtime_error("Use authenticated HTTPS or the explicit Consumer Wi-Fi login to identify this device");
+  validate_wtp_settings(settings,true);
+  TlsStream tls(now_ms,TlsStream::Access::Production,management_tls_resolver());
+  TlsSelection selection{settings.hostname,settings.tls_identity,settings.tls_ca,
+      settings.tls_certificate,settings.tls_key,static_cast<unsigned>(settings.tcp_port)};
+  auto credentials=std::make_shared<TlsCredentials>(selection);
+  return identify(settings,[&](const auto &resource,const auto &method,const auto &,const auto &){
+      return pico_http_request(tls,selection,credentials,now_ms,resource,method);
+    },"engineering_mtls","tls",true);
 }
 } // namespace wsprrypi

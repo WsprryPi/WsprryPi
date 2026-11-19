@@ -336,6 +336,14 @@ int main(){
       {"controllers",migration_state["controllers"]}};
   const auto migration_etag="\""+migrate["expected_revision"].get<std::string>()+"\"";
   const auto pre_migration=bytes(ini);
+  const auto native_backend=config.transmit_backend;
+  const auto prior_authority=store.recurrence_authority();
+  config.transmit_backend=TransmitBackendKind::WTP;
+  const auto remote_replacement=call("migration","POST",migrate,migration_etag);
+  check(remote_replacement.status==409&&Json::parse(remote_replacement.body)["error"]["code"]=="unsupported_resource"&&
+      bytes(ini)==pre_migration&&store.recurrence_authority()==prior_authority,
+      "A remote WTP output cannot become device-owned recurrence or mutate migration state");
+  config.transmit_backend=native_backend;
   auto omitted=migrate;omitted["controllers"]=Json::array();
   check(call("migration","POST",omitted,migration_etag).status==409&&bytes(ini)==pre_migration,"Caller omission cannot replace authoritative inventory");
   check(authority.begin_test_tone(),"Independent manual output fixture");

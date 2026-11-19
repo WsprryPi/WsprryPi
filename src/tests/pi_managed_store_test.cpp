@@ -213,7 +213,6 @@ int main(int argc,char **argv){
   recovery_internal["CW"]["Message"]="FIRST RECOVERY RECEIPT";
   recovery_request["binding"]["device_id"]=self;
   recovery_request["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(recovery_internal);
-  for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})recovery_request["configuration"]["WTP"][key]="";
   recovery_request["expected_revision"]=recovery_store.recovery_revision();
   PiManagedStore::Operation recovery_operation{self,"1","/api/control/v1/host/configuration-recovery",recovery_request};
   unsigned recovery_attempts=0;
@@ -443,7 +442,6 @@ int main(int argc,char **argv){
       check(cold.installation_pending()&&bytes(initial+".recurrence-authority.json")==record,"Restart retains original installation identity without enabling output");
       auto setup=recovery_operation;setup.request["expected_revision"]=cold.recovery_revision();setup.request["operation_id"]=std::string(32,'7');
       setup.request["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
-      for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})setup.request["configuration"]["WTP"][key]="";
       auto enabled=internal;enabled["Operation"]["Transmit"]=true;
       refuses([&]{cold.persist_recovery(enabled,[]{},setup);});
       check(cold.installation_pending()&&bytes(initial+".recurrence-authority.json")==record,"An initial enable refuses before any final mutation");

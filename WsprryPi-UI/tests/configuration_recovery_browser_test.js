@@ -15,6 +15,7 @@ async function portNumber(start) {
 }
 async function main() {
     const initializing = process.env.WSPRRYPI_INITIALIZATION_UI === '1', migrating = process.env.WSPRRYPI_MIGRATION_UI === '1';
+    const remoteMigration = migrating && process.env.WSPRRYPI_MIGRATION_WTP_UI === '1';
     const retiring=process.env.WSPRRYPI_CONTROLLER_RETIREMENT_UI==='1';
     const page = initializing || migrating ? 'maintenance' : 'config';
     const binary = process.env.WSPRRYPI_MANAGED_MAIN_FIXTURE;
@@ -24,7 +25,7 @@ async function main() {
     const ini = path.join(directory,'native.ini'), ledger = path.join(directory,'revocation-v1');
     let source = fs.readFileSync(path.join(ui,'../config/wsprrypi.ini'),'utf8')
         .replace(/^Call Sign = .*$/m,'Call Sign = AA0NT').replace(/^Grid Square = .*$/m,'Grid Square = EM18')
-        .replace(/^Transmit Backend = .*$/m,'Transmit Backend = wtp').replace(/^Transport = .*$/m,'Transport = network_plain')
+        .replace(/^Transmit Backend = .*$/m,'Transmit Backend = ' + (remoteMigration ? 'wtp' : 'gpio')).replace(/^Transport = .*$/m,'Transport = network_plain')
         .replace(/^Hostname =.*$/m,'Hostname = 127.0.0.1').replace(/^TCP Port = .*$/m,'TCP Port = 31417')
         .replace(/^Device ID =.*$/m,'Device ID = ' + 'b'.repeat(32)).replace(/^Enabled = true$/m,'Enabled = false')
         .replace(/^Web Port = .*$/m,'Web Port = ' + backend).replace(/^Socket Port = .*$/m,'Socket Port = ' + socket);
@@ -121,13 +122,17 @@ async function main() {
         assert.equal(await run("/Certificate|TLS Client Key|TLS CA File|TLS Server Identity/.test(document.getElementById('configurationRecoveryFields').textContent)"),false);
         assert.equal(mutations.length,0,'Page load and recovery projection must not persist or start a management session');
         assert.deepEqual(fs.readFileSync(ini),original);assert(!fs.existsSync(ledger + '.simulated-trace.json'),'No backend from rejected defaults');
-        } else if(migrating) {await waitFor(()=>run("!!document.getElementById('recurrenceMigrationReview') && !document.getElementById('recurrenceMigration').hidden && !document.getElementById('recurrenceMigrationReview').disabled"),'verified local migration state',15000);assert.equal(mutations.length,0);}
+        } else if(migrating) {
+            await waitFor(()=>run("!!document.getElementById('recurrenceMigrationReview') && !document.getElementById('recurrenceMigration').hidden"),'verified local migration state',15000);
+            await waitFor(()=>run(remoteMigration ? "document.getElementById('recurrenceMigrationReview').disabled && document.getElementById('recurrenceMigrationState').textContent.includes('This Pi sends transmissions to another device')" : "!document.getElementById('recurrenceMigrationReview').disabled"),'native destination migration policy',15000);
+            assert.equal(mutations.length,0);
+        }
         const output = process.env.WSPRRYPI_RECOVERY_SCREENSHOTS || path.join(directory,'screenshots');fs.mkdirSync(output,{recursive:true});
         async function capture(scene) {
             for(const theme of ['light','dark']) for(const viewport of [{name:'desktop',width:1440,height:1050},{name:'mobile',width:390,height:844}]) {
                 await client.send('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:viewport.name === 'mobile'});
                 await run(`document.documentElement.setAttribute('data-bs-theme','${theme}')`);await client.settleRendering();
-                await run(retiring?"window.scrollTo(0,document.getElementById('controllerRetirement').getBoundingClientRect().top+window.scrollY-(document.querySelector('.navbar')?.getBoundingClientRect().height||110)-24)":'window.scrollTo(0,0)');await client.settleRendering();
+                await run(remoteMigration?"window.scrollTo(0,document.getElementById('recurrenceMigration').getBoundingClientRect().top+window.scrollY-(document.querySelector('.navbar')?.getBoundingClientRect().height||110)-24)":retiring?"window.scrollTo(0,document.getElementById('controllerRetirement').getBoundingClientRect().top+window.scrollY-(document.querySelector('.navbar')?.getBoundingClientRect().height||110)-24)":'window.scrollTo(0,0)');await client.settleRendering();
                 assert.equal(await run('document.documentElement.scrollWidth <= window.innerWidth'),true,'Recovery editor fits the viewport');
                 const shot = await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
                 fs.writeFileSync(path.join(output,`${scene}-${theme}-${viewport.name}.png`),Buffer.from(shot.data,'base64'));
@@ -178,6 +183,27 @@ async function main() {
             console.log('PASS: actual protected existing-assignment retirement review, retained unknown request, exact readback without another generation, offline pending, save fence, desktop/mobile light/dark, and no RF: '+output);return;
         }
         if(migrating) {
+            if(remoteMigration) {
+                const before=fs.readFileSync(ini+'.managed-settings.json');
+                const beforeIni=fs.readFileSync(ini);
+                await run("document.getElementById('recurrenceMigrationReview').click()");
+                assert.equal(mutations.length,0,'A disabled remote-output migration must not send a request');
+                const refused=await run(`(async()=>{
+                    const c=ConfigurationRecoveryClient.create({base:'/api/control/v1'}),r=await c.readiness();
+                    const context=(await c.targetRequest(r.device_id,'context')).data,settings=(await c.targetRequest(r.device_id,'settings')).data,migration=(await c.targetRequest(r.device_id,'migration')).data;
+                    try{await c.targetRequest(r.device_id,'migration',{method:'POST',body:{contract:WsprryControl.contract,schema:'target-migration',binding:context.binding,capability_revision:context.capability_revision,operation_id:'e'.repeat(32),expected_revision:settings.revision,expected_authority_generation:migration.authority_generation,controllers:migration.controllers}});return 'accepted';}catch(error){return error.code;}
+                })()`);
+                assert.equal(refused,'unsupported_resource','The production service must independently reject the stored remote destination');
+                assert.deepEqual(fs.readFileSync(ini),beforeIni);
+                assert.deepEqual(fs.readFileSync(ini+'.managed-settings.json'),before);
+                const trace=JSON.parse(fs.readFileSync(ledger+'.simulated-trace.json'));assert(trace.events.every(event=>!event.rf_on));
+                await run("document.getElementById('recurrenceMigrationTarget').focus()");
+                await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+                await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+                assert.equal(await run('document.activeElement.id'),'recurrenceMigrationRefresh','Keyboard navigation skips the unavailable migration action');
+                await capture('remote-output');
+                console.log('PASS: remote destination migration held in shipped UI and production service before writes; desktop/mobile light/dark and no RF: '+output);return;
+            }
             await capture('legacy');
             const before=JSON.parse(fs.readFileSync(ini+'.managed-settings.json'));
             dropMigrationReply=true;holdMigrationLookup=true;
@@ -199,7 +225,7 @@ async function main() {
             assert.match(await run("document.getElementById('recurrenceMigrationConsentLabel').textContent"),/may transmit/);
             await capture('rollback-review');
             await confirmByKeyboard('recurrenceMigrationConsent','recurrenceMigrationConfirm');
-            await waitFor(()=>run("document.getElementById('recurrenceMigrationState').textContent.includes('previous schedule is permitted') && document.getElementById('recurrenceMigrationRetry').hidden"),'verified explicit rollback',15000);
+            await waitFor(()=>run("document.getElementById('recurrenceMigrationState').textContent.includes('previous controller may run its saved schedule') && document.getElementById('recurrenceMigrationRetry').hidden"),'verified explicit rollback',15000);
             const rolled=JSON.parse(fs.readFileSync(ini+'.managed-settings.json'));
             assert.equal(rolled.scheduling.enabled,true);assert.equal(rolled.configuration.Operation.Transmit,false);
             const actions=mutations.filter(item=>/\/migration(?:\/rollback)?$/.test(item.path));

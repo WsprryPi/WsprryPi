@@ -14,22 +14,21 @@ namespace {
 const std::string device(32,'a'), boot(32,'1');
 const Json target{{"scope","member"},{"device_id",device},{"boot_id",boot}};
 Json canonical_caps() {
-  Json result{{"wtp",{{"profiles",{"rf-events/1"}},{"modes",{"wspr","tone"}},{"engine","test"},
+  Json result{{"execution",{{"modes",{"wspr","tone"}},{"engine","test"},
     {"frequency_ranges",Json::array({{{"minimum_nhz","100000000000000"},{"maximum_nhz","30000000000000000"}}})},
-    {"max_payload_bytes",65536},{"max_events",512},{"max_job_duration_ns","3600000000000"},
+    {"max_events",512},{"max_job_duration_ns","3600000000000"},
     {"minimum_arm_lead_ns","1000000"},{"maximum_arm_ahead_ns","300000000000"},{"maximum_arm_uncertainty_ns","500000000"},
-    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"},{"minimum_lease_ms",5000},{"maximum_lease_ms",60000},
-    {"response_cache_entries",8},{"response_cache_ttl_seconds",300},{"terminal_record_entries",8},{"terminal_record_ttl_seconds",3600}}},
-    {"features",Json::object()},{"active_job_connections",false},{"max_network_connections",2},{"max_wtp_connections",1},
+    {"maximum_holdover_age_ns","3600000000000"},{"output_disable_timeout_ns","50000000"}}},
+    {"features",Json::object()},{"active_execution_connections",false},{"max_network_connections",2},
     {"max_pending_connections",1},{"max_handshakes",1},{"max_body_bytes",32768}};
-  for(const auto name:{"config","schedules","jobs","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
-  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line"})result[name]=Json::parse(control_descriptor(name));
+  for(const auto name:{"config","schedules","network","application","station","hardware","consumer_setup_identity","softap","ble","restart"})result["features"][name]=std::string(name)!="consumer_setup_identity";
+  for(const auto name:{"application_resources","configuration_updates","management_carriers","saved_progress","gpio_drive","amplifier_timing","si5351","gps","gray_line","schedule_stop"})result[name]=Json::parse(control_descriptor(name));
   return result;
 }
 Json management() {
   Json carriers=Json::array();for(const auto name:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"}) carriers.push_back({{"carrier",name},{"built_in",true},{"available",true}});
   return {{"contract","Wsprry-Control/1"},{"schema","management"},{"target",target},{"profile","engineering"},{"preclock",true},{"profile_generation",nullptr},{"selected","engineering_mtls"},{"carriers",carriers},{"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
-    {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},{"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
+    {"operations",Json::parse(control_management_operations())},
     {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},{"login_ms",30000},{"idle_ms",1800000},{"absolute_ms",28800000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
 }
 
@@ -55,6 +54,8 @@ struct Member {
   bool corrupt_network_write{};
   bool reboot_during_network{};
   bool wrong_network_requested{};
+  bool native_stopped{},wrong_stop_target{},lose_stop{};
+  unsigned stop_revision{1};
   std::function<void()> on_read;
   explicit Member(char id='a') {management_value["target"]["device_id"]=std::string(32,id);caps["contract"]="Wsprry-Control/1";}
   PicoHttpResponse exchange(const std::string &resource,const std::string &method,const std::string &body,const std::string &) {
@@ -62,6 +63,16 @@ struct Member {
     if(on_read){auto callback=std::exchange(on_read,{});callback();}
     if(resource=="management")return {200,management_value.dump(),{}};
     if(resource=="capabilities")return {200,caps.dump(),{}};
+    if(resource=="schedules/stop") {
+      if(method=="POST") {
+        native_stopped=true;++stop_revision;
+        if(lose_stop)return {503,R"({"error":{"code":"transport_unavailable"}})",{}};
+      }
+      auto bound=target;if(wrong_stop_target)bound["device_id"]=std::string(32,'b');
+      return {200,Json{{"contract","Wsprry-Control/1"},{"schema","schedule-stop"},{"target",bound},
+        {"wspr_enabled",!native_stopped},{"message_enabled",false},{"owned",!native_stopped},
+        {"output_active",!native_stopped},{"stopped",native_stopped}}.dump(),"\"stop-"+std::to_string(stop_revision)+"\""};
+    }
     if(resource=="network") {
       if(reboot_during_network)management_value["target"]["boot_id"]=std::string(32,'9');
       auto value=network;value["contract"]="Wsprry-Control/1";
@@ -78,6 +89,20 @@ struct Member {
     return {[this](const auto &r,const auto &m,const auto &b,const auto &v){return exchange(r,m,b,v);},{},{}};
   }
 };
+void retired_management_operations() {
+  for(unsigned fault=0;fault<4;++fault) {
+    Member peer;
+    PicoManagementTarget selected(profile(),peer.fixture());
+    CHECK(selected.connect("engineering_mtls").status==200);
+    auto &operations=peer.management_value["operations"];
+    if(fault==0)operations["POST"].push_back("jobs");
+    if(fault==1)operations["GET"].erase(operations["GET"].begin());
+    if(fault==2)operations["GET"][1]=operations["GET"][0];
+    if(fault==3)operations["GET"][0]="unknown-resource";
+    CHECK(selected.request("network","PUT",R"({"contract":"Wsprry-Control/1","enabled":false})","\"network-1\"").status==409);
+    CHECK(peer.mutations==0);
+  }
+}
 void addresses() {
   for(const auto *address:{"10.0.0.2","172.16.0.1","172.31.255.254","192.168.4.1","fd00::1","fc00::1"})
     CHECK(private_management_address(address,{}));
@@ -146,6 +171,31 @@ void contexts() {
   if(result.status!=404)throw std::runtime_error("In-flight read failed: "+result.body);
   CHECK(peer.mutations==0);
 }
+void native_stop() {
+  Member peer;PicoManagementTarget selected(profile(),peer.fixture());
+  CHECK(selected.connect("engineering_mtls").status==200);
+  const auto read=selected.request("schedules/stop","GET");CHECK(read.status==200&&peer.mutations==0);
+  const Json binding{{"device_id",device},{"boot_id",boot},{"profile_generation","1"},{"connection_generation","1"}};
+  CHECK(pico_management_response_valid("schedules/stop","GET",read,binding));
+  Json body{{"contract","Wsprry-Control/1"},{"schema","schedule-stop"},{"target",target},{"stop",true}};
+  CHECK(selected.request("schedules/stop","POST",body.dump(),"\"stale\"").status==412&&peer.mutations==0);
+  body["job_id"]=std::string(32,'c');
+  CHECK(selected.request("schedules/stop","POST",body.dump(),read.etag).status==400&&peer.mutations==0);body.erase("job_id");
+  body["target"]["boot_id"]=std::string(32,'9');
+  CHECK(selected.request("schedules/stop","POST",body.dump(),read.etag).status==409&&peer.mutations==0);body["target"]=target;
+  const auto stopped=selected.request("schedules/stop","POST",body.dump(),read.etag);
+  CHECK(stopped.status==200&&peer.native_stopped&&peer.mutations==1);
+  CHECK(pico_management_response_valid("schedules/stop","POST",stopped,binding,body.dump()));
+  auto malformed=stopped;auto value=Json::parse(malformed.body);value["owned"]=true;malformed.body=value.dump();
+  CHECK(!pico_management_response_valid("schedules/stop","POST",malformed,binding,body.dump()));
+  Member lost;lost.lose_stop=true;PicoManagementTarget uncertain(profile(),lost.fixture());
+  CHECK(uncertain.connect("engineering_mtls").status==200);
+  CHECK(uncertain.request("schedules/stop","POST",body.dump(),"\"stop-1\"").status==503&&lost.mutations==1);
+  CHECK(Json::parse(uncertain.request("schedules/stop","GET").body)["stopped"]==true&&lost.mutations==1);
+  Member changed;changed.wrong_stop_target=true;PicoManagementTarget wrong(profile(),changed.fixture());
+  CHECK(wrong.connect("engineering_mtls").status==200);
+  CHECK(wrong.request("schedules/stop","POST",body.dump(),"\"stop-1\"").status==502&&changed.mutations==0);
+}
 void network_parity() {
   Member unsupported;unsupported.caps["features"]["network"]=false;
   PicoManagementTarget unavailable(profile(),unsupported.fixture());
@@ -198,5 +248,5 @@ void network_parity() {
   CHECK(rebooting.mutations==0&&stale.binding()["connected"]==false);
 }
 }
-int main() {try {addresses();contexts();network_parity();std::cout<<"PASS: bounded private resolver, independent management negotiation, identity/boot/capability fencing, network parity, and concurrency refusal\n";}
+int main() {try {addresses();retired_management_operations();contexts();native_stop();network_parity();std::cout<<"PASS: bounded private resolver, independent management negotiation, native stop/refusal/uncertain readback, identity/boot/capability fencing, network parity, and concurrency refusal\n";}
 catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -1,3 +1,4 @@
+#include "wtp_retirement.hpp"
 /**
  * @file arg_parser_runtime.cpp
  * @brief Applies validated argument-parser configuration to runtime services.
@@ -34,6 +35,9 @@ void wsprrypi::testing::set_application_simulation_fixture(const WsprTransmitter
 
 void apply_runtime_config_side_effects()
 {
+    if (const auto refusal = wsprrypi::wtp_retirement_configuration_refusal(config); !refusal.empty())
+        throw std::runtime_error(refusal);
+
     const wsprrypi::BackendKind backend_kind =
         config.transmit_backend == TransmitBackendKind::SIMULATED
             ? wsprrypi::BackendKind::SIMULATED
@@ -55,18 +59,10 @@ void apply_runtime_config_side_effects()
     si5351_config.tx_output = config.si5351_tx_output;
     si5351_config.power_level = config.power_level;
     si5351_config.app_managed = config.use_ini;
-    if (config.transmit_backend == TransmitBackendKind::WTP) {
-        if (!wtp_runtime_selected()) wsprTransmitter.shutdownForProcessExit();
-        select_wtp_runtime(config.wtp);
-        if (!wtp_runtime_ready()) (void)wtp_runtime_inspect();
-    } else {
-        select_wtp_runtime(std::nullopt);
-        if(backend_kind==wsprrypi::BackendKind::SIMULATED&&application_simulation_fixture)
-            wsprTransmitter.selectBackend(backend_kind,si5351_config,*application_simulation_fixture);
-        else wsprTransmitter.selectBackend(backend_kind, si5351_config);
-    }
-    if (config.transmit_backend != TransmitBackendKind::WTP)
-        wsprTransmitter.setTransmitNow(backend_kind == wsprrypi::BackendKind::SIMULATED);
+    if(backend_kind==wsprrypi::BackendKind::SIMULATED&&application_simulation_fixture)
+        wsprTransmitter.selectBackend(backend_kind,si5351_config,*application_simulation_fixture);
+    else wsprTransmitter.selectBackend(backend_kind, si5351_config);
+    wsprTransmitter.setTransmitNow(backend_kind == wsprrypi::BackendKind::SIMULATED);
 
     llog.logS(INFO,
               "Transmit backend: ",

@@ -22,7 +22,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['index.css'],
-        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'si5351.js', 'gps.js', 'gray-line.js', 'gpio-drive.js', 'amplifier-timing.js', 'filter-selector.js', 'pico-target-client.js', 'pico-target-editors.js', 'pi-target-client.js', 'pi-target-editors.js', 'scheduling-editor.js', 'wtp-management.js', 'wtp-usb-settings.js', 'wtp-firmware.js', 'fleet-client.js', 'fleet-schedules.js', 'controller-retirement.js', 'index.js', 'setup-targets.js'],
+        'js' => ['udp-logging.js', 'udp-logging-controls.js', 'cw_timing_state.js', 'local-wtp.js', 'wtp.js', 'si5351.js', 'gps.js', 'gray-line.js', 'gpio-drive.js', 'amplifier-timing.js', 'filter-selector.js', 'pico-target-client.js', 'pico-target-editors.js', 'pi-target-client.js', 'pi-target-editors.js', 'scheduling-editor.js', 'wtp-management.js', 'wtp-usb-settings.js', 'fleet-client.js', 'fleet-schedules.js', 'controller-retirement.js', 'index.js', 'setup-targets.js'],
         'partial' => __DIR__ . '/views/config.php',
     ],
     'logs' => [

@@ -20,5 +20,4 @@ PicoHttpResponse pico_http_request(TlsStream &, const TlsSelection &,
     const std::string &resource, const std::string &method,
     const std::string &body = {}, const std::string &revision = {},
     std::optional<std::uint64_t> operation_deadline = {});
-nlohmann::json wtp_pi_revocation_status(const WtpSettings&, unsigned management_port);
 } // namespace wsprrypi

@@ -9,13 +9,16 @@
 
 using namespace wsprrypi;
 int main() {
-  assert(wtp_dns_sd_binding({"txtvers=1", "binding=tls"}) == "tls");
-  assert(wtp_dns_sd_binding({"txtvers=1", "binding=plain", "future=x", "feature", "FUTURE=y"}) == "plain");
-  for (const auto &txt : {std::vector<std::string>{"binding=tls", "txtvers=1"},
-                          {"txtvers=2", "binding=tls"}, {"txtvers=1"},
-                          {"txtvers=1", "binding=plain", "BINDING=tls"},
-                          {"txtvers=1", "TXTvers=1", "binding=tls"},
-                          {"txtvers=1", "binding=unknown"}})
+  const std::vector<std::string> management_txt{"txtvers=1","product=WsprryPico","management=Consumer-Radio/1"};
+  assert(wtp_dns_sd_binding(management_txt)=="consumer");
+  assert(wtp_dns_sd_binding({"management=Consumer-Radio/1","product=WsprryPico","txtvers=1"})=="consumer");
+  for(const auto &txt:std::vector<std::vector<std::string>>{
+      {"txtvers=1","binding=tls"},{"txtvers=1","binding=plain"},
+      {"txtvers=2","product=WsprryPico","management=Consumer-Radio/1"},
+      {"txtvers=1","product=Other","management=Consumer-Radio/1"},
+      {"txtvers=1","product=WsprryPico","management=WTP/1"},
+      {"txtvers=1","product=WsprryPico","MANAGEMENT=Consumer-Radio/1","management=Consumer-Radio/1"},
+      {"txtvers=1","product=WsprryPico","future=Consumer-Radio/1"}})
     assert(!wtp_dns_sd_binding(txt));
 
   WtpDiscovery discovery;
@@ -24,11 +27,11 @@ int main() {
   const WtpServiceKey two{2, 0, "Shared Pico", "local"};
   discovery.found(one, 1000);
   discovery.found(two, 1000);
-  discovery.resolved(one, "pico-one.local", 40123, {"txtvers=1", "binding=tls"}, 1001);
-  discovery.resolved(two, "pico-two.local", 31417, {"txtvers=1", "binding=plain"}, 1001);
+  discovery.resolved(one, "pico-one.local", 80, management_txt, 1001);
+  discovery.resolved(two, "pico-two.local", 80, management_txt, 1001);
   auto snapshot = discovery.snapshot(1002);
   assert(snapshot["candidates"].size() == 2);
-  assert(snapshot["candidates"][0]["port"] == 40123);
+  assert(snapshot["candidates"][0]["port"] == 80);
   assert(snapshot["candidates"][0]["id"] != snapshot["candidates"][1]["id"]);
   const auto id = snapshot["candidates"][0]["id"].get<std::string>();
   assert(discovery.candidate(id, 1002).has_value());
@@ -56,7 +59,7 @@ int main() {
   legacy.device_id = "a" + std::string(31, 'a');
   auto [initial, revision] = catalog.snapshot(legacy);
   assert(initial["profiles"].size() == 1 && !initial["active_id"].get<std::string>().empty());
-  assert(initial["profiles"][0]["settings"] == wtp_settings_json(legacy));
+  assert(initial["profiles"][0]["settings"] == management_profile_settings_json(legacy));
   auto [again, same_revision] = catalog.snapshot(legacy);
   assert(initial == again && same_revision == revision);
   bool rejected = false;
@@ -66,15 +69,23 @@ int main() {
   WtpCatalog reopened(name);
   assert(reopened.snapshot(legacy).first == initial);
   assert(reopened.profile(initial["active_id"], revision, legacy).settings.start_uncertainty_ns == 1'000'000);
+  rejected=false;
+  try{catalog.mutate({{"operation","edit"},{"id",initial["active_id"]},{"name","Legacy"},
+      {"settings",wtp_settings_json(legacy)},{"consent_plain",false}},revision,legacy);}catch(...){rejected=true;}
+  assert(rejected && catalog.snapshot(legacy).second==revision);
+  auto [edited,edited_revision]=catalog.mutate({{"operation","edit"},{"id",initial["active_id"]},{"name","Legacy renamed"},
+      {"settings",management_profile_settings_json(legacy)},{"consent_plain",false}},revision,legacy);
+  assert(catalog.profile(initial["active_id"],edited_revision,legacy).settings.start_uncertainty_ns==1'000'000);
+  assert(edited["profiles"][0]["name"]=="Legacy renamed");revision=edited_revision;
   auto plain = legacy;
   plain.transport = "network_plain"; plain.hostname = "pico.local"; plain.tcp_port = 41234;
   rejected = false;
   try { catalog.mutate({{"operation", "add"}, {"name", "Plain"}, {"method", "manual"},
-      {"discovery_id", ""}, {"settings", wtp_settings_json(plain)}, {"consent_plain", false}}, revision, legacy); }
+      {"discovery_id", ""}, {"settings", management_profile_settings_json(plain)}, {"consent_plain", false}}, revision, legacy); }
   catch (...) { rejected = true; }
   assert(rejected);
-  auto missing_limit = wtp_settings_json(plain);
-  missing_limit.erase("Start Uncertainty ns");
+  auto missing_limit = management_profile_settings_json(plain);
+  assert(!missing_limit.contains("Start Uncertainty ns")&&!missing_limit.contains("Allow Frequency Adjustment"));
   auto [added, added_revision] = catalog.mutate({{"operation", "add"}, {"name", "Plain"},
       {"method", "manual"}, {"discovery_id", ""}, {"settings", missing_limit},
       {"consent_plain", true}}, revision, legacy);
@@ -85,8 +96,9 @@ int main() {
   auto [renamed, renamed_revision] = catalog.mutate({{"operation", "rename"},
       {"id", plain_id}, {"name", "Nearby bench"}}, added_revision, legacy);
   assert(renamed["profiles"][1]["name"] == "Nearby bench");
-  assert(renamed["profiles"][0]["settings"]["Start Uncertainty ns"] == 1'000'000);
-  assert(renamed["profiles"][1]["settings"]["Start Uncertainty ns"] == 100'000'000);
+  assert(!renamed["profiles"][0]["settings"].contains("Start Uncertainty ns"));
+  assert(catalog.profile(initial["active_id"],renamed_revision,legacy).settings.start_uncertainty_ns==1'000'000);
+  assert(catalog.profile(plain_id,renamed_revision,legacy).settings.start_uncertainty_ns==100'000'000);
   WtpCatalog renamed_reload(name);
   assert(renamed_reload.profile(plain_id, renamed_revision, legacy).settings == plain);
   auto [removed, removed_revision] = catalog.mutate({{"operation", "remove"},

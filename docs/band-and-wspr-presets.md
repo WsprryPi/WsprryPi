@@ -84,7 +84,7 @@ Web band-selected Test Tone and CLI `--test-tone 20m` target one steady carrier 
 
 CW controls are numeric: QRSS carrier, FSKCW space with mark = space + positive shift, and DFCW dot with dash = dot + positive shift. Band aliases are rejected. Band correlation still applies to filter selection, frequency policy and output limits. QRSS/DFCW gaps have RF off; FSKCW retains space. Frequency labels do not alter timing or saved values.
 
-Fleet WSPR `frequency_hz` already means absolute RF center. The same `14097100` value yields the four tones above without a dial conversion. WTP event frequencies are absolute RF targets; receiving endpoints do not add 1,500 Hz, consult standalone frequency settings or apply Pi calibration again. Requested targets, backend realization and independent measured RF are separate evidence.
+An internal compiled occurrence uses absolute RF targets. The same `14097100` Hz RF center yields the four tones above without another dial conversion. Native execution does not add 1,500 Hz or apply host calibration a second time. Each device plans and executes its own schedule. Requested targets, backend realization and independent measured RF are separate evidence.
 
 ## WSPR preset identity
 

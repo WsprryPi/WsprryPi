@@ -2,7 +2,7 @@
 // Independent production management context/journal and actual Pico USB APIs.
 'use strict';
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),readline=require('node:readline');
-const {spawnFixtureChild:spawn,finishChildren}=require('./browser_fixture_process.js');
+const {spawnFixtureChild:spawn,finishChildren,waitForExit}=require('./browser_fixture_process.js');
 const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode!=='--paired-pi')throw Error('Explicit management fixture and candidate Pico USB driver required');
 (async()=>{
  let child,failure;
@@ -16,10 +16,24 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    // The paired mode uses the actual listener's 10/s source quota. Pace the
    // fixture rather than weakening production admission or retrying a write.
    if(mode)await new Promise(resolve=>setTimeout(resolve,110));
-   child.stdin.write(JSON.stringify(command)+'\n');const result=JSON.parse(await line());assert.equal(result.execution_ready,false,'Settings must not construct/select a WTP execution backend');return result;
+   child.stdin.write(JSON.stringify(command)+'\n');const result=JSON.parse(await line());assert.equal(result.execution_selected,false,'Settings/time must not select a WTP execution backend');assert.equal(result.execution_ready,false,'Settings must not construct/select a WTP execution backend');return result;
   };
   const operation=()=>crypto.randomBytes(16).toString('hex');
   const before=await call({control:'status'});assert.equal(before.status,200);assert.equal(before.body.job.owner_id,null);assert.equal(before.body.job.output_active,false);
+  if(!mode){
+   const waitTime=async predicate=>{const deadline=Date.now()+8000;for(;;){const observed=await call({control:'time-status'});if(predicate(observed.body.time))return observed;assert(Date.now()<deadline,'Management time-owner deadline: '+JSON.stringify(observed.body));await new Promise(resolve=>setTimeout(resolve,50));}};
+   await call({control:'time-owner',qualified:false});
+   await waitTime(time=>time?.reason==='host_utc_unqualified');
+   await call({control:'time-owner',qualified:true});
+   const accepted=await waitTime(time=>time?.accepted===true&&time?.selected===true);
+   assert.equal(accepted.body.time.selected_source,'controller');
+   const native=await call({control:'operations'});assert.equal(native.status,200);
+   assert(['synchronized','holdover'].includes(native.body.standalone.clock_state),JSON.stringify(native.body));
+   assert.equal(native.body.job.owner_id,null);assert.equal(native.body.job.output_active,false);
+   await call({control:'time-owner',qualified:false});
+   await waitTime(time=>time?.reason==='host_utc_unqualified');
+   console.log('PASS: independent management owner supplies actual Pico UTC without a browser/WTP backend; loss of host qualification refuses new samples without output');
+  }
   if(mode){
    const gateway=await call({resource:'context',method:'GET'});assert.equal(gateway.status,200,JSON.stringify(gateway));
    assert.equal(gateway.body.schema,'target-context');assert.equal(gateway.body.target.product,'WsprryPico');
@@ -28,7 +42,7 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    assert.deepEqual(gateway.body.authorization,{pair_id:'c'.repeat(32),authorization_generation:'1',renewal_required:false});
    assert.equal(gateway.body.gateway.pair_id,'c'.repeat(32));assert.equal(gateway.body.gateway.authorization_generation,'1');
    assert.match(gateway.body.capability_revision,/^[0-9a-f]{64}$/);assert.match(gateway.body.configuration_revision,/^[0-9a-f]{64}$/);
-   for(const resource of ['configuration','hostname','wifi','network'])assert(gateway.body.gateway.resources.includes(resource));
+   for(const resource of ['configuration','hostname','wifi','network','status','schedules/stop'])assert(gateway.body.gateway.resources.includes(resource));
    for(const resource of ['jobs','firmware','resume','authorities/register'])assert(!gateway.body.gateway.resources.includes(resource));
    const oldName=await call({resource:'hostname',method:'GET'});assert.equal(oldName.status,200);
    assert.equal((await call({control:'reconnect-usb'})).status,200);
@@ -182,6 +196,20 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    assert.equal((await call({resource:'context',method:'GET'})).status,200);
   }
   if(mode){const refused=await call({resource:'hostname',method:'GET',fault:'wrong-parent-context'});assert.equal(refused.status,403);assert.equal(refused.body.error.code,'unauthorized');}
+  const nativeStatus=await call({resource:'status',method:'GET'});assert.equal(nativeStatus.status,200,JSON.stringify(nativeStatus));
+  assert.equal(nativeStatus.body.job.boot_id,nativeStatus.body.standalone.boot_id);
+  assert.equal(nativeStatus.body.job.output_active,false);
+  let stopRead=await call({resource:'schedules/stop',method:'GET'});assert.equal(stopRead.status,200,JSON.stringify(stopRead));
+  const stopBody={contract:'Wsprry-Control/1',schema:'schedule-stop',target:stopRead.body.target,stop:true};
+  const wrongStop=await call({resource:'schedules/stop',method:'POST',revision:stopRead.etag,context:stopRead.context,operation_id:operation(),
+   body:JSON.stringify({...stopBody,target:{...stopBody.target,boot_id:'9'.repeat(32)}})});
+  assert.equal(wrongStop.status,409,JSON.stringify(wrongStop));
+  stopRead=await call({resource:'schedules/stop',method:'GET'});assert.equal(stopRead.status,200);
+  const stopRequest={resource:'schedules/stop',method:'POST',revision:stopRead.etag,context:stopRead.context,operation_id:operation(),body:JSON.stringify(stopBody)};
+  const stopped=await call(stopRequest);assert.equal(stopped.status,200,JSON.stringify(stopped));assert.equal(stopped.body.stopped,true);
+  assert.equal(stopped.body.wspr_enabled,false);assert.equal(stopped.body.message_enabled,false);assert.equal(stopped.body.owned,false);assert.equal(stopped.body.output_active,false);
+  const stopReplay=await call(stopRequest);assert.equal(stopReplay.status,200,JSON.stringify(stopReplay));assert.deepEqual(stopReplay.body,stopped.body);
+  const stopConfirmed=await call({resource:'schedules/stop',method:'GET'});assert.equal(stopConfirmed.etag,stopped.etag,'Retained stop reply must not dispatch another stop');
   let network=await call({resource:'network',method:'GET'});assert.equal(network.status,200,JSON.stringify(network));
   const enabled=await call({resource:'network',method:'PUT',revision:network.etag,context:network.context,operation_id:operation(),body:JSON.stringify({contract:'Wsprry-Control/1',enabled:true})});
   assert.equal(enabled.status,200,JSON.stringify(enabled));assert.equal(enabled.body.requested_enabled,true);
@@ -243,7 +271,10 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
     assert.equal(receipt.receipt.state,'rejected');assert(!JSON.stringify(retained).includes(secret));
     console.log('PASS: actual Pi TLS principal, automatic attached-Pico negotiation, typed USB settings and recovery, revoked-before-handoff refusal without a Pico mutation');
   }
-  console.log('PASS: independent USB context, actual framing/ACK/Pico aliases, durable redacted replay, refused inputs before journaling, explicit action recovery, no WTP backend/claim/output');
+  child.stdin.end();
+  assert(await waitForExit(child,5000),'Management owners and time worker must retire without a forced process kill');
+  assert.equal(child.exitCode,0,'Management owner teardown must complete successfully');
+  console.log('PASS: independent USB context, actual framing/ACK/Pico aliases, durable redacted replay, refused inputs before journaling, explicit action recovery, joined time-owner teardown, no WTP backend/claim/output');
  }catch(error){failure=error;}
  await finishChildren({failure,children:[child]});
 })().catch(error=>{console.error(error);process.exitCode=1;});

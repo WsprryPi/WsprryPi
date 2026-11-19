@@ -357,6 +357,12 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
             return operation_document(*receipt);
         }
         if(migration){
+            // A device-owned replacement must execute on this device. Keep
+            // explicit old-software rollback available, but never turn a
+            // controller's remote output into a native recurrence authority.
+            if(!rollback&&(config.transmit_backend==TransmitBackendKind::WTP||
+                saved["configuration"]["Operation"]["Transmit Backend"]=="wtp"))
+                return refuse(409,"unsupported_resource");
             const auto authority=store_.recurrence_authority();
             if(body["expected_authority_generation"]!=authority["generation"])return refuse(412,"revision_conflict");
             const bool draining=!rollback&&authority["state"]!="retiring"&&writable(*state)&&legacy_recurrence_has_accepted_work();
@@ -463,8 +469,6 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
         if(candidate["scheduling"]["solar"]["enabled"]==true&&authority["state"]!="staged"&&authority["state"]!="native")return refuse(409,"authority_pending");
         for(const auto *key:{"Web Port","Socket Port"})
             if(candidate["configuration"]["Operation"][key]!=saved["configuration"]["Operation"][key])return refuse(409,"read_only_field");
-        for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})
-            if(candidate["configuration"]["WTP"][key]!=saved["configuration"]["WTP"][key])return refuse(409,"read_only_field");
         if(!state->reserve_configuration())return refuse(409,"confirmation_required");
         struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
         const auto current=observe();

@@ -107,6 +107,7 @@ def main():
                 raise ValueError('Invalid scoped client role registry')
             header += '  if (method == '+json.dumps(method)+') return '+' || '.join('resource == '+json.dumps(name) for name in names)+';\n'
         header += '  return false;\n}\n'
+    header += 'inline std::string_view control_management_operations() { return R"CTRL('+json.dumps(spec['management_routes'],separators=(',', ':'))+')CTRL"; }\n'
     header += 'inline std::size_t control_request_limit(std::string_view resource) {\n'
     for name, maximum in spec['request_limits'].items():
         header += '  if (resource == '+json.dumps(name)+') return '+str(maximum)+';\n'
@@ -117,6 +118,14 @@ def main():
             body=json.dumps(document,separators=(',',':'))
             header += '  if (name == '+json.dumps(name)+') return R"CTRL('+body+')CTRL";\n'
         header += '  return "{}";\n}\n'
+    # Protected storage remains independently versioned. This schema is never
+    # returned by a control descriptor or admitted on a control route.
+    storage=json.loads((DEST/'pi-managed-settings-storage.schema.json').read_text())['$defs']
+    storage_bytes=json.dumps(storage,separators=(',',':'))
+    header += 'inline std::string_view pi_stored_candidate_definitions() {\n  static const std::string document = [] {\n    std::string value;\n'
+    for start in range(0,len(storage_bytes),16384):
+        header += '    value.append(R"STORE('+storage_bytes[start:start+16384]+')STORE");\n'
+    header += '    return value;\n  }();\n  return document;\n}\n'
     capshape=json.dumps(spec['$defs']['capabilities'],separators=(',',':'))
     header += 'inline std::string_view control_capabilities_shape() { return R\"CTRL('+capshape+')CTRL\"; }\n'
     # Existing native reply definitions for the paired-Pi consumer. Resolve
@@ -136,7 +145,7 @@ def main():
                 for child in value:visit(child)
         visit(native[name])
     for name in ['application','progress','gpio-drive','filter-selector-resource','amplifier-timing-resource',
-                 'gps','si5351','gray-line','udp-logging','udp-logging-capabilities','udp-logging-test','udp-logging-test-capabilities']:
+                 'gps','si5351','gray-line','status','native-execution','schedule-stop-read','schedule-stop-request','udp-logging','udp-logging-capabilities','udp-logging-test','udp-logging-test-capabilities']:
         include_native(name)
     native_bytes=json.dumps(native,separators=(',',':'))
     if len(native_bytes)>1048576 or ')CTRL"' in native_bytes:raise ValueError('Native reply definitions exceed generation bound')

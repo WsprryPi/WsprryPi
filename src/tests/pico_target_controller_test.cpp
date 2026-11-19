@@ -30,7 +30,7 @@ Json canonical_caps() {
 Json management() {
   Json carriers=Json::array();for(const auto name:{"engineering_mtls","engineering_field","consumer_station","consumer_ap","usb_physical"}) carriers.push_back({{"carrier",name},{"built_in",true},{"available",true}});
   return {{"contract","Wsprry-Control/1"},{"schema","management"},{"target",target},{"profile","engineering"},{"preclock",true},{"profile_generation",nullptr},{"selected","engineering_mtls"},{"carriers",carriers},{"unsupported",{"plain_wtp_json","tls_wtp_json","ble_json"}},
-    {"operations",{{"GET",{"capabilities","status","config","schedules","network","application","management"}},{"PUT",{"schedules","network"}},{"POST",{"config/update"}}}},
+    {"operations",Json::parse(control_management_operations())},
     {"limits",{{"http_body",32768},{"consumer_plaintext",32724},{"config",4096},{"update",2048},{"login_ms",30000},{"idle_ms",1800000},{"absolute_ms",28800000},{"consumer_sessions",3},{"consumer_pending_logins",1}}}};
 }
 

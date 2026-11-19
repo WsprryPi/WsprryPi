@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Shipped Fleet browser client -> production coordinator -> selected actual Pico
-// TLS/USB handler and production Pi simulated backend. No device nodes or RF.
+// TLS/USB handler. No execution backend, device nodes, or RF.
 "use strict";
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm"), crypto = require("node:crypto");
 const {spawnFixtureChild, stopIsolatedProcess} = require("./browser_fixture_process.js"), readline = require("node:readline");
@@ -54,47 +54,31 @@ async function main() {
             while (performance.now() < limit) {await client.refresh();if (condition(client.snapshot())) return;await new Promise(resolve => setTimeout(resolve, 30));}
             throw new Error(reason + ": " + JSON.stringify(client.snapshot().data));
         };
-        await wait(state => Object.keys(state.data.outputs).length === 2 && Object.values(state.data.outputs).every(o => o.can_resume), "two actual outputs inspected");
-        const pico = (carrier === "network" ? "a" : "d").repeat(32), pi = "b".repeat(32);
-        assert.equal(client.snapshot().data.outputs[pico].identity.product, "WsprryPico");
-        assert.equal(client.snapshot().data.outputs[pi].identity.product, "WsprryPi");
-        const mutate = async (operation, id) => {
-            for (let review = 0; review < 12; review++) {
-                await client.refresh();
-                try {return await client.mutate({operation, device_id: id}, client.capture(id));}
-                catch (error) {if (!error.message.includes("revision_conflict")) throw error;
-                    await client.refresh();client.review(id);}
-            }
-            throw new Error("Fixture explicit read/review conflict budget exhausted");
-        };
-        ambiguousPost = true;
-        await assert.rejects(mutate("enable", pico), /Ambiguous accepted response/);
-        assert.match(ambiguousId, /^[0-9a-f]{32}$/);
-        await wait(state => state.data.assignments.find(r => r.device_id === pico).enabled && client.outcome(pico)?.action_id === ambiguousId && client.outcome(pico)?.state === "confirmed", "ambiguous accepted Enable reconciled by its original action ID");
-        assert.equal(posted.filter(c => c.operation === "enable" && c.device_id === pico).length, 1, "ambiguous response cannot cause another mutating POST");
-        assert.equal(client.snapshot().data.assignments.find(r => r.device_id === pi).enabled, false, "selected Pico cannot enable the Pi");
-        const pause = await mutate("pause", pico);
-        await wait(() => client.outcome(pico)?.action_id === pause.action_id && client.outcome(pico)?.state === "confirmed", "Pico pause confirmed through owning coordinator");
-        await mutate("enable", pi);
-        await wait(state => state.data.assignments.find(r => r.device_id === pi).enabled, "simulated Pi enable committed");
-        assert.equal(client.snapshot().data.assignments.find(r => r.device_id === pico).enabled, false, "selected Pi cannot enable Pico");
-        const stopPi = await mutate("pause", pi);
-        await wait(() => client.outcome(pi)?.action_id === stopPi.action_id && client.outcome(pi)?.state === "confirmed", "simulated Pi pause confirmed");
-        assert.equal(client.snapshot().data.assignments.some(r => r.enabled), false);
-        const failedIncarnation = client.snapshot().data.controller_incarnation;
-        const failedReplacement = await exchange({fail_replace: true});
-        assert.equal(failedReplacement.status, 503);
-        assert.equal(failedReplacement.body.error.code, "fleet_unavailable");
-        await assert.rejects(client.refresh());
-        assert.equal(client.snapshot().valid, false, "a failed replacement cannot leave a valid stopped-controller projection");
-        await exchange({replace: true});
-        await wait(state => state.data.controller_incarnation !== failedIncarnation && Object.values(state.data.outputs).every(o => o.can_resume), "corrected configuration restores actual target owners with a fresh incarnation");
-        const old = client.capture(pi), oldIncarnation = client.snapshot().data.controller_incarnation;
-        await exchange({replace: true});
-        await wait(state => state.data.controller_incarnation !== oldIncarnation && Object.values(state.data.outputs).every(o => o.can_resume), "manager replacement retires old sessions/identity leases");
-        await assert.rejects(client.mutate({operation: "enable", device_id: pi}, old), /changed after review/);
-        const readStart = performance.now();await client.refresh();assert.ok(performance.now() - readStart < 1000, "published read remains bounded");
-        console.log(`Fleet Operations ${carrier}: shipped browser correlation/selection, actual Pico handlers, independent simulated Pi, committed enable, priority pause, owned cleanup, explicit failed replacement and fresh-owner restoration passed.`);
+        await wait(state=>Object.keys(state.data.outputs).length===2,'two retained legacy outputs');
+        const before=client.snapshot().data;
+        assert.equal(before.assignments[0].name,before.assignments[1].name,'duplicate display names retain distinct IDs');
+        for(const output of Object.values(before.outputs)) {
+            assert.equal(output.state,'migration_required');
+            assert.equal(output.can_resume,false);assert.equal(output.can_pause,false);assert.equal(output.can_reconcile,false);
+        }
+        for(const operation of ['assign','enable','pause','schedule','recover','remove']) {
+            const result=await exchange({method:'POST',body:JSON.stringify({operation,device_id:'a'.repeat(32)}),etag:client.snapshot().etag,resource:'fleet'});
+            assert.equal(result.status,409);assert.equal(result.body.error.code,'migration_required');
+        }
+        await client.refresh();assert.deepEqual(client.snapshot().data.assignments,before.assignments);
+        const peerStatus=await exchange({peer_status:true});assert.equal(peerStatus.status,200);
+        assert.equal(peerStatus.body.job.owner_id,null);assert.equal(peerStatus.body.job.output_active,false);
+        assert.equal(peerStatus.legacy_contacts,0);assert.equal(peerStatus.saved_unchanged,true);
+        const incarnation=client.snapshot().data.controller_incarnation;
+        const failedReplacement=await exchange({fail_replace:true});assert.equal(failedReplacement.status,503);
+        assert.equal(failedReplacement.body.error.code,'fleet_unavailable');
+        await assert.rejects(client.refresh());assert.equal(client.snapshot().valid,false);
+        await exchange({replace:true});
+        await wait(state=>state.data.controller_incarnation!==incarnation,'fresh coordinator incarnation');
+        assert.deepEqual(client.snapshot().data.assignments,before.assignments);
+        const final=await exchange({peer_status:true});assert.equal(final.legacy_contacts,0);assert.equal(final.saved_unchanged,true);
+        assert.equal(final.body.job.owner_id,null);assert.equal(final.body.job.output_active,false);
+        console.log(`Fleet ${carrier}: shipped read coordinator, duplicate names, preserved legacy duties, refused actions, no carrier reconnect, corrupt/replaced owner, and actual Pico management status passed.`);
     } finally {
         events.get("pagehide")?.();clearTimeout(deadline);child.stdin.end();
         if (child.exitCode === null && child.signalCode === null) {

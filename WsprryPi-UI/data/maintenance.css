@@ -475,3 +475,9 @@
 #controllerAccess [hidden] { display: none !important; }
 
 #pairingState { overflow-wrap: anywhere; }
+
+/* Retained migration actions remain readable when their authority is held. */
+#recurrenceMigration .btn-outline-secondary {
+    --bs-btn-disabled-color: var(--bs-body-color);
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+}

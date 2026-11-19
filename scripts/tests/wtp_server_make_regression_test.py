@@ -14,9 +14,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 source = (ROOT / "src/Makefile").read_text()
-targets = ("wtp-protocol-test", "wtp-pi-authority-test", "wtp-pi-listener-test",
-           "wtp-pi-routing-probe")
-builders = ("wtp-server-host-build", "wtp-client-host-build")
+targets = ("wtp-pi-authority-test", "wtp-server-core-test")
+builders = ("wtp-server-host-build",)
 rules = []
 for target in (*targets, *builders):
     marker = "\n" + target + ":"
@@ -74,7 +73,7 @@ else:
 with tempfile.TemporaryDirectory(prefix="wtp-server-make-") as temporary:
     root = Path(temporary)
     (root / "helper.py").write_text(helper)
-    for component in ("client", "server"):
+    for component in ("server",):
         folder = root / f"WTP-{component.title()}"
         folder.mkdir()
         (folder / "Makefile").write_text(f""".PHONY: all test
@@ -92,14 +91,11 @@ build/libwtp_{component}.a:
     env = os.environ.copy()
     for name in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL"):
         env.pop(name, None)
-    # Isolate each archive with the other already cached, as well as testing
-    # both cold. Otherwise one library's build can hide a race in the other.
-    scenarios = ((targets, ()),
-                 (targets[1:], ("client",)),
-                 ((targets[0], *targets[2:]), ("server",)))
+    # Cold and already-built archives, with repeated concurrent consumers.
+    scenarios = ((targets, ()), (targets, ("server",)))
     for goals, prebuilt in scenarios:
         for jobs in (2, 8):
-            for component in ("client", "server"):
+            for component in ("server",):
                 library = root / f"WTP-{component.title()}/build/libwtp_{component}.a"
                 library.unlink(missing_ok=True)
                 (root / ("archive-builds-" + component)).unlink(missing_ok=True)
@@ -113,7 +109,7 @@ build/libwtp_{component}.a:
                 rfd = os.open(ready,os.O_RDWR|os.O_NONBLOCK)
                 releases = {}
                 environment = env | {'ARCHIVE_READY':str(ready)}
-                for component in ('client','server'):
+                for component in ('server',):
                     release = root/('release-'+component)
                     release.unlink(missing_ok=True)
                     os.mkfifo(release)
@@ -124,7 +120,7 @@ build/libwtp_{component}.a:
                     future = pool.submit(run_shell, shlex.join(['make',f'-j{jobs}',*goals]),
                         cwd=root,env=environment,stage='archive-build-and-consumers',watchdog=20)
                     try:
-                        expected = set(('client','server'))-set(prebuilt) if repeat == 0 else set()
+                        expected = set(('server',))-set(prebuilt) if repeat == 0 else set()
                         entered = set()
                         deadline = time.monotonic()+20
                         while entered != expected:
@@ -149,7 +145,7 @@ build/libwtp_{component}.a:
                         for fd in releases.values(): os.close(fd)
                 if errors:
                     raise BaseExceptionGroup('archive fixture coordination/build failed',errors)
-                for component in ("client", "server"):
+                for component in ("server",):
                     log = root / ("archive-builds-" + component)
                     builds = log.read_text().splitlines() if log.exists() else []
                     assert builds == ([] if component in prebuilt else ["build"])

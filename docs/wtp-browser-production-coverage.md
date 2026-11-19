@@ -2,8 +2,7 @@
 
 The [configuration contract](wtp-configuration-compatibility.md) and
 [browser API](wtp-browser-api.md) define member management, compatible atomic
-saves, independent station progress and recovery. The selected interoperability
-fixtures preserve old and current Pico source pairs with their own expectations.
+saves, independent station progress and recovery. The actual integration fixtures use the explicitly selected current Pi/Pico source pair, including tested edits. Superseded control views are refused.
 
 ## Hardware-free coverage
 

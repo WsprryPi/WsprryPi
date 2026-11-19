@@ -131,7 +131,7 @@ bool transmit_backend_is_compiled(TransmitBackendKind backend) noexcept
     case TransmitBackendKind::SIMULATED:
         return WSPRRYPI_BACKEND_SIMULATED;
     case TransmitBackendKind::WTP:
-        return true;
+        return false;
     }
     return false;
 }
@@ -1383,6 +1383,7 @@ namespace
         target.use_offset = source.use_offset;
         target.power_level = source.power_level;
         target.transmit_backend = source.transmit_backend;
+        target.stored_wtp_backend = source.stored_wtp_backend;
         target.simulated_backend_override = source.simulated_backend_override;
         target.wtp = source.wtp;
         target.wtp_server = source.wtp_server;
@@ -2632,6 +2633,11 @@ void persist_recovery_configuration(const nlohmann::json &configuration,
     // server-owned. Preserve actual saved input rather than a rendered default.
     if(preserved_internal.is_object()&&preserved_internal.contains("Experimental"))
         internal["Experimental"]=preserved_internal["Experimental"];
+    // Inactive retired fields remain byte-for-byte values in the private
+    // source projection. They are neither exposed nor accepted by Control/1.
+    for(const auto *section:{"WTP","WTP Server"})
+        if(preserved_internal.is_object()&&preserved_internal.contains(section))
+            internal[section]=preserved_internal[section];
     config_handler_serialization::apply_public_config_to_internal_json(configuration,internal);
     internal["Meta"]["Use INI"]=true;internal["Meta"]["INI Filename"]=config.ini_filename;
     const auto bytes=serialize_config_ini_projection_for_management(internal);

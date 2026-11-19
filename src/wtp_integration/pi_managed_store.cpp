@@ -1,3 +1,4 @@
+#include "wtp_retirement.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_managed_store.hpp"
 #include "pi_pair_contract.hpp"
@@ -115,7 +116,7 @@ Json parse_legacy(const std::string &bytes,const std::string &self){
     require(value.is_object()&&value.size()==5&&value.value("schema",Json(nullptr))=="pi-legacy-recurrence/1"&&
         value.value("device_id",Json(nullptr))==self&&value.contains("assignment_id")&&value["assignment_id"].is_string()&&
         value["assignment_id"].get_ref<const std::string&>().size()==32&&value["assignment_id"].get_ref<const std::string&>().find_first_not_of("0123456789abcdef")==std::string::npos&&
-        value.contains("candidate")&&valid_pi_candidate_shape(value["candidate"])&&value.contains("ini_hex")&&value["ini_hex"].is_string());
+        value.contains("candidate")&&valid_pi_stored_candidate_shape(value["candidate"])&&value.contains("ini_hex")&&value["ini_hex"].is_string());
     (void)decode_bytes(value["ini_hex"].get<std::string>());validate_stored_solar(value["candidate"]["scheduling"]);return value;
 }
 std::string installation_binding(const std::string &self,const std::string &installation,
@@ -362,7 +363,7 @@ void PiManagedStore::initialize(const Json &internal){
     std::lock_guard lock(mutex_);require(!held_);
     const auto configuration=config_handler_serialization::saved_configuration_from_internal_json(internal);
     if(initialized_){
-        check();require(configuration==settings_["configuration"]);
+        check();require(configuration==current_pi_configuration(settings_["configuration"]));
         if(recurrence_["state"]=="unclassified"&&recurrence_["clean_proof"].is_null()&&recurrence_["controllers"].empty()&&
             recurrence_["retirements"].empty()&&recurrence_["jobs"].empty()){
             const auto before=recurrence_;WtpPiBootIdentity random;
@@ -427,7 +428,7 @@ void PiManagedStore::write_committed_ini(const std::string &bytes){
 }
 const std::string &PiManagedStore::device_id() const noexcept {return self_;}
 std::uint64_t PiManagedStore::context_epoch() const {std::lock_guard lock(mutex_);return context_epoch_;}
-Json PiManagedStore::settings(){std::lock_guard lock(mutex_);check();return settings_;}
+Json PiManagedStore::settings(){std::lock_guard lock(mutex_);check();return current_pi_settings_record(settings_);}
 Json PiManagedStore::recurrence_authority(){std::lock_guard lock(mutex_);check();return recurrence_;}
 std::shared_ptr<RecurrenceProgress> PiManagedStore::recurrence_progress(){std::lock_guard lock(mutex_);check();require(recurrence_["state"]=="native"&&bool(progress_));return progress_;}
 std::optional<Json> PiManagedStore::authority_operation(const std::string &operation,const PiPairPrincipal &principal){
@@ -515,7 +516,7 @@ void PiManagedStore::persist_scheduling(const Operation &operation,bool enabled,
                         scope["authorization_generation"]==authority["registration"]["authorization_generation"]&&scope["assignment_revision"]==assignment["assignment_revision"])known=true;
             require(known&&retired);
         }
-        require(operation.request["candidate_digest"]==settings_["candidate_digest"]&&
+        require(operation.request["candidate_digest"]==current_pi_settings_record(settings_)["candidate_digest"]&&
             (recurrence_["state"]=="staged"||recurrence_["state"]=="native")&&recurrence_["jobs"].empty());
         for(const auto &controller:recurrence_["controllers"]){
             bool retired=false;
@@ -549,7 +550,9 @@ void PiManagedStore::persist_scheduling(const Operation &operation,bool enabled,
     catch(...){if(!held_){recurrence_=before;progress_initialization_=previous_initialization;}throw;}
 }
 Json PiManagedStore::rollback_configuration(){
-    std::lock_guard lock(mutex_);check();require(!legacy_.is_null());return legacy_["candidate"]["configuration"];
+    std::lock_guard lock(mutex_);check();require(!legacy_.is_null());
+    if(wtp_retirement_source_active(legacy_["candidate"]["configuration"]))throw std::runtime_error("migration_required");
+    return current_pi_configuration(legacy_["candidate"]["configuration"]);
 }
 void PiManagedStore::persist_migration(const Json &internal,const std::function<void()> &writer,const Operation &operation,bool rollback,const std::optional<Json> &pending_job){
     std::lock_guard lock(mutex_);check();
@@ -566,13 +569,13 @@ void PiManagedStore::persist_migration(const Json &internal,const std::function<
     if(rollback){
         require((recurrence_["state"]=="staged"||recurrence_["state"]=="native")&&settings_["scheduling"]["enabled"]==false&&!legacy_.is_null()&&
             request["resume_controller_id"]==self_&&request["resume_assignment_id"]==row["assignment_id"]&&
-            legacy_["assignment_id"]==row["assignment_id"]&&configuration==legacy_["candidate"]["configuration"]&&
+            legacy_["assignment_id"]==row["assignment_id"]&&configuration==current_pi_configuration(legacy_["candidate"]["configuration"])&&
             row["assignment_revision"]==PiManagementJournal::digest(canonical_pi_management_json(legacy_["candidate"])));
         if(!progress_initialization_.is_null())require(progress_&&!progress_->held()&&progress_->snapshot()["in_flight"].is_null());
         candidate=legacy_["candidate"];bytes=serialize_config_ini_projection_for_management(internal);
     }else{
         require((recurrence_["state"]=="legacy"||recurrence_["state"]=="rollback"||recurrence_["state"]=="retiring")&&
-            request["controllers"]==recurrence_["controllers"]&&configuration==settings_["configuration"]);
+            request["controllers"]==recurrence_["controllers"]&&configuration==current_pi_configuration(settings_["configuration"]));
         candidate={{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}};
         require(row["assignment_revision"]==PiManagementJournal::digest(canonical_pi_management_json(
             recurrence_["state"]=="retiring"?legacy_.at("candidate"):candidate)));
@@ -842,7 +845,7 @@ void PiManagedStore::complete_migration(){
 }
 void PiManagedStore::validate_snapshot(const Json &internal){
     std::lock_guard lock(mutex_);check();
-    require(config_handler_serialization::saved_configuration_from_internal_json(internal)==settings_["configuration"]);
+    require(config_handler_serialization::saved_configuration_from_internal_json(internal)==current_pi_configuration(settings_["configuration"]));
 }
 std::optional<Json> PiManagedStore::receipt(const std::string &principal,const std::string &authorization,const std::string &operation){
     std::lock_guard lock(mutex_);check();
@@ -885,7 +888,7 @@ void PiManagedStore::persist_stop(const Json &internal,const std::function<void(
     require(valid_controller_document(operation.request,"target-stop")&&
         operation.route=="/api/control/v1/targets/"+self_+"/stop"&&!replay(operation));
     if(operation.request["expected_revision"]!=settings_["revision"])throw std::runtime_error("revision_conflict");
-    auto expected=settings_["configuration"];expected["Operation"]["Transmit"]=false;
+    auto expected=current_pi_configuration(settings_["configuration"]);expected["Operation"]["Transmit"]=false;
     const auto configuration=config_handler_serialization::saved_configuration_from_internal_json(internal);
     require(configuration==expected);
     publish(Json{{"configuration",configuration},{"scheduling",settings_["scheduling"]}},
@@ -895,7 +898,7 @@ void PiManagedStore::persist_private(const Json &internal,const std::string &bef
     std::lock_guard lock(mutex_);check();
     require(recurrence_["state"]!="retiring"&&recurrence_["state"]!="reconciling");
     require(before==observations_.at("ini").bytes&&after.size()<=1048576&&
-        config_handler_serialization::saved_configuration_from_internal_json(internal)==settings_["configuration"]);
+        config_handler_serialization::saved_configuration_from_internal_json(internal)==current_pi_configuration(settings_["configuration"]));
     if(before==after)return;
     publish(Json{{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}},after,[]{},{});
 }
@@ -921,14 +924,15 @@ void PiManagedStore::persist_recovery(const Json &internal,const std::function<v
     const auto configuration=config_handler_serialization::saved_configuration_from_internal_json(internal);
     if(save){
         auto public_candidate=configuration;
-        for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})public_candidate["WTP"][key]="";
         require(canonical_pi_management_json(public_candidate)==canonical_pi_management_json(request["configuration"]));
     }
     const auto ini=stock_bytes?*stock_bytes:serialize_config_ini_projection_for_management(internal);
     if(!initialized_){initialize_transaction(internal,ini,writer,operation,request["expected_revision"].get<std::string>());return;}
     publish(Json{{"configuration",configuration},{"scheduling",settings_["scheduling"]}},ini,writer,operation);
 }
-void PiManagedStore::publish(const Json &candidate,const std::string &ini,const std::function<void()> &writer,const std::optional<Operation> &operation,bool authority_transition,bool pending,bool write_ini,const std::string &complete_operation,bool metadata_only,const char *completion_error){
+void PiManagedStore::publish(const Json &proposed,const std::string &ini,const std::function<void()> &writer,const std::optional<Operation> &operation,bool authority_transition,bool pending,bool write_ini,const std::string &complete_operation,bool metadata_only,const char *completion_error){
+    auto candidate=proposed;
+    candidate["configuration"]=current_pi_configuration(candidate.at("configuration"));
     require(valid_pi_candidate_shape(candidate));
     validate_stored_solar(candidate.at("scheduling"));
     if(candidate.at("scheduling").at("solar").at("enabled")==true)
@@ -946,7 +950,7 @@ void PiManagedStore::publish(const Json &candidate,const std::string &ini,const 
     }
     if(metadata_only){
         require(initialized_&&!operation&&!authority_transition&&!pending&&!write_ini&&complete_operation.empty()&&
-            candidate==Json({{"configuration",settings_["configuration"]},{"scheduling",settings_["scheduling"]}}));
+            candidate==Json({{"configuration",current_pi_configuration(settings_["configuration"])},{"scheduling",settings_["scheduling"]}}));
         auto previous=parse_recurrence_authority_record(observations_.at("recurrence").bytes,self_),current=next_authority;
         previous.erase("management");current.erase("management");require(previous==current);
         require(ini==observations_.at("ini").bytes&&

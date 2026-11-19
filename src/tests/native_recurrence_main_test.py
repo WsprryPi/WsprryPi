@@ -37,7 +37,7 @@ def main():
         source.optionxform = str
         source.read(Path(__file__).resolve().parents[2] / 'config/wsprrypi.ini')
         port = free_port()
-        source['Operation'].update({'Transmit Backend': 'wtp', 'Transmit': 'false', 'Enable on Boot': 'Never',
+        source['Operation'].update({'Transmit Backend': 'gpio', 'Transmit': 'false', 'Enable on Boot': 'Never',
             'Use LED': 'false', 'Use Amp': 'false', 'Use Shutdown': 'false', 'Web Port': str(port), 'Socket Port': str(port + 1)})
         source['WSPR'].update({'Call Sign': 'AA0NT', 'Grid Square': 'EM18', 'TX Power': '20'})
         source['WTP Server']['Enabled'] = 'false'
@@ -112,9 +112,6 @@ def main():
             candidate = copy.deepcopy(recovery['draft'])
             candidate['Operation'].update({'Transmit': False, 'Enable on Boot': 'Never'})
             candidate['WSPR'].update({'Call Sign': 'AA0NT', 'Grid Square': 'EM18', 'TX Power': 20})
-            candidate['WTP Server']['Enabled'] = False
-            for key in ('TLS CA File', 'TLS Client Certificate', 'TLS Client Key'):
-                candidate['WTP'][key] = ''
             unavailable = [(section, key) for section, group in candidate.items() for key, value in group.items()
                 if isinstance(value, dict) and value.get('state') == 'unavailable']
             assert not unavailable, unavailable
@@ -142,7 +139,10 @@ def main():
             action('disable', 'target-action')
             assert read(base + 'status')['phase'] == 'draining'
             wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Accepted message drains', 10)
-            assert any(event['kind'] == 'execution_start' for event in json.loads(trace.read_text())['events'])
+            observed_trace = json.loads(trace.read_text())
+            assert any(event['kind'] == 'execution_start' for event in observed_trace['events']), {
+                'trace': observed_trace, 'progress': json.loads(progress.read_text()),
+                'status': read(base + 'status'), 'service_log': (root / 'service.log').read_text()[-12000:]}
             saved_progress = progress.read_bytes()
             stop()
             launch()

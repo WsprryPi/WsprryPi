@@ -53,7 +53,7 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
     if(resource==='disable')item.settings.saved.scheduling.enabled=false;
     if(resource==='migration/rollback'){
      assert.equal(item.settings.saved.configuration.Operation.Transmit,false);assert.equal(item.settings.saved.scheduling.enabled,false);
-     assert.equal(body.resume_controller_id,b);item.migration.state='reconciling';item.migration.transition_id=body.operation_id;
+     assert.equal(body.resume_controller_id,device);item.migration.state='reconciling';item.migration.transition_id=body.operation_id;
      receipt.state='pending';receipt.revision=null;
     }
     item.settings.revision=revision;item.context.configuration_revision=revision;if(item.migration.state==='staged')item.migration.staged_revision=revision;
@@ -66,9 +66,29 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   });await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve));
   profile=createBrowserProfile();({browser,client}=await launchBrowser({executable:process.env.CHROME_BIN||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':'chromium'),args:['--headless','--no-sandbox','--disable-gpu','--disable-background-networking','about:blank'],profile,timeoutMs:60000}));
   const run=expression=>client.evaluate(expression),click=id=>run(`document.getElementById('recurrenceMigration${id}').click()`);
+  const output=process.env.WSPRRYPI_MIGRATION_SCREENSHOTS||path.resolve(ui,'../build/phase62-migration-ui');fs.mkdirSync(output,{recursive:true});
+  async function capture(scene){for(const theme of ['light','dark'])for(const width of [1440,390,320]){
+   await client.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<768});
+   await run(`document.documentElement.setAttribute('data-bs-theme','${theme}');document.getElementById('recurrenceMigration').scrollIntoView({behavior:'instant',block:'start'});window.scrollBy({top:-120,behavior:'instant'});`);await client.settleRendering();
+   assert.equal(await run("[...document.querySelectorAll('#recurrenceMigration .btn-outline-secondary:disabled')].every(b=>getComputedStyle(b).color===getComputedStyle(document.body).color)"),true,'Held migration action labels retain the theme foreground');
+   assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true,'Migration overflow '+width);
+   const shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,`${scene}-${theme}-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
+  }
   await client.send('Page.navigate',{url:`http://127.0.0.1:${proxy.address().port}/index.php?page=maintenance`});
-  await waitFor(()=>run("document.getElementById('recurrenceMigrationRollback')?.disabled===false&&document.getElementById('recurrenceMigrationDevice')?.textContent.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')"),'controller-only remote restore');
+  await waitFor(()=>run("document.getElementById('recurrenceMigrationRollback')?.disabled===true&&document.getElementById('recurrenceMigrationDevice')?.textContent.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')&&[...document.getElementById('recurrenceMigrationAssignment').options].some(o=>o.disabled)"),'retired controller restore held');
   assert.equal(calls.filter(call=>call.method!=='GET').length,0);
+  assert.match(await run("document.getElementById('recurrenceMigrationRestoreHelp').textContent"),/Controller-owned WTP schedules remain held/);
+  await run("document.getElementById('recurrenceMigrationRollback').dispatchEvent(new Event('click',{bubbles:true}))");
+  assert.equal(await run("document.getElementById('recurrenceMigrationConfirmation').hidden"),true);
+  assert.equal(calls.filter(call=>call.method==='POST').length,0,'Retired restore cannot issue preparatory Stop, disable, or a browser session');
+  await capture('controller-held');
+  const nativePrevious={...targets.get(a).migration.controllers[0],controller_id:a,assignment_id:'1'.repeat(32)};
+  targets.get(a).migration.controllers.unshift(nativePrevious);
+  targets.get(a).migration.wtp_binding=null;
+  await click('Refresh');await waitFor(()=>run("!document.getElementById('recurrenceMigrationAssignment').disabled"),'native previous schedule read');
+  await run(`document.getElementById('recurrenceMigrationAssignment').value='${a}/${'1'.repeat(32)}';document.getElementById('recurrenceMigrationAssignment').dispatchEvent(new Event('change'))`);
+  await waitFor(()=>run("!document.getElementById('recurrenceMigrationRollback').disabled"),'explicit previous local schedule');
   await click('Rollback');assert.equal(await run('document.activeElement.id'),'recurrenceMigrationConsent');
   const confirm=async()=>{await run("document.getElementById('recurrenceMigrationConsent').checked=true;document.getElementById('recurrenceMigrationConsent').dispatchEvent(new Event('change'))");await click('Confirm');};
   await confirm();await waitFor(()=>run("!document.getElementById('recurrenceMigrationRetry').hidden&&!document.getElementById('recurrenceMigrationRetry').disabled"),'lost preparation retained');
@@ -79,16 +99,10 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   await waitFor(()=>run("document.getElementById('recurrenceMigrationState').textContent.includes('Restoration is unconfirmed')&&!document.getElementById('recurrenceMigrationTarget').disabled"),'pending guarded handback');
   const grant=targets.get(a).last;
   assert.deepEqual(calls.filter(call=>call.method==='POST').map(call=>call.resource),['stop','stop','disable','migration/rollback']);
-  const select=async device=>{await run(`document.getElementById('recurrenceMigrationTarget').value='${device}';document.getElementById('recurrenceMigrationTarget').dispatchEvent(new Event('change'))`);await waitFor(()=>run(`document.getElementById('recurrenceMigrationDevice').textContent.includes('${device}')&&!document.getElementById('recurrenceMigrationTarget').disabled`),'selected migration target');};
+  const select=async device=>{await run(`document.getElementById('recurrenceMigrationTarget').value='${device}';document.getElementById('recurrenceMigrationTarget').dispatchEvent(new Event('change'))`);await waitFor(()=>run(`document.getElementById('recurrenceMigrationDevice').textContent.includes('${device}')&&!document.getElementById('recurrenceMigrationTarget').disabled`),'selected migration target '+device.slice(0,1));};
   await select(c);assert.equal(await run("document.getElementById('recurrenceMigrationRetry').hidden"),true);await select(a);
   assert.equal(await run("document.getElementById('recurrenceMigrationRetry').hidden"),false);assert.equal(targets.get(a).last,grant);
-  const output=path.resolve(ui,'../build/phase62-migration-ui');fs.mkdirSync(output,{recursive:true});
-  for(const theme of ['light','dark'])for(const width of [1440,390,320]){
-   await client.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:width<768});
-   await run(`document.documentElement.setAttribute('data-bs-theme','${theme}');document.getElementById('recurrenceMigration').scrollIntoView({behavior:'instant',block:'start'});window.scrollBy({top:-120,behavior:'instant'});`);await client.settleRendering();
-   assert.equal(await run('document.documentElement.scrollWidth<=innerWidth'),true,'Migration overflow '+width);
-   const shot=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,`pending-${theme}-${width}.png`),Buffer.from(shot.data,'base64'));
-  }
+  await capture('pending');
   const rejected=records.get(grant);rejected.state='rejected';rejected.revision=null;rejected.error={code:'authority_pending',retryable:false};
   targets.get(a).migration.state='staged';targets.get(a).migration.staged_revision=targets.get(a).settings.revision;
   await click('Retry');await waitFor(()=>run("document.getElementById('recurrenceMigrationFeedback').textContent.includes('refused')&&document.getElementById('recurrenceMigrationRetry').hidden"),'definite restore refusal');
@@ -115,7 +129,23 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   await click('Refresh');await waitFor(()=>run("!document.getElementById('recurrenceMigrationReview').disabled"),'newly recorded remote authority can migrate from disabled staging');
   withdraw=true;await click('Refresh');await waitFor(()=>run("document.getElementById('recurrenceMigrationFeedback').textContent.includes('unavailable')"),'withdrawn target');
   assert.equal(await run("document.getElementById('recurrenceMigrationReview').disabled&&document.getElementById('recurrenceMigrationRollback').disabled"),true);
-  console.log('PASS Maintenance migration: controller-only/two targets, explicit Stop+disable+restore, lost-step receipt-only recovery, retained target operations, refused result, re-pair/private-receipt outcome review, withdrawal and six desktop/mobile theme renders');
- }catch(error){failure=error;if(client)try{console.error(await client.evaluate("({feedback:document.getElementById('recurrenceMigrationFeedback')?.textContent,state:document.getElementById('recurrenceMigrationState')?.textContent,device:document.getElementById('recurrenceMigrationDevice')?.textContent,recovery:window.ConfigurationRecovery?.active,assignment:document.getElementById('recurrenceMigrationAssignment')?.value,choices:[...document.getElementById('recurrenceMigrationAssignment')?.options||[]].map(o=>({value:o.value,disabled:o.disabled})),busy:document.getElementById('recurrenceMigration')?.getAttribute('aria-busy')})"));}catch(_){}}
+  const remoteOutput=targets.get(c);remoteOutput.settings.saved.configuration.Operation['Transmit Backend']='wtp';
+  remoteOutput.migration.state='legacy';remoteOutput.migration.staged_revision=null;
+  assert.equal(control.validControllerDocument(remoteOutput.settings,'target-settings'),false,'Retired backend is not a historical current-control view');
+  const beforeRemote=calls.filter(call=>call.method==='POST').length;
+  await select(c);await waitFor(()=>run("document.getElementById('recurrenceMigrationFeedback').textContent.includes('unavailable')"),'unsupported legacy settings refused');
+  assert.equal(await run("document.getElementById('recurrenceMigrationReview').disabled&&document.getElementById('recurrenceMigrationRollback').disabled"),true);
+  assert((await run("document.getElementById('recurrenceMigrationState').textContent")).includes('unknown'));
+  assert((await run("document.getElementById('recurrenceMigrationDevice').textContent")).includes(c),'Unavailable read must not display the previous target identity');
+  await click('Review');assert.equal(calls.filter(call=>call.method==='POST').length,beforeRemote,'Unsupported old control never sends a transition');
+  await capture('unsupported-legacy-control');
+  remoteOutput.settings.saved.configuration.Operation['Transmit Backend']='gpio';
+  remoteOutput.migration.state='retiring';remoteOutput.migration.jobs=[{controller_id:b,job_id:'6'.repeat(32),boot_id:remoteOutput.context.binding.boot_id,state:'unknown'}];
+  assert(control.validControllerDocument(remoteOutput.migration,'target-migration-read'));
+  await click('Refresh');await waitFor(()=>run("!document.getElementById('recurrenceMigrationRetry').hidden&&!document.getElementById('recurrenceMigrationRefresh').disabled"),'retained native handover hold');
+  assert.equal(await run("document.getElementById('recurrenceMigrationReview').disabled"),true,'Same-boot unknown work cannot invent reboot reconciliation');
+  assert.equal(calls.filter(call=>call.method==='POST').length,beforeRemote);
+  console.log('PASS Maintenance migration: retired controller restore refuses before all writes; controller-only/two targets, explicit local Stop+disable+restore, lost-step receipt-only recovery, retained target operations, refused result, re-pair/private-receipt outcome review, withdrawal and controller-held/pending desktop/mobile theme renders');
+ }catch(error){failure=error;console.error('Fixture state:',[...targets].map(([id,t])=>({device:id[0],context:control.validControllerDocument(t.context,'target-context'),settings:control.validControllerDocument(t.settings,'target-settings'),migration:control.validControllerDocument(t.migration,'target-migration-read'),state:t.migration.state,backend:t.settings.saved.configuration.Operation['Transmit Backend'],staged:t.migration.staged_revision,revision:t.settings.revision})));if(client)try{console.error(await client.evaluate("({feedback:document.getElementById('recurrenceMigrationFeedback')?.textContent,state:document.getElementById('recurrenceMigrationState')?.textContent,device:document.getElementById('recurrenceMigrationDevice')?.textContent,recovery:window.ConfigurationRecovery?.active,assignment:document.getElementById('recurrenceMigrationAssignment')?.value,choices:[...document.getElementById('recurrenceMigrationAssignment')?.options||[]].map(o=>({value:o.value,disabled:o.disabled})),busy:document.getElementById('recurrenceMigration')?.getAttribute('aria-busy')})"));}catch(_){}}
  await finishFixture({failure,client,browser,php,profile,cleanups:[async()=>{if(proxy)await closeServer(proxy);} ]});
 })().catch(error=>{console.error(error);process.exitCode=1;});

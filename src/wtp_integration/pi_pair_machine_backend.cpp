@@ -26,8 +26,8 @@ PiPairMachineBackend::PiPairMachineBackend(History history,WtpCatalog &catalog,s
 PiPairMachineBackend::Discovery PiPairMachineBackend::discover(const PiPairPrincipal &principal,PiPairHistory &history,
     const PiPairMachineService::Cancellation &cancelled){
     std::unique_lock discovery(discovery_,std::try_to_lock);if(!discovery.owns_lock()||(cancelled&&cancelled()))return {};
-    const auto inventory=fixtures_.usb_inventory?fixtures_.usb_inventory():wtp_usb_discovery();
-    if(!inventory.is_object()||inventory.size()!=4||inventory.value("scope",std::string{})!="wtp-usb/1"||
+    const auto inventory=fixtures_.usb_inventory?fixtures_.usb_inventory():pico_management_usb_discovery();
+    if(!inventory.is_object()||inventory.size()!=4||inventory.value("scope",std::string{})!="pico-management-usb/1"||
         !inventory.contains("available")||!inventory["available"].is_boolean()||!inventory.contains("reason")||!inventory["reason"].is_string()||
         !inventory.contains("candidates")||!inventory["candidates"].is_array()||inventory["candidates"].size()>64)throw std::runtime_error("pairing_usb_inventory_unavailable");
     if(inventory["available"]!=true)return {};
@@ -36,7 +36,7 @@ PiPairMachineBackend::Discovery PiPairMachineBackend::discover(const PiPairPrinc
     for(const auto &row:inventory["candidates"]){
         if(!row.is_object()||row.size()!=5||row.value("binding",std::string{})!="usb"||row.value("state",std::string{})!="online"||
             !row.contains("id")||!row["id"].is_string()||!row.contains("instance")||!row["instance"].is_string()||!row.contains("settings"))throw std::runtime_error("pairing_usb_inventory_shape");
-        auto settings=parse_wtp_settings(row["settings"],true);const auto handle=row["id"].get<std::string>();
+        auto settings=parse_management_profile_settings(row["settings"],true);const auto handle=row["id"].get<std::string>();
         if(settings.transport!="usb"||!handle.starts_with("usb-")||handle.size()!=36||handle.substr(4).find_first_not_of("0123456789abcdef")!=std::string::npos||!handles.insert(handle).second||!serials.insert(settings.usb_serial).second)throw std::runtime_error("pairing_usb_inventory_binding");
         validate_discovered_usb(inventory,handle,settings);observations.emplace_back(handle,std::move(settings));
     }
@@ -88,7 +88,7 @@ PiPairMachineBackend::Discovery PiPairMachineBackend::discover(const PiPairPrinc
                     return;
                 }}
             const auto [after,next]=catalog_.mutate({{"operation","add"},{"name","Attached Pico "+settings.device_id.substr(0,8)},
-                {"method","manual"},{"discovery_id",""},{"settings",wtp_settings_json(settings)},{"consent_plain",false}},etag,active_());(void)next;
+                {"method","manual"},{"discovery_id",""},{"settings",management_profile_settings_json(settings)},{"consent_plain",false}},etag,active_());(void)next;
             for(const auto &row:after["profiles"])if(parse_wtp_settings(row.at("settings"),true)==settings)profile=row.at("id").get<std::string>();
         });
         return published?Discovery{profile,std::move(channel)}:Discovery{};

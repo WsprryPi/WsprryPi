@@ -12,14 +12,15 @@
     const feedback=text=>{node('Feedback').textContent=text;};
     const identity=()=>Array.from(root.crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
     const canReconcile=()=>!!operation?.confirmed_pending&&current?.migration.state==='retiring'&&current.migration.jobs.some(job=>job.boot_id!==current.context.binding.boot_id);
+    const remoteOutput=()=>current?.settings.saved.configuration.Operation['Transmit Backend']==='wtp';
     const selectedAssignment=()=>current?.migration.controllers.find(row=>row.controller_id+'/'+row.assignment_id===node('Assignment').value);
-    const allowedAssignment=row=>!!row&&(row.controller_id===selected||row.controller_id===current?.manager);
+    const allowedAssignment=row=>!!row&&row.controller_id===selected;
     function controls(){
         const ready=!!current&&available.has(selected)&&!busy&&(!operation||canReconcile())&&!root.ConfigurationRecovery?.active;
         const state=current?.migration.state,cap=current?.context.capabilities.find(item=>item.resource==='migration');
         node('Target').disabled=busy;node('Assignment').disabled=!ready;
         const canMigrate=['legacy','rollback','retiring'].includes(state)||state==='staged'&&current.migration.controllers.some(row=>row.controller_id!==selected);
-        node('Review').disabled=!ready||!cap?.write||!canMigrate;
+        node('Review').disabled=!ready||!cap?.write||!canMigrate||remoteOutput();
         node('Review').textContent=state==='retiring'?'Review reconciliation':'Review migration';
         const restorable=['staged','native'].includes(state)&&!!current?.migration.controllers.length;
         node('Previous').hidden=!restorable;node('Rollback').hidden=!restorable;
@@ -32,7 +33,7 @@
         node('Cancel').disabled=busy;node('').setAttribute('aria-busy',String(busy));
     }
     function render(){
-        if(!current){controls();return;}
+        if(!current){node('Device').textContent=selected?selected+' · status unavailable':'Choose a device';node('State').textContent='Current scheduling authority is unknown. Refresh status before a transition.';controls();return;}
         node('').hidden=false;
         node('Device').textContent=current.context.target.name+' · '+selected;
         const messages={legacy:'This device retains its existing schedule. Migration retires recorded prior schedules and saves the device-owned schedule disabled.',
@@ -42,12 +43,13 @@
             staged:'The device-owned schedule is saved and disabled.',native:'This device owns its recurring schedule.',
             unclassified:'Previous scheduling history cannot be verified. Migration remains unavailable.',held:'Scheduling history or outstanding work requires recovery.'};
         node('State').textContent=messages[current.migration.state]||'Scheduling authority requires review before a transition.';
-        if(canReconcile())node('State').textContent='This device restarted during handover. Review current output and confirm reconciliation before completing migration.';
+        if(remoteOutput())node('State').textContent='This Pi sends transmissions to another device. Retire its remote schedule and reconcile accepted work with WTP-capable software. Then configure the transmitting device’s own schedule; migration cannot turn this remote output into a local schedule.';
+        if(canReconcile()&&!remoteOutput())node('State').textContent='This device restarted during handover. Review current output and confirm reconciliation before completing migration.';
         const prior=states.get(selected)?.assignment||node('Assignment').value;node('Assignment').replaceChildren();
         const empty=root.document.createElement('option');empty.value='';empty.textContent='Choose a previous schedule';node('Assignment').append(empty);
         for(const row of current.migration.controllers){
             const option=root.document.createElement('option');option.value=row.controller_id+'/'+row.assignment_id;
-            option.textContent=(row.controller_id===selected?'This Pi':('Controller '+row.controller_id.slice(0,8)))+' · schedule '+row.assignment_id.slice(0,8);
+            option.textContent=(row.controller_id===selected?'Selected Pi':('Controller '+row.controller_id.slice(0,8)))+' · schedule '+row.assignment_id.slice(0,8);
             option.disabled=!allowedAssignment(row);node('Assignment').append(option);
         }
         if(prior&&[...node('Assignment').options].some(option=>option.value===prior&&!option.disabled))node('Assignment').value=prior;
@@ -74,12 +76,10 @@
             if(!bound(context.binding,settings.data.binding)||!bound(context.binding,migration.data.binding)||context.configuration_revision!==settings.data.revision||
                 settings.etag!=='"'+settings.data.revision+'"'||migration.etag!==settings.etag||settings.data.capability_revision!==context.capability_revision)throw Error('context_changed');
             if(migration.data.state==='staged'&&(settings.data.saved.scheduling.enabled!==false||migration.data.staged_revision!==settings.data.revision))throw Error('invalid_readback');
-            let manager=selected===readiness.device_id?null:readiness.device_id;
-            if(selected===readiness.device_id&&root.PairingClient){try{manager=(await root.PairingClient.create({base}).state()).manager?.device_id||null;}catch(_){/* Local rollback remains independent of pairing readiness. */}}
             if(evidence&&(!bound(evidence.context.binding,context.binding)||evidence.context.configuration_revision!==context.configuration_revision)){
                 evidence=null;node('OutcomeSummary').textContent='Current state changed. Read it again before confirming.';
             }
-            current={context,settings:settings.data,migration:migration.data,manager};
+            current={context,settings:settings.data,migration:migration.data};
             if(review&&(!bound(review.context.binding,context.binding)||review.settings.revision!==settings.data.revision)){review=null;node('Confirmation').hidden=true;}
             if(!operation&&['retiring','reconciling'].includes(migration.data.state)&&migration.data.transition_id)
                 operation={device:selected,id:migration.data.transition_id,resource:migration.data.state==='retiring'?'migration':'migration/rollback',body:null,confirmed_pending:true};
@@ -114,7 +114,7 @@
     async function refresh(){
         if(busy)return;busy=true;controls();
         try{await load();}
-        catch(_){current=null;node('').hidden=false;feedback('Saved scheduling history or this management connection is unavailable. Refresh status before a transition.');}
+        catch(_){current=null;node('').hidden=false;render();feedback('Saved scheduling history or this management connection is unavailable. Refresh status before a transition.');}
         finally{busy=false;controls();poll();}
     }
     async function readOutcome(){
@@ -204,7 +204,7 @@
         const next=node('Target').value;if(states.size>=64&&!states.has(next)){node('Target').value=selected;feedback('This page retains the maximum number of devices. Resolve its pending results before opening another device.');return;}
         remember();root.clearTimeout(timer);evidence=null;node('OutcomeSummary').textContent='';selected=next;const saved=states.get(selected);
         current=null;review=null;operation=saved?.operation||null;node('Assignment').value=saved?.assignment||'';node('Confirmation').hidden=true;node('Consent').checked=false;
-        feedback('Reading the selected device. Selection does not change output.');void refresh();
+        render();feedback('Reading the selected device. Selection does not change output.');void refresh();
     });
     node('Assignment').addEventListener('change',()=>{review=null;node('Confirmation').hidden=true;remember();controls();});
     node('ReadOutcome').addEventListener('click',()=>{void readOutcome();});node('ConfirmOutcome').addEventListener('click',()=>{void confirmOutcome();});

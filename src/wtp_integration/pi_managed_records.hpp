@@ -6,6 +6,11 @@ namespace wsprrypi {
 // Pure record encoding/validation for the approved private Pi formats. These
 // helpers grant no authority and do not replace complete configuration policy,
 // revision/ownership checks, WAL coordination, or admission inhibition.
+// Read-only recognition of the exact existing protected storage shape.
+// It is not accepted by current control requests or resource descriptors.
+bool valid_pi_stored_candidate_shape(const nlohmann::json &) noexcept;
+nlohmann::json current_pi_configuration(nlohmann::json);
+nlohmann::json current_pi_settings_record(nlohmann::json);
 struct PiOperationsRecord {nlohmann::json document;bool evicted{};};
 nlohmann::json pi_managed_settings_record(const std::string &self,
     const std::string &generation,const nlohmann::json &candidate,

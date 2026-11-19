@@ -3,7 +3,7 @@
 #include "wtp_integration/pi_pair_machine_backend.hpp"
 #include "wtp_integration/fleet_test.hpp"
 #include "wtp_integration/fleet_store.hpp"
-#include "wtp_integration/target_runtime.hpp"
+#include "wtp_integration/management_identity.hpp"
 // SPDX-License-Identifier: MIT
 #include "arg_parser.hpp"
 #include "config_handler_serialization.hpp"
@@ -34,7 +34,6 @@
 #include "wtp_integration/management_browser_session.hpp"
 #include "wtp_integration/browser_http.hpp"
 #include "WTP-Server/include/wtp_server/inhibited_rf_engine.hpp"
-#include "WTP-Server/include/wtp_server/endpoint.hpp"
 #include <atomic>
 #include <future>
 #include <mutex>
@@ -78,28 +77,7 @@ std::unique_ptr<PiPairHistory> history(const std::string &directory,bool control
 class Clock final:public wsprrypico::wtp::Clock {public:wsprrypico::wtp::ClockSnapshot snapshot() const override{
     using namespace wsprrypico::wtp;return {ClockState::Synchronized,1000000000000ULL,10000000000ULL,1000,0,LeapState::Normal,std::nullopt};}};
 class Identity final:public wsprrypico::wtp::IdentitySource {public:std::string new_boot_id() override{return id('f');}};
-class OwnerScheduleClock final:public WtpScheduleClock {
-public:
-    std::uint64_t now_ms()const override{return WtpSteadyClock{}.now_ms();}
-    std::optional<std::uint64_t> utc_now_ns()const override{return 1000000000000ULL;}
-    void wait_ms(std::uint64_t ms)override{std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
-};
-class OwnerPiPeer final:public wtp::ByteStream {
-    OwnerScheduleClock &clock_;
-    wsprrypico::wtp::Endpoint endpoint_;
-public:
-    OwnerPiPeer(OwnerScheduleClock &clock,WtpPiAuthority &authority):clock_(clock),endpoint_(authority,id('a'),"resume-owner-fixture","WsprryPi"){}
-    bool open(){endpoint_.disconnect();endpoint_.connect("isolated-management-owner");return true;}
-    wtp::IoResult read(std::span<std::uint8_t> bytes)override{
-        endpoint_.poll(clock_.now_ms());const auto source=endpoint_.output();const auto count=std::min(bytes.size(),source.size());
-        std::copy_n(source.begin(),count,bytes.begin());endpoint_.consume_output(count,clock_.now_ms());
-        return {count?wtp::IoState::Progress:wtp::IoState::WouldBlock,count};
-    }
-    wtp::IoResult write(std::span<const std::uint8_t> bytes)override{
-        const auto count=endpoint_.receive(bytes,clock_.now_ms());return {count?wtp::IoState::Progress:wtp::IoState::WouldBlock,count};
-    }
-    void close()noexcept override{endpoint_.disconnect();}
-};
+
 }
 int recover_registration(const std::string &root,unsigned port){
     initialize_privileged_network_runtime("enforced");PiPairAdmission outgoing;ManagementBrowserSessions sessions;
@@ -501,17 +479,8 @@ int main(int argc,char **argv){try{
                 book.confirm_idle(id('a'),{{"device_id",id('a')},{"boot_id",id('f')},{"owner_id",nullptr},{"job_id",nullptr},{"output_active",false},
                     {"state","empty"},{"submitted_job_id",nullptr},{"session_id",nullptr},{"controller_owner_id",nullptr}});
             }
-            WtpFleetTestHooks source_hooks;source_hooks.retirement_directory=source_directory;OwnerScheduleClock source_clock;
-            std::vector<std::shared_ptr<OwnerPiPeer>> source_peers;
-            source_hooks.create_target=[&](WtpSettings settings,std::function<bool()> admission,std::shared_ptr<void> lease){
-                auto peer=std::make_shared<OwnerPiPeer>(source_clock,authority);source_peers.push_back(peer);
-                auto runtime=std::make_unique<WtpTargetRuntime>(settings,source_clock,*peer,
-                    wtp::SessionOptions{wtp_random_identity(),wtp_random_identity(),settings.device_id},[peer]{return peer->open();},std::move(admission));
-                if(lease){runtime->output_lease=std::move(lease);runtime->output_lease_device=settings.device_id;}return runtime;
-            };
-            source_hooks.revocation_status=[&](auto,auto)->Json{const auto observed=authority.snapshot();return {{"schema","wsprrypi-wtp-endpoint/1"},
-                {"device_id",id('a')},{"boot_id",observed.remote.boot_id},{"revocation_generation",std::to_string(observed.revocation_generation)},
-                {"revocation_unavailable",observed.revocation_unavailable},{"local_requested",observed.requested_local_enable},{"output_unknown",observed.output_unknown}};};
+            WtpFleetTestHooks source_hooks;source_hooks.retirement_directory=source_directory;unsigned source_contacts=0;
+            source_hooks.before_execution_contact=[&] {++source_contacts;throw std::runtime_error("Retired execution contact");};
             source_hooks.retirement_signer=[&](const Json &request,const Json &receipt){return controller->retirement_response(request,receipt);};
             start_wtp_fleet_for_test(source_ini,id('b'),source_hooks);struct StopHandoverSource{~StopHandoverSource(){stop_wtp_fleet();}} stop_handover_source;
             actual_handover_source=true;const auto source_before=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
@@ -524,7 +493,6 @@ int main(int argc,char **argv){try{
                 for(const auto &entry:vectors["cases"])if(entry["name"]=="P209 complete recovery save")setup=entry["value"];}
             check(setup.is_object());setup["binding"]["device_id"]=id('a');setup["operation_id"]=id('d');setup["expected_revision"]=target_store->recovery_revision();
             setup["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
-            for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})setup["configuration"]["WTP"][key]="";
             target_store->persist_recovery(internal,[]{},PiManagedStore::Operation{id('a'),"1","/api/control/v1/host/configuration-recovery",setup});
             bool ready_binding=false;unsigned binding_port=31417;
             const auto observe=[&]()->std::optional<PiManagementObservation>{auto state=authority.management_snapshot(id('a'));
@@ -708,102 +676,26 @@ int main(int argc,char **argv){try{
             check(pending_settings.principal&&pending_settings.reply&&pending_migration.reply);
             const auto pending_proof=controller->outgoing_resume_grant(id('9'),*pending_settings.principal,issued_grant,
                 Json::parse(pending_migration.reply->payload.body),Json::parse(pending_settings.reply->payload.body));check(bool(pending_proof));
-            const auto prepared_ack=wtp_fleet_resume(*pending_proof,*controller,[]{return false;});check(prepared_ack&&(*prepared_ack)["outcome"]=="resumed");
-            {std::ofstream output(root+"/resume-crash-ack.json");output<<prepared_ack->dump();output.close();check(!chmod((root+"/resume-crash-ack.json").c_str(),0600));}
-            crash_boundaries("ack");
+            const auto held_authority=target_store->recurrence_authority(),held_settings=target_store->settings();
+            const auto held_source=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
+            check(!wtp_fleet_resume(*pending_proof,*controller,[]{return false;}));
+            check(target_store->recurrence_authority()==held_authority&&target_store->settings()==held_settings);
+            check(Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)==held_source&&source_contacts==0);
+            // An old target may already have durably issued a handback grant.
+            // Current software must leave it held, never recreate dispatch or
+            // fabricate a successful resume acknowledgement.
             WtpCatalog source_catalog(source_ini+".devices.json");
             PiPairRemoteController source_worker([&]{return controller;},requests,id('b'),source_catalog,source_ini+".management",
                 PiPairRemoteController::LoopbackTest{{"127.0.0.1",native_server.port()}});
-            source_worker.authority_source([]{return wtp_fleet_api("GET",{},{},"retirements");});check(source_worker.observe(id('9')));
-            lose_resume_ack=true;
-            const auto resume_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(8);
-            while(target_store->recurrence_authority()["state"]=="reconciling"&&std::chrono::steady_clock::now()<resume_deadline){
-                (void)source_worker.maintain(id('9'));std::this_thread::sleep_for(std::chrono::milliseconds(120));
-            }
-            check(!lose_resume_ack&&recurrence_remote_resume_active(target_store->recurrence_authority())&&target_store->settings()["configuration"]["Operation"]["Transmit"]==false);
-            const auto actual_outcome=target_store->recurrence_authority()["management"]["resume"]["acknowledgement"];
-            check(actual_outcome["outcome"]=="resumed"&&Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)["assignments"][0]["state"]=="rollback");
-            const auto outcome_receipt=native_request("GET","/api/pair/v1/operations/"+id('7'));check(outcome_receipt.reply&&outcome_receipt.reply->payload.status==200);
-            const auto confirmed=Json::parse(outcome_receipt.reply->payload.body);const auto ack_digest=PiManagementJournal::digest(canonical_pi_management_json(actual_outcome));
-            check(valid_pi_pair_document(confirmed,"operation")&&confirmed["request_digest"]==ack_digest&&confirmed["result_digest"]==ack_digest);
-            check(target_store->receipt(id('c'),"1",id('7'))->at("state")=="committed");
-            const auto settled=target_store->recurrence_authority();
-            check(native_request("POST","/api/pair/v1/resume/ack",actual_outcome).reply->payload.status==200&&target_store->recurrence_authority()==settled);
-            const auto registration_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(8);
-            while(target_store->recurrence_authority()["management"]["resume"]["registered"].is_null()&&std::chrono::steady_clock::now()<registration_deadline){
-                (void)source_worker.maintain(id('9'));std::this_thread::sleep_for(std::chrono::milliseconds(120));
-            }
-            check(!target_store->recurrence_authority()["management"]["resume"]["registered"].is_null());
-            check(target_store->settings()["scheduling"]["enabled"]==false&&PiManagementJournal::read_ini_input(target_ini).signature==ini_observation.signature);
-            const auto second_context=Json::parse(native_request("GET",prefix+"context").reply->payload.body);
-            const auto second_migration=Json::parse(native_request("GET",prefix+"migration").reply->payload.body);
-            const Json second_command={{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",second_context["binding"]},
-                {"capability_revision",second_context["capability_revision"]},{"operation_id",id('3')},{"expected_revision",target_store->settings()["revision"]},
-                {"expected_authority_generation",second_migration["authority_generation"]},{"controllers",second_migration["controllers"]}};
-            check(native_request("POST",prefix+"migration",second_command).reply->payload.status==202);
-            check(target_store->remote_handover()->at("requests")[0]["state"]=="prepared");
-            const auto fresh_fence_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(10);
-            while(target_store->recurrence_authority()["state"]=="retiring"&&std::chrono::steady_clock::now()<fresh_fence_deadline){
-                native->advance_remote_handover(retirement,[]{return false;});native->advance_migration();std::this_thread::sleep_for(std::chrono::milliseconds(120));
-            }
-            check(target_store->recurrence_authority()["state"]=="staged");
-            check(std::stoull(target_store->recurrence_authority()["retirements"][0]["retirement_generation"].get<std::string>())>std::stoull(issued_grant["authority_generation"].get<std::string>()));
-            const auto next_context=Json::parse(native_request("GET",prefix+"context").reply->payload.body);
-            restore["binding"]=next_context["binding"];restore["capability_revision"]=next_context["capability_revision"];restore["operation_id"]=id('9');
-            restore["expected_revision"]=target_store->settings()["revision"];restore["expected_authority_generation"]=target_store->recurrence_authority()["generation"];
-            check(native_request("POST",prefix+"migration/rollback",restore).reply->payload.status==202);
-            const auto second_grant=Json::parse(native_request("GET","/api/pair/v1/resume").reply->payload.body);
-            check(second_grant["grant_digest"]!=issued_grant["grant_digest"]&&second_grant["assignment_revision"]!=issued_grant["assignment_revision"]);
-            if(refuse_second)binding_port=31419; // Positive current evidence changed after grant publication: never consume it.
-            // A late old ACK is a retained historical receipt, never permission
-            // to clear or rebind the second pending grant.
-            check(native_request("POST","/api/pair/v1/resume/ack",actual_outcome).reply->payload.status==200&&target_store->recurrence_authority()["state"]=="reconciling");
-            const auto second_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(8);
-            while(target_store->recurrence_authority()["state"]=="reconciling"&&std::chrono::steady_clock::now()<second_deadline){
-                (void)source_worker.maintain(id('9'));std::this_thread::sleep_for(std::chrono::milliseconds(120));
-            }
+            source_worker.authority_source([]{return wtp_fleet_api("GET",{},{},"retirements");});
+            check(source_worker.observe(id('9')));(void)source_worker.maintain(id('9'));
+            check(target_store->recurrence_authority()["state"]=="reconciling"&&target_store->settings()["scheduling"]["enabled"]==false);
+            check(!recurrence_remote_resume_active(target_store->recurrence_authority())&&source_contacts==0);
+            check(PiManagementJournal::read_ini_input(target_ini).signature==ini_observation.signature);
             if(refuse_second){
-                check(target_store->recurrence_authority()["state"]=="staged"&&!recurrence_remote_resume_active(target_store->recurrence_authority()));
-                const auto rejected=target_store->receipt(id('c'),"1",id('9'));check(rejected&&(*rejected)["state"]=="rejected"&&(*rejected)["revision"].is_null()&&(*rejected)["error"]["code"]=="authority_pending");
-                check(target_store->recurrence_authority()["management"]["resume"]["acknowledgement"]["outcome"]=="refused"&&
-                    Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)["assignments"][0]["state"]=="retired");
-            }else check(recurrence_remote_resume_active(target_store->recurrence_authority()));
-            check(target_store->settings()["scheduling"]["enabled"]==false&&target_store->settings()["configuration"]["Operation"]["Transmit"]==false);
-            if(refuse_second){
-                // A newly paired owner verifies the target's exact permanent
-                // source fence through actual TLS before erasing a retired
-                // outgoing verifier. The target may retain old ACK evidence;
-                // no old verifier is needed to replay a source-owned signed ACK.
-                auto target_copy=history(root+"/cleanup-target"),source_copy=history(root+"/cleanup-source",true);
-                auto target_before=target_copy->snapshot();auto target_catalog_copy=parse_pi_pair_catalog(target_before.catalog.bytes,id('a'));
-                auto target_old=target_catalog_copy["active"];target_old["state"]="revoked";target_old["current"]=nullptr;
-                target_catalog_copy["retired"].push_back(target_old);target_catalog_copy["authorization_generation"]="3";
-                target_catalog_copy["active"]["pair_id"]=id('d');target_catalog_copy["active"]["authorization_generation"]="3";
-                target_copy->publish(target_before,target_catalog_copy);
-                const auto source_saved=source_copy->snapshot();auto source_peers_copy=parse_pi_pair_peers(source_saved.peers->bytes,id('b'));
-                auto old_profile=source_peers_copy["profiles"][0];old_profile["pair"]["state"]="revoked";old_profile["pair"]["current"]=nullptr;
-                source_peers_copy["retired"].push_back({{"profile_id",old_profile["profile_id"]},{"target_id",old_profile["target_id"]},{"endpoint",old_profile["endpoint"]},{"pair",old_profile["pair"]}});
-                source_peers_copy["profiles"][0]["profile_generation"]="2";source_peers_copy["profiles"][0]["pair"]["pair_id"]=id('d');
-                source_peers_copy["profiles"][0]["pair"]["authorization_generation"]="3";
-                source_copy->publish(source_saved,parse_pi_pair_catalog(source_saved.catalog.bytes,id('b')),parse_pi_pair_operations(source_saved.operations.bytes,id('b')),source_peers_copy);
-                PiPairMachineService cleanup_machine(*target_copy,target_sessions,id('a'),[&](const auto &,const auto &){return PicoHttpResponse{200,
-                    Json{{"contract","Wsprry-Control/1"},{"schema","targets"},{"targets",Json::array({native->target()})}}.dump(),{}};},
-                    [&](const auto &principal,const auto &request,const auto &){const auto browser=wtp_browser_http_request(request);check(bool(browser));PiPairHttpReply reply;
-                        reply.payload=native->handle(*browser,principal,*target_copy,&reply.readback_revision);return reply;});
-                PiPairServer cleanup_server(target_admission,[&](const auto &identity){return target_copy->management_credential(identity);},
-                    [&](const auto &principal){return target_copy->accept_finished(principal,&target_sessions)!=PiPairHistory::ManagementAccess::Denied;},
-                    [&](const auto &principal,const auto &request,auto &connection,const auto &cancelled){return cleanup_machine.handle(principal,request,connection,cancelled);},PiPairServer::Access::LoopbackTest);
-                check(cleanup_server.start());WtpCatalog cleanup_catalog(root+"/cleanup-catalog.json");
-                PiPairRemoteController cleanup_worker([&]{return std::shared_ptr<PiPairHistory>(source_copy.get(),[](auto *){});},requests,id('b'),cleanup_catalog,root+"/cleanup-management",
-                    PiPairRemoteController::LoopbackTest{{"127.0.0.1",cleanup_server.port()}});
-                cleanup_worker.authority_source([]{return wtp_fleet_api("GET",{},{},"retirements");});
-                check(cleanup_worker.observe(id('9')));const auto cleanup_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(12);
-                while(!parse_pi_pair_peers(source_copy->snapshot().peers->bytes,id('b'))["retired"].empty()&&std::chrono::steady_clock::now()<cleanup_deadline){
-                    (void)cleanup_worker.maintain(id('9'));std::this_thread::sleep_for(std::chrono::milliseconds(120));
-                }
-                check(parse_pi_pair_peers(source_copy->snapshot().peers->bytes,id('b'))["retired"].empty());
-                check(target_store->recurrence_authority()["state"]=="staged"&&target_store->settings()["scheduling"]["enabled"]==false);
-                cleanup_server.stop();source_copy->finish_service();target_copy->finish_service();
+                binding_port=31419;
+                check(!wtp_fleet_resume(*pending_proof,*controller,[]{return false;}));
+                check(target_store->settings()==held_settings&&source_contacts==0);
             }
             check(!engine.output_active());actual_handover_source=false;
             native_server.stop();
@@ -818,8 +710,8 @@ int main(int argc,char **argv){try{
                 {"duration_ms",1000},{"period_seconds",60},{"phase_seconds",0}}}};
             {WtpFleetStore saved(ini+".wtp-assignments.json",id('b'));saved.update(saved.snapshot().second,[&](Json &data){data={{"version",1},{"assignments",Json::array({row})},{"removals",Json::array()}};});}
             std::atomic_uint attempted_carrier{};WtpFleetTestHooks hooks;hooks.retirement_directory=ini+".retirements";
-            hooks.create_target=[&](auto,auto,auto)->std::unique_ptr<WtpTargetRuntime>{++attempted_carrier;throw std::runtime_error("Artificial offline output; no carrier opened");};
-            hooks.revocation_status=[](auto,auto)->Json{throw std::runtime_error("Artificial offline host; no network opened");};
+            hooks.before_execution_contact=[&]{++attempted_carrier;throw std::runtime_error("Retired execution contact");};
+
             start_wtp_fleet_for_test(ini,id('b'),hooks);struct StopFleet{~StopFleet(){stop_wtp_fleet();}} stop_fleet;
             const auto before=strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body);
             auto command=unsigned_request;command["assignment_id"]=before["assignments"][0]["assignment_id"];
@@ -846,23 +738,27 @@ int main(int argc,char **argv){try{
             check(stale_reply.reply&&stale_reply.reply->payload.status==409&&valid_pi_pair_document(strict_browser_json(stale_reply.reply->payload.body),"result"));
             check(strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body)==before);
             const auto accepted_reply=send("POST","/api/pair/v1/retirement",*signed_command);
-            check(accepted_reply.reply&&accepted_reply.reply->payload.status==202);
-            const auto fenced=strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body);
-            check(fenced["assignments"][0]["state"]=="retiring"&&fenced["generation"]!=before["generation"]);
+            check(accepted_reply.reply&&accepted_reply.reply->payload.status==409);
+            const auto held_result=parse_pi_pair_document(accepted_reply.reply->payload.body,"result");
+            check(held_result["code"]=="busy"&&held_result["retryable"]==false);
+            check(strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body)==before);
             auto status=command;status["schema"]="retirement-status";status.erase("assignment_revision");status.erase("retirement_generation");
             const auto signed_status=paired->retirement_request(status);check(bool(signed_status));
             const auto readback=send("POST","/api/pair/v1/retirement/status",*signed_status);
-            check(readback.reply&&readback.reply->payload.status==202&&parse_pi_pair_document(readback.reply->payload.body,"operation")["state"]=="pending");
-            check(parse_pi_pair_document(readback.reply->payload.body,"operation")==parse_pi_pair_document(accepted_reply.reply->payload.body,"operation"));
-            check(strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body)["generation"]==fenced["generation"]);
+            check(readback.reply&&readback.reply->payload.status==404&&parse_pi_pair_document(readback.reply->payload.body,"result")["code"]=="operation_unknown");
             for(const auto &path:{"/api/pair/v1/resume/ack","/api/pair/v1/authorities/register","/api/pair/v1/rotate/prepare","/api/control/v1/targets"}){
                 const auto denied=send("POST",path,*signed_command);check(denied.reply&&denied.reply->payload.status==403);
             }
             check(ordinary_calls==0);
             source_server.stop();stop_wtp_fleet();
             start_wtp_fleet_for_test(ini,id('b'),hooks);
-            check(strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body)["assignments"][0]["state"]=="retiring");
-            check(attempted_carrier>0); // Offline reconciliation never becomes a signed idle proof.
+            auto restarted=strict_browser_json(wtp_fleet_api("GET",{},{},"retirements").body);
+            check(restarted["controller_incarnation"]!=before["controller_incarnation"]);
+            check(restarted["revision"]!=before["revision"]);
+            auto prior=before;prior.erase("controller_incarnation");restarted.erase("controller_incarnation");
+            prior.erase("revision");restarted.erase("revision");
+            check(restarted==prior);
+            check(attempted_carrier==0); // Current software never starts legacy cleanup or signs a guessed idle proof.
             stop_wtp_fleet();
             // Existing source-side browser retirement must not strand a later
             // authenticated machine handover. Keep its old receipt intact.
@@ -925,24 +821,14 @@ int main(int argc,char **argv){try{
             auto malformed=reservation;malformed["extra"]=true;check(!controller->outgoing_resume_grant(id('9'),*actual.principal,grant,malformed,disabled));
             auto wrong_digest=disabled;wrong_digest["candidate_digest"]=std::string(64,'0');check(!controller->outgoing_resume_grant(id('9'),*actual.principal,grant,reservation,wrong_digest));
             const auto source_before=PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json");check(bool(source_before));
-            const auto ack=wtp_fleet_resume(*proof,*controller,[]{return false;});check(ack&&(*ack)["outcome"]=="resumed"&&valid_pi_pair_document(*ack,"resume-ack"));
-            auto unsigned_ack=*ack;unsigned_ack.erase("proof");check(controller->resume_acknowledgement(unsigned_ack)==ack);
-            WtpFleetStore source_after(retired_ini+".wtp-assignments.json",id('b'));const auto refreshed=source_after.snapshot().first["assignments"][0];
-            const auto frozen_assignment=Json::parse(source_before->bytes)["assignments"][0];
-            check(refreshed==controller_resume_assignment(row,frozen_assignment,grant,proof->hostname())&&refreshed["schedule"]==row["schedule"]&&refreshed["enabled"]==false);
-            const auto state=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
-            check(state["assignments"][0]["state"]=="rollback"&&state["assignments"][0]["receipt"]==old_receipt&&state["assignments"][0]["assignment_revision"]!=request["assignment_revision"]);
-            const auto activation_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(4);
-            while(attempted_carrier==contacts_before&&std::chrono::steady_clock::now()<activation_deadline)std::this_thread::sleep_for(std::chrono::milliseconds(20));
-            check(attempted_carrier>contacts_before);const auto resumed_contacts=attempted_carrier.load();
-            const auto settled=PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json");
-            check(wtp_fleet_resume(*proof,*controller,[]{return false;})==ack&&PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json")->signature==settled->signature);
+            const auto before_book=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
+            check(!wtp_fleet_resume(*proof,*controller,[]{return false;}));
+            const auto after=PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json");
+            check(after&&after->signature==source_before->signature&&attempted_carrier==contacts_before);
+            check(Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)==before_book);
             auto changed_boot=reservation;changed_boot["binding"]["boot_id"]=id('0');auto changed_settings=disabled;changed_settings["binding"]=changed_boot["binding"];
             const auto recovery=controller->outgoing_resume_grant(id('9'),*actual.principal,grant,changed_boot,changed_settings);check(recovery&&!recovery->current_target());
-            check(wtp_fleet_resume(*recovery,*controller,[]{return false;})==ack&&Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)["generation"]==state["generation"]);
-            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
-            check(attempted_carrier==resumed_contacts); // Replaying a consumed outcome never clears a later WTP recovery barrier or reconnects again.
-
+            check(!wtp_fleet_resume(*recovery,*controller,[]{return false;})&&attempted_carrier==contacts_before);
             source_server.stop();stop_wtp_fleet();
         }
     }

@@ -148,7 +148,7 @@ with contextlib.closing(Server(certificate='dns-only')) as server:
 for name in ['cn-only', 'wildcard']:
     with contextlib.closing(Server(certificate=name)) as server:
         probe(server, False, identity='pico-test.local')
-for options in [dict(certificate='expired'), dict(certificate='future'), dict(certificate='rogue'), dict(protocol='wrong'), dict(tls12=True), dict(abrupt=True), dict(stall=True)]:
+for options in [dict(certificate='expired'), dict(certificate='future'), dict(certificate='rogue'), dict(protocol='wrong'), dict(protocol='wtp/1'), dict(tls12=True), dict(abrupt=True), dict(stall=True)]:
     with contextlib.closing(Server(**options)) as server:
         began = time.monotonic()
         probe(server, False)

@@ -149,7 +149,75 @@
                 throw error;
             } finally {--entry.pending;ledger();recovery(entry);notify();}
         }
-        function notify() { host.SetupTargets?.editorChanged?.(); }
+        function stopControls() {
+            const entry=active,available=!!entry && !entry.paused && entry.handle?.state.connected && !entry.nativeStopBusy;
+            if(node('pico-native-stop'))node('pico-native-stop').disabled=!available || !!entry?.nativeStopUnknown || !!entry?.nativeStopUnsupported;
+            if(node('pico-native-stop-read'))node('pico-native-stop-read').disabled=!available;
+            if(node('pico-native-status-read'))node('pico-native-status-read').disabled=!available || !!entry?.nativeStatusBusy;
+            if(node('pico-native-status'))node('pico-native-status').textContent=entry?.nativeStatusMessage || '';
+            if(node('pico-native-stop-status'))node('pico-native-stop-status').textContent=entry?.nativeStopMessage || (available ? 'Stop applies to this Pico only. Your settings drafts are preserved.' : 'Connect to the intended Pico first.');
+        }
+        async function nativeStatus() {
+            const entry=active;
+            if(!entry || entry.paused || !entry.handle?.state.connected || entry.nativeStatusBusy)return;
+            const epoch=entry.epoch;
+            entry.nativeStatusBusy=true;entry.nativeStatusMessage='Reading device status…';stopControls();
+            try {
+                const result=await entry.handle.request('status');
+                const value=result.data;
+                if(entry.paused || entry.epoch!==epoch)throw Error('Connection changed.');
+                if(!result.response.ok || !value || value.contract!==host.WsprryControl.contract ||
+                    !value.job || !value.standalone || !identity(value.job.boot_id) || value.job.boot_id!==value.standalone.boot_id ||
+                    typeof value.job.state!=='string' || typeof value.job.output_active!=='boolean')throw Error('Invalid status.');
+                entry.nativeStatusMessage=entry.nativeStopUnknown ? 'Output and ownership remain unknown for the unconfirmed stop. Read stop status to reconcile it; this ordinary observation does not resolve that hold.' : `Device status: ${value.job.state}. Output ${value.job.output_active?'active':'inactive'}; ${value.job.owner_id?'owned':'unowned'}. This observation does not change schedules or settings.`;
+            } catch(error) {entry.nativeStatusMessage='Device status is unavailable. Output state is unknown. Reconnect to this Pico and read again; a lost connection does not confirm a stop.';}
+            finally {entry.nativeStatusBusy=false;notify();}
+        }
+        function checkedStop(entry,result,target) {
+            const value=result.data;
+            if(!result.response.ok || !value || Object.keys(value).sort().join(',')!=='contract,message_enabled,output_active,owned,schema,stopped,target,wspr_enabled' ||
+                value.contract!==host.WsprryControl.contract || value.schema!=='schedule-stop' || !value.target ||
+                Object.keys(value.target).sort().join(',')!=='boot_id,device_id,scope' || value.target.scope!=='member' ||
+                value.target.device_id!==entry.handle.device || !identity(value.target.boot_id) ||
+                target && (value.target.device_id!==target.device_id || value.target.boot_id!==target.boot_id) ||
+                !['message_enabled','output_active','owned','stopped','wspr_enabled'].every(key=>typeof value[key]==='boolean') ||
+                value.stopped && (value.message_enabled || value.wspr_enabled || value.owned || value.output_active) ||
+                !/^"[^"\x00-\x20\x7f]{1,126}"$/.test(result.response.headers.get('ETag') || ''))
+                throw Error('Stop status could not be verified for this Pico.');
+            return value;
+        }
+        async function nativeStop(readOnly) {
+            const entry=active;
+            if(!entry || entry.paused || !entry.handle?.state.connected || entry.nativeStopBusy || !readOnly && entry.nativeStopUnknown)return;
+            const epoch=entry.epoch;
+            entry.nativeStopBusy=true;entry.nativeStopMessage=readOnly?'Reading native stop status…':'Stopping native schedules…';stopControls();
+            try {
+                const before=await entry.handle.request('schedules/stop');
+                if(!before.response.ok && before.data?.error?.code==='unsupported_resource') {
+                    entry.nativeStopUnsupported=true;
+                    entry.nativeStopMessage='This Pico does not support native schedule stop through this management connection. Use its local USB Console safety control.';
+                    return;
+                }
+                entry.nativeStopUnsupported=false;
+                let value=checkedStop(entry,before);
+                if(entry.paused || entry.epoch!==epoch)throw Error('This Pico connection changed. Reconnect and read stop status.');
+                if(!readOnly) {
+                    entry.nativeStopUnknown=true;entry.nativeStatusMessage='Output and ownership are unknown while the stop is unconfirmed.';
+                    const result=await entry.handle.request('schedules/stop',{method:'POST',revision:before.response.headers.get('ETag'),body:{schema:'schedule-stop',target:value.target,stop:true}});
+                    entry.nativeStopOperation=result.operation;
+                    value=checkedStop(entry,result,value.target);
+                    if(!value.stopped)throw Error('Inactive and unowned output was not confirmed.');
+                }
+                if(entry.paused || entry.epoch!==epoch)throw Error('This Pico connection changed. Reconnect and read stop status.');
+                if(entry.nativeStopOperation)client.reviewed(entry.nativeStopOperation,entry.handle.device);
+                entry.nativeStopUnknown=false;entry.nativeStatusMessage='';
+                entry.nativeStopMessage=value.stopped?'Both native schedules are disabled; output is confirmed inactive and unowned. Your drafts are preserved. Read saved settings before explicitly enabling again.':'Current status read: a native schedule remains enabled or output is not confirmed inactive and unowned. Stop explicitly or use local Console recovery.';
+            } catch(error) {
+                entry.nativeStopUnknown=true;entry.nativeStatusMessage='Output and ownership are unknown for the unconfirmed stop. Read stop status to reconcile it.';
+                entry.nativeStopMessage='Stop is refused or unconfirmed. Read stop status before another action. A lost connection does not confirm inactive output; use local USB Console recovery if this Pico cannot be reached.';
+            } finally {entry.nativeStopBusy=false;ledger();notify();}
+        }
+        function notify() { stopControls();host.SetupTargets?.editorChanged?.(); }
         function organize(panel) {
             if (panel.dataset.setupOrganized) return;
             panel.dataset.setupOrganized = 'true';
@@ -184,7 +252,7 @@
             const feedback = find('wtp-network-feedback'),explanation = feedback.nextElementSibling;
             network.append(networkTitle,find('wtp-network-load'),find('wtp-network-disable'),feedback,explanation);io.append(network);
             scheduling.append(find('wtp-gray-line-controls').parentElement,find('wtp-combined-settings'));
-            const limits=host.document.createElement('p');limits.className='form-text';limits.textContent='WSPR recurrence and keyed-message recurrence are separate. The WSPR control below is not an atomic master. Keyed-message enable/pause state and editing are unavailable through this verified adapter; use the Pico’s own controls. Independent Pi day/night frequency profiles are unavailable; no controller sunrise writes are performed.';scheduling.prepend(limits);
+            const limits=host.document.createElement('p');limits.className='form-text';limits.textContent='WSPR recurrence and keyed-message recurrence are separate. The WSPR control below changes only WSPR. Stop native schedules disables both schedules and confirms inactive, unowned output. Keyed-message enable/pause state and editing are unavailable through this verified adapter; use the Pico’s own controls. Independent Pi day/night frequency profiles are unavailable; no controller sunrise writes are performed.';scheduling.prepend(limits);
             signal.append(member);
             const unavailable = host.document.createElement('p');unavailable.className = 'form-text';unavailable.textContent = 'Pi CW profiles are unavailable on this Pico. Its station controls retain their separate save and apply actions. WSPR recurrence and gray-line controls are in Scheduling.';signal.prepend(unavailable);
             const panes = host.document.createElement('div');panes.className = 'tab-content';panes.append(signal,scheduling,transmitter,io);
@@ -350,6 +418,9 @@
         }
         function init() {
             template = node('pico-target-template');if (!template) return;
+            node('pico-native-stop')?.addEventListener('click',()=>nativeStop(false));
+            node('pico-native-stop-read')?.addEventListener('click',()=>nativeStop(true));
+            node('pico-native-status-read')?.addEventListener('click',nativeStatus);
             node('pico-target-read-recovery').addEventListener('click',readRecovery);
             node('pico-target-review-recovery').addEventListener('click',reviewRecovery);
             host.addEventListener('pagehide',() => {++selection;for (const entry of entries.values()) {entry.paused = true;++entry.epoch;entry.handle.retire();}});

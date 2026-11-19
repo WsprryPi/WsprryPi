@@ -94,7 +94,13 @@ int main(int argc,char **argv){
   char pattern[]="/tmp/pico-independent-usb-XXXXXX";const auto directory=mkdtemp(pattern);if(!directory)throw std::runtime_error("private_directory");
   struct Remove{std::string path;~Remove(){std::filesystem::remove_all(path);}} remove{directory};
   WtpSettings settings;settings.transport="usb";settings.path="/dev/fixture-wtp";settings.usb_serial="fixture-independent";settings.vendor_id=0xcafe;settings.product_id=0x4012;settings.device_id=std::string(32,'a');
+  std::atomic_bool utc_qualified{false};
   auto channel=std::make_shared<PicoUsbManagementChannel>(settings);
+  channel->utc_observer=[&]{
+    const auto mono=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return HostUtcObservation{utc_qualified.load(),static_cast<std::uint64_t>(mono),
+      1760000000000000000ULL+static_cast<std::uint64_t>(mono),200000};
+  };
   channel->factory_for_test=[&]{return std::make_unique<UsbManagementClient>(driver,now,[&](unsigned ms){driver.wait(ms);});};
   const auto journal=std::string(directory)+(paired?"/attached-management":"/journal"),controller=identity(paired?'d':'c');
   PicoManagementContext context(settings,controller,std::string(directory)+"/journal","1","1",{{},{},channel},PicoManagementHistoryAuthority::isolated());
@@ -134,8 +140,8 @@ int main(int argc,char **argv){
    lifetime=std::make_unique<PiPairServiceLifetime>(history,incoming,sessions);
    if(!lifetime->open())throw std::runtime_error("pair_fixture_lifetime");
    backend=std::make_unique<PiPairMachineBackend>([&]{return history;},*attached_catalog,attached,[]{return std::optional<WtpSettings>{};},nullptr,
-    PiPairMachineBackend::Fixtures{[&]{auto observed=settings;observed.device_id=inventory_fault==2?identity('9'):std::string{};auto inventory=nlohmann::json{{"scope","wtp-usb/1"},{"available",true},{"reason",""},
-      {"candidates",nlohmann::json::array({{{"id","usb-"+identity('f')},{"instance","Software Pico"},{"binding","usb"},{"state","online"},{"settings",wtp_settings_json(observed)}}})}};
+    PiPairMachineBackend::Fixtures{[&]{auto observed=settings;observed.device_id=inventory_fault==2?identity('9'):std::string{};auto inventory=nlohmann::json{{"scope","pico-management-usb/1"},{"available",true},{"reason",""},
+      {"candidates",nlohmann::json::array({{{"id","usb-"+identity('f')},{"instance","Software Pico"},{"binding","usb"},{"state","online"},{"settings",management_profile_settings_json(observed)}}})}};
       if(inventory_fault==1)inventory["candidates"][0]["unexpected"]=true;
       return inventory;},
      [&](const auto &){return channel;}});
@@ -185,7 +191,7 @@ int main(int argc,char **argv){
    if(!valid_controller_document(targets,"targets")||targets["targets"].size()!=1||targets["targets"][0]["device_id"]!=settings.device_id)
     throw std::runtime_error("pair_fixture_automatic_usb_identity");
    const auto [enrolled,catalog_etag]=attached_catalog->snapshot({});(void)catalog_etag;
-   if(enrolled["profiles"].size()!=1||parse_wtp_settings(enrolled["profiles"][0]["settings"],true).device_id!=settings.device_id)
+   if(enrolled["profiles"].size()!=1||parse_management_profile_settings(enrolled["profiles"][0]["settings"]).device_id!=settings.device_id)
     throw std::runtime_error("pair_fixture_verified_automatic_enrollment");
    controller_history=paired_history(std::string(directory)+"/controller",true);
    controller_lifetime=std::make_unique<PiPairServiceLifetime>(controller_history,outgoing,controller_sessions);
@@ -199,6 +205,12 @@ int main(int argc,char **argv){
   while(std::getline(std::cin,line)){
    const auto command=strict_browser_json(line);operation_cancelled.store(false);PicoHttpResponse result;std::string reply_readback,reply_recovery_operation,reply_recovery_resource,reply_operation;
    if(command.value("control","")=="journal")result={200,PicoManagementJournal(journal,controller,settings.device_id,paired?attached_catalog->management_history_authority({}):PicoManagementHistoryAuthority::isolated()).snapshot().dump(),{}};
+   else if(command.value("control","")=="time-owner"){
+    utc_qualified=command.value("qualified",false);channel->start_time_refresh();
+    result={200,channel->client->observation().dump(),{}};
+   }
+   else if(command.value("control","")=="time-status")result={200,channel->client->observation().dump(),{}};
+   else if(command.value("control","")=="operations")result=channel->client->request("/api/control/v1/operations","GET",{},{});
    else if(command.value("control","")=="status")result=channel->client->request("/api/control/v1/status","GET",{},{});
    else if(command.value("control","")=="reconnect-usb"){channel->client->close();driver.restart();result={200,R"({"ok":true})",{}};}
    else if(command.value("control","")=="seed-foreign-receipt"&&paired){
@@ -263,7 +275,7 @@ int main(int argc,char **argv){
    }
    else result=context.request({command.at("method"),"/api/control/v1/targets/"+settings.device_id+"/pico/"+command.at("resource").get<std::string>(),command.value("body",""),command.value("revision",""),true,{}},command.value("context",context.id()),command.value("operation_id",""));
    const auto recovery=context.recovery_hint();
-   std::cout<<nlohmann::json{{"status",result.status},{"operation",reply_operation},{"body",strict_browser_json(result.body)},{"etag",result.etag},{"binding",paired?gateway_binding:context.binding()},{"context",paired?gateway_context:context.id()},{"readback_revision",paired?reply_readback:context.readback_revision()},{"recovery_operation",paired?reply_recovery_operation:recovery.first},{"recovery_resource",paired?reply_recovery_resource:recovery.second},{"execution_ready",wtp_runtime_ready()},{"response_valid",command.value("validate_response",false)?nlohmann::json(pico_management_response_valid(command.at("resource").get<std::string>(),command.value("method",std::string("GET")),result,gateway_binding,command.value("body",std::string{}))):nlohmann::json(nullptr)}}.dump()<<std::endl;
+   std::cout<<nlohmann::json{{"status",result.status},{"operation",reply_operation},{"body",strict_browser_json(result.body)},{"etag",result.etag},{"binding",paired?gateway_binding:context.binding()},{"context",paired?gateway_context:context.id()},{"readback_revision",paired?reply_readback:context.readback_revision()},{"recovery_operation",paired?reply_recovery_operation:recovery.first},{"recovery_resource",paired?reply_recovery_resource:recovery.second},{"execution_selected",wtp_runtime_selected()},{"execution_ready",wtp_runtime_ready()},{"response_valid",command.value("validate_response",false)?nlohmann::json(pico_management_response_valid(command.at("resource").get<std::string>(),command.value("method",std::string("GET")),result,gateway_binding,command.value("body",std::string{}))):nlohmann::json(nullptr)}}.dump()<<std::endl;
   }
   if(paired){controller_lifetime->close();lifetime->close();server->stop();controller_lifetime->drain();lifetime->drain();}
  }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

@@ -64,7 +64,7 @@ nlohmann::json PicoManagementTarget::gateway_resources() const {
     if(!pico_management_capabilities_valid(caps,carrier_))return result;
     const auto feature=[&](const char *name){return caps["features"].contains(name)&&caps["features"][name]==true;};
     const auto add=[&](const char *resource,bool supported){if(supported)result.push_back(resource);};
-    add("management",true);add("configuration",feature("config")&&caps.contains("configuration_updates"));
+    add("management",true);add("status",true);add("configuration",feature("config")&&caps.contains("configuration_updates"));
     add("application",feature("application"));add("station",feature("station"));add("hardware",feature("hardware"));
     add("pins",feature("hardware"));add("pins/validate",feature("hardware"));
     for(const auto &[descriptor,resource]:std::initializer_list<std::pair<const char *,const char *>>{
@@ -75,6 +75,7 @@ nlohmann::json PicoManagementTarget::gateway_resources() const {
     for(const auto *resource:{"udp-logging","udp-logging/capabilities","udp-logging/test","udp-logging/test/capabilities"})add(resource,true);
     for(const auto *resource:{"network","wifi","hostname"})add(resource,feature("network"));
     add("ap",feature("softap"));add("restart",feature("restart"));add("logging",caps.contains("logging"));
+    add("schedules/stop",caps.contains("schedule_stop"));
     return result;
 }
 PicoHttpResponse PicoManagementTarget::exchange(const std::string &resource,const std::string &method,
@@ -294,9 +295,9 @@ PicoHttpResponse PicoManagementTarget::request_impl(const std::string &resource,
             return pico_usb_settings_request(io,settings_.device_id,boot_,resource,method,body,revision);
         }
         if (resource=="configuration") return pico_configuration_request(io,settings_.device_id,boot_,method,body,revision,carrier_,generation);
-        if (resource=="application" || resource=="station" || resource=="hardware" || resource=="gpio-drive" ||
+        if (resource=="status" || resource=="application" || resource=="station" || resource=="hardware" || resource=="gpio-drive" ||
             resource=="amplifier-timing" || resource=="filter-selector" || resource=="si5351" || resource=="gps" ||
-            resource=="gray-line" || resource=="gpio-drive-progress" || resource=="pins" || resource=="pins/validate")
+            resource=="gray-line" || resource=="gpio-drive-progress" || resource=="pins" || resource=="pins/validate" || resource=="schedules/stop")
             return pico_resource_request(io,settings_.device_id,boot_,resource,method,body,revision,carrier_,generation);
         if (resource=="progress" || resource=="progress/update" || resource=="progress/apply")
             return pico_progress_request(io,settings_.device_id,boot_,resource,method,body,revision,carrier_,generation);

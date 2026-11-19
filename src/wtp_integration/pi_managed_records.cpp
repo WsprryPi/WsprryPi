@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_records.hpp"
 #include "controller_contract.hpp"
+#include "control_contract.hpp"
 #include "pi_management_journal.hpp"
 #include <charconv>
 #include <cstdint>
@@ -75,6 +76,26 @@ void validate_entries(const Json &receipts,const std::string &self,std::size_t m
     require(pending<=32);
 }
 }
+bool valid_pi_stored_candidate_shape(const Json &candidate) noexcept {
+    try {
+        static const auto definitions=Json::parse(pi_stored_candidate_definitions());
+        return valid_pi_candidate_shape(candidate) ||
+            valid_closed_contract_document(candidate,definitions.at("pi-candidate"),definitions);
+    } catch (...) { return false; }
+}
+Json current_pi_configuration(Json value) {
+    if(!value.is_object())throw std::invalid_argument("invalid_pi_configuration");
+    value.erase("WTP");value.erase("WTP Server");return value;
+}
+Json current_pi_settings_record(Json record) {
+    record["configuration"]=current_pi_configuration(record.at("configuration"));
+    const Json candidate{{"configuration",record["configuration"]},{"scheduling",record["scheduling"]}};
+    require(valid_pi_candidate_shape(candidate));
+    record["candidate_digest"]=hash(candidate);
+    // Revision continues to bind the exact original private after-image. A
+    // read projection never rewrites the journal or grants a new revision.
+    return record;
+}
 nlohmann::json pi_managed_settings_record(const std::string &self,const std::string &generation,
     const Json &candidate,const std::string &private_digest){
     require(hex(self,32)&&decimal(generation,true)&&hex(private_digest,64)&&valid_pi_candidate_shape(candidate));
@@ -91,8 +112,12 @@ bool valid_pi_managed_settings_record(const Json &record,const std::string &self
         if(!fields(record,{"schema","device_id","configuration_generation","configuration","scheduling","candidate_digest","revision"})||
             record["schema"]!="pi-managed-settings/1"||record["device_id"]!=self||!decimal(record["configuration_generation"],true)||
             !hex(record["candidate_digest"],64)||!hex(record["revision"],64))return false;
-        return record==pi_managed_settings_record(self,record["configuration_generation"].get<std::string>(),
-            Json{{"configuration",record["configuration"]},{"scheduling",record["scheduling"]}},private_digest);
+        const Json candidate{{"configuration",record["configuration"]},{"scheduling",record["scheduling"]}};
+        if(!hex(private_digest,64)||!valid_pi_stored_candidate_shape(candidate)||canonical_pi_management_json(candidate).size()>32768)return false;
+        const auto digest=hash(candidate);
+        const auto revision=hash(Json{{"device_id",self},{"configuration_generation",record["configuration_generation"]},
+            {"candidate_digest",digest},{"private_state_digest",private_digest}});
+        return record["candidate_digest"]==digest && record["revision"]==revision;
     }catch(...){return false;}
 }
 PiOperationsRecord pi_operations_record(const std::string &self,const Json &receipts){

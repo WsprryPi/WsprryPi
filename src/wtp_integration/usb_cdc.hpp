@@ -62,6 +62,21 @@ PicoCdcSelection paired_linux_cdc(const PicoCdcSelection &, PicoCdcRole,
     const std::filesystem::path &sysfs_root = "/sys",
     const std::filesystem::path &dev_root = "/dev");
 
+// Management profiles may select interface 4 directly. Existing explicit
+// interface-2 locators resolve only their own physical parent's management role.
+// No protocol probing, Console fallback, or tty-number inference is permitted.
+PicoCdcSelection management_linux_cdc(const PicoCdcSelection &,
+    const std::filesystem::path &sysfs_root = "/sys",
+    const std::filesystem::path &dev_root = "/dev");
+// Transitional execution lookup while WTP remains supported. A profile found
+// through management still selects only its exact physical parent's WTP role.
+PicoCdcSelection wtp_linux_cdc(const PicoCdcSelection &,
+    const std::filesystem::path &sysfs_root = "/sys",
+    const std::filesystem::path &dev_root = "/dev");
+PicoCdcSelection logging_linux_cdc(const PicoCdcSelection &,
+    const std::filesystem::path &sysfs_root = "/sys",
+    const std::filesystem::path &dev_root = "/dev");
+
 class PosixCdcSystem : public CdcSystem {
 public:
   CdcIdentity inspect(const std::string &path) override;

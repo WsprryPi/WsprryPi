@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
         wsprrypico::network::credentials_second::certificate,wsprrypico::network::credentials_second::key,
         wsprrypico::network::credentials_second::ca}:
     wsprrypico::provisioning::CredentialMaterial{device_id,hostname,static_cast<std::uint16_t>(selected_port),certificate,key,ca};
-  wsprrypico::network::PicoServer server{service, api, device, "phase11-host-test",material};
+  wsprrypico::network::PicoServer server{service, api, device, material};
   if (!server.start()) { std::cerr << "TLS server initialization failed: " << server.last_error() << "\n"; return 1; }
   std::cout << "READY " << server.port() << std::endl;
   while (true) {

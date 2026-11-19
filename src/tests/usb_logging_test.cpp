@@ -119,10 +119,11 @@ int main() {
     try { validate_usb_logging_start(invalid, device, boot); } catch (...) { refused = true; }
     assert(refused);
   }
-  const nlohmann::json attached = {{"available", true}, {"candidates", {{{"settings", {{"USB Serial", "1545B6EFBF78028C"}}}}, {{"settings", {{"USB Serial", "invalid"}}}}}}};
+  const nlohmann::json attached = {{"scope","pico-management-usb/1"},{"available", true}, {"candidates", {{{"settings", {{"USB Serial", "1545B6EFBF78028C"}}}}, {{"settings", {{"USB Serial", "invalid"}}}}}}};
   const auto observed = usb_logging_attached_sources(attached);
   assert(observed.size() == 1 && observed[0]["device_id"] == "c2a3a2a314c948b50a8562a1aeb69669");
   assert(usb_logging_attached_sources({{"available", false}}).empty());
+  auto retired=attached;retired["scope"]="wtp-usb/1";assert(usb_logging_attached_sources(retired).empty());
   // Policy authority and persistence are exercised without opening hardware.
   char directory[] = "/tmp/wsprrypi-log-test-XXXXXX";
   assert(mkdtemp(directory));

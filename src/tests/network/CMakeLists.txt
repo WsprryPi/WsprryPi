@@ -148,9 +148,7 @@ set(core
     usb/management_endpoint.cpp
     usb/time_exchange.cpp
     wtp/json.cpp
-    wtp/codec.cpp
-    wtp/endpoint.cpp
-    wtp/frame_parser.cpp
+    wtp/observation.cpp
     wtp/inhibited_rf_engine.cpp
     wtp/job_service.cpp
     wtp/sha256.cpp
@@ -181,19 +179,17 @@ target_compile_definitions(pico_consumer_fixture PRIVATE MBEDTLS_CONFIG_FILE="${
 target_link_libraries(pico_consumer_fixture PUBLIC microchrony PRIVATE mbedcrypto)
 target_compile_options(pico_consumer_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 add_executable(consumer_interop consumer_interop.cpp
-    ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp ../../wtp_integration/pico_usb_settings.cpp ../../wtp_integration/controller_contract.cpp
+    ../../wtp_integration/management_identity.cpp ../../wtp_integration/consumer_radio.cpp ../../wtp_integration/configuration.cpp ../../wtp_integration/pico_usb_settings.cpp ../../wtp_integration/controller_contract.cpp
     ../../wtp_integration/browser_api.cpp ../../wtp_integration/network_http.cpp
     ../../wtp_integration/plain_tcp.cpp ../../wtp_integration/tls.cpp
-    ../../wtp_runtime_bridge.cpp ../../wtp_pi_control.cpp ../../wtp_integration/output_lease.cpp ../../wtp_integration/usb_cdc.cpp ../../wtp_integration/usb_management.cpp ../../wtp_integration/pico_usb_management_channel.cpp ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
-    ../../wtp_integration/application.cpp ../../wtp_integration/status.cpp
-    ../../wtp_integration/scheduler.cpp ../../wtp_integration/backend.cpp
-    ../../wtp_integration/execution_plan.cpp ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
+    ../../privileged_network_policy.cpp ../../backend_http_guard.cpp ../../support_request_guard.cpp ../../httplib.cpp
+    ../../WSPR-Transmitter/src/execution_plan_compiler.cpp
     ../../WSPR-Transmitter/src/transmission_controller.cpp)
 target_compile_definitions(consumer_interop PRIVATE WSPRRYPI_CONSUMER_CRYPTO_TEST=1 MBEDTLS_CONFIG_FILE="${MBEDTLS_CONFIG_FILE}")
 target_include_directories(consumer_interop PRIVATE ../.. ../../WTP-Client/include ../../WSPR-Transmitter/src
     "${PICO_SOURCE}/src" "${PICO_SOURCE}/tests" "${CMAKE_BINARY_DIR}/generated" "${MBEDTLS_SOURCE}/include")
 target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto OpenSSL::SSL OpenSSL::Crypto
-    "${CMAKE_BINARY_DIR}/client/libwtp_client.a" pthread)
+    pthread)
 target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 
 add_executable(wtp_fixture_clock_test fixture_clock_test.cpp)

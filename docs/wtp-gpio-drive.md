@@ -9,13 +9,13 @@ An unavailable or unreachable member never displays an observed default.
 
 This electrical setting does not adjust WSPR reported power or any Pi local
 BCM/RP1/Si5351 setting. Actual RF power depends on load and frequency. Other
-pins and WTP/1 jobs are unchanged. USB needs no Pico Wi-Fi. Network management
+pins and native execution semantics are unchanged. USB needs no Pico Wi-Fi. Network management
 requires the existing authenticated Consumer-Radio or engineering carrier.
-Plain WTP transport provides no configuration authority.
+External WTP execution is retired.
 
-Save drive progress retains this one field without a complete station. Apply saved drive is a separate action over a complete applied configuration. The protected GET/PUT/POST `/api/control/v1/member/gpio-drive-progress` facade forwards only the current progress drive field and explicit drive domain, preserving other drafts.
+Save drive progress retains this one field without a complete station. Apply saved drive is a separate action over a complete applied configuration. The protected GET/PUT/POST `/api/control/v1/targets/<device-id>/pico/gpio-drive-progress` facade forwards only the current progress drive field and explicit drive domain, preserving other drafts.
 
-The protected GET/PUT /api/control/v1/member/gpio-drive route binds a fresh read to the
+The protected GET/PUT /api/control/v1/targets/<device-id>/pico/gpio-drive route binds a fresh read to the
 current selection and ETag. The adapter validates the complete
 `gpio-drive` descriptor, target/boot, current application context and
 readback before forwarding one mutation. It reconciles the saved response but

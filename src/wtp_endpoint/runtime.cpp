@@ -1,10 +1,9 @@
+#include "WTP-Server/include/wtp_server/observation.hpp"
 #include "wtp_endpoint/runtime.hpp"
+#include "wtp_retirement.hpp"
 
 #include "wtp_endpoint/authority.hpp"
-#include "wtp_endpoint/dns_sd_publisher.hpp"
 #include "wtp_endpoint/identity.hpp"
-#include "wtp_endpoint/interface_selection.hpp"
-#include "wtp_endpoint/plain_listener.hpp"
 #include "wtp_endpoint/revocation_journal.hpp"
 #include "wtp_endpoint/system_clock.hpp"
 #include "wtp_endpoint/tone_engine.hpp"
@@ -56,7 +55,6 @@ namespace wsprrypi {
 static WtpExternalReconcileResult reconcile_native_external_output(const WtpManagedOutput &);
 namespace {
 std::string fixture_private_state_path;
-bool fixture_loopback_listener{};
 std::string private_state_path() {
     if(!fixture_private_state_path.empty())return fixture_private_state_path;
     const passwd* owner = getpwuid(geteuid());
@@ -77,11 +75,7 @@ public:
     explicit Runtime(const ArgParserConfig& settings)
         : device_id_(wtp_pi_device_id()),
           journal_(private_state_path(), device_id_),
-          selected_interface_(settings.wtp_server.interface),
-          port_(settings.wtp_server_port_override.value_or(settings.wtp_server.port)),
           settings_(settings) {
-        if(fixture_loopback_listener&&settings.transmit_backend!=TransmitBackendKind::SIMULATED)
-            throw std::runtime_error("Loopback endpoint fixture requires the explicit simulated backend");
         wsprrypico::wtp::ServiceConfig caps;
 #if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
         BackendExecutionInputs inputs;
@@ -203,84 +197,24 @@ public:
             throw std::runtime_error("WTP takeover revocation journal unavailable");
         if (settings.transmit)
             (void)authority_->enable_noninteractive();
-        listener_ = std::make_unique<WtpPlainListener>(
-            *authority_, device_id_, get_exe_version());
-
     }
 
-    ~Runtime() {
-        publisher_.stop();
-        if (listener_) listener_->stop();
-    }
-
-    void activate() {
-        std::lock_guard lock(state_mutex_);
-        if (activated_ || !listener_ || !engine_ || !settings_.wtp_server.enabled) return;
-        const auto now = std::chrono::steady_clock::now();
-        if (now < next_activation_) return;
-        next_activation_ = now + std::chrono::seconds(2);
-        activated_ = true;
-        const auto selected = fixture_loopback_listener?std::optional<WtpStationAddress>{{"","127.0.0.1",0}}:
-            wtp_select_station_address(wtp_station_addresses(), selected_interface_);
-        if (!selected) {
-            activated_ = false;
-            listener_error_ = "WTP station LAN interface selection is absent or ambiguous";
-            return;
-        }
-        address_ = *selected;
-        if (!listener_->start(address_->address, port_, address_->interface_name)) {
-            listener_error_ = listener_->error();
-            activated_ = false;
-            return;
-        }
-        listener_error_.clear();
-        std::array<char, 64> hostname{};
-        (void)gethostname(hostname.data(), hostname.size() - 1);
-        const auto name = "WsprryPi " + std::string(hostname.data()).substr(0, 40) +
-                          " " + device_id_.substr(0, 8);
-        // A multihomed Pi's ordinary hostname may resolve to an interface on
-        // which this listener is deliberately not bound. Publish the selected
-        // address under an endpoint-specific SRV target in the same group.
-        if(!fixture_loopback_listener)(void)publisher_.start(address_->interface_name, name, listener_->bound_port(),
-                               "wtp-" + device_id_ + ".local", address_->address);
-    }
-
+    // The authority, native engine, clock, and protected journals remain owned
+    // here. Retirement removes network publication and admission entirely.
+    void activate() {}
     void poll() {
         if (authority_) authority_->poll();
-        std::lock_guard lock(state_mutex_);
-        if (listener_ && listener_->running() && address_) {
-            const auto current = fixture_loopback_listener?std::optional<WtpStationAddress>{{"","127.0.0.1",0}}:
-                wtp_select_station_address(wtp_station_addresses(), selected_interface_);
-            // SO_BINDTODEVICE stores a kernel interface index. Recreating a
-            // device with the same name/address still requires a fresh socket.
-            if (!current || *current != *address_) {
-                publisher_.stop();
-                listener_->stop();
-                activated_ = false;
-                listener_error_ = "WTP station LAN address changed; listener withdrawn";
-            }
-        }
-        if (listener_ && !listener_->running()) publisher_.stop();
     }
-
-    std::optional<unsigned> active_port() const {
-        std::lock_guard lock(state_mutex_);
-        if(!activated_||!settings_.wtp_server.enabled||!listener_||!listener_->running())return {};
-        const auto port=listener_->bound_port();return port?std::optional<unsigned>(port):std::nullopt;
-    }
+    std::optional<unsigned> active_port() const { return {}; }
 
     std::string status_json() const {
         std::lock_guard lock(state_mutex_);
         nlohmann::json status{{"schema", "wsprrypi-wtp-endpoint/1"},
                               {"device_id", device_id_},
-                              {"enabled", settings_.wtp_server.enabled},
-                              {"listener_running", listener_ && listener_->running()},
-                              {"dns_sd_published", publisher_.published()},
+                              {"enabled", false},
+                              {"listener_running", false},
+                              {"dns_sd_published", false},
                               {"listener_error", listener_error_}};
-        if (listener_ && listener_->running()) {
-            status["address"] = address_->address;
-            status["port"] = listener_->bound_port();
-        }
         if (authority_) {
             const auto state = authority_->snapshot();
             status["local_requested"] = state.requested_local_enable;
@@ -309,12 +243,7 @@ public:
 
     std::shared_ptr<WtpPiAuthority> authority() const { return authority_; }
     const std::string &device_id() const { return device_id_; }
-    void withdraw() {
-        std::lock_guard lock(state_mutex_);
-        publisher_.stop();
-        listener_->stop();
-        activated_ = false;
-    }
+    void withdraw() {}
     const ArgParserConfig& settings() const { return settings_; }
 
 
@@ -339,15 +268,8 @@ private:
     std::unique_ptr<WtpPiToneEngine> engine_;
     std::unique_ptr<wsprrypico::wtp::JobService> service_;
     std::shared_ptr<WtpPiAuthority> authority_;
-    std::unique_ptr<WtpPlainListener> listener_;
-    WtpPiDnsSdPublisher publisher_;
-    std::optional<WtpStationAddress> address_;
     std::string listener_error_;
-    std::string selected_interface_;
-    std::uint16_t port_;
     ArgParserConfig settings_;
-    bool activated_ = false;
-    std::chrono::steady_clock::time_point next_activation_{};
     mutable std::mutex state_mutex_;
 };
 
@@ -413,6 +335,7 @@ PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device,cons
 
 bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) {
     std::lock_guard lifecycle(lifecycle_mutex);
+    if(const auto refusal=wtp_retirement_configuration_refusal(settings);!refusal.empty()){if(error)*error=refusal;return false;}
     if (!settings.use_ini) return true;
     try {
         auto candidate = std::make_shared<Runtime>(settings);
@@ -455,14 +378,6 @@ void testing::set_wtp_pi_private_state_path(const std::string &path){
     if(lstat(parent.c_str(),&info)!=0||!S_ISDIR(info.st_mode)||info.st_uid!=geteuid()||(info.st_mode&0077)!=0)
         throw std::invalid_argument("Isolated endpoint ledger requires a private fixture parent");
     fixture_private_state_path=path;
-}
-
-void testing::set_wtp_pi_loopback_fixture(bool enabled){
-    std::lock_guard lifecycle(lifecycle_mutex);std::lock_guard lock(runtime_mutex);
-    const auto disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-    if(runtime||pending_settings||fixture_private_state_path.empty()||!disabled||std::string_view(disabled)!="1")
-        throw std::invalid_argument("Loopback endpoint fixture requires disabled hardware and an isolated idle owner");
-    fixture_loopback_listener=enabled;
 }
 
 void poll_wtp_pi_endpoint() noexcept {

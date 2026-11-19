@@ -56,7 +56,8 @@ async function main() {
     mode = 'commit';const done = await client.retry();assert.equal(done.state,'committed');
     assert.equal(calls.at(-1).body,firstBody);assert.equal(sent.configuration.CW.Message,'EXPLICIT DRAFT');
     assert.equal(client.draft.CW.Message,'LATER DRAFT','Late accepted writes never erase a newer browser draft');
-    for (const key of ['TLS CA File','TLS Client Certificate','TLS Client Key']) assert.equal(sent.configuration.WTP[key],'');
+    assert.equal(Object.hasOwn(sent.configuration,'WTP'),false,'Retired private settings never enter a current recovery command');
+    assert.equal(Object.hasOwn(sent.configuration,'WTP Server'),false);
     const before = calls.length;assert.deepEqual(await client.retry(),done);assert.equal(calls.length,before,'A confirmed receipt is not dispatched again');
     for (const failure of ['invalid','replaced','storage']) {
         const isolated = create({fetch,crypto});isolated.accept(original);mode = failure;

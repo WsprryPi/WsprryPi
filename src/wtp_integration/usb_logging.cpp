@@ -200,7 +200,7 @@ public:
                                         {"device_id", settings.device_id},
                                         {"name", profile.at("name")}});
     }
-    result["attached"] = allow_devices_ ? usb_logging_attached_sources(wtp_usb_discovery()) : Json::array();
+    result["attached"] = allow_devices_ ? usb_logging_attached_sources(pico_management_usb_discovery()) : Json::array();
     for (auto &attached : result["attached"])
       for (const auto &profile : known.at("profiles"))
         if (profile.at("settings").value("Device ID", "") == attached.at("device_id").get<std::string>()) {
@@ -327,11 +327,10 @@ private:
       source.close();
       source.retry = now + 5000;
       source.lease = pico_usb_runtime_lease(settings.usb_serial);
-      const auto selected = paired_linux_cdc(
+      const auto selected = logging_linux_cdc(
           {settings.path, settings.usb_serial,
            static_cast<std::uint16_t>(settings.vendor_id),
-           static_cast<std::uint16_t>(settings.product_id), PicoCdcRole::Wtp},
-          PicoCdcRole::Logging);
+           static_cast<std::uint16_t>(settings.product_id)});
       if (!source.stream.begin_open(selected, now))
         throw std::runtime_error("logging_busy_or_disconnected");
       source.deadline = now + 3000;
@@ -540,7 +539,7 @@ std::shared_ptr<Collector> manager;
 } // namespace
 Json usb_logging_attached_sources(const Json &discovery) {
   Json result = Json::array();
-  if (!discovery.value("available", false)) return result;
+  if (discovery.value("scope",Json(nullptr))!="pico-management-usb/1" || !discovery.value("available", false)) return result;
   for (const auto &candidate : discovery.at("candidates")) {
     if (result.size() >= 64) break;
     const auto serial = candidate.at("settings").value("USB Serial", "");

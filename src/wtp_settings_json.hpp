@@ -49,3 +49,17 @@ inline WtpSettings parse_wtp_settings(const nlohmann::json &j, bool selected) {
   validate_wtp_settings(s, selected);
   return s;
 }
+
+// Current management connection projection. Retired execution policy remains
+// recognizable only in private INI/catalog records, never in new API input.
+inline nlohmann::json management_profile_settings_json(const WtpSettings &settings) {
+    auto value=wtp_settings_json(settings);
+    value.erase("Start Uncertainty ns");value.erase("Allow Frequency Adjustment");
+    return value;
+}
+inline WtpSettings parse_management_profile_settings(const nlohmann::json &value,bool selected=true) {
+    const auto fields=management_profile_settings_json(WtpSettings{});
+    if(!value.is_object()||value.size()!=fields.size())throw std::runtime_error("Invalid management profile settings");
+    for(const auto &entry:value.items())if(!fields.contains(entry.key()))throw std::runtime_error("Unknown management profile setting");
+    return parse_wtp_settings(value,selected);
+}

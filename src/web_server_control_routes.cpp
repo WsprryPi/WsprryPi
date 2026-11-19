@@ -38,11 +38,8 @@
 
 namespace {
 std::optional<WtpSettings> selected_wtp() {
-    if (controller_only_mode()) return {};
-    const auto [snapshot, revision] = get_public_config_snapshot();
-    (void)revision;
-    if (snapshot.at("Operation").value("Transmit Backend", "") != "wtp") return {};
-    return parse_wtp_settings(snapshot.at("WTP"), true);
+    return {}; // Retired execution selection is never an authority for management.
+
 }
 wsprrypi::WtpCatalog &catalog() {
     // The main-owned host outlives every HTTP worker. Reuse its mutex and
@@ -95,25 +92,25 @@ void require_probe_idle() {
         state == WsprTransmitState::HUNG)
         throw std::runtime_error("Stop and resolve transmitter work before identifying a device");
 }
-WtpSettings candidate_settings(const nlohmann::json &request, bool allow_blank_plain) {
+WtpSettings candidate_settings(const nlohmann::json &request, bool) {
     const auto id = request.at("discovery_id").get<std::string>();
     if (id.starts_with("usb-")) {
-        auto settings = parse_wtp_settings(request.at("settings"), true);
-        wsprrypi::validate_discovered_usb(wsprrypi::wtp_usb_discovery(), id, settings);
+        auto settings = parse_management_profile_settings(request.at("settings"), true);
+        wsprrypi::validate_discovered_usb(wsprrypi::pico_management_usb_discovery(), id, settings);
         return settings;
     }
     const auto candidate = wsprrypi::wtp_discovery().candidate(id, discovery_now());
     if (!candidate) throw std::runtime_error("Discovery candidate is unavailable or stale");
-    auto settings = parse_wtp_settings(request.at("settings"), true);
+    auto settings = parse_management_profile_settings(request.at("settings"), true);
     const std::string binding = settings.transport == "network" ? "tls" :
-        settings.transport == "network_plain" ? "plain" : "usb";
+        settings.transport == "network_plain" ? "consumer" : "usb";
     if (candidate->binding != binding || settings.hostname != candidate->target ||
         settings.tcp_port != static_cast<int>(candidate->port))
         throw std::runtime_error("Discovery binding or SRV endpoint changed; review the candidate");
     if (binding == "tls" && settings.tls_identity.empty())
         throw std::runtime_error("Discovered TLS requires a pinned certificate identity");
-    if (binding == "plain" && !allow_blank_plain && settings.device_id.empty())
-        throw std::runtime_error("Plain LAN needs a confirmed WTP device ID");
+    if (binding == "consumer" && settings.device_id.empty())
+        throw std::runtime_error("Consumer Wi-Fi needs an expected immutable device ID");
     return settings;
 }
 wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
@@ -129,7 +126,7 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
         const auto active = selected_wtp();
         if (request.path == "/api/control/v1/host/discovery" && request.method == "GET") {
             auto result = wsprrypi::wtp_discovery().snapshot(discovery_now());
-            result["usb"] = wsprrypi::wtp_usb_discovery();
+            result["usb"] = wsprrypi::pico_management_usb_discovery();
             return {200, result.dump(), {}};
         }
         if (request.path == "/api/control/v1/host/devices" && request.method == "GET") {
@@ -156,13 +153,15 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             if (operation == "add" && body.value("method", "") == "dns_sd") {
                 const auto settings = candidate_settings(body, false);
                 if (settings.transport == "network_plain" && body.value("consent_plain", false) != true)
-                    throw std::runtime_error("Plain LAN requires explicit consent");
+                    throw std::runtime_error("Consumer Wi-Fi requires an explicit connection choice");
                 require_probe_idle();
-                const auto observed = wtp_runtime_safe_probe([&] {
-                    return wsprrypi::wtp_probe_network_identity(settings);
-                });
-                if (observed.at("device_id") != settings.device_id)
-                    throw std::runtime_error("Observed WTP identity changed");
+                if(settings.transport=="network"){
+                        const auto observed = wtp_runtime_safe_probe([&] {
+                            return wsprrypi::wtp_probe_network_identity(settings);
+                        });
+                        if (observed.at("device_id") != settings.device_id)
+                            throw std::runtime_error("Observed management identity changed");
+                }
             } else if (operation == "edit") {
                 auto old = catalog().profile(body.at("id").get<std::string>(),
                     request.get_header_value("If-Match"), active);
@@ -171,11 +170,13 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
                         {"settings", body.at("settings")}};
                     const auto settings = candidate_settings(candidate, false);
                     require_probe_idle();
-                    const auto observed = wtp_runtime_safe_probe([&] {
-                        return wsprrypi::wtp_probe_network_identity(settings);
-                    });
-                    if (observed.at("device_id") != settings.device_id)
-                        throw std::runtime_error("Observed WTP identity changed");
+                    if(settings.transport=="network"){
+                        const auto observed = wtp_runtime_safe_probe([&] {
+                            return wsprrypi::wtp_probe_network_identity(settings);
+                        });
+                        if (observed.at("device_id") != settings.device_id)
+                            throw std::runtime_error("Observed management identity changed");
+                    }
                 }
             }
             auto [result, revision] = catalog().mutate(body,
@@ -185,59 +186,8 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             revision=catalog().snapshot(active).second;
             return {200, result.dump(), revision};
         }
-        if (request.path == "/api/control/v1/host/devices/use" && request.method == "POST") {
-            if (request.get_header_value("If-Match").empty())
-                return {428, R"({"error":{"code":"revision_required"}})", {}};
-            const auto body = wsprrypi::strict_browser_json(request.body);
-            if (!body.is_object() || body.size() != 2 ||
-                !body.contains("id") || !body.contains("catalog_revision"))
-                throw std::runtime_error("Invalid selection request");
-            const auto profile = catalog().profile(body.at("id").get<std::string>(),
-                body.at("catalog_revision").get<std::string>(), active);
-            const auto [current_config, current_revision] = get_public_config_snapshot();
-            if (current_revision != request.get_header_value("If-Match"))
-                throw std::runtime_error("revision_conflict");
-            if (current_config.at("Operation").value("Transmit", false))
-                throw std::runtime_error("Disable transmission before switching devices");
-            if (profile.legacy_unverified || profile.settings.device_id.empty())
-                throw std::runtime_error("Confirm the expected WTP device ID before selection");
-            if (profile.method == "dns_sd") {
-                const nlohmann::json candidate = {{"discovery_id", profile.discovery_id},
-                    {"settings", wtp_settings_json(profile.settings)}};
-                const auto settings = candidate_settings(candidate, false);
-                require_probe_idle();
-                const auto observed = wtp_runtime_safe_probe([&] {
-                    return wsprrypi::wtp_probe_network_identity(settings);
-                });
-                if (observed.at("device_id") != settings.device_id)
-                    throw std::runtime_error("Observed WTP identity changed");
-            }
-            const auto state = transmitter_state();
-            if (!wtp_runtime_switch_allowed())
-                throw std::runtime_error("Resolve Pico ownership and output before switching devices");
-            if (state == WsprTransmitState::TRANSMITTING ||
-                state == WsprTransmitState::RECOVERING || state == WsprTransmitState::HUNG)
-                throw std::runtime_error("Stop and resolve current transmitter work before switching");
-            const auto selection_error = wtp_runtime_selection_error(profile.settings);
-            if (!selection_error.empty()) throw std::runtime_error(selection_error);
-            // The active INI and runtime path are the sole endpoint authority.
-            // A config failure leaves the catalog untouched and the old active
-            // endpoint selected. No separate active-ID write can partially fail.
-            std::string revision;
-            try {
-                revision = patch_all_from_web_revision(
-                    {{"Operation", {{"Transmit Backend", "wtp"}}},
-                     {"WTP", wtp_settings_json(profile.settings)}},
-                    request.get_header_value("If-Match"));
-            } catch (...) {
-                const auto [after, after_revision] = get_public_config_snapshot();
-                if (after.at("Operation").value("Transmit Backend", "") == "wtp" &&
-                    after.at("WTP") == wtp_settings_json(profile.settings))
-                    return {500, R"({"error":{"code":"runtime_apply_unconfirmed","message":"The active endpoint was saved, but runtime application was not confirmed. Review status before further work."}})", after_revision};
-                throw;
-            }
-            return {200, nlohmann::json{{"ok", true}, {"active_id", profile.id}}.dump(), revision};
-        }
+        if (request.path == "/api/control/v1/host/devices/use")
+            return {404,R"({"error":{"code":"not_found"}})",{}};
         return {404, R"({"error":{"code":"not_found"}})", {}};
     } catch (const std::exception &error) {
         const std::string reason = error.what();

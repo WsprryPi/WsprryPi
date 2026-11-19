@@ -10,7 +10,6 @@
         return keys.length === other.length && keys.every((key,index) => key === other[index] && same(left[key],right[key]));
     };
     const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
-    const privateKeys = new Set(['TLS CA File', 'TLS Client Certificate', 'TLS Client Key']);
     class RecoveryError extends Error {
         constructor(code, status = 0) { super(code); this.code = code; this.status = status; }
     }
@@ -94,7 +93,6 @@
             if (action) value.action = action;
             else {
                 value.configuration = clone(draft);
-                for (const key of privateKeys) value.configuration.WTP[key] = '';
             }
             if (!control.validControllerDocument(value,value.schema)) throw new RecoveryError('candidate_invalid');
             if (new TextEncoder().encode(JSON.stringify(value)).byteLength > 32768) throw new RecoveryError('payload_too_large');
@@ -197,7 +195,7 @@
                 }
             },
             set(section,key,value) {
-                if (!draft || !own(draft,section) || !own(draft[section],key) || section === 'WTP' && privateKeys.has(key))
+                if (!draft || !own(draft,section) || !own(draft[section],key))
                     throw new RecoveryError('read_only_field');
                 const changed = clone(current); changed.draft = clone(draft); changed.draft[section][key] = value;
                 if (!control.validControllerDocument(changed,'configuration-recovery') ||

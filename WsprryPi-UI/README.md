@@ -125,28 +125,27 @@ report locations, and actual replacement status as its final output block.
 
 ### Fleet access
 
-The Setup > Fleet tab groups known and nearby WTP devices, connection and status
-controls, member management, and output schedules. It is available on every page
-load without a console command or visibility preference. Browsing the tab does
-not apply endpoint settings or enable transmission. Profile application, member
-saves and schedule changes retain their explicit controls.
+The Setup > Fleet tab groups saved devices, nearby management advertisements,
+and read-only legacy controller schedules. It is available without a console
+command or visibility preference. Browsing does not select a transmitter
+backend, apply settings, or enable transmission. Each device owns its native
+schedule. Manage a selected Pico through its target-bound settings editor.
 
-### Pico finite CW messages
+Legacy controller rows preserve saved enable and in-flight history without
+reconnecting, dispatching, or performing cleanup. Complete outstanding duties
+with WTP-capable software before replacement. Retirement receipt review is
+read-only. Fleet Operations retains historical observations and the native
+local Operations view.
 
-When Pico is selected, the CW message form shows the exact calculated integer-
-nanosecond duration, character count out of 32, event count against the connected
-device's limit, and the finite-job duration ceiling (at most 60 minutes). Spaces
-count toward 32; invalid drafts remain intact. Duration, event and message-length
-errors are distinct, and a refreshed smaller capability updates validation.
-Other backends retain their existing message limits and duration display.
+### Pico native schedules and stop
 
-The calculation quantizes timing fields to nanoseconds before summing events,
-matching the parent WTP request builder; QRSS/FSKCW dash length is three quantized
-dots. One repetition is a complete native job. The existing repeat interval is
-scheduler spacing, not permission to exceed a device's finite-job duration.
-Local Chromium tests cover both desktop/mobile layouts, 31/32/33 and spaces,
-exact duration boundaries, smaller CAPS and fractional timing. They use simulated
-controller responses; live-device R3 acceptance remains separately required.
+The selected Pico's WSPR and keyed-message recurrence uses retained management,
+with the device's current limits and native timing. The UI does not upload
+finite jobs or run remote controller recurrence. Native schedule stop disables
+both schedules and confirms inactive, unowned output through authenticated,
+target-bound readback. A lost or refused response remains unknown; ordinary
+status refresh cannot clear that hold. Explicit stop-status readback resolves
+it without replaying a mutation, and settings drafts remain with their target.
 
 ### Browser fixture process ownership
 
@@ -169,8 +168,8 @@ Run `npm test` and `npm run test:browser` from this component. The process
 regression covers an exited leader with a stubborn writer and verifies that an
 unrelated sentinel survives. `node tests/wtp_pi_fleet_ui_integration_test.js`
 exercises the separate Fleet browser fixture. These use synthetic local
-controller responses; an online test-network interface is needed for workflows
-that honor `navigator.onLine`, even when external access is disabled.
+controller responses; network-isolated loopback fixtures may explicitly model browser connectivity
+to their owned local peers; production offline guards remain active.
 
 ## Development browser fixtures
 
@@ -212,15 +211,16 @@ USB, or RF output.
 
 ## Shared Setup production browser fixtures
 
-`setup-targets.js` selects an editing context independently of `WtpUi` output
-selection. Native fields must finish loading before they are writable. Retained
+`setup-targets.js` selects an editing context independently of the local
+transmitter backend. Native fields must finish loading before they are writable. Retained
 local drafts require explicit resume; Pico forms remain outside native autosave.
 `pico-target-editors.js` keeps scoped DOM drafts and captured target handles.
 
 Build `build/bin/shared_setup_main_fixture` from `src` with explicitly selected
 `BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=`. This actual-main fixture accepts only
-an offline WTP output and two exact authenticated loopback Pico software peers;
-it refuses physical backends and fails if any output transport write occurs.
+explicit simulated local output and two exact authenticated loopback Pico
+software peers. It refuses physical backends and fails if any output transport
+write occurs.
 The Pico source and pinned Mbed TLS dependency for the network fixture must be
 selected explicitly as in the parent non-hardware workflow.
 

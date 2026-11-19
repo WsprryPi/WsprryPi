@@ -342,7 +342,7 @@ bool TlsStream::begin_open(const TlsSelection &s, std::shared_ptr<TlsCredentials
   const auto host = canonical_network_identity(s.host);
   const auto identity = canonical_network_identity(s.expected_identity.empty() ? s.host : s.expected_identity);
   if (!credentials || !host || !identity || !s.port || s.port > 65535 ||
-      (alpn != "wtp/1" && alpn != "http/1.1")) { p.fail("Invalid TLS endpoint"); return false; }
+      alpn != "http/1.1") { p.fail("Invalid TLS endpoint"); return false; }
   p.selection = s; p.selection.host = *host; p.selection.expected_identity = *identity;
   p.credentials = std::move(credentials); p.alpn = std::move(alpn);
   p.deadline = p.clock() + resolve_timeout_ms;

@@ -1432,7 +1432,8 @@ legend {
 
 #setup-scheduling .btn-outline-secondary,
 #setup-pi-workspace .btn-outline-secondary,
-#setup-pico-scheduling .btn-outline-secondary {
+#setup-pico-scheduling .btn-outline-secondary,
+#setup-pico-workspace .btn-outline-secondary {
     --bs-btn-disabled-color: var(--bs-body-color);
     --bs-btn-disabled-border-color: var(--bs-border-color);
 }

@@ -3,7 +3,7 @@
     'use strict';
     if (!root.document) return;
     const control = root.WsprryControl, client = root.ConfigurationRecoveryClient.create({base:root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1'});
-    const node = id => root.document.getElementById(id), privateKeys = new Set(['TLS CA File','TLS Client Certificate','TLS Client Key','TLS Server Identity']);
+    const node = id => root.document.getElementById(id);
     let active = false, built = false, busy = false, ready = false, blocked = false, polling = false, observer = null, serial = 0, actionRevision = 0;
     const unknown = value => !!value && typeof value === 'object' && value.state === 'unavailable';
     const element = (tag,className,text) => {const item = root.document.createElement(tag);if (className) item.className = className;if (text !== undefined) item.textContent = text;return item;};
@@ -71,9 +71,9 @@
         let labels = null;
         if(client.current.validation === 'initialization') {
             const options = section === 'Operation' && key === 'Transmit Backend'
-                ? {gpio:'Raspberry Pi GPIO','rp1-gpclk':'Raspberry Pi 5 GPIO (RP1)',si5351:'Si5351',wtp:'Remote output (WTP)'}
+                ? {gpio:'Raspberry Pi GPIO','rp1-gpclk':'Raspberry Pi 5 GPIO (RP1)',si5351:'Si5351'}
                 : section === 'Operation' && key === 'Mode' ? {WSPR:'WSPR',QRSS:'QRSS',FSKCW:'FSKCW',DFCW:'DFCW',TONE:'Tone'}
-                : section === 'WTP' && key === 'Transport' ? {network_plain:'Local network',usb:'USB'} : null;
+                : null;
             if(options) {labels=options;choice={...choice,enum:Object.keys(options)};}
         }
         const row = element('div','mb-3'), id = 'recovery-field-' + (++serial), label = element('label','form-label',key);
@@ -128,7 +128,6 @@
             const group = element('details','py-3 border-bottom'), title = element('summary','h5 mb-0',titleText), fields = element('div','mt-3');
             group.open = initializing && ['WSPR','Operation'].includes(section) || Object.values(values).some(unknown);group.append(title,fields);container.append(group);
             for (const [key,value] of Object.entries(values)) {
-                if (section === 'WTP' && privateKeys.has(key)) continue;
                 if (client.current.validation === 'initialization' && section === 'Operation' && ['Transmit','Enable on Boot'].includes(key)) continue;
                 const rule = control.controllerPiConfigurationField(section,key);
                 if (!rule) throw new Error('unavailable_configuration_shape');
@@ -214,7 +213,9 @@
         try {if(!installing || node('installationSetup')) build();} catch (_) {blocked = true;feedback('The recovery editor is unavailable. Reload to verify the page before making changes.');}
         buttons();
         root.PicoFirmwareSafety?.render?.();
-        if (!value.writable) {
+        if (value.validation === 'migration_required') {
+            if (node('configurationRecoveryExplanation')) node('configurationRecoveryExplanation').textContent = 'Migration required. Use WTP-capable software to disable legacy recurrence, confirm inactive and unowned output, and complete controller retirement before replacing it. Saved settings remain read-only.';
+        } else if (!value.writable) {
             if (node('configurationRecoveryExplanation')) node('configurationRecoveryExplanation').textContent = 'Saved history or startup could not be verified. These settings are read-only; Reset cannot erase that history.';
             if (node('configSaveStatus')) node('configSaveStatus').textContent = 'Read-only recovery';
             if (node('configSaveStatusHint')) node('configSaveStatusHint').textContent = 'Saved history and startup must be verified before settings can change.';

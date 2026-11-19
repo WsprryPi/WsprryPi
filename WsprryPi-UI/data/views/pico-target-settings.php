@@ -3,6 +3,17 @@
             <h4 id="pico-target-heading" class="cw-control-section__title" tabindex="-1">Pico settings</h4>
             <p id="pico-target-identity" class="visually-hidden">Choose a saved Pico with the Device selector. This does not select a transmitter backend.</p>
             <p id="pico-target-feedback" class="form-text" role="status" aria-live="polite"></p>
+            <section class="mb-3" aria-labelledby="pico-native-stop-heading">
+                <h5 id="pico-native-stop-heading" class="cw-control-section__title">Native schedule safety</h5>
+                <p class="form-text">Stop this Pico’s WSPR and keyed-message schedules. A confirmed stop disables both saved schedules and confirms inactive, unowned output. Enable a schedule explicitly to run it again.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="pico-native-stop" type="button" class="btn btn-outline-danger" disabled>Stop native schedules</button>
+                    <button id="pico-native-status-read" type="button" class="btn btn-outline-secondary" disabled>Read device status</button>
+                    <button id="pico-native-stop-read" type="button" class="btn btn-outline-secondary" disabled>Read stop status</button>
+                </div>
+                <p id="pico-native-status" class="form-text" role="status" aria-live="polite"></p>
+                <p id="pico-native-stop-status" class="form-text" role="status" aria-live="polite">Connect to the intended Pico first.</p>
+            </section>
             <div id="pico-target-recovery" hidden>
                 <p id="pico-target-recovery-state" class="form-text" role="status" aria-live="polite"></p>
                 <button id="pico-target-read-recovery" type="button" class="btn btn-outline-primary">Read current settings</button>
@@ -71,7 +82,7 @@
                         <option value="consumer_station">Consumer Wi-Fi</option>
                         <option value="consumer_ap">Consumer setup Wi-Fi</option>
                     </select>
-                    <div class="form-text" id="wtp-management-carrier-hint">USB uses the selected Pico cable and needs no Wi-Fi credentials. Network management is selected separately from job transport.</div>
+                    <div class="form-text" id="wtp-management-carrier-hint">USB uses the selected Pico cable and needs no Wi-Fi credentials. Consumer Wi-Fi uses encrypted authenticated requests on HTTP port 80. Engineering HTTPS uses the explicit saved certificate identity and port.</div>
                 </div>
                 <div class="col-12 col-lg-6 config-stacked-field" id="wtp-management-host-field" hidden>
                     <label class="form-label" for="wtp-management-host">Pico IP address or local hostname</label>

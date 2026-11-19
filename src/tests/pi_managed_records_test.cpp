@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/pi_managed_records.hpp"
+#include "wtp_integration/controller_contract.hpp"
+#include "wtp_settings_json.hpp"
+#include "wtp_server_settings_json.hpp"
+#include "wtp_retirement.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
 #include <fstream>
 #include <iostream>
@@ -21,6 +25,32 @@ int main(int argc,char **argv){
   const auto private_digest=PiManagementJournal::digest("preserved private INI state");
   const auto saved=pi_managed_settings_record(self,"1",request["candidate"],private_digest);
   check(valid_pi_managed_settings_record(saved,self,private_digest),"Approved private settings shape and canonical digests");
+  // Storage recognition preserves the original sealed bytes and hashes;
+  // the single current control view refuses these retired fields.
+  auto old_candidate=request["candidate"];
+  old_candidate["configuration"]["WTP"]=wtp_settings_json(WtpSettings{});
+  auto dormant_listener=WtpServerSettings{};dormant_listener.enabled=false;
+  old_candidate["configuration"]["WTP Server"]=wtp_server_settings_json(dormant_listener);
+  old_candidate["configuration"]["WTP"]["Hostname"]="retained-custom.local";
+  old_candidate["configuration"]["WTP"]["TLS Client Key"]="/private/retained-key";
+  check(valid_pi_stored_candidate_shape(old_candidate)&&!valid_pi_candidate_shape(old_candidate),"Stored legacy fields are not a current control view");
+  refuses([&]{(void)pi_managed_settings_record(self,"1",old_candidate,private_digest);});
+  auto original=saved;original["configuration"]=old_candidate["configuration"];
+  const auto old_digest=PiManagementJournal::digest(canonical_pi_management_json(old_candidate));
+  original["candidate_digest"]=old_digest;
+  original["revision"]=PiManagementJournal::digest(canonical_pi_management_json(Json{{"device_id",self},{"configuration_generation","1"},
+      {"candidate_digest",old_digest},{"private_state_digest",private_digest}}));
+  const auto bytes=original.dump();
+  check(parse_pi_managed_settings_record(bytes,self,private_digest)==original,"Exact legacy checksum recognized without rewriting");
+  const auto projected=current_pi_settings_record(original);
+  check(projected["revision"]==original["revision"]&&projected["configuration"]==request["candidate"]["configuration"]&&
+      original.dump()==bytes,"Current projection preserves sealed storage and its exact revision");
+  auto malformed=old_candidate;malformed["configuration"]["WTP"]["unexpected"]=true;
+  check(!valid_pi_stored_candidate_shape(malformed),"Stored legacy validation remains closed");
+  auto tampered=original;tampered["configuration"]["WTP"]["TLS Client Key"]="/private/other";
+  check(!valid_pi_managed_settings_record(tampered,self,private_digest),"Retained private legacy fields remain hash bound");
+  old_candidate["configuration"]["Operation"]["Transmit Backend"]="wtp";
+  check(valid_pi_stored_candidate_shape(old_candidate)&&wtp_retirement_source_active(old_candidate["configuration"]),"Active stored legacy state is recognized for a hold, never execution");
   check(saved.size()==7&&!saved.contains("private_state_digest"),"Private-preservation digest remains outside the saved/public candidate");
   auto equivalent=request["candidate"],integer=equivalent;
   equivalent["configuration"]["GPIO"]["Manual PPM"]=1.0;integer["configuration"]["GPIO"]["Manual PPM"]=1;

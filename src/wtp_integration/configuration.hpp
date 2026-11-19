@@ -9,6 +9,7 @@ using PicoManagementExchange = std::function<PicoHttpResponse(
 // Reuse the current closed capability/descriptor validation during management-
 // only negotiation, without constructing or inspecting an execution session.
 bool pico_management_capabilities_valid(const nlohmann::json &, const std::string &carrier);
+bool pico_native_status_valid(const nlohmann::json &,const std::string &device,const std::string &boot);
 // Pure paired-controller response check. Uses current producer shapes and
 // exact device/boot; performs no I/O or replay of a mutating adapter.
 bool pico_management_response_valid(const std::string &resource,const std::string &method,

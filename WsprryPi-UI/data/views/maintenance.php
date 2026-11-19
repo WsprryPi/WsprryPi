@@ -65,7 +65,7 @@ require __DIR__ . '/../card_header.php';
                     <div id="recurrenceMigrationPrevious" class="mb-3" hidden>
                         <label for="recurrenceMigrationAssignment" class="form-label">Previous schedule</label>
                         <select id="recurrenceMigrationAssignment" class="form-select" aria-describedby="recurrenceMigrationRestoreHelp" disabled></select>
-                        <p id="recurrenceMigrationRestoreHelp" class="form-text">A remote schedule can be restored only through its currently paired previous controller. Pair that controller again first if management has changed.</p>
+                        <p id="recurrenceMigrationRestoreHelp" class="form-text">Only a previous local schedule can be restored here. Controller-owned WTP schedules remain held for recovery with compatible WTP-capable software.</p>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <button id="recurrenceMigrationReview" type="button" class="btn btn-outline-primary" disabled>Review migration</button>

@@ -182,7 +182,7 @@ constexpr std::string_view BUILD_DIRTY = to_string_view(MAKE_DIRTY); ///< Build-
 
 std::string get_compiled_backends()
 {
-    return std::string(WSPRRYPI_COMPILED_BACKENDS) + ",wtp";
+    return std::string(WSPRRYPI_COMPILED_BACKENDS);
 }
 
 bool has_ancillary_gpio() noexcept
@@ -522,13 +522,15 @@ std::string get_pi_model()
 
 int get_raspberry_pi_generation()
 {
-    if (!g_hardware_platform_detection_enabled)
-        return -1;
-
+    // An explicit typed fixture identity requires no hardware discovery. Keep
+    // it usable when simulated main disables all host platform probing.
     if (g_pi_generation_override.has_value())
     {
         return *g_pi_generation_override;
     }
+
+    if (!g_hardware_platform_detection_enabled)
+        return -1;
 
     if (const auto model_generation =
             parse_generation_from_pi_model(get_pi_model());

@@ -35,7 +35,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const profiles={};
   for(const [id,tcp] of [['a',18443],['b',18444]]){
    const catalog=await call('/api/control/v1/host/devices');
-   const settings={'Transport':'network','Hostname':'wsprrypico-'+id.repeat(32)+'.local','Device ID':id.repeat(32),'TCP Port':tcp,
+   const settings={'Endpoint':'','USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'TLS Server Identity':'','Transport':'network','Hostname':'wsprrypico-'+id.repeat(32)+'.local','Device ID':id.repeat(32),'TCP Port':tcp,
     'TLS CA File':path.join(temporary,id,'client-ca.crt'),'TLS Client Certificate':path.join(temporary,id,'client.crt'),'TLS Client Key':path.join(temporary,id,'client.key')};
    const saved=await call('/api/control/v1/host/devices','POST',{operation:'add',name:'Pico '+id,method:'manual',discovery_id:'',settings,consent_plain:false},{'If-Match':catalog.etag});assert.equal(saved.status,200,JSON.stringify(saved.body));profiles[id]=saved.body.profiles.at(-1).id;
   }

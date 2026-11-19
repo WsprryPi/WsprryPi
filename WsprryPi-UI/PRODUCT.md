@@ -48,6 +48,10 @@ layouts, in both light and dark themes.
 ## Capabilities and Constraints
 
 - Supported transmission modes include WSPR, QRSS, FSKCW, and DFCW.
+- Each device owns its native recurring schedule. Managing a Pico does not
+  select a transmitter backend, upload a finite job, or dispatch occurrences.
+- Unconfirmed native stop remains held until explicit target-bound readback;
+  ordinary status refresh does not clear it, and settings drafts are preserved.
 - Configuration values have an end-to-end lifecycle spanning defaults, parsing,
   validation, presentation, persistence, scheduling, and runtime consumption.
 - Operator-entered custom values must not be silently replaced by presets or
@@ -61,7 +65,7 @@ layouts, in both light and dark themes.
   does not qualify RF output, physical timing, GPIO, I2C, installation, service
   behavior, or a transmitter chain.
 - The editable first-party web interface lives in `WsprryPi-UI`; operator
-  documentation lives in the separate `Wsprry_Pi_Docs` repository.
+  documentation lives in the separate `WsprryPi-Docs` repository.
 
 ## Brand Commitments
 

@@ -1,267 +1,32 @@
-# Selected Pico USB firmware access
+# Pico USB firmware access
 
-The main Pi installer supplies Python, libusb and USB-capable picotool. It reuses a compatible installed picotool 2.3 or newer within 2.x; otherwise it downloads the pinned picotool 2.3.1 release package matching Bookworm or Trixie and 32-bit ARMv6 or 64-bit AArch64 userspace. It verifies the archive and every packaged file against the application checkout's checksum policy, checks the executable's ABI and USB command support, and installs the executable, support data and upstream notices under `/usr/local/lib/wsprrypi/picotool`, with a command link at `/usr/local/bin/picotool`. Picotool is never compiled on the Pi. The browser uses the installed tool; it does not install picotool on demand.
+The independent WsprryPico USB installer remains available. The former selected-backend browser firmware workflow is unavailable in retired software: `/api/control/v1/member/firmware` refuses without selecting a WTP runtime. Managing a Pico's native settings does not select a transmitter backend or authorize firmware installation.
 
-WsprryPi provides **Pico firmware over USB** beside selected Pico controls in
-Setup. The shared core remains owned by WsprryPico; WsprryPi provides protected routes,
-process/permission boundaries, selected-member maintenance and presentation.
+Use the companion [standalone installation guide](https://wsprrypico.readthedocs.io/en/devel/install.html) and its [WsprryPi host service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host). Only one process may own the selected USB connection. Firmware programming, service operation, BOOTSEL, erasure, and physical recovery require explicit operator authorization and the applicable procedure.
 
-Select an image source explicitly. The firmware branch defaults to **main**, independently of WsprryPi's branch, and applies to CI images. Choose the latest verified CI image, a specific release or CI version, or a stable release.
+## Retained installer contract
 
-The version field accepts a version with or without a leading `v`.
+The shared core owns release selection, image and manifest verification, device identity, UF2 bounds, backup, programming, preservation, and recovery. The Pi retains its verified deployment and permission helpers, process/result validators, durable maintenance markers, and private transaction records. They do not create a replacement browser update workflow.
 
-For the supported published prerelease, choose **Specific version** and enter
-`1.0.0-rc.3` (or `v1.0.0-rc.3`). Review firmware source
-`a5270eebb36d2280dc76817b48a33ffab343b42d` and canonical build
-[43657497901](https://github.com/WsprryPi/WsprryPico/actions/runs/43657497901).
-The shared installer verifies the canonical publication and the manifest’s
-firmware UF2 SHA-256 before accepting the public bytes.
-The embedded canonical control-schema digest must equal
-`a71d09fc1086bf7fd9bafd397a852717da53afa8dd4f43eae313549c3a0f8feb`.
-RC.3 remains a prerelease: **Stable release** does not select it. The firmware
-branch selector applies to CI image selection and remains independent of this
-exact release choice and the shared installer update channel.
+The main Pi installer provisions Python, libusb, USB permissions, and a compatible verified picotool package. Source deployment does not authorize running an installer. The independent core identifies a board by USB serial and physical parent, never by tty suffix or enumeration order. Console remains interface 0, Management interface 4, and Logging interface 6. Interfaces 2/3 are Reserved and inert in application images; RFBench retains its non-WTP Commands exception. The installer does not require a WTP sibling or negotiate a WTP session.
 
-Download and check image resolves the canonical public image without touching
-the device. The shared installer compares the verified image's embedded
-settings schema digest with the digest compiled into WsprryPi. A mismatch,
-missing digest, or unavailable image refuses the check. Installation repeats
-the compatibility check before programming. Installation needs a successful plan for the current USB
-serial, device and selection, followed by explicit confirmation. Changing the
-selector invalidates the displayed plan. Developer builds remain a host CLI
-workflow; browser clients cannot request compilation.
+For paired management, require the current canonical control-schema digest from the selected source pair. The standalone core supports `--require-control-sha256` for this explicit check: missing or mismatched embedded metadata refuses before programming. An old published release is not automatically compatible with the current prerelease schema. Installing an image without a matched digest does not establish Pi management compatibility. Select and review an exact image and source; do not bypass a required mismatch or substitute another peer.
 
-The backend invokes `/usr/bin/python3 -I` with the fixed deployed entry path
-`/usr/local/lib/wsprrypi/pico-usb/entry.py`, direct argument arrays, bounded output
-and a deadline. It validates `wsprrypico-usb-result/1`, installer contract and exit
-status. The adapter checks root ownership/protection and the retained core/schema
-hashes, then executes the verified source without a stale bytecode cache.
-Release selection, identity, UF2 bounds, backup, programming and preservation
-are implemented only in the shared core. The browser cannot pass a command,
-filesystem path, download URL or arbitrary device.
+## Preservation and recovery
 
-`GET/POST /api/control/v1/member/firmware` uses existing privileged API authorization;
-POST additionally requires the same-origin mutation context. Closed request
-shapes bind the current `selection_id`. Plan defaults to main when branch is
-omitted. Upgrade requires its current `plan_id` and `confirmed: true`. Recover
-uses only the selected serial's private retained record. No USB update is
-offered for a network-only Pico.
+Preserve exact installer/image/schema identity, the full same-board backup, reserved flash, saved semantics, selected serial, physical port, and transaction records. A successful download or software image plan is not a completed installation. Verification must establish the new boot, device identity, firmware identity, and preserved state through the current independent management path.
 
-## Full flash erase
+Unknown or interrupted programming remains held. Use the original transaction's explicit recovery procedure and retained installer bytes; do not replace it with a new image or infer success from missing records. Connection-only recovery must not reflash the board. Full erase requires a separate explicit selection and complete blank-flash readback. Restoration requires the original complete image and saved semantics. Existing unresolved transaction files and maintenance markers must not be deleted as temporary residue.
 
-**Erase this Pico → Erase firmware and all data…** is independent of image
-selection. It removes firmware, Wi-Fi credentials, certificates, Bluetooth
-bonds and every persistent flash record, including diagnostic and boot
-workaround sectors. The entire 4 MiB flash is compared with blank bytes before
-success is reported. ROM, OTP and immutable hardware identity are outside this
-flash operation. No new backup is created; existing host backups are retained.
+Before replacing WTP-capable firmware, complete its outstanding execution, ownership, cleanup, and controller retirement duties with compatible software. See [migration and recovery](wtp-status-recovery.md). A current settings editor cannot perform legacy WTP cleanup.
 
-Disable the selected Pico's saved standalone schedule first. Confirm the USB
-serial and destructive operation. The Pi requires idle/unowned admission and
-pauses that member while the core prepares a transaction. Reconnect the same
-Pico in BOOTSEL on the same physical port, then choose **Erase after BOOTSEL**
-and confirm again. Keep USB connected through verification. Success leaves
-the Pico blank in BOOTSEL and releases the host maintenance hold without
-attempting WTP reconnection. Install firmware before returning it to service.
+## Software validation
 
-An interrupted erase stays in maintenance; **Retry full erase** repeats the
-erase and complete comparison on the same device. It never restores old
-firmware or settings. The exact installer is retained in the private
-transaction snapshot, so recovery needs no firmware image or network access.
-Starting erase can refresh the compatible installer, with the verified cached
-copy retained when offline. An older cached installer without erase support
-refuses; update the installer before retrying.
-
-The standalone CLI exposes the same operation as `usb_installer.py erase
---device SERIAL --board pico2_w --yes`; running firmware produces a manual
-BOOTSEL handoff and exact continuation command. A board already in BOOTSEL
-can be erased directly.
-
-## Firmware update and recovery
-
-For verified older CI firmware, **Install checked image** prepares a one-time
-BOOTSEL migration instead of attempting an unsupported automatic reset. The
-Pico must be idle, unowned, and have its saved standalone schedule disabled or
-unconfigured. No firmware is written during preparation. The page instructs
-the operator to unplug the selected Pico, hold BOOTSEL while reconnecting to
-the same Pi USB port, release BOOTSEL, then choose **Continue after BOOTSEL**.
-Continuation uses the private retained transaction, verifies the same board
-and old application, completes a verified full backup, and checks reserved
-flash and loaded saved settings before returning the member to use. Keep the
-Pico idle and do not edit settings between preparation and continuation.
-Reloading the page or restarting the service retains the continuation state.
-The controller remains available for status and recovery when startup finds a
-retained maintenance hold; that Pico remains unavailable for transmission.
-
-During installation, continuation or unresolved maintenance, the application
-is read-only except for firmware status and continuation/recovery. A banner
-identifies this state; configuration, device selection, transmission controls,
-reboot and shutdown are disabled. The HTTP and WebSocket handlers also reject
-mutations, including requests from other tabs. The maintenance hold survives a
-failed status read or browser reload. Normal controls return only after the
-host confirms that firmware work and its durable hold have ended.
-
-Firmware status refreshes automatically while the selected USB Pico is
-available, including after page reload or another tab starts work. An activity
-indicator identifies image checking, installation or recovery; monitoring time
-and the age of the last successful status read distinguish ongoing work from a
-lost connection. Failed reads retry automatically, without repeating an install
-or recovery request. A temporary loss of the general Pico status does not cancel
-this firmware monitor. Each result is bound to the selected USB serial and host
-selection context; changing image choices still requires a fresh image check.
-
-The shared installer exposes no overall percentage or live byte counts. The
-activity indicator is indeterminate and does not claim a particular backup,
-programming or verification fraction. Read firmware status remains available
-while work is running. A manual read shows a reading indicator and successful
-read time, even when the update state has not changed. Reads observe host progress;
-they do not repeat programming or access the Pico. Monitoring stops when the
-page closes or the selected USB connection becomes unavailable.
-
-GitHub API rate limits identify the actual refusal and earliest retry time,
-rather than implying that the selected branch has no verified image. Fleet
-shows the UTC time, the browser's local time and a countdown. Download and check
-image stays disabled during that wait, including after reload or changing
-branches. Firmware status keeps refreshing from the Pi without another GitHub
-request. When the wait ends, the button becomes available; another download
-still needs an explicit click. A minimum one-minute wait is identified when
-GitHub supplies no usable retry header. Limits on optional additional CI status
-do not invalidate a verified checked image. GitHub response bodies, addresses
-and credentials are not exposed in the error.
-
-A refusal before programming reports that no firmware was written. Safe error
-text is shown beside the firmware controls; paths and backup contents remain
-private. The core retains the failure reason and stage in its private
-transaction record so an administrator can diagnose a failed preflight without
-guessing or repeating a write.
-
-Before upgrading, the runtime obtains fresh idle/unowned admission, detaches
-only the selected member and durably creates
-`/var/lib/wsprrypi/pico-usb-control/SERIAL.json`. Runtime and installer share
-per-serial locks under `/run/lock/wsprrypico`. Firmware preflash/postboot holds
-protect the standalone scheduler as described in WsprryPico's
-[installer contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md).
-A failed/ambiguous update keeps that member blocked across service restart.
-After core verification, a serialized reconnection checks the fresh device
-identity and version while the durable marker still blocks scheduling. The
-marker is removed only after reconnection succeeds. Other fleet members keep
-their existing admission rules.
-
-A verified update negotiates a fresh WTP session and confirms the exact new
-boot, device identity and firmware version against both USB control channels.
-The previous session's boot-change protection remains latched. If programming
-is verified but Pi reconnection is unconfirmed, the page identifies that state;
-Recover this update retries only reconnection and does not reflash the Pico.
-
-Recover this update can finish a retained core transaction or retry Pi
-reconnection after verified programming. Host loss before the Pi receives the
-private transaction path may require administrator recovery: inspect
-`/var/lib/wsprrypi/pico-usb` over the host console, bind the correct serial and
-use the core's explicit `recover --transaction ... --device ... --board pico2_w
---yes` command. A record without a completed backup is not permission to program.
-Do not delete a marker to bypass an unidentified state or restore another
-board's backup. Deliberate BOOTSEL reconnect may be necessary. Browser status
-omits private paths and never contains flash/credential bytes.
-
-## Independent installer updates
-
-`config/pico-usb-installer.json` declares installer contract 1 and an update
-channel. It contains no WsprryPico commit or file checksums. The protected Pi
-adapter understands the result, transaction and firmware-manifest contracts;
-compatible shared installer fixes are supplied from verified WsprryPico source
-independently of Pi releases. The installer channel is independent of firmware
-image selection.
-
-The Pi package installs the protected adapter, policy, USB permissions and required tools without contacting WsprryPico. An empty installer cache is a valid installed state. WsprryPi installation, application startup, ordinary Pico discovery, status polling and normal transmission do not download the shared installer. Existing verified installers and private recovery snapshots survive package updates.
-
-**Download and check image** obtains a compatible shared installer on first use; an explicit full-erase request also bootstraps it when needed. Successful update checks are cached for ten minutes. The Pi searches up to thirty recent successful canonical software CI runs in the configured channel, newest first, skips duplicate source revisions, and selects the first source compatible with this adapter and Python host. A pending branch tip or a newer incompatible installer does not hide an earlier verified compatible commit. Successful sources outside the selected branch history are excluded. Branch and ancestry metadata omit large file diffs. CI workflow, repository, attempt and verification-job checks precede downloading the Python installer and schema at an immutable commit. Git blob identities and retained SHA-256 hashes bind the bytes to the source and CI receipt. No downloaded installer code runs during selection. Separate installer releases and tags are unnecessary; firmware still downloads as a compiled UF2.
-
-An incompatible result or schema contract, unsupported Python version, changed payload or failed CI cannot replace the installed copy. If bootstrap cannot obtain a verified compatible source, only the requested Pico firmware operation fails; an erase bootstrap refusal reports that no device recovery is required because USB has not been accessed. A refresh failure retains the previous verified copy and reports the reason beside the firmware controls. GitHub retry guidance is honored without retrying early. No GitHub credentials are loaded.
-
-A checked image retains its installer identity. Installing it does not check
-for or substitute a newer installer. Before the first possible firmware write,
-the adapter persists an immutable installer/schema/receipt snapshot in the
-private transaction area. Recovery reads that snapshot and the retained image
-offline, even after the installer channel advances or its general cache is
-removed. Existing transactions use the frozen installer retained when the
-adapter was migrated. Root ownership, file protection, symlink refusal and
-checksum verification apply before execution; verified bytes are executed
-without a Python bytecode cache. Adapter replacement and entry processes use a
-shared host lock. Package replacement refuses outstanding Pico maintenance.
-
-## Storage limits
-
-The Pi keeps three recent image-check downloads, two completed firmware
-transactions in total, and up to eight pre-programming refusals. Completed and
-unchanged histories expire after seven days. These are global limits across
-installer versions. Unresolved recovery records and backups are never evicted
-to make room; eight unresolved transactions block another installation.
-Installer objects are retained only for the active selection, those three
-image checks and the legacy recovery copy. Private snapshots survive while
-their transaction survives. Same-board local-build references retain their
-existing maximum of 32 boards and remain separate from saved settings.
-
-## Package lifecycle
-
-`scripts/pico_usb_deploy.py` installs the protected entry, distribution manager
-and channel policy without a Pico source download. The first explicit image
-check or erase obtains and verifies a compatible shared installer. Migration keeps
-the previous exact installer for legacy recovery. An explicit maintainer
-`--development-source` deployment remains labelled `unpublished-working-tree`;
-it never impersonates a verified CI publication. Removal retains private
-recovery material and immutable installer snapshots.
-
-The package creates private root-owned backup/control/cache directories,
-`dialout` USB permissions for WsprryPico CDC and RP2350 BOOTSEL, and a setgid
-per-device lock directory restored by tmpfiles at boot. Installation adds the
-ordinary user identified by `SUDO_USER` to `dialout`, preserving existing group
-memberships. Uninstallation leaves that membership in place. Existing shells
-retain their original groups. Log out and back in, or run `newgrp dialout` to
-open a shell with `dialout` access immediately; run `id -nG` in that shell to
-check, and `exit` to return to the original shell. A plain child shell does not
-refresh group membership. Permissions apply to
-new USB enumeration after rules reload; reconnect a cable when necessary.
-Python 3.10+ and USB-enabled picotool 2.3 or newer within 2.x are required. The main Pi installer supplies Python, libusb and the matching prebuilt picotool package without installing a Pico SDK or compiling picotool. The imported Fleet entry never downloads or removes tools, and deploying the USB adapter does not change unrelated backend settings. The separate [standalone bootstrap](https://wsprrypico.readthedocs.io/en/devel/install.html#run-directly-with-curl) can offer an official picotool download and cleanup. When using it on a WsprryPi host, follow the [service handoff](https://wsprrypico.readthedocs.io/en/devel/wsprrypi.html#standalone-installer-on-a-wsprrypi-host) so only one process uses the selected USB connection.
-
-## Validation boundary
-
-The [shared installer contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md)
-and [published release limits](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
-describe software compatibility, publication checks, and qualification limits.
-The imported noninteractive entry point retains contract 1; interactive
-standalone menus do not change the Pi adapter's protocol.
-
-Preservation verification requires exact firmware identity, reserved flash,
-saved semantics and the new boot to agree. Connection-only recovery must not
-reflash the board. Erase verification requires full-flash blank readback;
-restoration requires the original complete image and saved semantics. A successful
-software test or one board observation does not qualify every later installer,
-firmware image, physical interruption, multi-board operation or RF output.
-
-The Pi repository-root commands are:
+The shared [installer engineering contract](https://github.com/WsprryPi/WsprryPico/blob/devel/engineering/development/usb-installer.md) owns its detailed transaction and preservation rules. Hardware-free tests cover its retained source and adapters:
 
 ```sh
 python3 -B scripts/tests/pico_usb_deploy_test.py
 python3 -B scripts/tests/pico_usb_bundle_test.py
-node WsprryPi-UI/tests/wtp_firmware_test.js
-node WsprryPi-UI/tests/wtp_firmware_polling_test.js
-node WsprryPi-UI/tests/pico_firmware_safety_test.js
-node WsprryPi-UI/tests/wtp_firmware_ui_integration_test.js
-php -l WsprryPi-UI/data/views/wtp-controls.php
-git diff --check
 ```
 
-Run C++ checks on a supported Linux environment. Inspect each command before
-execution; these software checks do not authorize deployment, service changes
-or Pico operation.
-
-The published [Pico operator manual](https://wsprrypico.readthedocs.io/en/devel/install.html)
-covers standalone installation, tool download/cleanup, preservation and recovery.
-The published [Pi operator manual](https://wsprry-pi.readthedocs.io/en/devel/User_Interface/Setup/Transmitter/index.html#install-or-update-pico-firmware-over-usb)
-covers Fleet's selected-Pico workflow. The operator manuals and this engineering contract serve different audiences.
-
-## Shared lock interoperability
-
-Runtime and standalone installer callers open an existing serial lock without `O_CREAT`. First creation is exclusive; a competing creator is followed by one ordinary reopen. This preserves the same inode and existing ownership while supporting Linux `fs.protected_regular` in the shared sticky lock directory. Regular-file validation, no-follow opens, nonblocking runtime shared leases and installer exclusive leases still apply. A refused lock is retained; neither caller removes a foreign lock or changes Linux protection settings to gain access.
-
-Application removal validates and retires a completed RP1 reboot-reconciliation checkpoint with its owned startup integration. A pending, malformed or unsafe checkpoint refuses before startup files are removed, preserving the supported recovery implementation. Protected configuration/Apache backups and persistent WTP endpoint data retain their separate ownership policies; they are not terminal provider residue.
+Run the companion `tests/usb_installer_tests.py` and `tests/usb_tool_download_tests.py` against the intended Pico sources. These checks do not deploy tools, program a board, operate services, or qualify physical USB interruption recovery, GPIO, timing, or RF. Existing transaction evidence qualifies only its exact source, device, image, and procedure.

@@ -413,6 +413,11 @@ function restorePersistedConfigDraft() {
         return false;
     }
 
+    if (String(payload.Operation?.["Transmit Backend"] || "").toLowerCase() === "wtp") {
+        showBackendStatus("Migration required: the saved browser draft selects a retired WTP backend. The draft remains saved and has not been applied.", "warning", "config-draft");
+        return false;
+    }
+
     const draftSnapshot = JSON.stringify(payload);
     if (draftSnapshot === lastSavedConfigPayload) {
         removePersistedConfigDraft();
@@ -443,7 +448,6 @@ function restorePersistedConfigDraft() {
         ? { ...wspr["Band Preferences"] }
         : {};
     renderBandPreferenceRows();
-    window.WtpUi?.populate(payload.WTP);
     setTransmitBackendSelection(operation["Transmit Backend"], true);
     if (typeof updateBackendPlatformSupportUi === "function") {
         updateBackendPlatformSupportUi();
@@ -1995,12 +1999,10 @@ function updateRuntimeControlStatusFromForm(mode) {
 }
 
 function selectedTransmitBackend() {
-    if (window.WtpUi?.selected()) return "wtp";
     return $("#transmit_backend").is(":checked") ? "si5351" : "gpio";
 }
 
 function setTransmitBackendSelection(backend, triggerChange = false, refreshInventory = true) {
-    window.WtpUi?.select(String(backend).toLowerCase() === "wtp");
     const $backend = $("#transmit_backend");
     $backend.prop("checked", transmitBackendForUi(backend) === "si5351");
     if (triggerChange) {
@@ -2256,7 +2258,6 @@ function si5351UiSupported() {
 }
 
 function resolveSupportedTransmitBackend(preferredBackend = null) {
-    if (preferredBackend === "wtp") return "wtp";
     const platform = window.WSPRRYPI_PLATFORM || {};
     const preferred = preferredBackend === "si5351" ? "si5351" : "gpio";
     const gpioSupported = platform.gpioClockTransmissionSupported !== false;
@@ -2436,9 +2437,8 @@ function updateBackendPlatformSupportUi() {
             ? backendInlineHintMessage()
             : noBackendAvailableMessage());
 
-    $backend.prop("disabled", currentBackend === "wtp" || !anyBackendSupported);
+    $backend.prop("disabled", !anyBackendSupported);
     $selectorHint.text(
-        currentBackend === "wtp" ? "Pico is selected on Fleet. Turn off Use Pico there to choose GPIO or Si5351." :
         rp1RouteSelectable && !gpioSupported
             ? rp1RouteSelectorHint()
             : isRp1GpioPlatform() && !rp1GpioOperatorVisible()
@@ -4439,7 +4439,7 @@ function buildConfigPayload(options = {}) {
     const amp_pin_active_high = parseBool($("#amp_active_high").is(":checked"));
     let band_gpio = collectBandGpioConfig();
     let transmit_backend = transmitBackendForPersistence();
-    if (!["gpio", "rp1-gpclk", "si5351", "wtp"].includes(transmit_backend)) {
+    if (!["gpio", "rp1-gpclk", "si5351"].includes(transmit_backend)) {
         transmit_backend = isRp1GpioPlatform() && rp1GpioOperatorVisible()
             ? "rp1-gpclk"
             : "gpio";
@@ -4615,7 +4615,6 @@ function buildConfigPayload(options = {}) {
         Operation,
         GPIO,
         Si5351,
-        ...(window.WtpUi ? { WTP: window.WtpUi.read() } : {}),
         Calibration,
         WSPR,
         CW,

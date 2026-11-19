@@ -46,7 +46,7 @@ bool safe_name(const std::string &name) {
 nlohmann::json serialize(const WtpCatalogProfile &p,bool private_profile=true) {
   nlohmann::json result={{"id", p.id}, {"name", p.name}, {"method", p.method},
       {"discovery_id", p.discovery_id}, {"legacy_unverified", p.legacy_unverified},
-      {"settings", wtp_settings_json(p.settings)}};
+      {"settings", private_profile?wtp_settings_json(p.settings):management_profile_settings_json(p.settings)}};
   if(private_profile)result["generation"]=p.generation;
   return result;
 }
@@ -268,11 +268,11 @@ std::pair<nlohmann::json, std::string> WtpCatalog::mutate(
   if (operation == "add") {
     if (request.size() != 6 || profiles.size() >= 64) throw std::runtime_error("Invalid or full catalog");
     WtpCatalogProfile p{local_id(), request.at("name").get<std::string>(),
-        request.at("method").get<std::string>(), "", parse_wtp_settings(request.at("settings"), true)};
+        request.at("method").get<std::string>(), "", parse_management_profile_settings(request.at("settings"), true)};
     if (p.method == "dns_sd") p.discovery_id = request.at("discovery_id").get<std::string>();
     else if (request.at("discovery_id") != "") throw std::runtime_error("Manual profile cannot bind discovery");
     if (p.settings.transport == "network_plain" && request.at("consent_plain") != true)
-      throw std::runtime_error("Plain LAN requires explicit consent");
+      throw std::runtime_error("Consumer Wi-Fi requires an explicit connection choice");
     p.generation=next_generation(value);
     profiles.push_back(serialize(parse(serialize(p))));
   } else if (operation == "edit") {
@@ -281,9 +281,13 @@ std::pair<nlohmann::json, std::string> WtpCatalog::mutate(
     for (auto &item : profiles) if (item.at("id") == request.at("id")) {
       auto p = parse(item);
       p.name = request.at("name").get<std::string>();
-      p.settings = parse_wtp_settings(request.at("settings"), true);
+      const auto legacy_uncertainty=p.settings.start_uncertainty_ns;
+      const auto legacy_rounding=p.settings.allow_frequency_adjustment;
+      p.settings = parse_management_profile_settings(request.at("settings"), true);
+      p.settings.start_uncertainty_ns=legacy_uncertainty;
+      p.settings.allow_frequency_adjustment=legacy_rounding;
       if (p.settings.transport == "network_plain" && request.at("consent_plain") != true)
-        throw std::runtime_error("Plain LAN requires explicit consent");
+        throw std::runtime_error("Consumer Wi-Fi requires an explicit connection choice");
       p.legacy_unverified = p.settings.device_id.empty() && p.legacy_unverified;
       p.generation=next_generation(value);
       item = serialize(parse(serialize(p)));
@@ -309,7 +313,7 @@ std::pair<nlohmann::json, std::string> WtpCatalog::mutate(
   } else throw std::runtime_error("Unknown catalog operation");
   for (std::size_t i = 0; i < profiles.size(); ++i)
     for (std::size_t j = i + 1; j < profiles.size(); ++j)
-      if (parse(profiles[i]).settings == parse(profiles[j]).settings)
+      if (management_profile_settings_json(parse(profiles[i]).settings) == management_profile_settings_json(parse(profiles[j]).settings))
         throw std::runtime_error("An identical endpoint is already saved");
   save(value);
   return {public_catalog(value), wtp_catalog_revision(value)};

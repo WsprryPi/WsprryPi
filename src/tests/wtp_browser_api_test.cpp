@@ -31,8 +31,8 @@ int main() {
         ++management; CHECK(resource == "config"); CHECK(method == "PUT"); CHECK(revision == "\"revision\"");
         return PicoHttpResponse{412, R"({"error":{"code":"revision_conflict"}})", {}};
       }, [&](auto job) { ++mutations; CHECK(job == std::string(32, 'a')); return PicoHttpResponse{200, R"({"cleanup_ok":true})", {}}; });
-    for (auto path : {"/api/control/v1/status", "/api/control/v1/jobs", "/api/control/v1/capabilities"}) CHECK(api.handle({"GET", path, {}, {}, false}).status == 200);
-    CHECK(reads == 3 && mutations == 0 && management == 0);
+    for (auto path : {"/api/control/v1/status", "/api/control/v1/capabilities"}) CHECK(api.handle({"GET", path, {}, {}, false}).status == 200);
+    CHECK(reads == 2 && mutations == 0 && management == 0);
     auto status = nlohmann::json::parse(api.handle({"GET", "/api/control/v1/status", {}, {}, false}).body);
     CHECK(status["host"]["start_utc_ns"] == "18446744073709551615");
     CHECK(api.handle({"PUT", "/api/control/v1/config", R"({"contract":"Wsprry-Control/1"})", {}, false}).status == 403);
@@ -60,10 +60,10 @@ int main() {
     nlohmann::json body{{"contract","Wsprry-Control/1"},{"session_id", std::string(32, '1')}, {"request_id", std::string(32, '2')}, {"operation", "ABORT"}, {"body", {{"job_id", std::string(32, 'a')}}}};
     BrowserRequest request{"POST", "/api/control/v1/jobs/" + std::string(32, 'a') + "/abort", body.dump(), {}, true};
     const auto first = api.handle(request);
-    CHECK(first.status == 200 && api.handle(request).body == first.body && mutations == 1);
+    CHECK(first.status == 404 && api.handle(request).body == first.body && mutations == 0);
     body["body"]["job_id"] = std::string(32, 'b'); request.path = "/api/control/v1/jobs"; request.body = body.dump();
-    CHECK(api.handle(request).status == 409 && mutations == 1);
-    request.body = std::string(32769, 'a'); CHECK(api.handle(request).status == 413);
+    CHECK(api.handle(request).status == 404 && mutations == 0);
+    request.body = std::string(32769, 'a'); CHECK(api.handle(request).status == 404);
     for (const auto path : {"/api/control/v1/config", "/api/control/v1/network", "/api/control/v1/schedules", "/api/control/v1/host/config"}) {
       CHECK(classify_privileged_http_operation("GET", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("PUT", path) == PrivilegedOperationClass::protected_operation);
@@ -77,7 +77,7 @@ int main() {
       CHECK(classify_privileged_http_operation("POST", path) == PrivilegedOperationClass::protected_operation);
       CHECK(classify_privileged_http_operation("GET", std::string(path) + "/other") == PrivilegedOperationClass::reject);
     }
-    CHECK(classify_privileged_http_operation("POST", "/api/control/v1/jobs/" + std::string(32, 'a') + "/abort") == PrivilegedOperationClass::protected_operation);
+    CHECK(classify_privileged_http_operation("POST", "/api/control/v1/jobs/" + std::string(32, 'a') + "/abort") == PrivilegedOperationClass::reject);
     CHECK(classify_privileged_http_operation("GET", "/api/control/v1/unknown") == PrivilegedOperationClass::reject);
     std::cout << "Shared API shapes, precision, revisions, bounded parsing, cancellation replay and route classification passed\n";
   } catch (const std::exception &error) { std::cerr << error.what() << '\n'; return 1; }

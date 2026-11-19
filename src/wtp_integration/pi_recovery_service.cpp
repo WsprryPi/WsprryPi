@@ -1,3 +1,4 @@
+#include "wtp_retirement.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_recovery_service.hpp"
 #include "pi_configuration_recovery.hpp"
@@ -56,7 +57,8 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
         if(state==PiHostReadiness::Ready&&!owner_.admission_ready())state=PiHostReadiness::Starting;
         const auto saved=owner_.draft();
         const bool installing=healthy&&owner_.store().installation_pending();
-        const bool editable=healthy&&(saved.has_value()||installing)&&state==PiHostReadiness::ConfigurationRecovery&&!owner_.configuration_validated();
+        const bool legacy_active=saved&&wtp_retirement_source_active(saved->source);
+        const bool editable=!legacy_active&&healthy&&(saved.has_value()||installing)&&state==PiHostReadiness::ConfigurationRecovery&&!owner_.configuration_validated();
         if(request.path=="/api/control/v1/host/readiness"){
             if(request.method!="GET")return refuse(405,"unsupported_resource");
             return document({{"contract","Wsprry-Control/1"},{"schema","host-readiness"},{"device_id",self_},
@@ -83,11 +85,12 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
                 }
             Json result{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery"},{"binding",healthy?binding():Json(nullptr)},
                 {"capability_revision",capability_revision_},{"revision",revision},{"writable",editable},{"draft",Json::object()},
-                {"defaulted_fields",defaults},{"validation",healthy?(installing?"initialization":owner_.configuration_validated()?"unvalidated":"invalid"):"storage_unavailable"}};
+                {"defaulted_fields",defaults},{"validation",healthy?(legacy_active?"migration_required":installing?"initialization":owner_.configuration_validated()?"unvalidated":"invalid"):"storage_unavailable"}};
             const auto budget=32768-result.dump().size();
             result["draft"]=saved&&!installing?pi_configuration_recovery_draft(*saved,budget):pi_configuration_recovery_draft(known,budget);
             return document(result,"configuration-recovery",revision);
         }
+        if(legacy_active)return refuse(409,"migration_required");
         const bool save=request.method=="PUT",action=request.method=="POST";
         if(!save&&!action)return refuse(405,"unsupported_resource");
         Json body;try{body=strict_browser_json(request.body,16);}catch(...){return refuse(400,"invalid_json");}
@@ -109,12 +112,6 @@ PicoHttpResponse PiRecoveryService::handle(const BrowserRequest &request,bool au
             validating_candidate=true;
             if(action){persist_stock_configuration(body["action"]=="repair");return;}
             auto candidate=body["configuration"];
-            for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"}){
-                Json preserved="";
-                if(saved&&saved->source.contains("WTP")&&saved->source["WTP"].contains(key))preserved=saved->source["WTP"][key];
-                if(!valid_pi_configuration_field("WTP",key,preserved))throw std::runtime_error("invalid_private_reference");
-                candidate["WTP"][key]=preserved;
-            }
             persist_recovery_configuration(candidate,saved?saved->source:Json::object());
         });
         return document(receipt,"target-operation",receipt["revision"]);

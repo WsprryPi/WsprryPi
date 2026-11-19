@@ -35,7 +35,7 @@ void fixture(const std::string &ini){
     config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";
     config.wspr.callsign=config.callsign;config.wspr.grid_square=config.grid_square;config.wspr.power_dbm=config.power_dbm;config.wspr.frequencies=config.frequencies;
     config.wtp.transport="network_plain";config.wtp.hostname="127.0.0.1";config.wtp.device_id=std::string(32,'b');config.wtp.tcp_port=31417;
-    resolve_backend_specific_config(config);config_to_json();jConfig["Operation"]["Transmit Backend"]="wtp";
+    resolve_backend_specific_config(config);config_to_json();jConfig["Operation"]["Transmit Backend"]="gpio";
     {std::ofstream output(ini);output<<"[Security]\nPrivileged Network Safety = enforced\n";}
     check(!chmod(ini.c_str(),0600),"Private runtime fixture");iniFile.set_filename(ini);iniFile.set_raw_passthrough_keys({{"Security","Privileged Network Safety"}});json_to_ini();
 }

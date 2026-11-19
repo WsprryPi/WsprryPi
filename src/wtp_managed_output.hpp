@@ -4,8 +4,8 @@
 #include <functional>
 #include <optional>
 namespace wsprrypi {
-// Read-only typed projection of the independently selected outgoing WTP
-// application. Obtaining it never connects, claims, loads, arms, or saves.
+// Compatibility projection for native management reservations. No outgoing
+// execution owner exists; obtaining it never contacts a device.
 struct WtpManagedOutput {
     ManagedOutputObservation output;
     std::optional<std::string> destination_id;

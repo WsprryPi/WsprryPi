@@ -315,7 +315,7 @@ THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE := ./WSPR-Transmitter/src/thread_affinit
 COMPONENT_CPP_SOURCES := $(filter-out $(PPM_MANAGER_TEST_SOURCE) $(SIGNAL_HANDLER_TEST_SOURCE) $(SINGLETON_TEST_SOURCE) $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(LEGACY_GPIO_CLOCK_MODEL_TEST_SOURCE) $(GPIO_FREQUENCY_CORRECTION_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE) $(RP1_GPCLK_PLANNER_TEST_SOURCE) $(RP1_GPCLK_LIFECYCLE_TEST_SOURCE) $(RP1_GPCLK_TRANSITION_TEST_SOURCE) $(RP1_GPCLK_BACKEND_TEST_SOURCE) $(RP1_GPCLK_LINUX_PROVIDER_TEST_SOURCE) $(RP1_GPCLK_DEVELOPMENT_POLICY_TEST_SOURCE) $(RP1_GPCLK_TRANSMIT_BACKEND_TEST_SOURCE) $(RP1_GPCLK_ADMIN_PROBE_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE),$(COMPONENT_CPP_SOURCES))
 COMPONENT_CPP_SOURCES := $(filter-out $(TRANSMITTER_SHARED_CPP_SOURCES) $(TRANSMITTER_BACKEND_CPP_SOURCES),$(COMPONENT_CPP_SOURCES))
 
-WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp) $(wildcard WTP-Client/src/*.cpp) WTP-Client/src/detail/json.cpp
+WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp)
 WTP_APPLICATION_SOURCES += $(wildcard WTP-Server/src/*.cpp)
 WTP_APPLICATION_SOURCES += $(filter-out wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp,$(wildcard wtp_endpoint/*.cpp))
 WTP_APPLICATION_SOURCES += $(if $(filter si5351,$(BACKEND_LIST)),wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp)
@@ -676,7 +676,7 @@ CXXFLAGS := $(SI5351_TRANSPORT_FLAGS) $(if $(findstring clang,$(CXX_VERSION_LINE
            -DLIB_JOURNALD=$(HAVE_JOURNALD)
 
 # Include paths
-CXXFLAGS += -I$(abspath ./WTP-Client/include) -I$(abspath ./WTP-Client/src)
+CXXFLAGS += -I$(abspath ./WTP-Client/include)
 CXXFLAGS += -I$(abspath ./WTP-Server/include)
 CXXFLAGS += -I$(abspath .)
 CXXFLAGS += -I$(abspath $(BUILD_METADATA_DIR))
@@ -1257,7 +1257,11 @@ wtp-protocol-test: wtp-client-host-build
 wtp-server-host-build:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server all
 
-# Portable Pi WTP ownership model; inhibited engine and injected clock only.
+# Portable native ownership model; inhibited engine and injected clock only.
+.PHONY: wtp-server-core-test
+wtp-server-core-test: wtp-server-host-build
+	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
+
 .PHONY: wtp-pi-authority-test
 wtp-pi-authority-test: wtp-server-host-build
 	$(Q)$(MAKE) --no-print-directory -C WTP-Server test
@@ -1266,34 +1270,6 @@ wtp-pi-authority-test: wtp-server-host-build
 		wtp_endpoint/revocation_journal.cpp \
 		WTP-Server/build/libwtp_server.a -o build/wtp_pi_authority_test
 	$(Q)build/wtp_pi_authority_test
-
-.PHONY: wtp-pi-listener-test
-ifeq ($(HOST_OS),Linux)
-WTP_LISTENER_TEST_FLAGS := -DWSPRRYPI_TEST_SOCKET_WRAPPERS
-WTP_LISTENER_TEST_LDFLAGS := -Wl,--wrap=setsockopt -Wl,--wrap=accept
-endif
-wtp-pi-listener-test: wtp-server-host-build wtp-client-host-build
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_LISTENER_TEST_FLAGS) \
-		-I. -IWTP-Server/include -IWTP-Client/include \
-		tests/wtp_pi_plain_listener_test.cpp wtp_endpoint/authority.cpp \
-		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
-		WTP-Server/build/libwtp_server.a \
-		WTP-Client/build/libwtp_client.a $(WTP_LISTENER_TEST_LDFLAGS) -o build/wtp_pi_plain_listener_test
-	$(Q)build/wtp_pi_plain_listener_test
-
-# Linux-only network fixture; no transmitter hardware. The routing acceptance
-# uses private namespaces and needs root/CAP_NET_ADMIN, unlike ordinary tests.
-.PHONY: wtp-pi-routing-probe wtp-pi-routing-test
-wtp-pi-routing-probe: wtp-server-host-build wtp-client-host-build
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror \
-		-I. -IWTP-Server/include -IWTP-Client/include \
-		tests/wtp_pi_routing_probe.cpp wtp_endpoint/authority.cpp \
-		wtp_endpoint/revocation_journal.cpp wtp_endpoint/plain_listener.cpp \
-		WTP-Server/build/libwtp_server.a WTP-Client/build/libwtp_client.a \
-		-Wl,--wrap=setsockopt -o build/wtp_pi_routing_probe
-
-wtp-pi-routing-test: wtp-pi-routing-probe
-	$(Q)$(SUDO) python3 tests/wtp_pi_reply_routing_test.py --probe build/wtp_pi_routing_probe
 
 .PHONY: wtp-pi-revocation-test
 wtp-pi-revocation-test:
@@ -1339,22 +1315,6 @@ wtp-pi-control-test:
 		-o build/wtp_pi_control_test
 	$(Q)build/wtp_pi_control_test
 
-# Pure parent adapter tests. Kept outside automatic production source discovery
-# until WTP backend integration is approved. No transport or hardware is opened.
-WTP_PLAN_BUILD_DIR ?= build/wtp-plan
-WTP_PLAN_CXXFLAGS ?= -O2 -g
-WTP_PLAN_LDFLAGS ?=
-.PHONY: wtp-plan-test
-wtp-plan-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_PLAN_BUILD_DIR)/client)" CXXFLAGS="$(WTP_PLAN_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_PLAN_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_PLAN_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_execution_plan_test.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp "$(WTP_PLAN_BUILD_DIR)/client/libwtp_client.a" \
-		$(WTP_PLAN_LDFLAGS) -o "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-	$(Q)"$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-	$(Q)python3 -B tests/wtp_frequency_vectors.py "$(WTP_PLAN_BUILD_DIR)/wtp_execution_plan_test"
-
 WTP_USB_BUILD_DIR ?= build/wtp-usb
 WTP_USB_CXXFLAGS ?= -O2 -g
 WTP_USB_LDFLAGS ?=
@@ -1363,7 +1323,7 @@ wtp-usb-test:
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_USB_BUILD_DIR)/client)" CXXFLAGS="$(WTP_USB_CXXFLAGS)"
 	$(Q)mkdir -p "$(WTP_USB_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_USB_CXXFLAGS) $(OPENSSL_CFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp "$(WTP_USB_BUILD_DIR)/client/libwtp_client.a" \
+		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp \
 		$(OPENSSL_LIBS) $(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 	$(Q)"$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 
@@ -1964,12 +1924,7 @@ help:
 	$(Q)echo "  semantics-test          Run the full Linux semantics suite (requires gpiod.hpp)"
 	$(Q)echo "  semantics-test-portable Run the simulated-only portable semantics subset"
 	$(Q)echo "  wtp-protocol-test       Run standalone WTP/1 wire and session tests"
-	$(Q)echo "  wtp-plan-test           Run hardware-free WTP execution-plan conversion tests"
-	$(Q)echo "  wtp-scheduler-test      Run hardware-free early WTP scheduling tests"
-	$(Q)echo "  wtp-status-test         Run WTP status and explicit recovery tests"
-	$(Q)echo "  wtp-application-test    Run hardware-free WTP owned-worker tests"
 	$(Q)echo "  wtp-production-test     Run injected parent configuration/runtime and UI tests"
-	$(Q)echo "  wtp-backend-test        Run hardware-free complete-plan WTP backend tests"
 	$(Q)echo "  wtp-usb-test            Run WTP USB adapter tests using fakes and PTYs only"
 	$(Q)echo "  gdb                     Debug with gdb"
 	$(Q)echo "  test-tone               Run the binary with a test tone"
@@ -2001,82 +1956,6 @@ calibration-roundtrip-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 idle-startup-policy-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(SEMANTICS_TEST_OUT) --idle-startup-overrides-only
 
-# Explicit complete-plan WTP backend, scripted peer and virtual clock only.
-WTP_BACKEND_BUILD_DIR ?= build/wtp-backend
-WTP_BACKEND_CXXFLAGS ?= -O2 -g
-WTP_BACKEND_LDFLAGS ?=
-.PHONY: wtp-backend-test
-wtp-backend-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_BACKEND_BUILD_DIR)/client)" CXXFLAGS="$(WTP_BACKEND_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_BACKEND_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_BACKEND_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_backend_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_BUILD_DIR)/client/libwtp_client.a" $(WTP_BACKEND_LDFLAGS) -o "$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
-	$(Q)"$(WTP_BACKEND_BUILD_DIR)/wtp_backend_test"
-
-# Optional reference endpoint test; caller supplies a provenance-verified checkout.
-WTP_BACKEND_REFERENCE_BUILD_DIR ?= build/wtp-backend-reference
-.PHONY: wtp-backend-interop-test
-wtp-backend-interop-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client interop-test PICO_SOURCE="$(abspath $(PICO_SOURCE))" BUILD_DIR="$(abspath $(WTP_BACKEND_REFERENCE_BUILD_DIR))"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
-		tests/wtp_backend_reference_test.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
-		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
-	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/backend_reference_test"
-
-# Early WTP scheduling through a virtual host/device clock and scripted peer.
-WTP_SCHEDULER_BUILD_DIR ?= build/wtp-scheduler
-WTP_SCHEDULER_CXXFLAGS ?= -O2 -g
-WTP_SCHEDULER_LDFLAGS ?=
-.PHONY: wtp-scheduler-test
-wtp-scheduler-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_SCHEDULER_BUILD_DIR)/client)" CXXFLAGS="$(WTP_SCHEDULER_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_SCHEDULER_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_SCHEDULER_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_scheduler_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_SCHEDULER_BUILD_DIR)/client/libwtp_client.a" $(WTP_SCHEDULER_LDFLAGS) -o "$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
-	$(Q)"$(WTP_SCHEDULER_BUILD_DIR)/wtp_scheduler_test"
-
-.PHONY: wtp-scheduler-interop-test
-wtp-scheduler-interop-test: wtp-backend-interop-test
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 -g -I. -IWTP-Client/include \
-		tests/wtp_scheduler_reference_test.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/libwtp_client.a" "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference_bridge.o" \
-		$(WTP_BACKEND_REFERENCE_BUILD_DIR)/reference/*.o -o "$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
-	$(Q)"$(WTP_BACKEND_REFERENCE_BUILD_DIR)/scheduler_reference_test"
-
-# Coherent cross-thread WTP status and explicit recovery reporting.
-WTP_STATUS_BUILD_DIR ?= build/wtp-status
-WTP_STATUS_CXXFLAGS ?= -O2 -g
-WTP_STATUS_LDFLAGS ?=
-.PHONY: wtp-status-test
-wtp-status-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_STATUS_BUILD_DIR)/client)" CXXFLAGS="$(WTP_STATUS_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_STATUS_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_STATUS_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_status_test.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_STATUS_BUILD_DIR)/client/libwtp_client.a" $(WTP_STATUS_LDFLAGS) -o "$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
-	$(Q)"$(WTP_STATUS_BUILD_DIR)/wtp_status_test"
-
-WTP_APPLICATION_BUILD_DIR ?= build/wtp-application
-WTP_APPLICATION_CXXFLAGS ?= -O2 -g
-WTP_APPLICATION_LDFLAGS ?=
-.PHONY: wtp-application-test
-wtp-application-test:
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_APPLICATION_BUILD_DIR)/client)" CXXFLAGS="$(WTP_APPLICATION_CXXFLAGS)"
-	$(Q)mkdir -p "$(WTP_APPLICATION_BUILD_DIR)"
-	$(Q)$(CXX) -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_APPLICATION_CXXFLAGS) -I. -IWTP-Client/include \
-		tests/wtp_application_test.cpp wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_APPLICATION_BUILD_DIR)/client/libwtp_client.a" $(WTP_APPLICATION_LDFLAGS) -o "$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
-	$(Q)"$(WTP_APPLICATION_BUILD_DIR)/wtp_application_test"
-
 .PHONY: wtp-production-test
 WTP_CATALOG_BUILD_DIR ?= build/wtp-catalog
 .PHONY: wtp-catalog-test
@@ -2086,7 +1965,7 @@ wtp-catalog-test:
 		tests/wtp_catalog_discovery_test.cpp wtp_integration/catalog.cpp wtp_integration/discovery.cpp \
 		$(OPENSSL_LIBS) -o "$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
 	$(Q)"$(WTP_CATALOG_BUILD_DIR)/wtp_catalog_discovery_test"
-$(BIN_DIR)/wtp_production_test: tests/wtp_production_test.cpp $(SEMANTICS_TEST_DEPS)
+$(BIN_DIR)/wtp_production_test: tests/wtp_retirement_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
@@ -2463,7 +2342,7 @@ wtp-management-ui-test:
 WTP_NETWORK_BUILD_DIR ?= build/wtp-network
 WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
-WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include -IWTP-Client/src $(OPENSSL_CFLAGS)
+WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include $(OPENSSL_CFLAGS)
 include ../scripts/network_build_rules.mk
 .PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
 wtp-config-cpp-test: $(NETWORK_BIN_DIR)/wtp_configuration_test
@@ -2493,18 +2372,14 @@ wtp-network-client-build:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_network_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
-		wtp_integration/application.cpp wtp_integration/status.cpp wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
+		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
 wtp-config-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
-	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp wtp_runtime_bridge.cpp wtp_pi_control.cpp wtp_integration/output_lease.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/pico_usb_management_channel.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
-		wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp wtp_integration/application.cpp wtp_integration/status.cpp \
-		wtp_integration/scheduler.cpp wtp_integration/backend.cpp wtp_integration/execution_plan.cpp \
-		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		"$(WTP_NETWORK_BUILD_DIR)/client/libwtp_client.a" $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
+		wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/browser_api.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp \
+		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
 # These fixtures share a CMake tree, credentials and loopback TLS port.
 # Serialize an invocation that requests both; parallel recipe builds still use CMake -j.
 ifneq ($(filter wtp-config-interop-test wtp-network-interop-test,$(MAKECMDGOALS)),)
@@ -2517,7 +2392,7 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)node ../WsprryPi-UI/tests/wtp_progress_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" "$(abspath $(PICO_SOURCE))/engineering/protocol/Consumer-Radio-v1-vectors.json"
 	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/wspr_scheduler_frequency_export BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-wtp "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wspr_scheduler_frequency_export --export-native-tests "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/consumer_interop" --scheduler-frequency "$(WTP_NETWORK_BUILD_DIR)/scheduler-frequency.jsonl"
 	$(Q)node ../WsprryPi-UI/tests/wtp_resources_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 	$(Q)node ../WsprryPi-UI/tests/wtp_amplifier_timing_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
@@ -2598,7 +2473,7 @@ wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := WTP-Client/src/codec.cpp WTP-Client/src/detail/json.cpp tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
@@ -2662,9 +2537,9 @@ udp-logging-test:
 # Actual application and finite read-only load, built without physical backends.
 .PHONY: production-browser-regression-test tls-observer-test
 TEST_NETNS_RUNNER ?= unshare --net
-production-browser-regression-test: debug
+production-browser-regression-test: debug $(BIN_DIR)/pi_managed_main_fixture
 	$(Q)python3 -B tests/production_browser_load_test.py
-	$(Q)$(TEST_NETNS_RUNNER) python3 -B tests/production_ini_roundtrip_test.py "$(abspath $(PROFILE_DEBUG_BIN))"
+	$(Q)$(TEST_NETNS_RUNNER) python3 -B tests/production_ini_roundtrip_test.py "$(abspath $(PROFILE_DEBUG_BIN))" --fixture "$(abspath $(BIN_DIR)/pi_managed_main_fixture)"
 
 tls-observer-test:
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
@@ -2693,16 +2568,9 @@ ci-installer-offline-test: support-bundle-runtime-installer-test pico-usb-instal
 
 .PHONY: gpio-line-resolver-test non-wspr-repeat-policy-test
 
-.PHONY: wtp-fleet-capacity-test
-$(BIN_DIR)/wtp_fleet_capacity_test: tests/wtp_fleet_capacity_test.cpp $(SEMANTICS_TEST_DEPS)
-	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
-# Explicit typed memory carriers and deterministic logical clocks; no hardware.
-wtp-fleet-capacity-test: $(BIN_DIR)/wtp_fleet_capacity_test
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_fleet_capacity_test
 
 .PHONY: wtp-fleet-operations-driver-build
-$(BIN_DIR)/wtp_fleet_operations_driver: tests/wtp_fleet_operations_driver.cpp $(SEMANTICS_TEST_DEPS)
+$(BIN_DIR)/wtp_fleet_operations_driver: tests/fleet_retirement_pair_driver.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 wtp-fleet-operations-driver-build: $(BIN_DIR)/wtp_fleet_operations_driver
@@ -2732,6 +2600,12 @@ solar-geometry-pair-test:
 .PHONY: recurrence-authority-record-test
 .PHONY: solar-clock-test
 .PHONY: native-recurrence-test
+.PHONY: wtp-retirement-config-test
+$(BIN_DIR)/wtp_retirement_config_test: tests/wtp_retirement_config_test.cpp wtp_retirement.hpp config_types.hpp wtp_settings.hpp wtp_settings_json.hpp wtp_server_settings.hpp wtp_server_settings_json.hpp wtp_integration/identity.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWSPR-Reference/src/wspr tests/wtp_retirement_config_test.cpp -o $@
+wtp-retirement-config-test: $(BIN_DIR)/wtp_retirement_config_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/wtp_retirement_config_test
 $(BIN_DIR)/native_recurrence_test: tests/native_recurrence_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)

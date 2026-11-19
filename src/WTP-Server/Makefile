@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Standalone portable WTP/1 server core; no parent application dependency.
+# Standalone portable native execution core; no parent application dependency.
 CXX ?= c++
 BUILD_DIR ?= build
 CXXFLAGS ?= -O2 -g
@@ -17,7 +17,8 @@ $(BUILD_DIR)/%.o: src/%.cpp $(HEADERS)
 	mkdir -p $(@D)
 	$(CXX) $(FLAGS) -c $< -o $@
 
-$(LIBRARY): $(OBJECTS)
+$(LIBRARY): $(OBJECTS) Makefile
+	rm -f $@
 	$(AR) rcs $@ $(OBJECTS)
 
 $(BUILD_DIR)/server_core_test: tests/server_core_test.cpp $(LIBRARY) $(HEADERS)

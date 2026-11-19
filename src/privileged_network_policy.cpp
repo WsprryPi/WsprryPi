@@ -140,7 +140,10 @@ PrivilegedOperationClass classify_privileged_http_operation(
             return PrivilegedOperationClass::protected_operation;
         if ((path == "/api/control/v1/member/configuration" || path == "/api/control/v1/member/management") && (method == "GET" || method == "POST"))
             return PrivilegedOperationClass::protected_operation;
-        if (method == "GET" && (path == "/api/control/v1/status" || path == "/api/control/v1/jobs" || path == "/api/control/v1/capabilities"))
+        if((path=="/api/control/v1/member/status" && method=="GET") ||
+           (path=="/api/control/v1/member/schedules/stop" && (method=="GET"||method=="POST")))
+            return PrivilegedOperationClass::protected_operation;
+        if (method == "GET" && (path == "/api/control/v1/status" || path == "/api/control/v1/capabilities"))
             return PrivilegedOperationClass::read_only;
         // Remote management reads consume the sole TLS slot and host config
         // reveals local administrator-managed references: protect these too.
@@ -160,9 +163,7 @@ PrivilegedOperationClass classify_privileged_http_operation(
                                   path == "/api/control/v1/host/wtp-endpoint/recover" ||
                                   path == "/api/control/v1/host/discovery/identify")))
             return PrivilegedOperationClass::protected_operation;
-        if (method == "POST" && (path == "/api/control/v1/jobs" ||
-            (path.starts_with("/api/control/v1/jobs/") && path.ends_with("/abort") && path.size() == std::string("/api/control/v1/jobs/").size() + 32 + std::string("/abort").size())))
-            return PrivilegedOperationClass::protected_operation;
+
         return PrivilegedOperationClass::reject;
     }
     if (is_support_bundle_path(path)) {

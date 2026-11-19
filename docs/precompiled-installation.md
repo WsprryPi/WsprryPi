@@ -68,8 +68,12 @@ atomic rename. If a subsequent installer step fails, the installer attempts to
 restore the prior executable and service state. This is executable recovery,
 not a rollback of package or configuration changes.
 
-An upgrade preserves current settings, including WTP connection settings,
-WSPR frequency preferences and band-selector assignments. Retired `GPIO.Use NTP`
+An upgrade preserves current settings, including inactive private legacy WTP
+connection values, WSPR frequency preferences, and band-selector assignments.
+The stock retired listener is disabled. Existing active WTP selection or an
+enabled listener remains a migration hold; installation must not silently
+convert it to a native backend. Complete [legacy retirement](wtp-status-recovery.md)
+with compatible software before replacement. Retired `GPIO.Use NTP`
 settings migrate to the clock-estimate policy and manual correction; existing
 canonical values take precedence. A failed or empty
 configuration merge stops installation and retains the existing configuration

@@ -33,7 +33,7 @@ void fixture(const std::string &ini){
     config.wspr.power_dbm=config.power_dbm;config.wspr.frequencies=config.frequencies;
     config.wtp.transport="network_plain";config.wtp.hostname="127.0.0.1";config.wtp.device_id=std::string(32,'b');config.wtp.tcp_port=31417;
     resolve_backend_specific_config(config);config_to_json();
-    jConfig["Operation"]["Transmit Backend"]="wtp";
+    jConfig["Operation"]["Transmit Backend"]="gpio";
     put(ini,"; startup fixture\n[Security]\nPrivileged Network Safety = enforced\n");
     iniFile.set_filename(ini);iniFile.set_raw_passthrough_keys({{"Security","Privileged Network Safety"}});json_to_ini();
 }
@@ -46,7 +46,26 @@ int main(int argc,char **argv){
     check(recovery_command.is_object(),"Current authoritative recovery command required");
     char pattern[]="/tmp/pi-managed-startup-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary,"Private startup fixture");const std::string root=temporary;
     struct Remove{std::string root;~Remove(){std::filesystem::remove_all(root);}} remove{root};
-    const auto ini=root+"/settings.ini";const std::string self(32,'a');fixture(ini);
+    const std::string self(32,'a');
+    {
+        const auto legacy=root+"/legacy.ini";fixture(legacy);
+        jConfig["Operation"]["Transmit Backend"]="wtp";json_to_ini();
+        const auto before=bytes(legacy);
+        PiManagedStartup owner(legacy,self);owner.prepare();std::string error;
+        check(!load_json(legacy,&error,nullptr)&&error.find("Migration required")!=std::string::npos,
+            "A simulated process override cannot hide the stored WTP backend");
+        check(!owner.admission_ready()&&!owner.configuration_validated()&&bytes(legacy)==before,
+            "Legacy startup holds output and preserves the original source");
+        PiRecoveryService recovery(owner,self,std::string(32,'c'),[]{return PiHostReadiness::ConfigurationRecovery;});
+        const auto read=recovery.handle({"GET","/api/control/v1/host/configuration-recovery"},true);
+        const auto report=nlohmann::json::parse(read.body);
+        check(read.status==200&&report["writable"]==false&&report["validation"]=="migration_required",
+            "Legacy recovery is readable and explicitly migration-held");
+        const auto rejected=recovery.handle({"POST","/api/control/v1/host/configuration-recovery","{}",{},true},true);
+        check(rejected.status==409&&bytes(legacy)==before&&!owner.store().initialized(),
+            "Recovery reset/save cannot erase outstanding legacy duties");
+    }
+    const auto ini=root+"/settings.ini";fixture(ini);
     std::string recovered_ini;
     {
         PiManagedStartup owner(ini,self);owner.prepare();
@@ -69,7 +88,7 @@ int main(int argc,char **argv){
         check(initial_draft&&initial_draft->source["WSPR"]["Call Sign"]=="AA0NT"&&owner.configuration_validated(),
             "Read-only saved draft is captured by the owning parser independently of native readiness");
         const auto profiles=owner.catalog().snapshot(config.wtp).first;
-        check(profiles["profiles"].size()==1&&profiles["active_unmatched"]==false,"First transaction preserves the existing selected WTP profile");
+        check(profiles["profiles"].empty(),"Native startup does not synthesize a remote-output profile from dormant WTP settings");
         unsigned reservations=0;bool permit=true;
         owner.activate([&](const auto &action){++reservations;if(!permit)throw std::runtime_error("native authority held");action();});
         check(owner.admission_ready()&&wtp_pi_begin_scheduled(),"Explicit native activation opens the separate readiness gate");
@@ -161,7 +180,6 @@ int main(int argc,char **argv){
         request["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(invalid_json);
         request["configuration"]["CW"]["Fade Shape"]="none";
         request["configuration"]["CW"]["Message"]="EXPLICIT RECOVERY SAVE";
-        for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})request["configuration"]["WTP"][key]="";
         const PiManagedStore::Operation recovery{self,"1","/api/control/v1/host/configuration-recovery",request};
         const auto runtime_before=get_public_config_snapshot();const auto invalid_bytes=bytes(invalid);
         BrowserRequest browser{"PUT",recovery_path,request.dump(),recovery_view.etag,true};
@@ -200,8 +218,8 @@ int main(int argc,char **argv){
             "A committed save cannot expose another editable draft before authoritative parser readback");
         refuses([&]{owner.activate([](const auto &action){action();});});
         check(load_json(invalid,&error,nullptr),"Explicit saved recovery candidate is reread through the owning INI parser");
-        check(owner.catalog().snapshot(config.wtp).first["active_unmatched"]==false,
-            "A rejected initial candidate cannot poison the selected-profile import of a later successful recovery");
+        check(owner.catalog().snapshot({}).first["profiles"].empty(),
+            "A rejected retired-field candidate cannot seed a remote-output profile during native recovery");
         owner.activate([](const auto &action){action();});check(owner.admission_ready(),"Only valid saved readback permits subsequent native activation");
         readiness=PiHostReadiness::Ready;
         check(nlohmann::json::parse(service.handle({"GET","/api/control/v1/host/readiness"},true).body)["state"]=="ready"&&

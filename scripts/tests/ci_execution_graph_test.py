@@ -264,7 +264,7 @@ class SourceIdentityTests(unittest.TestCase):
             self.assertIn(shlex.split(jobs[name]['env']['MAKEFLAGS']),
                 [['-j2'],['-j','2'],['--jobs=2'],['--jobs','2']])
         goals = make_goals(jobs['non-hardware-validation'])
-        for required in ('wtp-plan-test', 'wtp-fleet-test', 'wtp-production-cpp-test', 'wtp-api-cpp-test',
+        for required in ('wtp-managed-output-test', 'wtp-fleet-test', 'wtp-production-cpp-test', 'wtp-api-cpp-test',
                          'wtp-config-cpp-test', 'ci-focused-state-test', 'ci-network-policy-test',
                          'ci-support-lifecycle-test', 'ci-installer-offline-test', 'php2shell-test'):
             self.assertEqual(goals[required], 1, required)
@@ -312,7 +312,7 @@ class MakeDispatchTests(unittest.TestCase):
         rules = '\n'.join(rule(source, target) for target in targets)
         phony = '\n'.join(line for line in source.splitlines() if line.startswith('.PHONY:'))
         (root / 'tests').mkdir()
-        (root / 'tests/wtp_production_test.cpp').touch()
+        (root / 'tests/wtp_retirement_runtime_test.cpp').touch()
         (root / 'bin').mkdir()
         spy = root / 'bin/node'
         spy.write_text('#!'+sys.executable+'''

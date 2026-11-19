@@ -1,32 +1,31 @@
 # Pico control compatibility
 
-## Published RC.3 companion
+## Coordinated development sources
 
-Current `devel` supports the published **WsprryPico 1.0.0-rc.3** prerelease,
-firmware source `a5270eebb36d2280dc76817b48a33ffab343b42d`.
-The [release](https://github.com/WsprryPi/WsprryPico/releases/tag/v1.0.0-rc.3)
-and [Pico release notes](https://wsprrypico.readthedocs.io/en/devel/reference/releases.html)
-identify its firmware and limits. A later Pico documentation commit does not
-change that firmware identity. Beta 7 remains a separate published source pair;
-these instructions describe current development support.
+Use matching Pi and Pico sources with the current generated control contract.
+The generator and `src/wtp_integration/contract/PROVENANCE.json` identify the
+selected companion source; local validation must also identify tested edits.
+A previously published firmware version or matching control major alone does
+not establish compatibility with this development schema. Unsupported or
+inconsistent descriptors refuse before writes, without selecting an older
+peer or another carrier.
 
-The maintained generator vendors the exact RC.3 schema, lifecycle guard and
-shared controls. Capability admission still checks the current descriptors,
-carrier, target, and revision; a matching firmware version alone grants no
-authority. RC.3 does not require a control migration or a new major version.
-WTP/1, authentication/transport, and storage remain independently versioned.
+Retirement changes the one current prerelease Control/1 schema. It does not
+create a historical settings view. Authentication/transport, storage, and
+internal WTP-format fixtures retain their independent version boundaries;
+external WTP execution is unsupported.
 
-Select RC.3 explicitly through the [USB firmware interface](pico-usb-installer.md).
 Software source-pair checks and image planning do not qualify physical USB,
-installation, services, timing, or RF.
+installation, services, timing, or RF. See [USB firmware access](pico-usb-installer.md)
+for the retained standalone installer and the current browser limitation.
 
 ## Current control contract
 
 Pi and Pico use one current `Wsprry-Control/1` settings/control contract under
 `/api/control/v1`. Earlier beta settings APIs and resource views are unsupported;
-update both applications together. WTP/1 finite-job compatibility is independent.
+update both applications together. External finite-job compatibility is not supported.
 
-Pico’s direct browser controls provide **Wi-Fi/Host → Advanced → Recovery and reset…**. Infrastructure recovery requires the current Pico password and the encrypted consumer session; the public recovery page remains AP-only. Both reset choices require two acknowledgments and an exact typed phrase. These actions use Pico’s existing reset coordinator and are independent of WTP job control or Pi configuration saves. A lost reset reply is uncertain and must not be replayed. The network-pair checks exercise the selected Pico’s production recovery routes and browser confirmations in addition to the independent USB-pair checks.
+Pico’s direct browser controls provide **Wi-Fi/Host → Advanced → Recovery and reset…**. Infrastructure recovery requires the current Pico password and the encrypted consumer session; the public recovery page remains AP-only. Both reset choices require two acknowledgments and an exact typed phrase. These actions use Pico’s existing reset coordinator and are independent of native schedule stop and Pi configuration saves. A lost reset reply is uncertain and must not be replayed. The network-pair checks exercise the selected Pico’s production recovery routes and browser confirmations in addition to the independent USB-pair checks.
 
 Pico owns the authoritative contract. Pi validates the current contract,
 capabilities and selected carrier before using a member resource. Unknown
@@ -79,7 +78,7 @@ retry, peer substitution or carrier fallback is automatic.
 USB and supported authenticated network carriers use the same control model
 through their existing production adapters. USB retains its matching response
 ACK before deferred effects; network retains complete-response delivery
-confirmation. Durable saves and accepted jobs can survive a lost reply.
+confirmation. Durable saves and accepted native occurrences can survive a lost reply.
 
 Both actual production network and USB suites must pass for the explicit
 candidate source pair, including amplifier-enable operations and old-contract

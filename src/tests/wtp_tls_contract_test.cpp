@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
     std::uint64_t now{};
     auto resolver = std::make_unique<Resolver>(); auto *fake = resolver.get();
     TlsStream stream([&] { return now; }, TlsStream::Access::LoopbackTest, std::move(resolver));
+    CHECK(!stream.begin_open(selection,credentials,"wtp/1") && fake->calls==0);
     CHECK(stream.begin_open(selection, credentials));
     now += TlsStream::resolve_timeout_ms; stream.poll_open();
     CHECK(!stream.opening() && stream.observation().state == "failed");

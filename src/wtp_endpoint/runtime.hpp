@@ -50,10 +50,7 @@ namespace testing {
 // Isolated native-main fixtures only. No CLI, INI, environment, or HTTP setting
 // exposes this path; production continues to use the invoking user's ledger.
 void set_wtp_pi_private_state_path(const std::string &);
-// Explicit simulated-only process fixture: loopback/ephemeral listener, no DNS-SD.
-// Requires hardware access disabled, a private fixture ledger and no live owner.
-// No CLI/INI/environment selector or automatic host/backend fallback exists.
-void set_wtp_pi_loopback_fixture(bool);
+
 }
 
 } // namespace wsprrypi

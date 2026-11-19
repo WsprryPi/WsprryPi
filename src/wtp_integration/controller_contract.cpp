@@ -62,7 +62,10 @@ bool match(const Json &value,const Json &rule,const Json &definitions,unsigned d
         const auto properties=rule.value("properties",Json::object());
         for(const auto &[key,item]:value.items()) {
             if(properties.contains(key)) {if(!match(item,properties[key],definitions,depth+1))return false;}
-            else if(rule.value("additionalProperties",true)==false)return false;
+            else if(rule.contains("additionalProperties")) {
+                const auto &additional=rule["additionalProperties"];
+                if(additional==false || (additional.is_object()&&!match(item,additional,definitions,depth+1)))return false;
+            }
         }
     }
     if(value.is_array()) {
@@ -163,7 +166,7 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
             if(value["role"]=="controller-only"&&(value["state"]=="configuration_recovery"||value["state"]=="output_recovery"))return false;
         }
         if(name=="configuration-recovery"){
-            if(value["writable"]==true&&(value["binding"].is_null()||value["validation"]=="storage_unavailable"))return false;
+            if(value["writable"]==true&&(value["binding"].is_null()||(value["validation"]=="storage_unavailable"||value["validation"]=="migration_required")))return false;
             std::set<std::string> paths;
             for(const auto &path:value["defaulted_fields"])if(!paths.insert(path.get<std::string>()).second)return false;
         }

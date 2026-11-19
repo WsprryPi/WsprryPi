@@ -58,7 +58,7 @@ public:
             std::unique_ptr<TlsResolver> = system_tls_resolver());
   ~TlsStream() override;
   bool begin_open(const TlsSelection &, std::shared_ptr<TlsCredentials>,
-                  std::string alpn = "wtp/1");
+                  std::string alpn = "http/1.1");
   void poll_open();
   bool ready() const;
   bool opening() const;

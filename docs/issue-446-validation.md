@@ -32,8 +32,9 @@ measured RF.
 
 WSPR continues to use four tones at -2.197265625, -0.732421875, +0.732421875,
 and +2.197265625 Hz relative to its center. QRSS, FSKCW, and DFCW keep their
-existing compatibility reference compensation. Si5351, RP1, simulated, and WTP
-TONE plans receive no extra frequency correction. No calibration constants,
+existing compatibility reference compensation. Si5351, RP1, and simulated
+TONE plans receive no extra frequency correction. The former WTP backend is
+retired; its historical target semantics are not a supported execution path. No calibration constants,
 CLI options, UI, scheduler rules, selectors, or persistence formats changed.
 
 ## Validation boundary

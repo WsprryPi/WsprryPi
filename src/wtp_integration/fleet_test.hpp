@@ -5,15 +5,11 @@
 #include <functional>
 #include <memory>
 namespace wsprrypi {
-struct WtpTargetRuntime;
-// Explicit typed fixture construction only. No CLI, INI, environment, or UI
-// selector installs these hooks. Captured fixture state, clocks, and streams
-// must outlive the Fleet.
+// Typed observers are confined to source-level refusal fixtures. There is no
+// execution carrier factory in the product or fixture construction path.
 struct WtpFleetTestHooks {
     std::string retirement_directory;
-    std::function<std::unique_ptr<WtpTargetRuntime>(WtpSettings,
-        std::function<bool()>, std::shared_ptr<void>)> create_target;
-    std::function<nlohmann::json(const WtpSettings&, unsigned)> revocation_status;
+    std::function<void()> before_execution_contact;
     // Actual isolated pairing history for multi-owner process fixtures. The
     // production owner always resolves its process-selected pairing history.
     std::function<std::optional<nlohmann::json>(const nlohmann::json &,const nlohmann::json &)> retirement_signer;
