@@ -15,7 +15,7 @@ const h = require('./browser_harness.js');
         php = h.spawnFixtureChild('php', ['-S', `127.0.0.1:${port}`, '-t', 'data', 'tests/browser_fixture_router.php'], {cwd: ui});
         await h.waitForSpawn(php);
         await h.waitForPhp(php, `http://127.0.0.1:${port}/index.php?page=config`);
-        ({browser, client, profile} = await h.launchBrowser({args: ['--headless=new', '--disable-gpu', '--no-first-run']}));
+        ({browser, client, profile} = await h.launchBrowser({args: ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run']}));
         await client.send('Page.navigate', {url: `http://127.0.0.1:${port}/index.php?page=config`});
         await h.waitFor(() => client.evaluate('!!window.SetupTargets'), 'Setup initialized');
         // Keep the real Setup renderer and templates; isolate synthetic inventory
