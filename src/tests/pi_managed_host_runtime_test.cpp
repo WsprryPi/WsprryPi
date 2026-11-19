@@ -83,7 +83,7 @@ void gateway(const nlohmann::json &valid,int port){
     },"application/json");
     check(chunked&&chunked->status==413,"Unknown-length recovery input stops at the same body bound");
     auto doc=nlohmann::json::parse(current->body);auto configuration=config_handler_serialization::saved_configuration_from_internal_json(valid);
-    for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})configuration["WTP"][key]="";
+    check(!configuration.contains("WTP")&&!configuration.contains("WTP Server"),"Recovery uses the current settings projection");
     const nlohmann::json command{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery-save"},{"binding",doc["binding"]},
         {"capability_revision",doc["capability_revision"]},{"expected_revision",doc["revision"]},{"operation_id",std::string(32,'e')},{"configuration",configuration}};
     httplib::Headers headers{{"Origin","http://127.0.0.1:"+std::to_string(port)},{"X-WsprryPico-Request","1"},

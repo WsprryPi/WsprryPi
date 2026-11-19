@@ -32,7 +32,9 @@ def main():
         source.optionxform = str
         source.read(Path(__file__).resolve().parents[2] / "config/wsprrypi.ini")
         source["Security"]["Privileged Network Safety"] = "insecure-disabled" if args.network_safety_off else "enforced"
-        source["Operation"]["Transmit Backend"] = "wtp"
+        # Keep a native physical selection in the saved document; the fixture
+        # selects simulation explicitly on its CLI without persisting it.
+        source["Operation"]["Transmit Backend"] = "gpio"
         source["Operation"]["Enable on Boot"] = "Never"
         source["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": "20"})
         source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1",
@@ -78,9 +80,7 @@ def main():
                 candidate["CW"]["Fade Shape"] = "raised_cosine"
                 if args.initialization:
                     candidate["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": 20})
-                    candidate["WTP Server"]["Enabled"] = False
-                for key in ("TLS CA File", "TLS Client Certificate", "TLS Client Key"):
-                    candidate["WTP"][key] = ""
+                assert "WTP" not in candidate and "WTP Server" not in candidate
                 # Every other field must be an actual typed saved value;
                 # the test may not silently insert defaults for omissions.
                 assert not doc["defaulted_fields"], doc["defaulted_fields"]

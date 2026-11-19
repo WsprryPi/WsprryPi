@@ -36,7 +36,7 @@ class TestClock final:public Clock {public:ClockSnapshot snapshot() const overri
 class TestIdentity final:public IdentitySource {public:std::string new_boot_id() override{return std::string(32,'1');}};
 Json view(PiManagedHost &host){const auto result=host.recovery({"GET","/api/control/v1/host/configuration-recovery"},true);check(result.status==200,"Closed recovery view");return Json::parse(result.body);}
 BrowserRequest save(const Json &current,Json configuration){
-    for(const auto *key:{"TLS CA File","TLS Client Certificate","TLS Client Key"})configuration["WTP"][key]="";
+    check(!configuration.contains("WTP")&&!configuration.contains("WTP Server"),"Recovery uses only the current settings projection");
     Json command{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery-save"},{"binding",current["binding"]},
         {"capability_revision",current["capability_revision"]},{"operation_id",std::string(32,'e')},
         {"expected_revision",current["revision"]},{"configuration",configuration}};

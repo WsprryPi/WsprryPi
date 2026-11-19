@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Actual main with an explicitly selected simulated backend and an always-offline typed
-// software transport. This fixture cannot open a device or network connection.
+// Actual main with an explicitly selected simulated backend and private ledger.
+// Only loopback management is available; no external execution transport exists.
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "web_server.hpp"
