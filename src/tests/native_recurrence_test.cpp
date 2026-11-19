@@ -173,12 +173,14 @@ bool real_message(bool virtual_time,bool reject,bool force_late=false){
         transmitter_cb(event,level,message,value);
         if(ended){std::lock_guard lock(mutex);terminal=message;done=true;cv.notify_all();}
     });
+    // Include preparation and durable reservation in the scheduled delay;
+    // loaded runners can spend much of the lead time in those operations.
+    const auto before=std::chrono::steady_clock::now();
     const auto start=utc()+300'000'000ULL;const std::array<std::uint64_t,1> starts{start};
     plan=prepare_native_occurrence(config,starts);assert(plan->evaluation.outcome==SolarOutcome::Allowed);
     const auto &tones=plan->evaluation.intent->nominal_tones_nhz;
     assert(reserve_native_occurrence(plan,nlohmann::json{{"message","E"}},tones));
     const auto when=std::chrono::system_clock::time_point(std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::nanoseconds(start)));
-    const auto before=std::chrono::steady_clock::now();
     assert(start_non_wspr_transmission_now(config,when,plan)&&plan->accepted);
     {std::lock_guard lock(config_update_mutex());
         f.snapshot.policy.schedule_enabled=false;
@@ -197,6 +199,7 @@ bool real_message(bool virtual_time,bool reject,bool force_late=false){
     if(force_late)assert(late&&!started);
     const auto elapsed=std::chrono::steady_clock::now()-before;
     assert(elapsed>=std::chrono::milliseconds(200)&&elapsed<std::chrono::seconds(4));
+    assert(terminal_utc>=when);
     if(!reject){
         std::ifstream input(sim.trace_path);nlohmann::json trace;input>>trace;assert(!trace.is_null());
         if(late){
