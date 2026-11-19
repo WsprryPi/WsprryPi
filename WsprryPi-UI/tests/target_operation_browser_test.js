@@ -53,7 +53,7 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
     const upstream=http.request({hostname:'127.0.0.1',port,path:request.url,method:request.method,headers:request.headers},other=>{response.writeHead(other.statusCode,other.headers);other.pipe(response);});upstream.on('error',()=>response.destroy());request.pipe(upstream);
    }catch(error){response.writeHead(500);response.end(JSON.stringify({error:String(error)}));}
   });await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve));
-  ({browser,client,profile}=await h.launchBrowser({args:['--headless=new','--disable-gpu','--no-first-run'],expectedDialogs:[
+  ({browser,client,profile}=await h.launchBrowser({args:['--headless=new','--no-sandbox','--disable-gpu','--no-first-run'],expectedDialogs:[
    'Enable saved scheduling on '+context.target.name+' ('+pi+')?', 'Pause scheduling on '+context.target.name+' ('+pi+')?', 'Enable transmission on '+context.target.name+' ('+pi+')?', 'Stop output on '+context.target.name+' ('+pi+')?', 'Stop output on '+picoTarget.name+' ('+pico+')?'
   ]}));
   const run=expression=>client.evaluate(expression),click=id=>run(`document.getElementById('operationTarget${id}').click()`);
