@@ -339,15 +339,18 @@ jobs:
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    container: ubuntu:24.04
+    container:
+      image: ubuntu:24.04
+      volumes:
+        - /etc/ssl/certs/ca-certificates.crt:/runner-ca-certificates.crt:ro
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
       - name: Install build dependencies without libgpiod
         run: |
           sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          apt-get -o Acquire::https::CaInfo=/runner-ca-certificates.crt update
+          DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::https::CaInfo=/runner-ca-certificates.crt install -y --no-install-recommends \
             build-essential ca-certificates git libssl-dev libavahi-client-dev libsystemd-dev pkg-config \
             python3 strace
 
