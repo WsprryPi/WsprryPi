@@ -72,9 +72,6 @@ def main():
         source["Operation"]["Transmit Backend"] = "gpio"
         source["Operation"]["Enable on Boot"] = "Never"
         source["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": "20"})
-        source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1",
-                              "TCP Port": "31417", "Device ID": "b" * 32})
-        source["WTP Server"]["Enabled"] = "false"
         source["CW"]["Fade Shape"] = "raised_cosine"
         if not args.initialization and not args.policy_upgrade:
             source["CW"]["Fade In Ms"] = "-1"
