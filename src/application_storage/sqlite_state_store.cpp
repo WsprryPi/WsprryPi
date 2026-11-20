@@ -143,8 +143,29 @@ struct SqliteStateStore::Impl {
     Checkpoint checkpoint;
     std::mutex mutex;
     std::atomic_bool is_held{false};
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+    std::atomic<std::shared_ptr<const StateSnapshot>> published;
+#else
+    // Apple libc++ still lacks the C++20 specialization. Keep its supported
+    // shared_ptr atomic operations without using deprecated overloads on GCC.
     std::shared_ptr<const StateSnapshot> published;
+#endif
     int data_version{};
+
+    std::shared_ptr<const StateSnapshot> published_snapshot() const {
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+        return published.load();
+#else
+        return std::atomic_load(&published);
+#endif
+    }
+    void publish_snapshot(std::shared_ptr<const StateSnapshot> image) {
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+        published.store(std::move(image));
+#else
+        std::atomic_store(&published,std::move(image));
+#endif
+    }
 
     Impl(std::string input, std::string self, StateRole selected, StateOpen mode, Checkpoint observer)
         : identity(std::move(self)), selected_role(selected), checkpoint(std::move(observer)) {
@@ -200,7 +221,7 @@ struct SqliteStateStore::Impl {
             }
             require(scalar("PRAGMA quick_check") == "ok");
             data_version = integer("PRAGMA data_version");
-            published=std::make_shared<const StateSnapshot>(read());
+            publish_snapshot(std::make_shared<const StateSnapshot>(read()));
             check_files();
         } catch (const StateStorageError &) { close(); throw; }
         catch (...) { close(); fail(); }
@@ -305,7 +326,7 @@ StateRole SqliteStateStore::role() const noexcept { return impl_->selected_role;
 StateSnapshot SqliteStateStore::snapshot() {
     auto &owner = *impl_;
     if(execution_read_depth){
-        const auto image=std::atomic_load(&owner.published);
+        const auto image=owner.published_snapshot();
         require(!owner.is_held.load()&&bool(image));return *image;
     }
     std::lock_guard lock(owner.mutex);
@@ -327,7 +348,7 @@ StateRecordSnapshot SqliteStateStore::record(StateRecord kind) {
     auto &owner = *impl_;
     require(allowed(owner.selected_role, kind), Code::InvalidInput);
     if(execution_read_depth){
-        const auto image=std::atomic_load(&owner.published);
+        const auto image=owner.published_snapshot();
         require(!owner.is_held.load()&&bool(image));
         const auto found=image->records.find(kind);
         if(found==image->records.end())return {image->revision,{},{}};
@@ -390,7 +411,7 @@ std::string SqliteStateStore::commit(const std::string &expected, const std::vec
         const auto revision = decimal(previous);
         require(revision < std::numeric_limits<std::uint64_t>::max(), Code::InvalidInput);
         const auto next = std::to_string(revision + 1);
-        const auto previous_image=std::atomic_load(&owner.published);
+        const auto previous_image=owner.published_snapshot();
         require(bool(previous_image)&&previous_image->revision==previous);
         auto image=std::make_shared<StateSnapshot>(*previous_image);image->revision=next;
         for (const auto &change : changes) {
@@ -415,7 +436,7 @@ std::string SqliteStateStore::commit(const std::string &expected, const std::vec
         owner.exec("COMMIT"); committed = true;
         if (owner.checkpoint) owner.checkpoint(StateWritePoint::Committed);
         owner.check_live();
-        std::atomic_store(&owner.published,std::shared_ptr<const StateSnapshot>(std::move(image)));
+        owner.publish_snapshot(std::shared_ptr<const StateSnapshot>(std::move(image)));
         return next;
     } catch (const StateStorageError &error) {
         const auto rollback = sqlite3_exec(owner.db, "ROLLBACK", nullptr, nullptr, nullptr);
