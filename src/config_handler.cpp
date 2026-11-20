@@ -29,6 +29,7 @@
 #include "wtp_settings_json.hpp"
 #include "wtp_server_settings_json.hpp"
 #include "wtp_pi_control.hpp"
+#include "wtp_retirement.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "config_handler.hpp"
@@ -1797,6 +1798,10 @@ namespace
                 missing_required_tx_item);
 
             ini_to_json_impl(filename, ini_data, candidate_json);
+            // Validate the stored selection before applying a transient
+            // simulator override or decoding unsupported endpoint fields.
+            if (wsprrypi::wtp_retirement_source_active(candidate_json))
+                throw std::runtime_error("Migration required: unsupported transmitter configuration.");
             config_handler_deserialization::deserialize_json_to_runtime_config(
                 candidate_json, candidate_config);
             candidate_config.enable_web = config.enable_web;

@@ -349,7 +349,9 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Cold package downloads can exceed ten minutes before compilation starts.
+    # Retain time for the complete strict build and its unchanged audits.
+    timeout-minutes: 30
     container:
       image: ubuntu:24.04
       volumes:
