@@ -445,16 +445,29 @@ jobs:
     container: debian:trixie-slim
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
+    defaults:
+      run:
+        shell: /usr/sbin/runuser -u wsprrypi-ci -- /bin/bash --noprofile --norc -e -o pipefail {0}
     steps:
       - name: Install build and audit dependencies
+        shell: bash
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
-            libsystemd-dev nodejs npm php-cli pkg-config python3 shellcheck strace
+            libsystemd-dev nodejs npm passwd php-cli pkg-config python3 shellcheck strace util-linux
 
       - name: Check out source
         uses: actions/checkout@v7
+
+      - name: Select unprivileged checkout owner
+        shell: bash
+        run: |
+          # Recovery workers must execute below directories owned by their
+          # own user or root, including GitHub's runner-owned workspace parent.
+          useradd --uid "$(stat -c %u "$(dirname "$GITHUB_WORKSPACE")")" \
+            --create-home --shell /bin/bash wsprrypi-ci
+          chown -R wsprrypi-ci:wsprrypi-ci "$GITHUB_WORKSPACE"
 
       - name: Trust parent checkout ownership
         run: |
@@ -533,6 +546,10 @@ jobs:
           ref: e17d710499e8c7c630d2eda6adececd7f6b797f5 # v1.0.0 provider source; package remains release-selected
           path: src/build/rp1-provider-reference
           persist-credentials: false
+
+      - name: Set reference checkout ownership
+        shell: bash
+        run: chown -R wsprrypi-ci:wsprrypi-ci "$GITHUB_WORKSPACE/src/build/rp1-provider-reference"
 
       - name: Run RP1 non-hardware regression
         working-directory: src
