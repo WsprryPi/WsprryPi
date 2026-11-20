@@ -3,6 +3,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBrowser, waitFor, finishFixture, closeServer } = require('./browser_harness.js');
@@ -11,8 +12,8 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
     const controllerOnly = process.argv[4] === 'controller';
     const basePath = '/wsprrypi';
     assert(Number.isInteger(backendPort) && backendPort >= 1024 && backendPort <= 49151);
-    const ui = path.resolve(__dirname, '..'), captures = '/private/tmp/wsprrypi-sqlite-maintenance-ui' + (controllerOnly ? '/controller' : '');
-    fs.mkdirSync(captures, { recursive: true });
+    const ui = path.resolve(__dirname, '..');
+    const captures = fs.mkdtempSync(path.join(os.tmpdir(), 'wsprrypi-sqlite-maintenance-ui-'));
     const phpPort = await freePort();
     let php, proxy, browser, client, profile, failure, dropConfirm = true, failReadback = false;
     const mutations = [];
