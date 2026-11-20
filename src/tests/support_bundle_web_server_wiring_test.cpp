@@ -24,6 +24,7 @@ int main() {
     const std::filesystem::path source_root = std::filesystem::current_path();
     const std::string source = read_file(source_root / "web_server.cpp");
     const std::string header = read_file(source_root / "web_server.hpp");
+    const std::string backend = read_file(source_root / "application_control/backend_services.cpp");
     const std::string config_routes =
         read_file(source_root / "web_server_config_routes.cpp");
     const std::string config_http =
@@ -54,33 +55,21 @@ int main() {
         config_routes + config_http + control_routes + admin_routes +
         admin_http + request_guard + version_routes;
 
-    const std::size_t construction = source.find("SupportBundleRuntime::create_production()");
-    const std::size_t registration = source.find("register_support_bundle_http_routes(");
-    assert(construction != std::string::npos && registration != std::string::npos);
-    assert(construction < registration);
-    assert(count(source, "SupportBundleRuntime::create_production()") == 1);
+    assert(count(backend, "SupportBundleRuntime::create_production()") == 1);
     assert(count(source, "register_support_bundle_http_routes(") == 1);
+    assert(source.find("wsprrypi::backend_support_jobs()") != std::string::npos);
     assert(header.find("network_snapshot_provider_") != std::string::npos);
     assert(source.find("network_snapshot_provider_()") != std::string::npos);
-    assert(count(source, "resolve_support_bundle_intake_production") == 1);
     assert(source.find("resolve_support_bundle_intake_production);") != std::string::npos);
-
-    const std::size_t stop = source.find("svr->stop();");
-    const std::size_t join = source.find("serverThread.join();");
-    const std::size_t shutdown = source.find("supportBundleJobManager_->shutdown();");
-    assert(stop != std::string::npos && join != std::string::npos && shutdown != std::string::npos);
-    assert(stop < join && join < shutdown);
-    assert(header.find("std::unique_ptr<SupportBundleJobManager> supportBundleJobManager_") <
-           header.find("std::unique_ptr<httplib::Server> svr"));
-
-    const std::size_t manager_shutdown = source.find("supportBundleJobManager_->shutdown();");
-    const std::size_t server_reset = source.find("svr.reset();");
-    const std::size_t manager_reset = source.find("supportBundleJobManager_.reset();");
-    assert(manager_shutdown < server_reset && server_reset < manager_reset);
-    assert(source.find("svr = std::make_unique<httplib::Server>();") != std::string::npos);
+    assert(source.find("->shutdown()") == std::string::npos);
+    assert(backend.find("if(jobs)jobs->shutdown();") != std::string::npos);
+    assert(source.find("pairing_runtime_") == std::string::npos);
+    assert(source.find("wsprrypi::backend_pairing_service") != std::string::npos);
+    const auto stop=source.find("svr->stop();"),join=source.find("serverThread.join();");
+    const auto reset=source.find("svr.reset();"),release=source.find("supportBundleJobManager_.reset();");
+    assert(stop<join&&join<reset&&reset<release);
     assert(source.find("supportBundleRoutesRegistered_ = false;") != std::string::npos);
-
-    assert(source.find("svr->listen(\"0.0.0.0\", port_);") != std::string::npos);
+    assert(source.find("svr->listen(loopback_fixture_?\"127.0.0.1\":\"0.0.0.0\", port_);") != std::string::npos);
     assert(count(source, "->listen(") == 1);
     assert(config_routes.find("\"/config\"") != std::string::npos);
     assert(version_routes.find("\"/version\"") != std::string::npos);
@@ -98,7 +87,6 @@ int main() {
     assert(count(admin_routes, "\"/api/rp1-gpclk-route\"") == 2);
     assert(count(version_routes, "\"/version\"") == 1);
     assert(config_routes.find("json.hpp") == std::string::npos);
-    assert(control_routes.find("json.hpp") == std::string::npos);
     assert(admin_routes.find("json.hpp") == std::string::npos);
     assert(config_http.find("httplib.hpp") == std::string::npos);
     assert(admin_http.find("httplib.hpp") == std::string::npos);

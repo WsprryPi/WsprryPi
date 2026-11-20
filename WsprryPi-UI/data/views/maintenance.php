@@ -13,6 +13,7 @@ require __DIR__ . '/../card_header.php';
                 <div id="installationSetup">
                     <?php require __DIR__ . '/configuration-recovery.php'; ?>
                 </div>
+                <?php require __DIR__ . '/backup-restore.php'; ?>
                 <section id="controllerAccess" class="maintenance-pane mb-4" aria-labelledby="controllerAccessTitle">
                     <h2 id="controllerAccessTitle" class="maintenance-pane__title h5 mb-0">Controller access</h2>
                     <p id="pairingState" class="maintenance-pane__body mb-0">Checking controller access…</p>

@@ -432,7 +432,7 @@ class ServiceInstallRecoveryTest(unittest.TestCase):
         self.assertNotIn("get_sem_ver", config)
         self.assertLess(
             group.index('"capture_install_sem_ver"'),
-            group.index('"manage_config'),
+            group.index('"manage_application_state'),
         )
 
 

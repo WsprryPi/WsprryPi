@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_pair_machine_backend.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "browser_http.hpp"
 #include "controller_contract.hpp"
 #include "pi_pair_contract.hpp"
@@ -141,6 +142,7 @@ PiPairHttpReply PiPairMachineBackend::request(const PiPairPrincipal &principal,c
             {"pair_id",principal.identity().pair_id},{"state","rejected"},{"code",closed},{"retryable",status==503||status==429}}.dump(),{}},{},{}};
     };
     try{
+        if(request.method!="GET"&&restored_remote_authority_held())return failure(503,"recovery_required");
         const auto history=history_();const auto browser=wtp_browser_http_request(request);
         if(!history||!browser||(cancelled&&cancelled()))return failure(403,"unauthorized");
         if(principal.identity().purpose==PiPairTlsPurpose::Retirement){

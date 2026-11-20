@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <map>
 #include "pi_pair_catalog_store.hpp"
 #include "pi_pair_initialization.hpp"
 #include "owned_state_directory.hpp"
@@ -43,6 +44,9 @@ public:
     // irrecoverable safe records use zero. Unsafe/replaced paths return none.
     std::optional<std::string> recovery_generation() noexcept;
     PiPairCatalogStore::Snapshot snapshot();
+    // Trusted recovery capture only. Pins the selected key/history namespace;
+    // absent first-use history stays absent, and unavailable history refuses.
+    void with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &);
     void publish(const PiPairCatalogStore::Snapshot &,const nlohmann::json &);
     void publish(const PiPairCatalogStore::Snapshot &,const nlohmann::json &,const nlohmann::json &);
     void publish(const PiPairCatalogStore::Snapshot &,const nlohmann::json &,const nlohmann::json &,const nlohmann::json &peers);

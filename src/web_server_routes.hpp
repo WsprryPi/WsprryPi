@@ -29,6 +29,9 @@ class PiPairHistory;
 
 namespace web_server_routes
 {
+// Backend exit only, after request/device workers have drained. Browser
+// listener restart must not destroy these owners or their durable sessions.
+void shutdown_backend_control_owners() noexcept;
 struct RouteResponse;
 using CorsHeaderSetter = std::function<void(httplib::Response &)>;
 using NetworkSnapshotProvider =

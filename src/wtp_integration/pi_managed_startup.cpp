@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "pi_managed_startup.hpp"
+#include "application_storage/application_state.hpp"
+#include "application_control/local_transport.hpp"
+#include "application_storage/sqlite_catalog.hpp"
 #include "recurrence_authority.hpp"
 #include "config_handler.hpp"
 #include "config_handler_serialization.hpp"
@@ -25,6 +28,7 @@ void require(bool value){if(!value)throw std::runtime_error("pi_management_start
 struct PiManagedStartup::State {
     enum class Phase {Unprepared,Bootstrapping,Ready,Held};
     std::string ini,self;
+    std::shared_ptr<SqliteStateStore> database;
     std::filesystem::path input_parent;
     std::optional<WtpSettings> bootstrap_active;
     WtpCatalog catalog;
@@ -41,6 +45,13 @@ struct PiManagedStartup::State {
          input_parent(std::filesystem::canonical(std::filesystem::path(ini).has_parent_path()?std::filesystem::path(ini).parent_path():".")),
          catalog(ini+".wtp-devices.json"),
          store(ini,self,anchor()),pairing(std::move(initialize_pairing)){}
+    explicit State(std::shared_ptr<SqliteStateStore> selected,std::function<void(PiPairInitializationProof)> initialize_pairing)
+        :ini(selected?selected->directory()+"/configuration":std::string{}),
+         self(selected?selected->identity():std::string{}),database(std::move(selected)),
+         input_parent(database?database->directory():std::string{}),
+         catalog(sqlite_catalog_storage(database)),store(database,anchor()),pairing(std::move(initialize_pairing)) {
+        require(database&&database->role()==StateRole::Pi&&application_database()==database);
+    }
     PiManagementAnchor anchor(){
         return {[this]{return catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).read();},
             [this](const auto &history,const auto &commit){catalog.pi_management_anchor(self,store.initialized()?std::nullopt:bootstrap_active).coordinate(history,commit);}};
@@ -78,6 +89,8 @@ struct PiManagedStartup::State {
 };
 PiManagedStartup::PiManagedStartup(std::string ini,std::string self,std::function<void(PiPairInitializationProof)> pairing)
     :state_(std::make_shared<State>(std::move(ini),std::move(self),std::move(pairing))){}
+PiManagedStartup::PiManagedStartup(std::shared_ptr<SqliteStateStore> database,std::function<void(PiPairInitializationProof)> pairing)
+    :state_(std::make_shared<State>(std::move(database),std::move(pairing))){}
 PiManagedStartup::~PiManagedStartup(){
     std::lock_guard lock(config_update_mutex());
     if(installed_owner!=state_.get())return;
@@ -100,6 +113,7 @@ void PiManagedStartup::prepare(){
     installed_owner=state_.get();state_->phase=State::Phase::Held;
     const auto state=state_;
     iniFile.set_file_reader([state](const std::string &path){
+        require(!state->database);
         require(state->phase==State::Phase::Bootstrapping||state->phase==State::Phase::Ready);
         const auto prefix=state->ini+".preview.";
         const bool preview=path.starts_with(prefix)&&path.size()==prefix.size()+6&&
@@ -110,6 +124,7 @@ void PiManagedStartup::prepare(){
         return PiManagementJournal::read_ini_input(path).bytes;
     });
     iniFile.set_file_writer([state](const std::string &path,const std::string &bytes){
+        require(!state->database);
         require((state->phase==State::Phase::Bootstrapping||state->phase==State::Phase::Ready)&&path==state->ini);
         const auto parent=std::filesystem::path(path).has_parent_path()?std::filesystem::path(path).parent_path():std::filesystem::path(".");
         require(std::filesystem::canonical(parent)==state->input_parent);
@@ -154,13 +169,26 @@ void PiManagedStartup::prepare(){
             // The parent proves that only the private network-safety value
             // changes. It neither reserves RF nor applies transmitter settings.
             state->store.persist_private(internal,before,after);
+        },
+        [state](const auto &internal,const std::string &before,const std::string &after){
+            if(!state->store.initialized())throw LocalCommandRefused(LocalRefusal::SetupRequired);
+            state->source(internal);bool entered=false;
+            try{state->guarded([&]{entered=true;state->store.persist_advanced(internal,before,after);});}
+            catch(...){if(!entered)throw LocalCommandRefused(LocalRefusal::Busy);throw;}
         });
     // Recover committed images before the component or application reads INI.
     state->store.validate_initial_source();
-    const auto recurrence=prepare_pi_recurrence_storage(state->self,state->ini);
-    state->store.bind_recurrence_storage(recurrence.path,true);
-    state->store.recover();
-    state->store.prepare_installation(recurrence.prior_output_history,state->pairing);
+    if(state->database) {
+        state->store.bind_recurrence_storage({},true);
+        state->store.recover();
+        if(!state->store.initialized())state->store.prepare_installation(wtp_pi_has_prior_output_history(),state->pairing);
+        require(state->store.initialized()||state->store.installation_pending());
+    } else {
+        const auto recurrence=prepare_pi_recurrence_storage(state->self,state->ini);
+        state->store.bind_recurrence_storage(recurrence.path,true);
+        state->store.recover();
+        state->store.prepare_installation(recurrence.prior_output_history,state->pairing);
+    }
     set_legacy_recurrence_admission([state]{
         if(!state->validated||(state->phase!=State::Phase::Bootstrapping&&state->phase!=State::Phase::Ready))return LegacyRecurrenceAdmission::Held;
         const auto authority=state->store.recurrence_authority();

@@ -18,6 +18,7 @@ BackendHttpGuardDecision evaluate_backend_http_request(
             !trusted_proxy_identities.empty() ||
             path == "/config" || path.starts_with("/config/") ||
             path == "/control" || path.starts_with("/control/") ||
+            path.starts_with("/api/recovery/") ||
             path == "/api/support-bundles" ||
             path.starts_with("/api/support-bundles/") ||
             path == "/api/network-safety" ||

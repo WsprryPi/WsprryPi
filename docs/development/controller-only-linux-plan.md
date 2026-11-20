@@ -124,28 +124,9 @@ operations; never treat shutdown as authority to adopt/reset another device.
 
 ### Identity and configuration
 
-Preserve existing stable controller identities. On non-Linux hosts, provide a
-persistent cryptographically generated controller identity conforming to the
-accepted identity contract; never derive trust from hostname, IP, MAC address,
-CPU architecture, or a hard-coded shared value. Use platform CSPRNGs and fresh
-boot/session identities. Missing or inconsistent identity/pairing storage refuses
-management until explicit recovery under #473. Do not distribute preinitialized
-identities or keys in packages/images. A complete credential-store clone cannot
-in general be detected locally: document clone exclusion and target-local pairing
-replacement recovery rather than promising a new clone-detection system.
-Distinguish first installation from lost established state: provision a fresh
-controller identity once through the accepted backend initialization, under the
-service account, before readiness. An empty enrollment needs no pairing keys;
-a saved enrollment with missing keys requires recovery. Reinstall must not treat
-missing established authority as permission to generate a replacement identity.
-Platform moves and existing-installation identity conversions are
-outside this task; preserve existing data and refuse implicit conversion.
+Preserve existing stable controller identities. On non-Linux hosts, provide a persistent cryptographically generated controller identity conforming to the accepted identity contract; never derive trust from hostname, IP, MAC address, CPU architecture, or a hard-coded shared value. Use platform CSPRNGs and fresh boot/session identities. Missing or inconsistent identity/pairing storage refuses management until explicit recovery under #473. Do not distribute preinitialized identities or keys in packages/images. A complete credential-store clone cannot in general be detected locally: document clone exclusion and target-local pairing replacement recovery rather than promising a new clone-detection system. Distinguish first installation from lost established state: provision a fresh controller identity once through the accepted backend initialization, under the service account, before readiness. An empty enrollment needs no pairing keys; a saved enrollment with missing keys requires recovery. Reinstall must not treat missing established authority as permission to generate a replacement identity. Use the accepted encrypted backup/restore engine for supported computer moves. Preserve destination identity and authority, supported portable-setting rules, and explicit destination-review holds. Do not add platform-specific credential conversion or an implicit identity replacement.
 
-On Linux retain `/usr/local/etc/wsprrypi.ini`. The installer creates configuration;
-the browser never creates or discovers host files. Use the same INI semantics on
-other platforms with installer-resolved native paths passed explicitly to the
-service. Inventory controller-owned keys, defaults, units, validation, and CLI
-precedence from accepted #473. Do not invent a parallel settings schema.
+Use the accepted [SQLite and process contract](sqlite-storage-contract.md). SQLite is authoritative for supported local settings and controller state; an existing INI is one-time migration input and is retired afterward. The backend owns initialization and validation, the existing UI edits ordinary settings, and the local validated `--settings` command edits advanced saved values. Platform installers select explicit native private state/runtime paths; neither browser input nor working directory selects them. Preserve current defaults, units, startup precedence, and one current settings schema.
 
 Local-transmitter fields are not applied or rewritten. Invalid relevant settings
 refuse startup. Preserve existing valid values on reinstall. Listener/security
@@ -154,13 +135,7 @@ Do not reuse local-station validation merely to obtain controller policy.
 
 ### Ownership and storage
 
-Use platform-specific config, private state, logs, and temporary directories.
-Linux new installs use root-owned configuration and service-owned
-`/var/lib/wsprrypi/controller`; macOS uses installer-owned configuration and a
-private service-owned Application Support directory; Windows uses installer-owned
-configuration and restricted ProgramData state. Fix exact paths in the platform
-manifest before coding. Pass them through the accepted storage owners, never by
-working-directory dependence or browser input.
+Use platform-specific config, private state, logs, and temporary directories. Linux SQLite installations use the private application-generation root `/var/lib/wsprrypi/application-state`; existing independent identity and companion owners retain their accepted bindings. macOS uses a private service-owned Application Support directory, and Windows uses restricted ProgramData state. Fix exact paths in the platform manifest before coding. Pass them through the accepted storage owners, never by working-directory dependence or browser input.
 
 Separate executable/configuration ownership from mutable catalogs, device-managed
 pairing keys, authorization generations, receipts, journals, and cursors.
@@ -213,22 +188,9 @@ licenses, build provenance, dirty-source attribution, and artifact checksums.
 Release signing/notarization and publication need their own credentials/authority;
 unmet distribution requirements must be reported, not bypassed.
 
-Privileged installation may create a dedicated service identity, install files,
-set narrowly scoped device permissions, and register the service. Runtime is
-unprivileged: Linux systemd, macOS launchd, Windows Service Control Manager.
-Use a dedicated least-privilege service identity, explicit paths/working directory,
-bounded stop/restart handling, and protected config/state/log ACLs. Do not grant
-administrator/root runtime, interactive-user secrets, broad sudo rights, or
-world-writable device nodes. Verify hardening does not block required USB/network
-or durable writes. A foreground diagnostic invocation uses the same runtime.
+Privileged installation may create a dedicated service identity, install files, set narrowly scoped device permissions, and register the service. The controller backend and browser runtime are unprivileged under their native service identities: Linux systemd, macOS launchd, and Windows Service Control Manager. The separate maintenance lifecycle adapter may hold only the narrow native privilege required for admitted service replacement and protected recovery state; it exposes no arbitrary command or service executor. The current Linux recovery topology uses a separate root maintenance worker; #475 must qualify its unprivileged controller backend and browser independently. Use a dedicated least-privilege service identity, explicit paths/working directory, bounded stop/restart handling, and protected config/state/log ACLs. Do not grant administrator/root backend or browser runtime, interactive-user secrets, broad sudo rights, or world-writable device nodes. Verify hardening does not block required USB/network or durable writes. A foreground diagnostic invocation uses the same runtime.
 
-Install/update is repeatable and preserves configuration, identity, pairing, and
-journals. Refuse a conflicting installed role, occupied deployment, unsafe paths,
-or incompatible storage version before destructive changes. No automatic conversion
-of transmitter installations, platform migration, credential reset, or ownership
-adoption. Stage and verify replacements; preserve the prior working artifact and
-state until successful activation. Rollback must not run an older writer against
-incompatible state or erase accepted remote outcomes.
+Install/update is repeatable and preserves configuration, identity, pairing, and journals. Refuse a conflicting installed role, occupied deployment, unsafe paths, or incompatible storage version before destructive changes. No automatic role conversion, credential reset, or ownership adoption. Supported explicit computer moves use the accepted recovery engine and cannot convert a Pi role into a controller role. Stage and verify replacements; preserve the prior working artifact and state until successful activation. Rollback must not run an older writer against incompatible state or erase accepted remote outcomes.
 
 Define role-specific uninstall ownership: remove only installer-owned service,
 files, and permission rules; preserve user state by default. State deletion,
@@ -314,7 +276,7 @@ Emulation/cross-compilation alone is not native runtime or installation evidence
   for forbidden device access, transmitter construction, power/service commands,
   and privilege requests. A suppression environment variable is insufficient.
 - Test CLI/help/version, invalid/mixed arguments, missing role on controller build,
-  minimal/read-only/legacy-rich INIs, bounds/precedence, byte preservation,
+  one-time minimal/read-only/legacy-rich INI migration, SQLite startup and no fallback, bounds/precedence, supported-value preservation,
   corrupted or missing identity/keys/state, partial startup, listener conflicts,
   single-instance locking, permission failures, signals/service stop, and restart.
   No target mutation or execution dispatch before authority/readiness admission;
@@ -384,3 +346,9 @@ No release-readiness or universal-platform claim may exceed that evidence.
 
 Preparing this plan does not execute it. No staging, commit, push, installation,
 service operation, hardware access, or transmission is authorized.
+
+## SQLite and separate-service reconciliation
+
+Apply the accepted SQLite ownership, initialization/migration, advanced-settings command, diagnostic export, encrypted recovery, and persistent restore-hold contracts. Keep backend, HTTP/browser-WebSocket process, and independent maintenance lifecycle separate on every claimed native profile. Apache/PHP remain the current Linux asset/proxy integration; other native hosting/service/IPC adapters require their own qualified implementation. A Linux fixture or macOS portable build does not qualify Windows, installed services, or physical USB.
+
+The ordinary Pi role remains hybrid: it can transmit locally and manage permitted remote targets at the same time. Controller-only is an explicit additional zero-output role, not a mutually exclusive transmitter-versus-fleet product architecture. Current `--no-web` operation retains backend and maintenance ownership. Recovery is available through the existing Maintenance page and local command without adding advanced settings controls. New platform work must preserve these behaviors rather than introduce another storage or recovery engine.

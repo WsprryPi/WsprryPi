@@ -39,6 +39,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <optional>
 
 class SupportBundleJobManager;
 class PrivilegedNetworkAdmin;
@@ -94,6 +95,8 @@ public:
 
     // True only after the HTTP listener has bound, not merely after thread start.
     bool isListening();
+    bool loopback_fixture() const noexcept{return loopback_fixture_;}
+    std::optional<int> listening_port();
 
     /**
      * @brief Stops the web server.
@@ -116,16 +119,10 @@ public:
 private:
     friend class WebServerNetworkLifecycleTest;
 
-    void start_pairing_supervisor();
-    void stop_pairing_supervisor() noexcept;
-    std::mutex pairing_mutex_;
-    std::shared_ptr<wsprrypi::PiPairRuntime> pairing_runtime_;
-    std::thread pairing_thread_;
-    std::atomic_bool pairing_stopping_{true};
     int port_;                         ///< Port on which the server listens.
     bool loopback_fixture_{};
     // Declared before svr so route captures are destroyed before the manager.
-    std::unique_ptr<SupportBundleJobManager> supportBundleJobManager_;
+    std::shared_ptr<SupportBundleJobManager> supportBundleJobManager_;
     std::unique_ptr<PrivilegedNetworkAdmin> privilegedNetworkAdmin_;
     wsprrypi::Rp1GpclkRouteService* rp1GpclkRouteService_ = nullptr;
     bool supportBundleRoutesRegistered_ = false;

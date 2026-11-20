@@ -32,6 +32,11 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "config_handler.hpp"
+#include "application_storage/application_state.hpp"
+#include "application_storage/ini_migration.hpp"
+#include "application_control/advanced_settings.hpp"
+#include "application_control/local_transport.hpp"
+#include "pi_managed_host_runtime.hpp"
 #include "privileged_network_admin.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
 #include "i2c_bus_inventory.hpp"
@@ -60,6 +65,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -70,6 +76,8 @@
 #include <openssl/sha.h>
 #include <optional>
 #include <shared_mutex>
+#include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -88,6 +96,7 @@ ConfigStockCoordinator config_stock_coordinator;
 ConfigIniDraftObserver config_ini_draft_observer;
 ConfigIniInputGuard config_ini_input_guard;
 ConfigPrivateCoordinator config_private_coordinator;
+ConfigAdvancedCoordinator config_advanced_coordinator;
 thread_local bool explicit_config_persistence = false;
 struct ExplicitConfigPersistence {
     bool previous{explicit_config_persistence};
@@ -96,22 +105,27 @@ struct ExplicitConfigPersistence {
 };
 }
 void set_config_persistence_owner(ConfigPersistenceCoordinator owner,ConfigSnapshotValidator validator,
-    ConfigStockCoordinator stock,ConfigIniDraftObserver draft,ConfigIniInputGuard input,ConfigPrivateCoordinator private_owner) {
+    ConfigStockCoordinator stock,ConfigIniDraftObserver draft,ConfigIniInputGuard input,ConfigPrivateCoordinator private_owner,ConfigAdvancedCoordinator advanced_owner) {
     std::lock_guard lock(config_update_mutex());
-    if(bool(owner)!=bool(validator)||bool(owner)!=bool(stock)||((draft||input||private_owner)&&!owner))throw std::invalid_argument("Configuration persistence, snapshot and stock owners must be installed together");
+    if(bool(owner)!=bool(validator)||bool(owner)!=bool(stock)||((draft||input||private_owner||advanced_owner)&&!owner))throw std::invalid_argument("Configuration persistence, snapshot and stock owners must be installed together");
     config_persistence_owner=std::move(owner);
     config_snapshot_validator=std::move(validator);
     config_stock_coordinator=std::move(stock);
     config_ini_draft_observer=std::move(draft);
     config_ini_input_guard=std::move(input);
     config_private_coordinator=std::move(private_owner);
+    config_advanced_coordinator=std::move(advanced_owner);
 }
 void validate_config_ini_input(const std::string &filename){
     std::lock_guard lock(config_update_mutex());
+    if(wsprrypi::application_database_selected()&&filename!=wsprrypi::application_configuration_namespace())
+        throw std::invalid_argument("Configuration namespace does not match selected application state");
     if(config_ini_input_guard)config_ini_input_guard(filename);
 }
 bool read_owned_ini_snapshot(const std::string &path,std::optional<std::string> &bytes){
     std::lock_guard lock(config_update_mutex());
+    if(wsprrypi::application_database_selected())
+        throw std::logic_error("File configuration reads are unavailable for database state");
     if(!config_persistence_owner||!config.use_ini||path!=config.ini_filename)return false;
     try{validate_config_ini_input(path);bytes=wsprrypi::PiManagementJournal::read_ini_input(path).bytes;}
     catch(...){bytes.reset();}
@@ -192,6 +206,11 @@ namespace
     // or process restart removes this exception and uses immediate cancellation.
     std::string config_file_stamp(const std::string &path)
     {
+        if(wsprrypi::application_database_selected()) {
+            validate_config_ini_input(path);
+            const auto saved=wsprrypi::database_configuration_input();
+            return path+":"+saved.record_revision;
+        }
         struct stat info{};
         if (stat(path.c_str(), &info) != 0) return {};
 #if defined(__APPLE__)
@@ -1300,8 +1319,6 @@ namespace
             {"Socket Port", 31416},
             {"Use Shutdown", false},
             {"Shutdown Button", 19}};
-        target["WTP"] = wtp_settings_json(WtpSettings{});
-        target["WTP Server"] = wtp_server_settings_json(WtpServerSettings{});
         target["Experimental"] = {
             {"Allow Unqualified Frequency", false},
             {"Allow Non-Amateur Frequency", false}};
@@ -1568,8 +1585,6 @@ namespace
                 section != "Si5351" &&
                 section != "WSPR" &&
                 section != "CW" &&
-                section != "WTP" &&
-                section != "WTP Server" &&
                 section != "Experimental")
             {
                 continue;
@@ -1604,9 +1619,7 @@ namespace
                     continue;
                 }
 
-                if ((section == "WTP" && wtp_settings_json(WtpSettings{}).value(key, nlohmann::json()).is_string()) ||
-                    (section == "WTP Server" && key == "Interface") ||
-                    (section == "Si5351" && key == "Adapter Identity"))
+                if (section == "Si5351" && key == "Adapter Identity")
                 {
                     patch[section][key] = trimmed;
                 }
@@ -1641,6 +1654,64 @@ namespace
         target.merge_patch(patch);
     }
 
+    bool build_candidate_from_database(
+        const std::string &filename,
+        const wsprrypi::PersistentConfiguration &saved,
+        nlohmann::json &candidate_json,
+        ArgParserConfig &candidate_config,
+        std::string *error_message,
+        nlohmann::json *error_details,
+        bool observe_saved_draft)
+    {
+        try {
+            validate_config_ini_input(filename);
+            if(saved.role!=wsprrypi::StateRole::Pi)
+                throw std::invalid_argument("Controller settings cannot configure a local transmitter");
+            init_config_json_impl(candidate_json);
+            for(const auto &[section,value]:saved.configuration.items())
+                candidate_json[section]=value;
+            candidate_json["Meta"]["Use INI"]=true; // Internal persisted-source marker; no file projection.
+            candidate_json["Meta"]["INI Filename"]=filename;
+            candidate_json["Meta"]["debug_logging"]=saved.private_settings.debug_logging;
+            candidate_json["Meta"]["Loop TX"]=saved.private_settings.startup_loop_tx;
+            candidate_json["Meta"]["TX Iterations"]=saved.private_settings.startup_tx_iterations;
+            candidate_json["Experimental"]["Allow Unqualified Frequency"]=saved.private_settings.allow_unqualified_frequency;
+            candidate_json["Experimental"]["Allow Non-Amateur Frequency"]=saved.private_settings.allow_non_amateur_frequency;
+            if(observe_saved_draft&&config_ini_draft_observer) {
+                ConfigIniDraftSnapshot draft{filename,config_file_stamp(filename),saved.configuration,{}};
+                draft.raw_source=saved.configuration;
+                for(const auto &[section,values]:saved.configuration.items())
+                    for(const auto &[key,value]:values.items()) {
+                        (void)value;
+                        draft.present_fields.push_back(section+"."+key);
+                    }
+                config_ini_draft_observer(draft);
+            }
+            config_handler_deserialization::deserialize_json_to_runtime_config(candidate_json,candidate_config);
+            candidate_config.enable_web=config.enable_web;
+            candidate_config.rp1_development_confirmation_json=config.rp1_development_confirmation_json;
+            candidate_config.simulated_backend_override=config.simulated_backend_override;
+            if(candidate_config.simulated_backend_override)
+                candidate_config.transmit_backend=TransmitBackendKind::SIMULATED;
+            std::string error;
+            if(!validate_config_candidate(candidate_config,&error,false)) {
+                if(error_message)*error_message=error;
+                return false;
+            }
+            nlohmann::json details;
+            if(candidate_config.transmit&&!validate_wspr_semantics(candidate_config,&error,&details)) {
+                if(error_message)*error_message=error;
+                if(error_details)*error_details=details;
+                return false;
+            }
+            config_handler_serialization::serialize_runtime_config_to_json(candidate_config,candidate_json);
+            return true;
+        } catch(const std::exception &error) {
+            if(error_message)*error_message=error.what();
+            return false;
+        }
+    }
+
     bool build_candidate_from_ini(
         const std::string &filename,
         nlohmann::json &candidate_json,
@@ -1651,6 +1722,11 @@ namespace
     {
         try
         {
+            if(wsprrypi::application_database_selected()) {
+                if(warning_messages)warning_messages->clear();
+                return build_candidate_from_database(filename,wsprrypi::database_configuration_input().settings,
+                    candidate_json,candidate_config,error_message,error_details,observe_saved_draft);
+            }
             const auto draft_stamp=observe_saved_draft&&config_ini_draft_observer&&!iniFile.hasPendingChanges()
                 ?config_file_stamp(filename):std::string{};
             init_config_json_impl(candidate_json);
@@ -1806,6 +1882,82 @@ void init_config_json()
     init_config_json_impl(jConfig);
 }
 
+namespace {
+std::map<std::pair<std::string,std::string>,std::string> migration_ini_values(const std::string &bytes){
+    if(bytes.size()>wsprrypi::SqliteStateStore::maximum_record_bytes)
+        throw std::invalid_argument("Migration input exceeds configuration capacity");
+    // Match the owning INI parser's section/key, comment and last-value rules.
+    // Value conversion is the same parser used by the original config loader.
+    std::istringstream input(bytes);std::string line,section;
+    std::map<std::pair<std::string,std::string>,std::string> values;
+    while(std::getline(input,line)) {
+        const auto text=trim_copy(line);
+        if(text.empty()||text.front()==';'||text.front()=='#')continue;
+        if(text.front()=='['&&text.back()==']'){section=text.substr(1,text.size()-2);continue;}
+        const auto equal=text.find('=');if(equal==std::string::npos)continue;
+        const auto key=trim_copy(text.substr(0,equal));
+        if(key.empty())continue;
+        auto value=text.substr(equal+1);value=value.substr(0,value.find_first_of(";#"));
+        values[{section,key}]=trim_copy(value);
+    }
+    return values;
+}
+}
+std::pair<bool,int> saved_ini_startup_policy(const std::string &bytes)
+{
+    const auto all=migration_ini_values(bytes);
+    std::map<std::string,std::string> values;
+    for(const auto *key:{"Loop TX","TX Iterations"})
+        if(const auto found=all.find({"Meta",key});found!=all.end())values[key]=found->second;
+    bool loop=false;int iterations=0;
+    if(values.contains("Loop TX")&&!values.at("Loop TX").empty()) {
+        const auto value=parse_ini_value(values.at("Loop TX"));
+        if(!value.is_boolean())throw std::invalid_argument("Saved Loop TX must be boolean");
+        loop=value.get<bool>();
+    }
+    if(values.contains("TX Iterations")&&!values.at("TX Iterations").empty()) {
+        const auto value=parse_ini_value(values.at("TX Iterations"));
+        if(!value.is_number()||!std::isfinite(value.get<double>())||
+            value<std::numeric_limits<int>::min()||value>std::numeric_limits<int>::max())
+            throw std::invalid_argument("Saved TX Iterations is outside its supported range");
+        iterations=value.get<int>();
+    }
+    return {loop,iterations};
+}
+
+wsprrypi::PrivateConfiguration saved_ini_private_configuration(const std::string &bytes,bool native_settings)
+{
+    const auto values=migration_ini_values(bytes);
+    const auto boolean=[&](const std::string &section,const std::string &key) {
+        const auto found=values.find({section,key});
+        if(found==values.end()||found->second.empty())return false;
+        const auto value=parse_ini_value(found->second);
+        if(!value.is_boolean())throw std::invalid_argument("Saved private setting must be boolean");
+        return value.get<bool>();
+    };
+    wsprrypi::PrivateConfiguration result;
+    result.debug_logging=boolean("Meta","debug_logging");
+    if(values.contains({"Meta","Debug Logging"})) {
+        const auto alias=boolean("Meta","Debug Logging");
+        if(values.contains({"Meta","debug_logging"})&&alias!=result.debug_logging)
+            throw std::invalid_argument("Saved debug setting has conflicting aliases");
+        result.debug_logging=alias;
+    }
+    if(native_settings){
+        result.allow_unqualified_frequency=boolean("Experimental","Allow Unqualified Frequency");
+        result.allow_non_amateur_frequency=boolean("Experimental","Allow Non-Amateur Frequency");
+    }
+    const auto network=parse_privileged_network_ini_mode(bytes);
+    if(!network.valid&&!network.missing)throw std::invalid_argument("Saved network safety policy is invalid");
+    result.network_safety=network.mode==PrivilegedNetworkMode::enforced?
+        wsprrypi::SavedNetworkSafety::Enforced:wsprrypi::SavedNetworkSafety::InsecureDisabled;
+    if(native_settings){
+        const auto startup=saved_ini_startup_policy(bytes);
+        result.startup_loop_tx=startup.first;result.startup_tx_iterations=startup.second;
+    }
+    return result;
+}
+
 nlohmann::json initial_configuration_draft()
 {
     std::lock_guard update_lock(config_update_mutex());
@@ -1814,15 +1966,110 @@ nlohmann::json initial_configuration_draft()
     return draft;
 }
 
+wsprrypi::IniMigrationConfiguration wsprrypi::decode_ini_migration_configuration(const std::string &bytes,StateRole role)
+{
+    if(role!=StateRole::Pi&&role!=StateRole::Controller)throw StateStorageError(StateStorageError::Code::InvalidInput);
+    IniMigrationConfiguration result;result.private_settings=saved_ini_private_configuration(bytes,role==StateRole::Pi);
+    const auto values=migration_ini_values(bytes);
+    nlohmann::json known;init_config_json_impl(known);
+    // Unknown source fields can be reported and retired. A misspelled casing
+    // of a supported field must not silently replace its value with a default.
+    const auto folded=[](std::string value){
+        for(auto &byte:value)if(byte>='A'&&byte<='Z')byte=static_cast<char>(byte-'A'+'a');
+        return value;
+    };
+    const auto casing=role==StateRole::Controller
+        ? nlohmann::json{{"Meta",{{"debug_logging",nullptr}}},{"Operation",{{"Web Port",nullptr},{"Socket Port",nullptr}}}}
+        : known;
+    for(const auto &[field,value]:values){
+        (void)value;
+        if(field.first=="Meta"&&field.second=="Debug Logging")continue;
+        for(const auto &[section,fields]:casing.items()){
+            if(folded(section)!=folded(field.first)||!fields.is_object())continue;
+            for(const auto &[key,ignored]:fields.items()){
+                (void)ignored;
+                if(folded(key)==folded(field.second)&&(section!=field.first||key!=field.second)&&!values.contains({section,key}))
+                    throw std::invalid_argument("Migration source uses noncanonical setting casing");
+            }
+        }
+    }
+    const std::set<std::string> supported_sections{"Operation","GPIO","Calibration","Si5351","WSPR","CW","Band GPIO","Experimental"};
+    std::size_t ignored=0;
+    for(const auto &[field,value]:values){
+        (void)value;
+        const auto &[section,key]=field;
+        bool supported=(section=="Security"&&key=="Privileged Network Safety")||
+            (section=="Meta"&&(key=="debug_logging"||key=="Debug Logging"));
+        if(role==StateRole::Controller)
+            supported=supported||(section=="Operation"&&(key=="Web Port"||key=="Socket Port"));
+        else{
+            supported=supported||(section=="Meta"&&(key=="Loop TX"||key=="TX Iterations"))||
+                (supported_sections.contains(section)&&known.contains(section)&&known.at(section).contains(key))||
+                (section=="GPIO"&&key=="Use NTP");
+            if(section=="Band GPIO"&&key.ends_with(" Active High"))
+                supported=known.at(section).contains(key.substr(0,key.size()-11));
+        }
+        if(!supported)++ignored;
+    }
+    if(ignored)result.warnings.push_back("Ignored "+std::to_string(ignored)+
+        " source fields outside this role's supported saved settings; original bytes remain in the migration backup.");
+    if(role==StateRole::Controller){
+        result.private_settings.allow_unqualified_frequency=false;result.private_settings.allow_non_amateur_frequency=false;
+        result.private_settings.startup_loop_tx=false;result.private_settings.startup_tx_iterations=0;
+        const auto port=[&](const char *key,int fallback){
+            const auto found=values.find({"Operation",key});if(found==values.end())return fallback;
+            int number{};const auto &text=found->second;const auto parsed=std::from_chars(text.data(),text.data()+text.size(),number);
+            if(parsed.ec!=std::errc{}||parsed.ptr!=text.data()+text.size()||number<1024||number>49151)
+                throw StateStorageError(StateStorageError::Code::InvalidInput);
+            return number;
+        };
+        result.internal={{"Operation",{{"Web Port",port("Web Port",31415)},{"Socket Port",port("Socket Port",31416)}}}};
+    }else{
+        std::map<std::string,std::unordered_map<std::string,std::string>> data;
+        const std::set<std::string> sections{"Meta","Operation","GPIO","Calibration","Si5351","WSPR","CW","Band GPIO","Experimental"};
+        for(const auto &[field,value]:values)if(sections.contains(field.first))data[field.first][field.second]=value;
+        init_config_json_impl(result.internal);
+        (void)migrate_legacy_gpio_keys(data,result.warnings);
+        ini_to_json_impl("",data,result.internal);
+        ArgParserConfig parsed;
+        config_handler_deserialization::deserialize_json_to_runtime_config(result.internal,parsed);
+        config_handler_serialization::serialize_runtime_config_to_json(parsed,result.internal);
+        result.internal["Meta"]["Use INI"]=true;
+    }
+    // The current closed storage codec excludes unknown fields and observations.
+    (void)decode_persistent_configuration(encode_persistent_configuration(result.internal,result.private_settings,role),role);
+    return result;
+}
+
+nlohmann::json installed_configuration_draft()
+{
+    auto draft=initial_configuration_draft();
+    // Installed stock values differ intentionally from direct-CLI defaults.
+    draft["CW"]["Message"]="HELLO";
+    draft["CW"]["Fade Shape"]="raised_cosine";
+    draft["CW"]["Fade In Ms"]=20;draft["CW"]["Fade Out Ms"]=20;
+    draft["CW"]["Fade Slice Ms"]=2;
+    return draft;
+}
+
 bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &draft)
 {
     std::lock_guard lock(config_update_mutex());
     return !draft.file_stamp.empty()&&config_file_stamp(draft.filename)==draft.file_stamp;
 }
+std::string configuration_input_signature(const std::string &path){
+    std::lock_guard lock(config_update_mutex());
+    if(wsprrypi::application_database_selected()&&path!=wsprrypi::application_configuration_namespace())
+        throw std::invalid_argument("Configuration namespace does not match selected application state");
+    if(wsprrypi::application_database_selected())return config_file_stamp(path);
+    return wsprrypi::PiManagementJournal::read_ini_input(path).signature;
+}
 
 void ini_to_json(std::string filename)
 {
     std::lock_guard update_lock(config_update_mutex());
+    if(wsprrypi::application_database_selected())
+        throw std::logic_error("Direct file configuration parsing is unavailable for database state");
     ini_to_json_impl(filename, iniFile.getData(), jConfig);
 }
 
@@ -1836,7 +2083,9 @@ void json_to_config()
 
 namespace {
 std::string config_revision_locked() {
-    const auto bytes = jConfig.dump();
+    auto bytes = jConfig.dump();
+    if(wsprrypi::application_database_selected())
+        bytes += "\n"+wsprrypi::database_configuration_input().record_revision;
     unsigned char digest[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char *>(bytes.data()), bytes.size(), digest);
     std::string result = "\"";
@@ -1879,8 +2128,6 @@ build_persistent_ini_data(const nlohmann::json &source)
             section_name != "WSPR" &&
             section_name != "CW" &&
             section_name != "Experimental" &&
-            section_name != "WTP" &&
-            section_name != "WTP Server" &&
             section_name != "Band GPIO")
         {
             continue;
@@ -1916,9 +2163,6 @@ build_persistent_ini_data(const nlohmann::json &source)
         {
             const std::string &key = kv.key();
             const bool persist_key =
-                (section_name == "WTP" && wtp_settings_json(WtpSettings{}).contains(key)) ||
-                (section_name == "WTP Server" &&
-                 wtp_server_settings_json(WtpServerSettings{}).contains(key)) ||
                 (section_name == "Meta" &&
                  key == "debug_logging") ||
                 (section_name == "Operation" &&
@@ -2028,6 +2272,15 @@ void persist_config_json(const nlohmann::json &source)
         if(!completed)throw std::logic_error("Configuration persistence was not completed");
         return;
     }
+    if(wsprrypi::application_database_selected()) {
+        if(!explicit_config_persistence||!config_persistence_owner)
+            throw std::logic_error("Saved settings require their durable owner");
+        const auto database=wsprrypi::application_database();
+        const auto saved=database->record(wsprrypi::StateRecord::Configuration);
+        if(!saved.bytes||*saved.bytes!=wsprrypi::database_configuration_after_image(source))
+            throw std::runtime_error("Saved settings decision was not committed");
+        return;
+    }
     if (source.contains("GPIO") && source.at("GPIO").is_object() &&
         source.at("GPIO").contains("Manual PPM") &&
         source.at("GPIO").at("Manual PPM").is_number())
@@ -2058,6 +2311,8 @@ void persist_config_json(const nlohmann::json &source)
 
 std::string serialize_config_ini_projection_for_management(const nlohmann::json &source)
 {
+    if(wsprrypi::application_database_selected())
+        return wsprrypi::database_configuration_after_image(source);
     const auto data = build_persistent_ini_data(source);
     for (const auto &[section, values] : data)
         for (const auto &[key, value] : values)
@@ -2229,6 +2484,8 @@ void commit_config_candidate(const PreparedConfigCandidate &candidate)
 
     if (candidate.migration_required)
     {
+        if(wsprrypi::application_database_selected())
+            throw std::logic_error("File migration cannot run against database state");
         iniFile.set_raw_passthrough_keys(
             {{"Security", "Privileged Network Safety"}});
         iniFile.set_filename(candidate.normalized_config.ini_filename);
@@ -2553,9 +2810,27 @@ bool persist_rp1_gpclk_route_config(int gpio, std::string *error_message) noexce
     }
 }
 
+PreparedConfigCandidate prepare_saved_recovery_configuration(const wsprrypi::PersistentConfiguration &saved)
+{
+    std::lock_guard lock(config_update_mutex());
+    PreparedConfigCandidate candidate;
+    candidate.valid=build_candidate_from_database(config.ini_filename,saved,candidate.normalized_json,
+        candidate.normalized_config,&candidate.error_reason,&candidate.error_details,false);
+    return candidate;
+}
+
 namespace {
 PreparedConfigCandidate prepare_ini_after_image(const std::string &filename,const std::string &bytes)
 {
+    if(wsprrypi::application_database_selected()) {
+        PreparedConfigCandidate candidate;
+        const auto saved=wsprrypi::decode_persistent_configuration(bytes,wsprrypi::StateRole::Pi);
+        candidate.valid=build_candidate_from_database(filename,saved,candidate.normalized_json,
+            candidate.normalized_config,&candidate.error_reason,&candidate.error_details,false);
+        if(!candidate.valid)
+            throw std::runtime_error("Configuration after-image rejected: "+candidate.error_reason);
+        return candidate;
+    }
     // The component is a singleton. Use its existing parser on an exclusively
     // created private preparation file while holding the configuration lock;
     // restore the live parser before invoking the durable owner. No live file
@@ -2598,9 +2873,29 @@ void persist_stock_configuration(bool preserve_compatible_values)
 {
     std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
     std::lock_guard update_lock(config_update_mutex());
-    if (!config_stock_coordinator || !config.use_ini || iniFile.hasPendingChanges())
+    const bool database_mode=wsprrypi::application_database_selected();
+    if (!config_stock_coordinator || !config.use_ini || (!database_mode&&iniFile.hasPendingChanges()))
         throw std::runtime_error("Stock transaction requires a current, settled configuration owner");
     const auto filename = config.ini_filename;
+    if(database_mode) {
+        validate_config_ini_input(filename);
+        const auto database=wsprrypi::application_database();
+        if(database->role()!=wsprrypi::StateRole::Pi)
+            throw std::runtime_error("Local transmitter reset requires a native settings owner");
+        const auto before=wsprrypi::database_configuration_input();
+        auto defaults=installed_configuration_draft();
+        auto policy=wsprrypi::PrivateConfiguration{};
+        if(preserve_compatible_values) {
+            defaults=before.settings.configuration;
+            policy=before.settings.private_settings;
+        }
+        const auto bytes=wsprrypi::encode_persistent_configuration(defaults,policy,wsprrypi::StateRole::Pi);
+        const auto candidate=prepare_ini_after_image(filename,bytes);
+        if(wsprrypi::database_configuration_input().record_revision!=before.record_revision)
+            throw std::runtime_error("revision_conflict");
+        config_stock_coordinator(candidate.normalized_json,bytes);
+        return;
+    }
     const auto inspect = [](const std::string &path) {
         struct stat info{};
         if (::lstat(path.c_str(), &info) || !S_ISREG(info.st_mode) ||
@@ -2626,18 +2921,14 @@ void persist_recovery_configuration(const nlohmann::json &configuration,
 {
     std::lock_guard tone_transaction(test_tone_lifecycle_mutex());
     std::lock_guard update_lock(config_update_mutex());
-    if(!config_stock_coordinator||!config.use_ini||iniFile.hasPendingChanges())
+    if(!config_stock_coordinator||!config.use_ini||
+        (!wsprrypi::application_database_selected()&&iniFile.hasPendingChanges()))
         throw std::runtime_error("Recovery requires a settled configuration owner");
     auto internal=jConfig;
     // Experimental settings are excluded from the public candidate and remain
     // server-owned. Preserve actual saved input rather than a rendered default.
     if(preserved_internal.is_object()&&preserved_internal.contains("Experimental"))
         internal["Experimental"]=preserved_internal["Experimental"];
-    // Inactive retired fields remain byte-for-byte values in the private
-    // source projection. They are neither exposed nor accepted by Control/1.
-    for(const auto *section:{"WTP","WTP Server"})
-        if(preserved_internal.is_object()&&preserved_internal.contains(section))
-            internal[section]=preserved_internal[section];
     config_handler_serialization::apply_public_config_to_internal_json(configuration,internal);
     internal["Meta"]["Use INI"]=true;internal["Meta"]["INI Filename"]=config.ini_filename;
     const auto bytes=serialize_config_ini_projection_for_management(internal);
@@ -2652,6 +2943,8 @@ bool persist_owned_network_safety_ini(const std::string &path,const std::string 
 {
     std::lock_guard tone(test_tone_lifecycle_mutex());
     std::lock_guard lock(config_update_mutex());
+    if(wsprrypi::application_database_selected())
+        throw std::logic_error("File configuration writes are unavailable for database state");
     if(!config_persistence_owner)return false;
     if(!config_private_coordinator||!config.use_ini||path!=config.ini_filename||iniFile.hasPendingChanges()||
         before.size()>1048576||after.size()>1048576)
@@ -2669,6 +2962,88 @@ bool persist_owned_network_safety_ini(const std::string &path,const std::string 
     return true;
 }
 
+std::string persist_owned_network_safety_setting(const std::string &expected_revision,bool insecure_disabled)
+{
+    std::lock_guard tone(test_tone_lifecycle_mutex());
+    std::lock_guard lock(config_update_mutex());
+    if(!wsprrypi::application_database_selected()||!config_private_coordinator||!config.use_ini||
+        config.ini_filename!=wsprrypi::application_configuration_namespace())
+        throw std::runtime_error("Private settings require their durable owner");
+    validate_config_ini_input(config.ini_filename);
+    const auto database=wsprrypi::application_database();
+    const auto saved=database->record(wsprrypi::StateRecord::Configuration);
+    if(!saved.bytes||!saved.record_revision||*saved.record_revision!=expected_revision)
+        throw std::runtime_error("revision_conflict");
+    auto settings=wsprrypi::decode_persistent_configuration(*saved.bytes,wsprrypi::StateRole::Pi);
+    settings.private_settings.network_safety=insecure_disabled?wsprrypi::SavedNetworkSafety::InsecureDisabled:
+        wsprrypi::SavedNetworkSafety::Enforced;
+    const auto after=wsprrypi::encode_persistent_configuration(settings.configuration,settings.private_settings,settings.role);
+    const auto candidate=prepare_ini_after_image(config.ini_filename,after);
+    config_private_coordinator(candidate.normalized_json,*saved.bytes,after);
+    const auto committed=database->record(wsprrypi::StateRecord::Configuration);
+    if(committed.bytes!=after||!committed.record_revision||
+        (after!=*saved.bytes&&*committed.record_revision==expected_revision))
+        throw std::runtime_error("Private settings decision was not committed");
+    return *committed.record_revision;
+}
+
+std::string persist_owned_advanced_settings(const std::string &expected,const nlohmann::json &changes){
+    using namespace wsprrypi;
+    std::lock_guard tone(test_tone_lifecycle_mutex());
+    std::lock_guard lock(config_update_mutex());
+    if(!application_database_selected()||!config_advanced_coordinator||!config.use_ini||
+        config.ini_filename!=application_configuration_namespace())
+        throw LocalCommandRefused(LocalRefusal::StorageUnavailable);
+    if(exiting_wspr.load())throw LocalCommandRefused(LocalRefusal::Busy);
+    if(pi_managed_host_selected()){
+        const auto state=pi_managed_host_state();
+        if(state==PiHostReadiness::Starting)throw LocalCommandRefused(LocalRefusal::Busy);
+        if(state==PiHostReadiness::StorageRecovery)throw LocalCommandRefused(LocalRefusal::StorageUnavailable);
+    }
+    const auto database=application_database();
+    StateRecordSnapshot record;
+    try{validate_config_ini_input(config.ini_filename);record=database->record(StateRecord::Configuration);}
+    catch(...){throw LocalCommandRefused(LocalRefusal::StorageUnavailable);}
+    if(!record.bytes||!record.record_revision)throw LocalCommandRefused(LocalRefusal::StorageUnavailable);
+    if(*record.record_revision!=expected)throw LocalCommandRefused(LocalRefusal::RevisionConflict);
+    const auto before=decode_persistent_configuration(*record.bytes,StateRole::Pi);
+    const auto proposed=apply_advanced_changes(before,changes);
+    const auto after=encode_persistent_configuration(proposed.configuration,proposed.private_settings,StateRole::Pi);
+    PreparedConfigCandidate prepared;
+    try{prepared=prepare_ini_after_image(config.ini_filename,after);}
+    catch(...){throw LocalCommandRefused(LocalRefusal::InvalidRequest);}
+    if(current_test_tone_status().owned)throw LocalCommandRefused(LocalRefusal::Busy);
+    const bool active=!pi_managed_host_held();
+    config_advanced_coordinator(prepared.normalized_json,*record.bytes,after);
+    const auto committed=database->record(StateRecord::Configuration);
+    if(committed.bytes!=after||!committed.record_revision)throw std::runtime_error("Advanced settings decision was not confirmed");
+    if(after!=*record.bytes&&active){
+        // Publish only these explicit edits. Retain process overrides for
+        // untouched private fields and all live startup/iteration counters.
+        for(const auto &[name,value]:changes.items()){
+            const auto &field=*advanced_field(name);
+            jConfig[field.section][field.key]=value;
+            if(name=="Meta.debug_logging")config.debug_logging=value.get<bool>();
+            else if(name=="Operation.Web Port")config.web_port=value.get<int>();
+            else if(name=="Operation.Socket Port")config.socket_port=value.get<std::uint16_t>();
+            else if(name=="Experimental.Allow Unqualified Frequency")config.allow_unqualified_frequency=value.get<bool>();
+            else if(name=="Experimental.Allow Non-Amateur Frequency")config.allow_non_amateur_frequency=value.get<bool>();
+            else if(name=="Si5351.TX Output")config.si5351_tx_output=value.get<std::string>().back()-'0';
+            else if(name=="CW.Fade Shape")config.cw_fade_shape=value.get<std::string>();
+            else if(name=="CW.Fade In Ms")config.cw_fade_in_ms=value.get<int>();
+            else if(name=="CW.Fade Out Ms")config.cw_fade_out_ms=value.get<int>();
+            else if(name=="CW.Fade Slice Ms")config.cw_fade_slice_ms=value.get<int>();
+        }
+        ini_reload_generation.fetch_add(1,std::memory_order_release);
+        wtp_pi_configuration_committed(config);
+        publish_test_tone_planning_config(config);
+        refresh_logger_level_from_config();
+    }else if(after!=*record.bytes){
+        if(const auto host=pi_managed_host())host->signal_saved_configuration();
+    }
+    return *committed.record_revision;
+}
+
 bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserved_owner)
 {
     std::lock_guard tone(test_tone_lifecycle_mutex());
@@ -2677,12 +3052,14 @@ bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserve
         if(reserved_owner)throw std::runtime_error("Managed Stop owner unavailable");
         return false;
     }
-    if(!config.use_ini||iniFile.hasPendingChanges())
+    if(!config.use_ini||(!wsprrypi::application_database_selected()&&iniFile.hasPendingChanges()))
         throw std::runtime_error("Managed Stop requires an unchanged saved input");
     validate_config_ini_input(config.ini_filename);
     // Validate the actual saved input, not jConfig: Stop can restore a
     // temporary Test Tone mode, and unrelated runtime edits are not saves.
-    const auto before=wsprrypi::PiManagementJournal::read_ini_input(config.ini_filename).bytes;
+    const auto before=wsprrypi::application_database_selected()
+        ?wsprrypi::application_database()->record(wsprrypi::StateRecord::Configuration).bytes.value()
+        :wsprrypi::PiManagementJournal::read_ini_input(config.ini_filename).bytes;
     auto saved=prepare_ini_after_image(config.ini_filename,before);
     saved.normalized_json["Operation"]["Transmit"]=false;
     const auto after=serialize_config_ini_projection_for_management(saved.normalized_json);
@@ -2710,9 +3087,11 @@ void repair_from_web(bool attempt_repair)
     if (config_stock_coordinator)
     {
         persist_stock_configuration(attempt_repair);
-        iniMonitor.stop();
-        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
-        iniMonitor.setPriority(SCHED_RR, 10);
+        if(!wsprrypi::application_database_selected()) {
+            iniMonitor.stop();
+            iniMonitor.filemon(config.ini_filename, callback_ini_changed);
+            iniMonitor.setPriority(SCHED_RR, 10);
+        }
     }
     else if (attempt_repair)
     {

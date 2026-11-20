@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <system_error>
 #include "pi_pair_owner.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include <stdexcept>
@@ -11,6 +12,12 @@ void require(bool value){if(!value)throw std::runtime_error("pairing_storage_una
 PiPairOwner::PiPairOwner(std::string directory,std::string self):directory_(std::move(directory)),self_(std::move(self)),
     history_(std::make_shared<PiPairHistory>(directory_,self_)){}
 std::shared_ptr<PiPairHistory> PiPairOwner::history(){std::lock_guard guard(mutex_);return history_;}
+void PiPairOwner::with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &capture){
+    std::unique_lock guard(mutex_,std::try_to_lock);
+    if(!guard.owns_lock())throw std::system_error(std::make_error_code(std::errc::device_or_resource_busy));
+    require(bool(history_));
+    history_->with_backup_files(capture);
+}
 bool PiPairOwner::reopen_history(){
     std::lock_guard guard(mutex_);
     if(!history_||history_.use_count()!=1)return false;

@@ -3,6 +3,7 @@
 // identity, target-local clock health, loopback binding and private paths are
 // fixture seams. No production CLI, environment or INI bypass is added.
 #define wtp_pi_device_id phase7_os_device_id
+#include "software_control_runtime.hpp"
 #include "../wtp_endpoint/identity.cpp"
 #undef wtp_pi_device_id
 #include "wtp_endpoint/runtime.hpp"
@@ -30,18 +31,25 @@ public:
 #undef main
 #undef SingletonProcess
 int main(int argc,char **argv){
-    if(argc<6)return 2;
+    if(argc<4)return 2;
     fixture_self=argv[2];
     if(fixture_self.size()!=32||fixture_self.find_first_not_of("0123456789abcdef")!=std::string::npos)return 2;
-    bool simulated=false;
-    for(int i=3;i<argc;++i)if(std::string_view(argv[i])=="--backend"){
+    bool simulated=false,state_command=false,web=false;
+    for(int i=3;i<argc;++i){
+        const std::string_view option=argv[i];
+        if(option=="--web-service"){state_command=true;web=true;}
+        if(option=="--initialize-state"||option=="--migrate-state"||option=="--check-state")state_command=true;
+        if(option=="--backend"){
         if(simulated||i+1>=argc||std::string_view(argv[++i])!="simulated")return 2;
         simulated=true;
+        }
     }
-    if(!simulated)return 2;
+    if(!simulated&&!state_command)return 2;
+    wsprrypi::testing::SoftwareControlRuntime control_runtime(argv[1],argc,argv);
+    if(web)return pi_managed_production_main(argc-2,argv+2);
     wsprrypi::testing::set_wtp_pi_private_state_path(argv[1]);
     WsprTransmitter::SimulatedRuntimeConfig simulation;simulation.trace_path=std::string(argv[1])+".simulated-trace.json";
-    wsprrypi::testing::set_application_simulation_fixture(simulation);webServer.bind_loopback_for_test();
+    if(simulated)wsprrypi::testing::set_application_simulation_fixture(simulation);webServer.bind_loopback_for_test();
     wsprrypi::testing::set_native_clock_reader([](bool){
         wsprrypi::SolarClockObservation result;result.state=wsprrypi::SolarClockState::Synchronized;
         result.utc_ns=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();

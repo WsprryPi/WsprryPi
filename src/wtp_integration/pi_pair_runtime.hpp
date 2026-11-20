@@ -4,7 +4,7 @@
 #include "pi_pair_local_service.hpp"
 #include "pi_pair_machine_service.hpp"
 namespace wsprrypi {
-// Web/process-owned supervisor. Network joins run on its own thread, never the
+// Backend-owned supervisor. Network joins run on its own thread, never the
 // RF scheduler or a request/configuration callback. Construction starts nothing.
 class PiPairRuntime {
 public:

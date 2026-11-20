@@ -1,3 +1,4 @@
+#include "application_control/backend_services.hpp"
 /**
  * @file scheduling_runtime.cpp
  * @brief Owns transmitter callbacks and process runtime lifecycle.
@@ -26,6 +27,7 @@
 #include "privileged_network_runtime.hpp"
 #include "rp1_route_bridge.hpp"
 #include "runtime_config_operations.hpp"
+#include "application_storage/application_state.hpp"
 #include "signal_handler.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "version.hpp"
@@ -597,8 +599,12 @@ void stop_runtime_components_for_process_exit() noexcept
     request_wspr_shutdown("runtime teardown");
     ini_reload_pending.store(false, std::memory_order_relaxed);
 
+    wsprrypi::drain_backend_requests();
+
     webServer.stop();
     socketServer.stop();
+    socketServer.stop_command_runtime();
+    wsprrypi::stop_backend_services();
     stop_runtime_config_monitor();
     wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
@@ -618,8 +624,11 @@ void stop_runtime_components_for_process_exit() noexcept
 
 void stop_runtime_components_for_test() noexcept
 {
+    wsprrypi::drain_backend_requests();
     webServer.stop();
     socketServer.stop();
+    socketServer.stop_command_runtime();
+    wsprrypi::stop_backend_services();
     stop_runtime_config_monitor();
     wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
@@ -742,7 +751,8 @@ bool wspr_loop()
     if (config.use_ini) {
         wsprrypi::start_wtp_fleet(config.ini_filename);
         wsprrypi::start_udp_logging_policy(config.ini_filename);
-        try { wsprrypi::start_usb_logging(config.ini_filename); }
+        try { wsprrypi::start_usb_logging(config.ini_filename,wsprrypi::application_database_selected()?
+            wsprrypi::UsbLoggingCatalogSnapshot([]{return wsprrypi::application_catalog().snapshot({}).first;}):wsprrypi::UsbLoggingCatalogSnapshot{}); }
         catch (const std::exception&) { llog.logS(ERROR, "USB log collector unavailable; review its saved settings."); }
     }
     if(const auto host=wsprrypi::pi_managed_host()){
@@ -756,8 +766,8 @@ bool wspr_loop()
         }else host->hold_output();
     }
     recovery.finish_native_startup();
-    const bool start_web = web_server_start_enabled(config);
-    const bool start_websocket = websocket_server_start_enabled(config);
+    const bool start_web = web_server_start_enabled(config)&&!wsprrypi::application_database_selected();
+    const bool start_websocket = websocket_server_start_enabled(config)&&!wsprrypi::application_database_selected();
     const int startup_web_port = config.web_port;
     const uint16_t startup_socket_port = config.socket_port;
     const bool startup_socket_loopback_only = config.socket_loopback_only;
@@ -766,6 +776,8 @@ bool wspr_loop()
     {
         llog.logS(INFO, "Web UI disabled via CLI (--no-web)");
     }
+    else if(wsprrypi::application_database_selected())
+        llog.logS(INFO,"Browser listeners run in the separate web service.");
     else if (start_web&&!recovery.owns_http())
     {
         try
@@ -859,7 +871,7 @@ bool wspr_loop()
         });
 
     // Monitor INI file for changes
-    if (config.use_ini)
+    if (config.use_ini && !wsprrypi::application_database_selected())
     {
         // Start INI monitor
         start_runtime_config_monitor(config.ini_filename);
@@ -1027,6 +1039,8 @@ bool wspr_loop()
     // -------------------------------------------------------------------------
     llog.logS(DEBUG, "Stopping runtime components.");
 
+    wsprrypi::drain_backend_requests();
+
     llog.logS(DEBUG, "Stopping web server.");
     webServer.stop();
     llog.logS(DEBUG, "Web server stopped.");
@@ -1034,6 +1048,9 @@ bool wspr_loop()
     llog.logS(DEBUG, "Stopping socket server.");
     socketServer.stop();
     llog.logS(DEBUG, "Socket server stopped.");
+    socketServer.stop_command_runtime();
+
+    wsprrypi::stop_backend_services();
 
     llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);

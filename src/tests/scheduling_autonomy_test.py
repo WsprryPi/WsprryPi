@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Two actual-main simulated targets; no controller process during executions."""
 import argparse
-import configparser
 import calendar
 import copy
 import http.server
@@ -9,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import sqlite3
 import socket
 import subprocess
 import sys
@@ -16,9 +16,31 @@ import tempfile
 import time
 import urllib.request
 from controller_only_test import free_port, request as raw_request
+from software_backend_admission import backend_admission
+from software_web_service import start_software_web_service, stop_software_web_service
+
+
+def configuration_bytes(owner):
+    database=owner['state']/'generation-1/state.sqlite3'
+    with sqlite3.connect(database.resolve().as_uri()+'?mode=ro',uri=True) as connection:
+        return connection.execute("SELECT payload FROM records WHERE kind='configuration'").fetchone()[0]
 
 
 _last_request = {}
+
+
+def opposite_test_sites():
+    # Choose equatorial cell centers near local noon and midnight. Two fixed
+    # northern-hemisphere sites can both be dark in winter, and sites near a
+    # terminator can change frequency between the two observed occurrences.
+    utc=time.gmtime()
+    noon_longitude=180-15*(utc.tm_hour+utc.tm_min/60+utc.tm_sec/3600)
+    def locator(longitude,latitude):
+        longitude=(longitude+180)%360;latitude+=90
+        return (chr(65+int(longitude//20))+chr(65+int(latitude//10))+
+                str(int(longitude%20//2))+str(int(latitude%10))+
+                chr(65+min(23,int(longitude%2*12)))+chr(65+min(23,int(latitude%1*24))))
+    return [('a'*32,locator(noon_longitude,.01)),('b'*32,locator(noon_longitude+180,-.01))]
 
 def request(port, *args, **kwargs):
     # Honor the real protected API's ten-requests/second budget. This fixture
@@ -54,7 +76,7 @@ def main():
     if args.controller:
         controller(args.controller,json.loads(args.targets));return
     fixture=str(Path(args.fixture).resolve());out=Path(args.output).resolve();out.mkdir(parents=True,exist_ok=True)
-    processes=[];manager=None;logs=[]
+    processes=[];web_processes=[];manager=None;logs=[]
     def wait(check,label,seconds=15):
         end=time.monotonic()+seconds
         while time.monotonic()<end:
@@ -69,7 +91,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='scheduling-autonomy-') as temporary:
             root=Path(temporary);owners=[];allocated=set()
             def target_port():
-                for port in range(39000,39998,2):
+                for port in range(41000,41998,2):
                     if port in allocated:continue
                     try:
                         with socket.socket() as a,socket.socket() as b:
@@ -77,19 +99,18 @@ def main():
                         allocated.add(port);return port
                     except OSError:continue
                 raise AssertionError('No isolated target ports')
-            for device,locator in [('a'*32,'EM18IG'),('b'*32,'MK88IG')]:
-                directory=root/device;directory.mkdir(mode=0o700);ini=directory/'native.ini';ledger=directory/'ledger';port=target_port()
-                cfg=configparser.ConfigParser(interpolation=None);cfg.optionxform=str;cfg.read(Path(__file__).resolve().parents[2]/'config/wsprrypi.ini')
-                cfg['Operation'].update({'Transmit Backend':'wtp','Transmit':'false','Enable on Boot':'Never','Use LED':'false','Use Amp':'false','Use Shutdown':'false','Web Port':str(port),'Socket Port':str(port+1)})
-                cfg['WSPR'].update({'Call Sign':'AA0NT','Grid Square':locator,'TX Power':'20'});cfg['WTP Server']['Enabled']='false'
-                cfg['WTP'].update({'Transport':'network_plain','Hostname':'127.0.0.1','TCP Port':'31417','Device ID':'c'*32})
-                with ini.open('w') as f:cfg.write(f)
-                ini.chmod(0o600);Path(str(ini)+'.stock').write_bytes(ini.read_bytes());Path(str(ini)+'.stock').chmod(0o600)
+            for device,locator in opposite_test_sites():
+                directory=root/device;directory.mkdir(mode=0o700);state=directory/'state';ledger=directory/'ledger';port=target_port()
+                env={**os.environ,'TZ':'UTC','WSPRRYPI_DISABLE_HARDWARE_ACCESS':'1'}
+                with backend_admission(fixture):
+                    prepared=subprocess.run([fixture,str(ledger),device,'--initialize-state','--state-directory',str(state)],capture_output=True,text=True,env=env,timeout=15)
+                    assert prepared.returncode==0,prepared.stderr
                 log=(out/(device[:1]+'-target.log')).open('w');logs.append(log)
                 env={**os.environ,'TZ':'UTC','WSPRRYPI_DISABLE_HARDWARE_ACCESS':'1'}
-                command=[fixture,str(ledger),device,'--backend','simulated','-i',str(ini),'--socket-loopback-only','--socket-loopback-family','ipv4','--no-offset','--no-system-clock-frequency-estimate']
+                command=[fixture,str(ledger),device,'--backend','simulated','--state-directory',str(state),'--web-port',str(port),'--socket-port',str(port+1),'--socket-loopback-only','--socket-loopback-family','ipv4','--no-offset','--no-system-clock-frequency-estimate']
                 process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env);processes.append(process)
-                owners.append({'device':device,'locator':locator,'port':port,'ini':ini,'ledger':ledger,'process':process,'command':command,'progress':Path(str(ini)+'.recurrence-progress.json'),'trace':Path(str(ledger)+'.simulated-trace.json')})
+                web_processes.append(start_software_web_service([fixture,str(ledger),device],ledger,log,env))
+                owners.append({'device':device,'locator':locator,'port':port,'state':state,'ledger':ledger,'process':process,'command':command,'progress':state/'generation-1/configuration.recurrence-progress.json','trace':Path(str(ledger)+'.simulated-trace.json')})
             for owner in owners:
                 port=owner['port'];base=f"/api/control/v1/targets/{owner['device']}/"
                 def read(path):
@@ -117,8 +138,7 @@ def main():
                         time.sleep(.12)
                     assert result[0]==expected,result
                     return json.loads(result[1])
-                candidate=copy.deepcopy(recovery['draft']);candidate['Operation'].update({'Transmit':False,'Enable on Boot':'Never'});candidate['WSPR'].update({'Call Sign':'AA0NT','Grid Square':owner['locator'],'TX Power':20});candidate['WTP Server']['Enabled']=False
-                for key in ['TLS CA File','TLS Client Certificate','TLS Client Key']:candidate['WTP'][key]=''
+                candidate=copy.deepcopy(recovery['draft']);candidate['Operation'].update({'Transmit':False,'Enable on Boot':'Never','Web Port':port,'Socket Port':port+1});candidate['WSPR'].update({'Call Sign':'AA0NT','Grid Square':owner['locator'],'TX Power':20})
                 mutate('/api/control/v1/host/configuration-recovery','PUT',{'contract':'Wsprry-Control/1','schema':'configuration-recovery-save','binding':recovery['binding'],'capability_revision':recovery['capability_revision'],'operation_id':secrets.token_hex(16),'expected_revision':recovery['revision'],'configuration':candidate})
                 wait(lambda:(read('/api/control/v1/host/readiness') or {}).get('state')=='ready','Ready actual main')
                 context=read(base+'context');saved=read(base+'settings');assert context['binding']['device_id']==owner['device']
@@ -130,7 +150,8 @@ def main():
                 body['operation_id']=secrets.token_hex(16);mutate(base+'settings','PUT',body)
                 context=read(base+'context');saved=read(base+'settings');assert saved['saved']['scheduling']['enabled'] is False
                 mutate(base+'enable','POST',{'contract':'Wsprry-Control/1','schema':'target-enable','binding':context['binding'],'capability_revision':context['capability_revision'],'operation_id':secrets.token_hex(16),'expected_revision':saved['revision'],'candidate_digest':saved['candidate_digest']})
-                owner['initial_progress']=json.loads(owner['progress'].read_text())['record'];owner['ini_bytes']=owner['ini'].read_bytes();owner['saved']=read(base+'settings');owner['events']={};owner['admissions']={}
+                owner['initial_progress']=json.loads(owner['progress'].read_text())['record'];owner['configuration_bytes']=configuration_bytes(owner)
+                owner['saved']=wait(lambda:read(base+'settings'),'Accepted scheduling readback');owner['events']={};owner['admissions']={}
             ports={o['device']:o['port'] for o in owners};controller_port=free_port()
             command=[sys.executable,str(Path(__file__).resolve()),'--controller',str(controller_port),'--targets',json.dumps(ports)]
             manager=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env={**os.environ,'TZ':'Australia/Sydney'})
@@ -142,6 +163,8 @@ def main():
             probe=Path(__file__).resolve().parents[2]/'WsprryPi-UI/tests/scheduling_autonomy_browser_probe.js'
             subprocess.run(['node',str(probe),f'http://127.0.0.1:{controller_port}/'],check=True,timeout=25)
             manager.terminate();assert manager.wait(timeout=5)==-15;manager=None
+            for web in web_processes:stop_software_web_service(web)
+            assert all(web.poll() is not None for web in web_processes)
             absent=time.time_ns();assert all(o['first_start_utc_ns']>absent for o in owners),'Browser and controller must close before either first execution';end=time.monotonic()+110
             while time.monotonic()<end:
                 complete=True
@@ -154,7 +177,7 @@ def main():
                         if any(e['kind']=='execution_start' for e in trace['events']):owner['events'].setdefault(str(trace['plan_id']),{'observed_at_utc_ns':str(time.time_ns()),'trace':trace})
                     except (FileNotFoundError,json.JSONDecodeError):pass
                     complete=complete and len(owner['events'])>=2
-                    assert owner['ini'].read_bytes()==owner['ini_bytes'],'No controller-side sunrise/config writes'
+                    assert configuration_bytes(owner)==owner['configuration_bytes'],'No controller-side sunrise/config writes'
                 if complete:break
                 time.sleep(.04)
             assert all(len(o['events'])==2 for o in owners),'Two target-owned executions required during controller absence'
@@ -163,8 +186,25 @@ def main():
             def next_reservations():
                 records={o['device']:json.loads(o['progress'].read_text())['record'] for o in owners}
                 return records if all(v['in_flight'] and int(v['in_flight']['first_start_ns'])>time.time_ns()+5000000000 for v in records.values()) else None
-            before_reconnect=wait(next_reservations,'Settled future reservations',5)
+            try:
+                before_reconnect=wait(next_reservations,'Settled future reservations',5)
+            except AssertionError:
+                evidence={'before_web_reconnect':{o['device']:json.loads(o['progress'].read_text())['record'] for o in owners},'targets':[]}
+                for owner,log in zip(owners,logs):
+                    env={**os.environ,'TZ':'UTC','WSPRRYPI_DISABLE_HARDWARE_ACCESS':'1'}
+                    web_processes.append(start_software_web_service(owner['command'][:3],owner['ledger'],log,env))
+                    try:
+                        status=wait(lambda:json.loads(request(owner['port'],'GET',f"/api/control/v1/targets/{owner['device']}/status")[1]),'Failure status readback')
+                    except Exception as error:status={'readback_error':str(error)}
+                    evidence['targets'].append({'device':owner['device'],'status':status,'progress':json.loads(owner['progress'].read_text())['record']})
+                (out/'autonomy-refusal.json').write_text(json.dumps(evidence,indent=2)+'\n')
+                raise
             plans_before={o['device']:json.loads(o['trace'].read_text())['plan_id'] for o in owners}
+            for owner,log in zip(owners,logs):
+                env={**os.environ,'TZ':'UTC','WSPRRYPI_DISABLE_HARDWARE_ACCESS':'1'}
+                web_processes.append(start_software_web_service(owner['command'][:3],owner['ledger'],log,env))
+            for owner in owners:
+                wait(lambda:request(owner['port'],'GET','/api/control/v1/host/readiness')[0]==200,'Separate web service reconnect')
             manager=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env={**os.environ,'TZ':'Pacific/Honolulu'})
             after=wait(controller_read,'Controller reconnect observations');assert {v['selection'] for v in after['observations']}=={'day','night'}
             time.sleep(1.2)
@@ -172,20 +212,21 @@ def main():
                 current=json.loads(owner['progress'].read_text())['record'];prior=before_reconnect[owner['device']]
                 assert current['in_flight']==prior['in_flight'] and current['consumed_through_utc_ns']==prior['consumed_through_utc_ns'],'Reconnect must not admit or replay work'
                 assert json.loads(owner['trace'].read_text())['plan_id']==plans_before[owner['device']],'Reconnect must not execute another plan'
-            report={'reconnect_reservations':before_reconnect,'reconnect_plan_ids':plans_before,'schema':'issue473-phase7-autonomy/1','controller_absent_since_utc_ns':str(absent),'controller_before':before,'controller_after':after,'targets':[],'limits':'Actual main, protected APIs, native recurrence, journals and simulated execution; fixture-only independent identities and target-local healthy clock samples. No physical hardware, LAN, services or RF.'}
+            report={'reconnect_reservations':before_reconnect,'reconnect_plan_ids':plans_before,'schema':'issue473-phase7-autonomy/1','controller_absent_since_utc_ns':str(absent),'web_services_absent_since_utc_ns':str(absent),'backend_pids':{o['device']:o['process'].pid for o in owners},'controller_before':before,'controller_after':after,'targets':[],'limits':'Actual main, protected APIs, native recurrence, journals and simulated execution; fixture-only independent identities and target-local healthy clock samples. No physical hardware, LAN, services or RF.'}
             for owner in owners:
                 assert any(a['observed_at_utc_ns']>str(absent) and a['record']['occurrence_id']!=(owner['initial_progress']['in_flight'] or {}).get('occurrence_id') for a in owner['admissions'].values()),'Fresh autonomous admission while controller absent'
                 # QRSS preserves the existing 4-tone configuration reference offset;
                 # compare actual RF-on execution events, not configure/start reference.
                 frequencies={event['frequency_hz'] for row in owner['events'].values() for event in row['trace']['events'] if event['kind']=='event' and event['rf_on']};assert len(frequencies)==1 and frequencies.issubset({14097000,10140000}),frequencies
-                assert owner['ini'].read_bytes()==owner['ini_bytes'];assert owner['saved']['saved']['scheduling']['solar']['location']['locator']==owner['locator']
+                assert configuration_bytes(owner)==owner['configuration_bytes'];assert owner['saved']['saved']['scheduling']['solar']['location']['locator']==owner['locator']
                 assert all(any(event['kind']=='event' and event['rf_on'] for event in row['trace']['events']) for row in owner['events'].values()),'Actual simulated execution events required'
                 record=json.loads(owner['progress'].read_text())['record'];assert record['consumed_through_utc_ns']>=owner['initial_progress']['consumed_through_utc_ns']
                 report['targets'].append({'device':owner['device'],'locator':owner['locator'],'command':owner['command'],'admissions':owner['admissions'],'executions':owner['events'],'final_progress':record})
             assert {next(iter({e['frequency_hz'] for v in o['events'].values() for e in v['trace']['events'] if e['kind']=='event' and e['rf_on']})) for o in owners}=={14097000,10140000}
             (out/'evidence.json').write_text(json.dumps(report,indent=2)+'\n')
-            print('PASS two actual-main targets at independent sites: browser closed, controller absent, fresh admissions and two simulated executions each, opposite solar selections/frequencies, retained configuration, reconnect without replay, and disabled-field API refusal')
+            print('PASS two actual-main targets at independent sites: browser and web services closed, controller absent, fresh admissions and two simulated executions each, opposite solar selections/frequencies, retained configuration, reconnect without replay, and disabled-field API refusal')
     finally:
+        for web in web_processes:stop_software_web_service(web)
         for process in ([manager] if manager else [])+processes:
             if process.poll() is None:process.terminate();process.wait(timeout=10)
         for log in logs:log.close()

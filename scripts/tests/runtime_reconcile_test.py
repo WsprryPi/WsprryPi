@@ -659,8 +659,8 @@ class Tests(unittest.TestCase):
                     self.assertEqual(output.getvalue().strip(), 'not-applicable')
 
     def test_real_preparation_markers_are_required_only_for_rp1(self):
-        service = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini ; ignore_errors=no ; }'
-        for backend in ('gpio', 'si5351', 'wtp', 'rp1-gpclk'):
+        service = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J --state-directory /var/lib/wsprrypi/application-state ; ignore_errors=no ; }'
+        for backend in ('gpio', 'si5351', 'rp1-gpclk'):
             for binary in (b'old binary', b'WSPRRYPI_ROUTE_RESTORE_IDLE',
                            b'WSPRRYPI_RP1_REBOOT_IDLE',
                            b'WSPRRYPI_ROUTE_RESTORE_IDLE WSPRRYPI_RP1_REBOOT_IDLE'):
@@ -669,11 +669,11 @@ class Tests(unittest.TestCase):
                     config = (Path(__file__).resolve().parents[2]/'config/wsprrypi.ini').read_bytes().replace(
                         b'Transmit Backend = gpio', b'Transmit Backend = '+backend.encode())
                     def trusted(path):
-                        if path == recovery.companion.CONFIG: return config, None
                         if path == recovery.companion.BINARY: return binary, None
                         return path.read_bytes(), path.stat()
                     system = recovery.Linux()
-                    with patch.object(recovery.companion, 'trusted', side_effect=trusted), \
+                    with patch.object(recovery.companion, 'state', return_value={'backend':backend,'route':'gpio4','transmit':False}), \
+                         patch.object(recovery.companion, 'trusted', side_effect=trusted), \
                          patch.object(recovery.companion.subprocess, 'check_output', return_value=service), \
                          patch.object(recovery, 'ENVIRONMENT', env), \
                          patch.object(recovery.installer, 'secure_record_parent'), \
@@ -693,7 +693,7 @@ class Tests(unittest.TestCase):
         system = System()
         for name, error in (('inspect_service_command', ValueError('unsupported command')),
                             ('backend', ValueError('unknown backend')),
-                            ('backend', recovery.companion.configparser.DuplicateOptionError('Operation', 'Transmit Backend')),
+                            ('backend', ValueError('duplicate route-state field')),
                             ('backend', OSError('untrusted config'))):
             with self.subTest(name=name, error=error), \
                  patch.object(system, name, side_effect=error), \

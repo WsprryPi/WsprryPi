@@ -5,12 +5,18 @@
 Description=WsprryPi daemon for: %DAEMON_NAME%
 Documentation=https://github.com/orgs/WsprryPi/discussions
 Wants=time-sync.target
+Wants=wsprrypi-maintenance.service
+After=wsprrypi-maintenance.service
 After=time-sync.target
 After=systemd-journald.service
 
 [Service]
 Type=simple
 User=root
+Group=www-data
+RuntimeDirectory=wsprrypi
+RuntimeDirectoryMode=0750
+UMask=0077
 
 ExecStart=%EXEC_START%
 SyslogIdentifier=%SYSLOG_IDENTIFIER%

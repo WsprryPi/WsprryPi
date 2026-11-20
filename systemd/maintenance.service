@@ -1,0 +1,36 @@
+# Created for WsprryPi version %SEMANTIC_VERSION%
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=WsprryPi backup and recovery worker
+Documentation=https://github.com/orgs/WsprryPi/discussions
+Before=wsprrypi.service
+After=systemd-journald.service
+
+[Service]
+Type=simple
+User=root
+Group=www-data
+RuntimeDirectory=wsprrypi-maintenance
+RuntimeDirectoryMode=0750
+StateDirectory=wsprrypi-maintenance
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=%EXEC_START%
+SyslogIdentifier=%SYSLOG_IDENTIFIER%
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/wsprrypi /var/lib/wsprrypi-maintenance
+ReadWritePaths=-/etc/apache2/sites-available -/etc/apache2/sites-enabled
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

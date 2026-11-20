@@ -27,6 +27,7 @@
  */
 
 #include "web_socket.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "pico_usb_installer_state.hpp"
 #include "backend_capabilities.hpp"
@@ -85,7 +86,35 @@ nlohmann::json rp1_operation_record_json()
             {"finishedMonotonicNs", record.finished_monotonic_ns},
             {"qualificationClaim", false}};
 }
+
 #endif
+}
+
+thread_local WebSocketServer::LocalDispatch WebSocketServer::local_dispatch_{};
+void WebSocketServer::start_command_runtime(bool loopback_only){
+    command_loopback_.store(loopback_only);command_runtime_.store(true);
+}
+void WebSocketServer::stop_command_runtime(){
+    if(command_runtime_.exchange(false))stopBoundedTone();
+}
+void WebSocketServer::note_local_tone(std::uint64_t generation) noexcept{
+    if(local_dispatch_.server==this&&local_dispatch_.generation)*local_dispatch_.generation=generation;
+}
+std::string WebSocketServer::dispatch_local_command(const std::string &message,std::uint64_t &generation){
+    if(!command_runtime_.load()||local_dispatch_.server)throw std::runtime_error("browser_command_runtime_unavailable");
+    std::string reply;local_dispatch_={this,&reply,&generation};
+    struct Reset{~Reset(){WebSocketServer::local_dispatch_={};}}reset;
+    handleMessage(message);return reply;
+}
+void WebSocketServer::release_local_command_session(std::uint64_t generation){
+    if(!generation)return;
+    std::lock_guard command_lock(test_tone_command_mutex_);
+    {
+        std::lock_guard state_lock(bounded_tone_mutex_);
+        if(bounded_tone_generation_==generation){bounded_tone_generation_=0;bounded_tone_request_id_.clear();}
+    }
+    bounded_tone_cv_.notify_all();
+    (void)end_test_tone(generation,TestToneEndPolicy::Quiesce);
 }
 
 void WebSocketServer::cancelBoundedTone()
@@ -163,7 +192,7 @@ void WebSocketServer::boundedToneLoop()
 #if WSPRRYPI_BACKEND_RP1_GPCLK
                 attach_rp1_operation_record(terminal, rp1_operation_record_json(), true);
 #endif
-                if (running_) sendAllClients(terminal.dump());
+                if (running_||command_runtime_) sendAllClients(terminal.dump());
             }
         }
         state_lock.lock();
@@ -299,6 +328,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             const WsprRuntimeStatusSnapshot snapshot =
                 current_tx_runtime_status_snapshot();
             reply["tx_state"] = snapshot.tx_state;
+            reply["restore_hold"] = wsprrypi::application_restore_hold_view();
             reply["machine_power"] = {{"reboot", machine_power_control_supported()},
                                       {"power_off", machine_power_control_supported()}};
             reply["firmware_maintenance"]=wtp_runtime_firmware_busy();
@@ -402,7 +432,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             const TestToneRequestParseResult parsed_request =
                 parse_test_tone_request(j);
 
-            if (!running_) {
+            if (!running_&&!command_runtime_) {
                 reply = {{"command", "tone_start"}, {"started", false},
                          {"status", "error"}, {"tone_start", "rejected"},
                          {"message", "WebSocket server is stopping."}};
@@ -422,19 +452,20 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             {
                 const TestToneStartResult start_result =
                     start_test_tone(*parsed_request.request);
+                if(start_result.started)note_local_tone(start_result.lifecycle.generation);
                 reply = build_test_tone_response(*parsed_request.request, start_result);
             }
         }
         else if (cmd == "bounded_tone")
         {
             reply["command"] = "bounded_tone";
-            if (!running_)
+            if (!running_&&!command_runtime_)
             {
                 reply["status"] = "error";
                 reply["started"] = false;
                 reply["message"] = "WebSocket server is stopping";
             }
-            else if (!loopback_only_)
+            else if (!(command_runtime_?command_loopback_.load():loopback_only_))
             {
                 reply["status"] = "error";
                 reply["started"] = false;
@@ -479,6 +510,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
                             parsed.request->duration_ms);
                         const TestToneStartResult start_result =
                             start_test_tone(bounded_request);
+                        if(start_result.started)note_local_tone(start_result.lifecycle.generation);
                         reply = build_test_tone_response(
                             parsed.request->tone, start_result);
                         reply["command"] = "bounded_tone";
@@ -608,6 +640,7 @@ void WebSocketServer::sendJSON(const T &obj)
 {
     // T could be nlohmann::json or any structure you convert to it
     const std::string payload = obj.dump();
+    if(local_dispatch_.server==this&&local_dispatch_.reply){*local_dispatch_.reply=payload;return;}
     if (reply_ready_for_test_) reply_ready_for_test_(payload);
     sendAllClients(payload);
 }

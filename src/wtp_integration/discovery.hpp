@@ -49,7 +49,7 @@ private:
   static constexpr std::size_t maximum = 64;
 };
 WtpDiscovery &wtp_discovery();
-// Starts the Linux Avahi browser once at server setup. Snapshot reads never
+// Starts the Linux Avahi browser once at backend startup. Snapshot reads never
 // start a browser or open a WTP connection. Other platforms report unavailable.
 void start_wtp_discovery();
 } // namespace wsprrypi

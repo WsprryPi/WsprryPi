@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "pi_recovery_runtime.hpp"
 #include "pi_managed_host_runtime.hpp"
+#include "application_storage/application_state.hpp"
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
 #include "privileged_network_runtime.hpp"
@@ -28,19 +29,19 @@ bool PiRecoveryRuntime::await_configuration(){
     set_active_privileged_network_mode(PrivilegedNetworkMode::enforced);
     policy_override_=true;
     try{
-        if(web_server_start_enabled(config)){
+        if(web_server_start_enabled(config)&&!application_database_selected()){
             webServer.start(config.web_port);http_=true;
             const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
             while(!webServer.isListening()&&!exiting_wspr.load()&&std::chrono::steady_clock::now()<deadline)
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             if(!webServer.isListening())throw std::runtime_error("recovery_http_unavailable");
         }
-        if(websocket_server_start_enabled(config)){
+        if(websocket_server_start_enabled(config)&&!application_database_selected()){
             if(!socketServer.start(config.socket_port,SOCKET_KEEPALIVE,config.socket_loopback_only,config.socket_loopback_family))
                 throw std::runtime_error("recovery_websocket_unavailable");
             websocket_=true;
         }
-        if(host){
+        if(host&&!application_database_selected()){
             // MonitorFile inspects filesystem metadata only. Its callback never
             // opens/parses input, publishes defaults, or reaches runtime reload.
             const std::weak_ptr<PiManagedHost> weak=host;
@@ -70,6 +71,12 @@ void PiRecoveryRuntime::finish_native_startup(){
     if(!policy_override_)return;
     std::lock_guard lock(config_update_mutex());
     if(pi_managed_host_state()!=PiHostReadiness::Ready)return;
+    if(application_database_selected()){
+        const auto saved=database_configuration_input().settings;
+        initialize_privileged_network_runtime(saved.private_settings.network_safety==SavedNetworkSafety::Enforced?
+            "enforced":"insecure-disabled");
+        policy_override_=false;return;
+    }
     // Ordinary JSON persistence preserves private raw lines without retaining
     // them in the component's data map. Read the verified saved bytes instead
     // of accidentally replacing a deliberate Off preference with a default.

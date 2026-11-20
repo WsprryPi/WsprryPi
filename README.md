@@ -24,6 +24,8 @@ curl -L installwspr.aa0nt.net | sudo bash
 
 RP1 installation establishes neutral runtime administration. Selecting GPIO4 or GPIO20 is a later explicit action; installation and route selection do not enable output. Uninstallation preserves a pre-existing, changed, or ambiguously owned RP1 provider. `REMOVE_RP1_GPCLK_DKMS=false` also retains a proven WsprryPi-owned provider.
 
+Local settings and coordinated application state use backend-owned SQLite. HTTP and browser WebSockets run in a separate WsprryPi process behind the existing web hosting. The existing Maintenance page and local maintenance command provide encrypted backup, download, and reviewed restore; advanced saved settings use the validated local settings command. See the [storage and process contract](docs/development/sqlite-storage-contract.md), [local commands](src/application_control/README.md), and [recovery guide](src/application_recovery/README.md) for ownership, migration, recovery holds, and current qualification limits.
+
 ## Development and testing
 
 The [development guide](docs/development/README.md) covers builds, components, contracts, and hardware-free validation. The explicit [simulated backend](docs/simulated-backend.md) exercises planning, scheduling, cancellation, status, and failure handling on Debian without hardware access. Simulation does not qualify timing, GPIO, installation, services, or RF output.

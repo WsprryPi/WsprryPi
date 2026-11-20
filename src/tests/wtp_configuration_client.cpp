@@ -10,7 +10,7 @@
 using namespace wsprrypi;
 namespace {
 struct Resolver : TlsResolver {
-  bool begin(const std::string &, unsigned) { return true; }
+  bool begin(const std::string &, unsigned) override { return true; }
   auto poll() -> std::optional<std::vector<std::string>> override { return std::vector<std::string>{"127.0.0.1"}; }
   void cancel() noexcept override {}
 };

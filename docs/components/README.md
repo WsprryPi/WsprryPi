@@ -9,7 +9,7 @@ WsprryPi tracks its first-party web interface and reusable C++ components as ord
 | `WsprryPi-UI` | Browser interface and packaged web assets |
 | `src/Band-Lookup` | Shared frequency-to-band correlation |
 | `src/Chipset-Offsets` | Intrinsic chipset clock-correction values |
-| `src/INI-Handler` | INI parsing and atomic configuration updates |
+| `src/INI-Handler` | Reusable INI parser/writer; application use is limited to one-time import and isolated preparation |
 | `src/LCBLog` | Thread-safe application logging |
 | `src/Mailbox` | Raspberry Pi mailbox and DMA-safe memory access |
 | `src/MonitorFile` | File-change monitoring |
@@ -20,6 +20,8 @@ WsprryPi tracks its first-party web interface and reusable C++ components as ord
 | `src/WSPR-Transmitter` | Transmission planning and backend execution |
 | `src/WTP-Client` | Portable WTP/1 client framing, codecs and sessions |
 | `src/WTP-Server` | Portable WTP/1 server and job-policy core |
+
+Application-private [storage](../../src/application_storage/README.md), [local control](../../src/application_control/README.md), and [recovery](../../src/application_recovery/README.md) retain their own source and focused-test boundaries. They are backend integration, not new shared settings/control protocols.
 
 Each component root owns its source hierarchy, public interfaces, README, standalone build or test entry points, and extraction boundary. Application integration remains in the parent repository.
 

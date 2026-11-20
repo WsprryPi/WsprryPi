@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Actual host routes and native runtime; all output is explicitly simulated.
 #include "arg_parser.hpp"
+#include "application_storage/application_state.hpp"
 #include "config_handler.hpp"
 #include "runtime_config_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
@@ -28,9 +29,18 @@ int main(int,char**){
   config.transmit_backend=TransmitBackendKind::SIMULATED;config.simulated_backend_override=true;config.transmit=false;
   config.use_led=config.use_amp=config.use_shutdown=false;
   config.callsign="AA0NT";config.grid_square="EM18";config.power_dbm=20;config.frequencies="20m";
-  config.wtp.hostname="PrEsErVeD.LoCaL.";config.wtp.tcp_port=31499;config.wtp.start_uncertainty_ns=37000000;
-  const auto legacy=wtp_settings_json(config.wtp);
+  const auto inactive_defaults=wtp_settings_json(config.wtp);
   resolve_backend_specific_config(config);config_to_json();
+  const auto state=root+"/state";CHECK(mkdir(state.c_str(),0700)==0);
+  auto database=std::make_shared<SqliteStateStore>(state,std::string(32,'a'),StateRole::Pi,StateOpen::CreateNew);
+  database->commit("0",{{StateRecord::Configuration,encode_persistent_configuration(jConfig,{},StateRole::Pi)}});
+  ApplicationStateSelection selected(database);
+  config.ini_filename=application_configuration_namespace();config_to_json();
+  set_config_persistence_owner([&](const auto &source,const auto &persist){
+   const auto snapshot=database->snapshot();
+   database->commit(snapshot.revision,{{StateRecord::Configuration,database_configuration_after_image(source)}});persist();
+  },[](const auto &){},[](const auto &,const auto &){throw std::logic_error("Unused test owner");});
+  struct ClearOwner{~ClearOwner(){set_config_persistence_owner({},{},{});}}clear_owner;
   set_hardware_platform_detection_enabled(false);
   CHECK(get_raspberry_pi_generation()==-1);
   set_raspberry_pi_generation_override_for_test(4);
@@ -61,7 +71,7 @@ int main(int,char**){
   httplib::Headers write{{"Host",authority},{"Origin","http://"+authority},{"X-WsprryPico-Request","1"},{"If-Match",revision}};
   for(const auto body:{R"({"Operation":{"Transmit Backend":"wtp"}})",R"({"WTP":{"Hostname":"substituted.local"}})",R"({"WTP Server":{"Enabled":true}})"}){
    const auto response=client.Put("/api/control/v1/host/config",write,body,"application/json");CHECK(response&&response->status==400);
-   CHECK(config.transmit_backend==TransmitBackendKind::SIMULATED&&wtp_settings_json(config.wtp)==legacy);
+   CHECK(config.transmit_backend==TransmitBackendKind::SIMULATED&&wtp_settings_json(config.wtp)==inactive_defaults);
    CHECK(get_public_config_snapshot().second==revision);
   }
   const auto saved=client.Put("/api/control/v1/host/config",write,R"({"CW":{"Fade Shape":"raised_cosine","Fade In Ms":25,"Fade Out Ms":40,"Fade Slice Ms":7}})","application/json");
@@ -69,11 +79,15 @@ int main(int,char**){
   const auto stale=client.Put("/api/control/v1/host/config",write,"{}","application/json");CHECK(stale&&stale->status==412);
   write.erase("If-Match");CHECK(client.Put("/api/control/v1/host/config",write,"{}","application/json")->status==428);
   write.erase("Origin");CHECK(client.Put("/api/control/v1/host/config",write,"{}","application/json")->status==403);
-  CHECK(wtp_settings_json(config.wtp)==legacy);
-  RuntimeConfigCandidate restored;prepare_runtime_config_candidate(ini,restored);
-  CHECK(restored.valid&&wtp_settings_json(restored.normalized_config.wtp)==legacy);
+  CHECK(wtp_settings_json(config.wtp)==inactive_defaults);
+  RuntimeConfigCandidate restored;prepare_runtime_config_candidate(config.ini_filename,restored);
+  CHECK(restored.valid&&wtp_settings_json(restored.normalized_config.wtp)==inactive_defaults);
   CHECK(restored.normalized_config.cw_fade_in_ms==25&&restored.normalized_config.cw_fade_out_ms==40);
   CHECK(!wtp_runtime_selected());
-  std::cout<<"PASS production host configuration, dormant settings preservation, native runtime, no listener/publication, and retired backend refusal\n";
+  const auto stored=database_configuration_input().settings.configuration;
+  CHECK(!stored.contains("WTP")&&!stored.contains("WTP Server"));
+  CHECK(!std::filesystem::exists(config.ini_filename));
+  std::ifstream original(ini);CHECK(std::string((std::istreambuf_iterator<char>(original)),{})=="[Security]\nPrivileged Network Safety = enforced\n");
+  std::cout<<"PASS production host configuration, SQLite-only supported settings, native runtime, no listener/publication, and retired backend refusal\n";
  }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}
 }

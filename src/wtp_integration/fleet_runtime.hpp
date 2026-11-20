@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <map>
 #include "network_http.hpp"
 #include "pi_pair_retirement.hpp"
 #include <string>
@@ -9,6 +10,8 @@ namespace wsprrypi {
 // fixture identities do not provision host pairing storage.
 void start_wtp_fleet(const std::string& ini_path, const std::string& self_id = {});
 void stop_wtp_fleet() noexcept;
+// Trusted capture pins the actual lifecycle/retirement owners; no carrier work.
+void wtp_fleet_with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &);
 // Read-only positive closure from the actual source owner; unavailable holds.
 bool wtp_fleet_retirement_scope_closed(const nlohmann::json &,const nlohmann::json &);
 std::optional<nlohmann::json> wtp_fleet_resume(const PiPairResumeGrantProof &,PiPairHistory &,const std::function<bool()> &cancelled);

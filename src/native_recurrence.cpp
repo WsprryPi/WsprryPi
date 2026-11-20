@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "native_recurrence.hpp"
+#include "application_storage/sqlite_state_store.hpp"
 #include "runtime_config_bridge.hpp"
 #include "config_handler.hpp"
 #include "scheduling.hpp"
@@ -93,7 +94,7 @@ bool current(const std::shared_ptr<NativeOccurrence> &plan,bool accepting){
         // occurrence was accepted. Only the identical protected file is safe;
         // a later replacement, even with restored contents, invalidates it.
         if(!plan->snapshot.ordinary.use_ini||plan->ini_signature.empty()||
-            PiManagementJournal::read_ini_input(plan->snapshot.ordinary.ini_filename).signature!=plan->ini_signature)return false;
+            configuration_input_signature(plan->snapshot.ordinary.ini_filename)!=plan->ini_signature)return false;
     }
     if(legacy_recurrence_admission()!=LegacyRecurrenceAdmission::Native||!wtp_pi_management_ready())return false;
     const auto snapshot=current_native_solar_snapshot();
@@ -115,7 +116,7 @@ std::shared_ptr<NativeOccurrence> prepare_native_occurrence(const ArgParserConfi
     plan->snapshot=current_native_solar_snapshot();
     if(!plan->snapshot.native||!plan->snapshot.progress)throw std::runtime_error("native_authority_required");
     plan->snapshot.ordinary=cfg;plan->starts.assign(starts.begin(),starts.end());plan->id=WtpPiBootIdentity{}.new_boot_id();plan->reload_generation=ini_reload_generation.load();
-    if(cfg.use_ini)plan->ini_signature=PiManagementJournal::read_ini_input(cfg.ini_filename).signature;
+    if(cfg.use_ini)plan->ini_signature=configuration_input_signature(cfg.ini_filename);
     lists(plan->snapshot,plan->digests,plan->sizes);
     const auto progress=plan->snapshot.progress->snapshot();std::array<std::size_t,5> cursors{};
     for(std::size_t i=0;i<names.size();++i){
@@ -221,7 +222,8 @@ void finish_native_occurrence(bool reconciled) noexcept {
 std::shared_ptr<NativeOccurrence> active_native_occurrence(){std::lock_guard lock(state_mutex);return active;}
 bool native_occurrence_active() noexcept {return bool(active_native_occurrence());}
 bool native_launch_current(const std::shared_ptr<NativeOccurrence> &plan) noexcept {
-    try{std::unique_lock lock(config_update_mutex(),std::try_to_lock);return lock.owns_lock()&&plan&&plan->accepted&&current(plan,false);}catch(...){return false;}
+    try{SqliteExecutionReadScope committed_state;
+        std::unique_lock lock(config_update_mutex(),std::try_to_lock);return lock.owns_lock()&&plan&&plan->accepted&&current(plan,false);}catch(...){return false;}
 }
 TransmitterRuntimeCallback native_execution_callback(const std::shared_ptr<NativeOccurrence> &plan){
     const auto generation=++plan->execution_generation;const auto callback=transmitter_callbacks();

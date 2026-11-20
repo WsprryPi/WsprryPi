@@ -270,6 +270,7 @@ declare BINARY_VERSION=""
 declare -a BINARY_RUNTIME_PACKAGES=()
 declare BINARY_PREVIOUS=""
 declare BINARY_INSTALLED="false"
+declare STATE_TRANSITION_STARTED="false"
 declare BINARY_DESTINATION=""
 declare BINARY_INSTALL_DIR="/usr/local/bin"
 
@@ -329,6 +330,8 @@ declare BUILD_TYPE_OVERRIDE="${BUILD_TYPE_OVERRIDE:-}"
 declare WSPR_BUILD_TYPE=""
 declare WSPR_EXE=""
 readonly WSPR_INI="wsprrypi.ini"
+readonly WSPR_STATE_ROOT="/var/lib/wsprrypi/application-state"
+readonly WSPR_LISTENERS="/usr/local/etc/wsprrypi-listeners.json"
 
 # -----------------------------------------------------------------------------
 # @brief Resolve the effective build type and executable name.
@@ -834,6 +837,7 @@ readonly RUNTIME_APT_PACKAGES=(
     "libc6"
     "libsystemd0"
     "libavahi-client3"
+    "libsqlite3-0"
 )
 readonly WEB_APT_PACKAGES=("apache2" "php")
 readonly BUILD_APT_PACKAGES=(
@@ -841,6 +845,7 @@ readonly BUILD_APT_PACKAGES=(
     "libgpiod-dev"
     "libsystemd-dev"
     "libssl-dev"
+    "libsqlite3-dev"
     "libavahi-client-dev"
 )
 # readelf inspects supplied files; it does not compile or execute WsprryPi.
@@ -999,6 +1004,8 @@ declare NO_WEB="${NO_WEB:-false}"
 #   WAS_RUNNING=$(systemctl is-active --quiet myservice && echo true || echo false)
 # -----------------------------------------------------------------------------
 declare WAS_RUNNING="false"
+declare WAS_WEB_RUNNING="false"
+declare WAS_MAINTENANCE_RUNNING="false"
 
 # -----------------------------------------------------------------------------
 # @var REBOOT
@@ -7237,7 +7244,7 @@ resolve_binary_source() {
 }
 
 cleanup_precompiled_executable() {
-    if [[ -n "$BINARY_PREVIOUS" && "$BINARY_INSTALLED" != "recovery-failed" ]]; then
+    if [[ -n "$BINARY_PREVIOUS" && "$BINARY_INSTALLED" != "recovery-failed" && "$BINARY_INSTALLED" != "state-retained" ]]; then
         rm -f -- "$BINARY_PREVIOUS"
         BINARY_PREVIOUS=""
     fi
@@ -7249,6 +7256,14 @@ cleanup_precompiled_executable() {
 
 rollback_executable() {
     [[ "$BINARY_INSTALLED" == "true" ]] || return 0
+    if state_transition_needs_recovery; then
+        BINARY_INSTALLED="state-retained"
+        logE "Saved-state migration is established or incomplete. Retaining the SQLite-capable executable and previous binary backup; rerun the installer to complete service setup. Automatic service restart is withheld."
+        return 1
+    fi
+    if systemctl is-active --quiet wsprrypi-web.service 2>/dev/null; then
+        exec_command "Stop browser service for executable recovery" systemctl stop wsprrypi-web.service || { BINARY_INSTALLED="recovery-failed"; return 1; }
+    fi
     if systemctl is-active --quiet "$WSPR_SERVICE" 2>/dev/null; then
         exec_command "Stop $WSPR_SERVICE for executable recovery" \
             systemctl stop "$WSPR_SERVICE" || { BINARY_INSTALLED="recovery-failed"; return 1; }
@@ -7266,6 +7281,24 @@ rollback_executable() {
             rm -f -- "$BINARY_DESTINATION" || return 1
     fi
     BINARY_INSTALLED="false"
+}
+
+state_transition_needs_recovery() {
+    [[ "$STATE_TRANSITION_STARTED" == "true" ]] || return 1
+    local root="${1:-$WSPR_STATE_ROOT}"
+    [[ -e "$root" || -L "$root" || -e "${root}.prepare" || -L "${root}.prepare" ]]
+}
+
+validate_application_state_executable() {
+    local format
+    format=$(runuser -u "$SUDO_USER" -- "$1" --storage-format) || {
+        logE "Selected executable cannot report SQLite storage support."
+        return 1
+    }
+    [[ "$format" == "application-state/1" ]] || {
+        logE "Selected executable does not support application-state/1; select a compatible executable or build this source."
+        return 1
+    }
 }
 
 prepare_precompiled_executable() {
@@ -7320,6 +7353,20 @@ prepare_install_executable() {
 }
 
 stop_binary_service() {
+    if systemctl is-active --quiet wsprrypi-maintenance.service 2>/dev/null; then
+        local maintenance_jobs
+        maintenance_jobs=$("$BINARY_INSTALL_DIR/$WSPR_EXE" --maintenance jobs) || return 1
+        if ! python3 -c 'import json,sys; value=json.load(sys.stdin); sys.exit(0 if type(value) is dict and set(value)=={"schema","active","jobs"} and value["schema"]=="recovery-job-list/1" and value["active"] is None and type(value["jobs"]) is list else 1)' <<<"$maintenance_jobs"; then
+            logE "A maintenance job is active or unavailable. Finish or recover it before updating the executable."
+            return 1
+        fi
+        WAS_MAINTENANCE_RUNNING="true"
+        exec_command "Stop maintenance worker before executable replacement" systemctl stop wsprrypi-maintenance.service "$@" || return 1
+    fi
+    if systemctl is-active --quiet wsprrypi-web.service 2>/dev/null; then
+        WAS_WEB_RUNNING="true"
+        exec_command "Stop browser service before executable replacement" systemctl stop wsprrypi-web.service "$@" || return 1
+    fi
     if systemctl is-active --quiet "$WSPR_SERVICE" 2>/dev/null; then
         WAS_RUNNING="true"
         exec_command "Stop ${WSPR_SERVICE}.service" systemctl stop "${WSPR_SERVICE}.service" "$@" || return 1
@@ -7463,6 +7510,7 @@ manage_exe() {
             return 0
         fi
         [[ -f "$source_path" ]] || { logE "Executable is missing: $source_path"; return 1; }
+        validate_application_state_executable "$source_path" || return 1
         # Install required attribution before replacing any executable. A
         # missing notice refuses publication while the old binary stays intact.
         local notice="${LOCAL_REPO_DIR}/docs/licenses/botan/BSD-2-Clause.txt"
@@ -8429,17 +8477,105 @@ manage_service() {
 # -----------------------------------------------------------------------------
 # @brief Resolve the REST and WebSocket ports used by the installed service.
 # @details Mirrors the application's valid unprivileged port range and default
-#          fallback so Apache and readiness checks follow preserved INI values.
+#          validation so Apache and readiness checks follow admitted saved values.
 #          Results are returned in WSPRRYPI_WEB_PORT and WSPRRYPI_SOCKET_PORT.
 # -----------------------------------------------------------------------------
 # The dedicated worker is extracted from the same verified application image.
+manage_application_state() {
+    if [[ "$ACTION" == "uninstall" ]]; then
+        logI "Retaining saved application state and migration backups."
+        return 0
+    fi
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Would validate existing SQLite state, migrate the original INI once, or explicitly initialize a fresh installation."
+        return 0
+    fi
+    STATE_TRANSITION_STARTED="true"
+    exec_command "Admit saved application state" python3 \
+        "$LOCAL_REPO_DIR/scripts/application_state_install.py" \
+        --binary "$BINARY_INSTALL_DIR/$WSPR_EXE" --state-directory "$WSPR_STATE_ROOT" \
+        --ini-source "/usr/local/etc/$WSPR_INI" --listeners "$WSPR_LISTENERS"
+}
+
+manage_browser_service() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    local unit="wsprrypi-web.service"
+    local service_path="/etc/systemd/system/$unit"
+    local runtime_path="/run/systemd/system/$unit"
+    if [[ "$ACTION" == "uninstall" ]]; then
+        if [[ -e "$service_path" || -L "$service_path" ]]; then
+            exec_command "Stop and disable browser service" systemctl disable --now "$unit" "$debug" || return 1
+            exec_command "Remove browser service unit" rm -f -- "$service_path" "$debug" || return 1
+            exec_command "Reload systemd" systemctl daemon-reload "$debug" || return 1
+        fi
+        return 0
+    fi
+    [[ "$ACTION" == "install" ]] || return 1
+    repair_systemd_service_mask "$unit" "$service_path" "$runtime_path" "/dev/null" "$debug" || return 1
+    install_systemd_service_unit "$LOCAL_SYSTEMD_DIR/browser.service" "$service_path" "$runtime_path" \
+        "$unit" "$SEM_VER" "wsprrypi-web" "/usr/local/bin/$WSPR_EXE --web-service" "wsprrypi-web" "/dev/null" "$debug" || return 1
+    exec_command "Reload systemd" systemctl daemon-reload "$debug" || return 1
+    if [[ "${NO_WEB:-false}" == "true" ]]; then
+        exec_command "Disable browser service for --no-web" systemctl disable --now "$unit" "$debug" || return 1
+    else
+        exec_command "Enable browser service" systemctl enable "$unit" "$debug" || return 1
+        exec_command "Start browser service" systemctl restart "$unit" "$debug" || return 1
+    fi
+    debug_end "$debug"
+}
+
+resolve_wsprrypi_maintenance_role() {
+    python3 "$LOCAL_REPO_DIR/scripts/application_state_install.py" --read-listeners "$WSPR_LISTENERS" --role-only
+}
+
+manage_maintenance_service() {
+    local debug
+    debug=$(debug_start "$@")
+    eval set -- "$(debug_filter "$@")"
+    local unit="wsprrypi-maintenance.service"
+    local service_path="/etc/systemd/system/$unit"
+    local runtime_path="/run/systemd/system/$unit"
+    if [[ "$ACTION" == "uninstall" ]]; then
+        if [[ -e "$service_path" || -L "$service_path" ]]; then
+            exec_command "Stop and disable maintenance worker" systemctl disable --now "$unit" "$debug" || return 1
+            exec_command "Remove maintenance service unit" rm -f -- "$service_path" "$debug" || return 1
+            exec_command "Reload systemd" systemctl daemon-reload "$debug" || return 1
+        fi
+        logI "Retaining encrypted backups, recovery jobs, and their fixed local runtime for recovery."
+        return 0
+    fi
+    [[ "$ACTION" == "install" ]] || return 1
+    if [[ "$DRY_RUN" == "true" ]]; then
+        logI "Would package the verified recovery helper and enable its independent maintenance service."
+        return 0
+    fi
+    local role
+    role=$(resolve_wsprrypi_maintenance_role) || return 1
+    [[ "$role" == pi || "$role" == controller ]] || return 1
+    exec_command "Package the fixed maintenance runtime" python3 "$LOCAL_REPO_DIR/scripts/recovery_runtime_install.py" \
+        --binary "$BINARY_INSTALL_DIR/$WSPR_EXE" --source "$LOCAL_REPO_DIR/src/application_recovery" "$debug" || return 1
+    repair_systemd_service_mask "$unit" "$service_path" "$runtime_path" "/dev/null" "$debug" || return 1
+    install_systemd_service_unit "$LOCAL_SYSTEMD_DIR/maintenance.service" "$service_path" "$runtime_path" \
+        "$unit" "$SEM_VER" "wsprrypi-maintenance" "/usr/local/bin/$WSPR_EXE --maintenance-worker --role $role" "wsprrypi-maintenance" "/dev/null" "$debug" || return 1
+    exec_command "Reload systemd" systemctl daemon-reload "$debug" || return 1
+    exec_command "Enable maintenance worker" systemctl enable "$unit" "$debug" || return 1
+    exec_command "Start maintenance worker" systemctl restart "$unit" "$debug" || return 1
+    debug_end "$debug"
+}
+
 manage_udp_logging() {
     [[ "$DRY_RUN" == "true" ]] && return 0
     local operation=install
     [[ "$ACTION" == "uninstall" ]] && operation=remove
+    local namespace="$WSPR_STATE_ROOT/removed-configuration"
+    if [[ "$operation" == "install" ]]; then
+        namespace=$("$BINARY_INSTALL_DIR/$WSPR_EXE" --check-state --state-directory "$WSPR_STATE_ROOT" --companion-namespace) || return 1
+    fi
     exec_command "Manage optional UDP logging service" python3 \
         "$LOCAL_REPO_DIR/scripts/udp_log_control.py" "$operation" \
-        --ini "/usr/local/etc/$WSPR_INI" --application "$BINARY_INSTALL_DIR/$WSPR_EXE"
+        --state-namespace "$namespace" --application "$BINARY_INSTALL_DIR/$WSPR_EXE"
 }
 
 resolve_wsprrypi_service_ports() {
@@ -8447,50 +8583,16 @@ resolve_wsprrypi_service_ports() {
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
-    local ini_path="${1:-/usr/local/etc/${WSPR_INI}}"
-    local configured_web="" configured_socket="" resolved=""
-    WSPRRYPI_WEB_PORT=31415
-    WSPRRYPI_SOCKET_PORT=31416
-
-    if [[ -r "$ini_path" ]]; then
-        resolved=$(awk '
-            function trim(value) {
-                gsub(/^[ \t]+|[ \t]+$/, "", value)
-                return value
-            }
-            /^[[:space:]]*[;#]/ || /^[[:space:]]*$/ { next }
-            /^[[:space:]]*\[/ {
-                section = tolower($0)
-                sub(/^[[:space:]]*\[/, "", section)
-                sub(/\][[:space:]]*$/, "", section)
-                section = trim(section)
-                next
-            }
-            section == "operation" && index($0, "=") {
-                line = $0
-                sub(/[;#].*$/, "", line)
-                key = line
-                sub(/=.*/, "", key)
-                key = tolower(trim(key))
-                value = line
-                sub(/^[^=]*=/, "", value)
-                value = trim(value)
-                if (key == "web port") web = value
-                if (key == "socket port") socket = value
-            }
-            END { printf "%s|%s", web, socket }
-        ' "$ini_path")
-        IFS='|' read -r configured_web configured_socket <<<"$resolved"
+    local listeners="${1:-$WSPR_LISTENERS}"
+    local resolved
+    if [[ "$DRY_RUN" == "true" && ! -e "$listeners" && ! -L "$listeners" ]]; then
+        logI "Listener ports will be resolved from admitted application state during installation."
+        WSPRRYPI_WEB_PORT=31415
+        WSPRRYPI_SOCKET_PORT=31416
+        return 0
     fi
-
-    if [[ "$configured_web" =~ ^[0-9]+$ ]] && \
-        ((10#$configured_web >= 1024 && 10#$configured_web <= 49151)); then
-        WSPRRYPI_WEB_PORT=$((10#$configured_web))
-    fi
-    if [[ "$configured_socket" =~ ^[0-9]+$ ]] && \
-        ((10#$configured_socket >= 1024 && 10#$configured_socket <= 49151)); then
-        WSPRRYPI_SOCKET_PORT=$((10#$configured_socket))
-    fi
+    resolved=$(python3 "$LOCAL_REPO_DIR/scripts/application_state_install.py" --read-listeners "$listeners") || return 1
+    IFS='|' read -r WSPRRYPI_WEB_PORT WSPRRYPI_SOCKET_PORT <<<"$resolved"
 
     debug_print "Effective service ports: REST=${WSPRRYPI_WEB_PORT}, WebSocket=${WSPRRYPI_SOCKET_PORT}." "$debug"
     debug_end "$debug"
@@ -8521,9 +8623,8 @@ validate_wsprrypi_runtime() {
     fi
 
     local attempts_remaining=30 service_ready=false direct_api_ready=false
-    local proxy_api_ready=false
-    local installed_ini="/usr/local/etc/${WSPR_INI}"
-    resolve_wsprrypi_service_ports "$installed_ini" "$debug"
+    local proxy_api_ready=false ports_resolved=false
+    local installed_ini="$WSPR_LISTENERS"
 
     while ((attempts_remaining-- > 0)); do
         if systemctl is-active --quiet "${WSPR_SERVICE}.service" 2>/dev/null; then
@@ -8532,6 +8633,14 @@ validate_wsprrypi_runtime() {
                 direct_api_ready=true
                 proxy_api_ready=true
                 break
+            fi
+            if [[ "$ports_resolved" != "true" ]]; then
+                resolve_wsprrypi_service_ports "$installed_ini" "$debug" || return 1
+                ports_resolved=true
+            fi
+            if ! systemctl is-active --quiet wsprrypi-web.service 2>/dev/null; then
+                sleep 1
+                continue
             fi
             if curl --fail --silent --show-error --max-time 2 \
                 "http://127.0.0.1:${WSPRRYPI_WEB_PORT}/version" \
@@ -8556,7 +8665,7 @@ validate_wsprrypi_runtime() {
         return 1
     fi
     if [[ "$direct_api_ready" != "true" ]]; then
-        warn "WsprryPi service is active, but its configured local REST endpoint on port ${WSPRRYPI_WEB_PORT} did not become ready; inspect the installed INI and service journal."
+        warn "WsprryPi service is active, but its configured local REST endpoint on port ${WSPRRYPI_WEB_PORT} did not become ready; inspect saved listener settings and the service journal."
         debug_end "$debug"
         return 1
     fi
@@ -8917,7 +9026,7 @@ manage_apache() {
     server_name="${DEFAULT_SERVERNAME}"
     network_policy_file="/usr/local/etc/wsprrypi-apache-network-policy.conf"
     network_policy_renderer="${LOCAL_REPO_DIR}/scripts/render-apache-privileged-network-policy.py"
-    installed_ini="/usr/local/etc/${WSPR_INI}"
+    installed_ini="$WSPR_LISTENERS"
 
     if [[ -z "$ACTION" || "$ACTION" == install ]]; then
         if [[ ! -f "$network_policy_renderer" ]]; then
@@ -9548,7 +9657,7 @@ find_active_apache_site_conf() {
 #          tag is present, the block is appended to the file.
 #
 # @param $1 Apache vhost config path to update.
-# @param $2 Effective installed INI path.
+# @param $2 Trusted listener bootstrap path.
 # @param $3 Optional debug flag.
 #
 # @return 0 on success, 1 otherwise.
@@ -9561,12 +9670,12 @@ install_wsprrypi_proxy_block() {
     eval set -- "$(debug_filter "$@")"
 
     local config_file="${1:-}"
-    local installed_ini="${2:-/usr/local/etc/${WSPR_INI}}"
+    local installed_ini="${2:-$WSPR_LISTENERS}"
     local tmp_file block_file
     local backup_file
     local proxy_block
 
-    resolve_wsprrypi_service_ports "$installed_ini" "$debug"
+    resolve_wsprrypi_service_ports "$installed_ini" "$debug" || return 1
 
     if [[ "$DRY_RUN" == "true" ]]; then
         logD "Exec: update managed WsprryPi proxy block in $config_file for REST port ${WSPRRYPI_WEB_PORT} and WebSocket port ${WSPRRYPI_SOCKET_PORT}"
@@ -9590,6 +9699,8 @@ install_wsprrypi_proxy_block() {
     # Support bundle API family and signed private-intake availability.
     ProxyPass        /wsprrypi/api/support-bundles http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-bundles
     ProxyPassReverse /wsprrypi/api/support-bundles http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-bundles
+    ProxyPass        /wsprrypi/api/recovery http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/recovery
+    ProxyPassReverse /wsprrypi/api/recovery http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/recovery
     ProxyPass        /wsprrypi/api/support-intake http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-intake
     ProxyPassReverse /wsprrypi/api/support-intake http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/support-intake
     ProxyPass        /wsprrypi/api/network-safety http://127.0.0.1:${WSPRRYPI_WEB_PORT}/api/network-safety
@@ -9845,6 +9956,10 @@ cleanup_files_in_directories() {
 }
 
 restore_daemon_state() {
+    if [[ "${BINARY_INSTALLED:-false}" == "state-retained" ]]; then
+        logE "Saved-state transition needs installer completion; automatic service restart is withheld."
+        return 1
+    fi
     if [[ "${BINARY_INSTALLED:-false}" == "recovery-failed" ]]; then
         logE "Executable recovery needs attention; automatic service restart is withheld."
         return 1
@@ -9870,6 +9985,14 @@ restore_daemon_state() {
                 logE "Error: Unable to restart ${WSPR_SERVICE}."
                 retval=1
             }
+    fi
+    if [[ "${WAS_WEB_RUNNING:-false}" == true && "${NO_WEB:-false}" != true ]] && \
+        systemctl list-unit-files wsprrypi-web.service &>/dev/null; then
+        exec_command "Restore browser service" systemctl start wsprrypi-web.service "$debug" || retval=1
+    fi
+    if [[ "${WAS_MAINTENANCE_RUNNING:-false}" == true ]] && \
+        systemctl list-unit-files wsprrypi-maintenance.service &>/dev/null; then
+        exec_command "Restore maintenance worker" systemctl start wsprrypi-maintenance.service "$debug" || retval=1
     fi
 
     debug_end "$debug"
@@ -10085,7 +10208,7 @@ manage_wsprry_pi() {
     debug=$(debug_start "$@")
     eval set -- "$(debug_filter "$@")"
 
-    local service_command="/usr/local/bin/$WSPR_EXE -J -i /usr/local/etc/$WSPR_INI"
+    local service_command="/usr/local/bin/$WSPR_EXE -J --state-directory $WSPR_STATE_ROOT"
     if [[ "${NO_WEB:-false}" == "true" ]]; then
         service_command+=" --no-web"
     fi
@@ -10100,10 +10223,12 @@ manage_wsprry_pi() {
         "manage_support_bundle_runtime"
         "manage_pico_usb_runtime"
         "manage_route_application"
-        "manage_config \"$WSPR_INI\" \"/usr/local/etc/\""
+        "manage_application_state"
+        "manage_maintenance_service"
         "manage_i2c"
-        "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
         "manage_udp_logging"
+        "manage_service \"/usr/bin/$WSPR_EXE\" \"$service_command\" \"false\""
+        "manage_browser_service"
         "activate_rp1_gpclk_runtime_administration"
         "manage_web"
         "manage_apache"

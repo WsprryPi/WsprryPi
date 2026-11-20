@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Actual native main: dormant legacy values and current Pi management."""
+"""Actual native main: SQLite state and current Pi management."""
 import argparse
 import configparser
 import json
+import sqlite3
 from pathlib import Path
 import subprocess
 import tempfile
 import time
 from controller_only_test import free_port, request
+from software_backend_admission import backend_admission
+from software_web_service import start_software_web_service, stop_software_web_service
 
 
 def read_managed(port, path, with_headers=False):
@@ -27,11 +30,11 @@ def main():
     parser.add_argument("--fixture", required=True)
     args = parser.parse_args()
     executable = str(Path(args.fixture).resolve())
-    with tempfile.TemporaryDirectory(prefix="pi-managed-wtp-main-") as temporary:
+    with backend_admission(executable), tempfile.TemporaryDirectory(prefix="pi-managed-catalog-main-") as temporary:
         root = Path(temporary)
         ini, ledger = root / "native.ini", root / "revocation-v1"
         for backend in ("simulated", "gpio", "si5351"):
-            refused = subprocess.run([executable, str(ledger), "--backend", "wtp", "--backend", backend],
+            refused = subprocess.run([executable, str(ledger), "--backend", "gpio", "--backend", backend],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             assert refused.returncode == 2
         source = configparser.ConfigParser(interpolation=None);source.optionxform = str
@@ -40,14 +43,20 @@ def main():
             "Use LED": "false", "Use Amp": "false", "Use Shutdown": "false"})
         source["Security"]["Privileged Network Safety"] = "enforced"
         source["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": "20"})
-        source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1", "TCP Port": "31417", "Device ID": "b" * 32})
-        source["WTP Server"]["Enabled"] = "false"
         port = free_port();source["Operation"]["Web Port"] = str(port);source["Operation"]["Socket Port"] = str(port + 1)
         with ini.open("w") as output:source.write(output)
         ini.chmod(0o600)
+        state=root/"state"
+        migrated=subprocess.run([executable,str(ledger),"--migrate-state","--state-directory",str(state),"--ini-source",str(ini)],capture_output=True,text=True,timeout=15)
+        assert migrated.returncode==0,migrated.stderr
+        assert not ini.exists()
+        def saved_bytes():
+            with sqlite3.connect((state/"generation-1/state.sqlite3").resolve().as_uri()+"?mode=ro",uri=True) as connection:
+                return dict(connection.execute("SELECT kind,payload FROM records"))
         with (root / "service.log").open("w") as log:
-            process = subprocess.Popen([executable, str(ledger), "--backend", "simulated", "-i", str(ini),
+            process = subprocess.Popen([executable, str(ledger), "--backend", "simulated", "--state-directory", str(state),
                 "--socket-loopback-only", "--socket-loopback-family", "ipv4"], stdout=log, stderr=subprocess.STDOUT)
+            web = start_software_web_service([executable,str(ledger)],ledger,log)
             try:
                 deadline = time.monotonic() + 15
                 while True:
@@ -86,26 +95,29 @@ def main():
                 assert snapshot["saved"]["scheduling"] == candidate["scheduling"]
                 for cap in context["capabilities"]:
                     if cap["resource"] == "pi-scheduling":assert cap["activation"] == "next_occurrence" and cap["write"]
-                before = ini.read_bytes()
+                before = saved_bytes()
                 status, body, headers = read_managed(port, base + "settings", with_headers=True)
                 auth["If-Match"] = headers["ETag"]
                 bad = json.loads(command);bad["expected_revision"] = json.loads(body)["revision"];bad["operation_id"] = "9" * 32
-                bad["candidate"]["configuration"]["WTP"] = {}
+                bad["candidate"]["configuration"]["unsupported-settings"] = {}
                 assert request(port, "PUT", base + "settings", json.dumps(bad), auth)[0] == 400
-                assert ini.read_bytes() == before
-                retained = configparser.ConfigParser(interpolation=None);retained.optionxform = str;retained.read(ini)
-                assert dict(retained["WTP"]) == dict(source["WTP"]), "Current saves preserve dormant private legacy values"
+                assert saved_bytes() == before
+                retained = json.loads(saved_bytes()["configuration"])
+                assert retained["schema"] == "local-settings/1" and not ini.exists()
+                assert retained["configuration"]["Si5351"]["TX Output"] == source["Si5351"]["TX Output"]
+                assert retained["configuration"]["CW"]["Fade Shape"] == source["CW"]["Fade Shape"]
                 status, body = request(port, "POST", "/api/wtp/recover", json.dumps({"operation": "reconcile"}), auth)
                 assert status == 409 and json.loads(body)["ok"] is False, body
                 assert request(port, "GET", "/api/control/v1/host/readiness")[0] == 200
                 assert not Path(str(ledger) + ".simulated-trace.json").exists()
                 process.terminate();assert process.wait(timeout=10) == 0, (root / "service.log").read_text()
             finally:
+                stop_software_web_service(web)
                 if process.poll() is None:
                     process.terminate()
                     try:process.wait(timeout=10)
                     except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
-    print("PASS: actual native main, dormant legacy value preservation, protected Pi save/replay, closed WTP field refusal, inert retired diagnostics, and no transmission")
+    print("PASS: actual native main, SQLite advanced-value preservation, protected Pi save/replay, closed field refusal, and no transmission")
 
 
 if __name__ == "__main__":main()

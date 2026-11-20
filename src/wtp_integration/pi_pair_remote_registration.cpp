@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_pair_remote_controller.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "pi_pair_contract.hpp"
 #include "pi_pair_operations.hpp"
 #include "pi_pair_peers.hpp"
@@ -39,6 +40,7 @@ std::size_t PiPairHistory::reclaim_outgoing_retired(const std::string &selector,
 void PiPairRemoteController::authority_source(AuthoritySource source){std::lock_guard lock(observer_mutex_);authority_source_=std::move(source);}
 void PiPairRemoteController::receipt_eviction_observer(std::function<void()> retire){std::lock_guard lock(observer_mutex_);retire_contexts_=std::move(retire);}
 bool PiPairRemoteController::maintain(const std::string &selector,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return false;
     AuthoritySource source;{std::lock_guard lock(observer_mutex_);source=authority_source_;}
     if(!source)return observe(selector,cancelled);
     try{
@@ -75,6 +77,7 @@ bool PiPairRemoteController::maintain(const std::string &selector,const std::fun
     }catch(...){return false;}
 }
 PiPairRemoteController::ResumeTurn PiPairRemoteController::coordinate_resume(const std::string &selector,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return ResumeTurn::Held;
     try{
         require(bool(cancelled)&&!cancelled());const auto history=history_();require(bool(history));
         const auto selection=select(*history,selector);const auto state=entry(selector);
@@ -126,6 +129,7 @@ PiPairRemoteController::ResumeTurn PiPairRemoteController::coordinate_resume(con
     }catch(...){return ResumeTurn::Held;}
 }
 bool PiPairRemoteController::register_authority(const std::string &selector,AuthoritySource source,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return false;
     try{
         require(bool(cancelled)&&!cancelled());const auto history=history_();require(bool(history));const auto selection=select(*history,selector);const auto state=entry(selector);
         std::unique_lock registration(state->registration,std::try_to_lock);if(!registration.owns_lock())return false;

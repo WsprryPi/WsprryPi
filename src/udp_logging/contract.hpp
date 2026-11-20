@@ -317,4 +317,11 @@ inline void host_active(const Json &v, const Json &saved) {
             "udp_status_peer_binding");
   }
 }
+inline Json saved_host_policy(const std::string &bytes,const std::string &identity){
+  const auto document=parse(bytes);
+  require(fields(document,{"schema","collector_id","revision","sender","collector"})&&
+      document["schema"]=="host-udp-logging/1"&&document["collector_id"]==identity&&text(document["revision"],128),"udp_policy_binding");
+  settings({{"sender",document["sender"]},{"collector",document["collector"]}});
+  return document;
+}
 } // namespace wsprrypi::udp

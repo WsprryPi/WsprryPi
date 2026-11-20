@@ -10,21 +10,22 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 # Only external command/service and filesystem trust boundaries are replaced.
-# The installed hook, parser, marker checks, and environment writer are real.
+# The installed hook, marker checks, and environment writer are real.
+# Backend-owned route state is injected; its actual executable has separate tests.
 DRIVER = r'''
 import os
 from pathlib import Path
 from unittest.mock import patch
 import runtime_reconcile as recovery
 root = Path(os.environ['FIXTURE'])
-service = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini ; ignore_errors=no ; }'
+service = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J --state-directory /var/lib/wsprrypi/application-state ; ignore_errors=no ; }'
 def trusted(path):
-    mapped = {recovery.companion.CONFIG: root/'wsprrypi.ini',
-              recovery.companion.BINARY: root/'bin/wsprrypi'}.get(path, path)
+    mapped = {recovery.companion.BINARY: root/'bin/wsprrypi'}.get(path, path)
     if not mapped.is_relative_to(root):
         raise AssertionError('unexpected host read: '+str(path))
     return mapped.read_bytes(), mapped.stat()
-with patch.object(recovery.companion, 'trusted', side_effect=trusted), \
+with patch.object(recovery.companion, 'state', return_value={'backend':os.environ['BACKEND'],'route':'gpio4','transmit':False}), \
+     patch.object(recovery.companion, 'trusted', side_effect=trusted), \
      patch.object(recovery.companion.subprocess, 'check_output', return_value=service), \
      patch.object(recovery.installer, 'secure_record_parent'), \
      patch.object(recovery, 'ENVIRONMENT', root/'startup.env'), \
@@ -85,8 +86,8 @@ systemctl() {
     esac
 }
 for step in capture_install_sem_ver remove_legacy_services remove_legacy_files_and_dirs \
-    prepare_install_executable manage_support_bundle_runtime manage_pico_usb_runtime \
-    manage_config manage_i2c manage_udp_logging activate_rp1_gpclk_runtime_administration \
+    prepare_install_executable validate_application_state_executable manage_support_bundle_runtime manage_pico_usb_runtime \
+    manage_application_state manage_maintenance_service manage_i2c manage_udp_logging activate_rp1_gpclk_runtime_administration \
     manage_web manage_apache validate_wsprrypi_runtime manage_sound \
     cleanup_files_in_directories complete_application_ownership flag_need_reboot; do
     eval "$step() { :; }"
@@ -121,7 +122,7 @@ is_rp1_system() { fixture_detect_rp1 "$COMPAT"; }
 if rp1_gpclk_dkms_installation_selected; then printf selected; else printf excluded; fi
 """
         for model in ('5-model-b', '5-compute-module', '3-model-b-plus'):
-            for backend in ('gpio', 'si5351', 'wtp', 'rp1-gpclk'):
+            for backend in ('gpio', 'si5351', 'rp1-gpclk'):
                 for policy in ('auto', 'true', 'false'):
                     with self.subTest(model=model, backend=backend, policy=policy), tempfile.TemporaryDirectory() as raw:
                         compat = Path(raw)/'compatible'
@@ -136,7 +137,7 @@ if rp1_gpclk_dkms_installation_selected; then printf selected; else printf exclu
 
     def test_failed_upgrade_restores_old_binary_with_current_hook(self):
         import sys
-        for backend in ('gpio', 'si5351', 'wtp', 'rp1-gpclk'):
+        for backend in ('gpio', 'si5351', 'rp1-gpclk'):
             for selection in ('build', 'local', 'release'):
                 for recovery_fail in (0, 1):
                     with self.subTest(backend=backend, selection=selection, recovery_fail=recovery_fail), tempfile.TemporaryDirectory() as raw:

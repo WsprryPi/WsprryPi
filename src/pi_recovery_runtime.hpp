@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 namespace wsprrypi {
-// Owns only the listeners and metadata monitor started for protected recovery.
+// Coordinates protected recovery. SQL-backed browser listeners belong to the
+// separate web service; file-only component fixtures retain their listeners.
 // Keep this object alive through normal startup so a saved port change cannot
 // strand the browser that performed the repair. No output/backend cleanup runs
 // here, including when startup never reaches a validated configuration.

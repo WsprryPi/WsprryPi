@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import json
 import stat
 import subprocess
 import unittest
@@ -631,7 +632,7 @@ validate_wsprrypi_runtime
         )
         self.assertEqual(result.returncode, 1)
         self.assertIn("configured local REST endpoint on port 32415", result.stderr)
-        self.assertIn("installed INI and service journal", result.stderr)
+        self.assertIn("saved listener settings and the service journal", result.stderr)
 
     def test_runtime_readiness_waits_for_configured_direct_and_proxy_endpoints(self) -> None:
         result = self.run_shell(
@@ -699,11 +700,11 @@ validate_wsprrypi_runtime debug
         )
         self.assertEqual(snapshot(self.root), before)
 
-    def test_service_ports_and_proxy_block_follow_preserved_ini(self) -> None:
+    def test_service_ports_and_proxy_block_follow_admitted_listeners(self) -> None:
         ini = self.root / "installed.ini"
         config = self.root / "site.conf"
         ini.write_text(
-            "[Operation]\nWeb Port = 32415\nSocket Port = 32416\n",
+            json.dumps(dict(schema='listener-bootstrap/1', device_id='a' * 32, role='pi', web_port=32415, socket_port=32416)),
             encoding="utf-8",
         )
         config.write_text(
@@ -716,10 +717,12 @@ validate_wsprrypi_runtime debug
             r'''
 source "$INSTALLER"
 DRY_RUN=false
+LOCAL_REPO_DIR="$SOURCE_ROOT"
 install_wsprrypi_proxy_block "$CONFIG" "$INI"
 ''',
             CONFIG=config,
             INI=ini,
+            SOURCE_ROOT=ROOT,
         )
 
         rendered = config.read_text(encoding="utf-8")
@@ -735,21 +738,20 @@ install_wsprrypi_proxy_block "$CONFIG" "$INI"
         )
         self.assertEqual(stat.S_IMODE(config.stat().st_mode), 0o640)
 
-    def test_service_port_resolution_matches_application_fallbacks(self) -> None:
-        ini = self.root / "invalid.ini"
-        ini.write_text(
-            "[Operation]\nWeb Port = 80\nSocket Port = not-a-port\n",
-            encoding="utf-8",
-        )
-        result = self.run_shell(
+    def test_invalid_listener_descriptor_refuses_instead_of_using_default_ports(self) -> None:
+        descriptor = self.root / "invalid.json"
+        descriptor.write_text(json.dumps(dict(schema='listener-bootstrap/1', device_id='a' * 32,
+                                              role='pi', web_port=80, socket_port=31416)))
+        self.run_shell(
             r'''
 source "$INSTALLER"
-resolve_wsprrypi_service_ports "$INI"
-printf '%s|%s\n' "$WSPRRYPI_WEB_PORT" "$WSPRRYPI_SOCKET_PORT"
+LOCAL_REPO_DIR="$SOURCE_ROOT"
+DRY_RUN=false
+if resolve_wsprrypi_service_ports "$LISTENERS"; then exit 98; fi
 ''',
-            INI=ini,
+            LISTENERS=descriptor,
+            SOURCE_ROOT=ROOT,
         )
-        self.assertEqual(result.stdout.strip(), "31415|31416")
 
     def test_utc_timezone_dry_run_neither_prompts_nor_reconfigures(self) -> None:
         sentinel = self.root / "timezone-command-invoked"

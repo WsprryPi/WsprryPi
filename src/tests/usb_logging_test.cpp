@@ -2,6 +2,7 @@
 #include "wtp_integration/usb_logging.hpp"
 #include <cassert>
 #include "wtp_settings_json.hpp"
+#include "wtp_integration/catalog.hpp"
 #include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
@@ -171,6 +172,19 @@ int main() {
   assert(usb_logging_api("PUT", unknown.dump(), read.etag).status == 409);
   assert(chmod((ini + ".usb-logs.json").c_str(), 0644) == 0);
   assert(usb_logging_api("GET", "", "").status == 409);
+  stop_usb_logging();
+  assert(chmod((ini+".usb-logs.json").c_str(),0600)==0);
+  WtpCatalog owner(ini+".wtp-devices.json");
+  const auto shared_catalog=owner.snapshot({}).first;
+  assert(unlink((ini+".wtp-devices.json").c_str())==0);
+  testing::start_usb_logging_policy(ini,machine,[shared_catalog]{return shared_catalog;});
+  read=usb_logging_api("GET","","");
+  assert(read.status==200&&nlohmann::json::parse(read.body).at("candidates").size()==1);
+  assert(!std::filesystem::exists(ini+".wtp-devices.json"));
+  stop_usb_logging();
+  testing::start_usb_logging_policy(ini,machine,[]()->nlohmann::json{throw std::runtime_error("Backend catalog unavailable");});
+  assert(usb_logging_api("GET","","").status==409);
+  assert(!std::filesystem::exists(ini+".wtp-devices.json"));
   stop_usb_logging();
   std::filesystem::remove_all(directory);
 }

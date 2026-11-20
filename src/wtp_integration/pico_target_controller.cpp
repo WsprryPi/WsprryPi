@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pico_target_controller.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "pi_pair_history.hpp"
 #include "wtp_settings_json.hpp"
 #include "controller_contract.hpp"
@@ -130,6 +131,7 @@ PicoTargetReply PicoTargetController::handle(const BrowserRequest &request,const
 }
 PicoTargetReply PicoTargetController::handle_impl(const BrowserRequest &request,const std::string &profile,
     const std::string &context,const std::string &operation,const PiPairPrincipal *principal,PiPairHistory *history,const std::function<bool()> &cancelled) {
+    if(request.method!="GET"&&restored_remote_authority_held())return failure(503,"recovery_required");
     if(cancelled&&cancelled())return failure(503,"authority_pending");
     const bool paired=principal&&history;
     if(paired&&!history->management_authorization(*principal))return failure(403,"unauthorized");

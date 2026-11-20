@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <system_error>
 #include "pi_pair_history.hpp"
 #include "pi_pair_records.hpp"
 #include "pi_pair_operations.hpp"
@@ -161,6 +162,25 @@ std::optional<std::string> PiPairHistory::recovery_generation() noexcept {
 PiPairCatalogStore::Snapshot PiPairHistory::snapshot(){
     std::lock_guard guard(mutex_);
     try{verify_selection();return store_->snapshot();}catch(...){store_.reset();throw;}
+}
+void PiPairHistory::with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &capture){
+    std::unique_lock guard(mutex_,std::try_to_lock);
+    if(!guard.owns_lock())throw std::system_error(std::make_error_code(std::errc::device_or_resource_busy));
+    require(bool(capture));
+    if(!store_){
+        struct stat info{};require(::lstat(directory_.c_str(),&info)&&errno==ENOENT);
+        capture({});return;
+    }
+    verify_selection();const auto before=store_->snapshot();
+    require(before.authority&&before.peers);
+    const auto record=selection(before.authority->bytes,self_);
+    const auto selected=namespace_path(directory_,record);
+    capture({{"pairing/selector.json",directory_+"/authority.json"},
+        {"pairing/authority.json",selected+"/authority.json"},{"pairing/operations.json",selected+"/operations.json"},
+        {"pairing/peers.json",selected+"/peers.json"}});
+    verify_selection();const auto after=store_->snapshot();
+    require(after.catalog.signature==before.catalog.signature&&after.operations.signature==before.operations.signature&&
+        after.authority->signature==before.authority->signature&&after.peers->signature==before.peers->signature);
 }
 void PiPairHistory::publish(const PiPairCatalogStore::Snapshot &expected,const Json &value){
     std::lock_guard guard(mutex_);

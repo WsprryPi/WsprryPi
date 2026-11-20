@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Current application INI and finite HTTP-load checks; simulated-only, loopback."""
+"""One-time migration, SQLite and split HTTP load; simulated-only, loopback."""
 import argparse
 import configparser
 import fcntl
@@ -19,6 +19,7 @@ import urllib.request
 import urllib.error
 
 from production_browser_load import normal_browser_schedule
+from software_web_service import start_software_web_service, stop_software_web_service
 
 
 def main():
@@ -66,24 +67,15 @@ def main():
         settings = configparser.ConfigParser(interpolation=None)
         settings.optionxform = str
         settings.read(Path(__file__).resolve().parents[2] / 'config/wsprrypi.ini')
-        assert settings.getboolean('WTP Server','Enabled') is False, 'Stock configuration must not activate the retired listener'
+        assert 'WTP' not in settings and 'WTP Server' not in settings
         settings.read_dict({
             'Operation': {'Mode': 'WSPR', 'Transmit': 'false', 'Use LED': 'false', 'Use Amp': 'false',
                           'Use Shutdown': 'false', 'Enable on Boot': 'Never', 'Transmit Backend': 'gpio',
                           'Web Port': str(web_port), 'Socket Port': str(control_port)},
-            'WTP': {'Transport': 'network', 'Hostname': 'pico-loopback.local',
-                    'TLS Server Identity': 'pico-loopback.local', 'Device ID': 'a' * 32,
-                    'TCP Port': '18443', 'Endpoint': '', 'Allow Frequency Adjustment': 'true',
-                    'Start Uncertainty ns': '500000000'},
+            'WSPR': {'Call Sign': 'AA0NT', 'Grid Square': 'EM18'},
             'Calibration': {'PPM': '0'},
             'GPIO': {'Use System Clock Frequency Estimate': 'false', 'Frequency Residual PPM': '0', 'Manual PPM': '0'},
         })
-        certificate, key = root / 'certificate.pem', root / 'key.pem'
-        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
-                        '-config', '/dev/null', '-subj', '/CN=pico-loopback.local', '-keyout', str(key), '-out', str(certificate)],
-                       check=True, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        settings['WTP'].update({'TLS CA File': str(certificate), 'TLS Client Certificate': str(certificate),
-                                'TLS Client Key': str(key)})
         with ini.open('w') as output:
             settings.write(output)
         def get(path, port=web_port):
@@ -92,11 +84,23 @@ def main():
                 data = response.read(1024 * 1024 + 1)
                 assert len(data) <= 1024 * 1024, 'Bounded response required'
                 return data
+        template = ini.read_text()
+        ini.chmod(0o600)
+        state, ledger = root / 'state', root / 'native-ledger'
+        environment = dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1')
+        admitted = subprocess.run([str(fixture), str(ledger), '--migrate-state', '--state-directory', str(state), '--ini-source', str(ini)],
+                                  capture_output=True, text=True, env=environment, timeout=30)
+        assert admitted.returncode == 0, admitted.stdout + admitted.stderr
+        retired = Path(str(ini) + '.sqlite-migrated')
+        assert not ini.exists() and retired.read_text() == template
+        database = state / 'generation-1/state.sqlite3'
+        assert database.is_file()
         with (root / 'process.log').open('w') as log:
-            child = subprocess.Popen([str(fixture), str(root / 'native-ledger'), '--backend', 'simulated', '-i', str(ini),
+            child = subprocess.Popen([str(fixture), str(ledger), '--backend', 'simulated', '--state-directory', str(state),
                                       '--socket-loopback-only', '--socket-loopback-family', 'ipv4'],
                                      cwd=root, stdout=log, stderr=subprocess.STDOUT,
                                      env=dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1'))
+            web_child = start_software_web_service([str(fixture), str(ledger)], ledger, log, environment)
             try:
                 end = time.monotonic() + 20
                 while True:
@@ -112,11 +116,6 @@ def main():
                 assert 'WTP' not in config and 'WTP Server' not in config
                 operation = config['Operation']
                 assert operation['Transmit Backend'] == 'gpio', 'Simulation must not replace saved selection'
-                persisted = configparser.ConfigParser(interpolation=None)
-                persisted.optionxform = str
-                persisted.read(ini)
-                for section in ('WTP', 'WTP Server'):
-                    assert dict(persisted[section]) == dict(settings[section]), 'Dormant private settings changed'
                 assert operation['Transmit'] is False and operation['Enable on Boot'] == 'Never'
                 assert all(operation[name] is False for name in ('Use LED', 'Use Amp', 'Use Shutdown'))
                 assert operation['Web Port'] == web_port and operation['Socket Port'] == control_port
@@ -139,7 +138,12 @@ def main():
                     except urllib.error.HTTPError as error:
                         assert 400 <= error.code < 500
                 assert json.loads(get(fleet_path + '/operations'))['assignments'] == []
-                before = hashlib.sha256(ini.read_bytes()).digest()
+                # Check the database and WAL image after startup, not a retired
+                # source file that the running owners must never consult.
+                def state_image():
+                    return {path.name: hashlib.sha256(path.read_bytes()).digest() for path in database.parent.iterdir()
+                            if path.name in ('state.sqlite3', 'state.sqlite3-wal')}
+                before = state_image()
                 for seconds in (180, 300):
                     now, requests, events = [0.0], [], []
                     class Stop:
@@ -151,9 +155,11 @@ def main():
                                             lambda kind, value: events.append((kind, value)), clock=lambda: now[0])
                     assert len(requests) == 14 and requests.count('/api/wtp') == 8
                     assert len(events) == 16
-                assert hashlib.sha256(ini.read_bytes()).digest() == before, 'Read-only load changed saved INI'
+                assert state_image() == before, 'Read-only load wrote SQLite state'
+                assert not ini.exists() and retired.read_text() == template, 'Runtime consulted or recreated retired INI'
                 assert json.loads(get('/config')) == config, 'Read-only load changed exposed settings'
             finally:
+                stop_software_web_service(web_child)
                 if child.poll() is None:
                     child.terminate()
                     try: child.wait(timeout=10)
@@ -161,7 +167,6 @@ def main():
                         child.kill(); child.wait(timeout=3); raise
                 assert child.returncode == 0, (root / 'process.log').read_text()[-4000:]
         assert 'Transmit backend: simulated' in (root / 'process.log').read_text()
-        template = ini.read_text()
         invalid = {
             'lowercase-mode': template.replace('Mode = WSPR', 'mode = WSPR', 1),
             'lowercase-station-key': template.replace('Call Sign = ', 'call sign = ', 1),
@@ -172,40 +177,17 @@ def main():
             bad = root / (name + '.ini'); bad.write_text(text)
             rejected_hash = hashlib.sha256(bad.read_bytes()).digest()
             record = root / (name + '.log')
-            with record.open('w') as output:
-                child = subprocess.Popen([str(fixture), str(root / (name + '-ledger')), '--backend', 'simulated', '-i', str(bad),
-                                          '--socket-loopback-only', '--socket-loopback-family', 'ipv4'],
-                                         cwd=root, stdout=output, stderr=subprocess.STDOUT,
-                                         env=dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1'))
-                try:
-                    end = time.monotonic() + 15
-                    while True:
-                        assert child.poll() is None, record.read_text()[-4000:]
-                        try:
-                            readiness = json.loads(get('/api/control/v1/host/readiness', web_port))
-                            assert readiness['state'] == 'configuration_recovery', readiness
-                            try:
-                                get('/config', web_port)
-                                raise AssertionError('Invalid configuration exposed as current settings')
-                            except urllib.error.HTTPError as error:
-                                assert error.code == 409
-                                assert json.loads(error.read())['schema'] == 'configuration-recovery'
-                            break
-                        except OSError:
-                            assert time.monotonic() < end, record.read_text()[-4000:]
-                            time.sleep(.05)
-                    assert hashlib.sha256(bad.read_bytes()).digest() == rejected_hash, 'Rejected INI changed'
-                    assert not (root / (name + '-ledger.simulated-trace.json')).exists(), 'Invalid INI constructed an output backend'
-                finally:
-                    if child.poll() is None:
-                        child.terminate()
-                        try: child.wait(timeout=10)
-                        except subprocess.TimeoutExpired:
-                            child.kill(); child.wait(timeout=3); raise
-                    assert child.returncode == 0, record.read_text()[-4000:]
+            bad.chmod(0o600)
+            result = subprocess.run([str(fixture), str(root / (name + '-ledger')), '--migrate-state',
+                                     '--state-directory', str(root / (name + '-state')), '--ini-source', str(bad)],
+                                    cwd=root, capture_output=True, text=True, env=environment, timeout=30)
+            record.write_text(result.stdout + result.stderr)
+            assert result.returncode != 0, 'Invalid source admitted for migration: ' + name
+            assert hashlib.sha256(bad.read_bytes()).digest() == rejected_hash, 'Rejected migration source changed'
+            assert not (root / (name + '-ledger.simulated-trace.json')).exists(), 'Migration constructed an output backend'
             print('PASS current candidate rejects ' + name + ' without enabling output')
 
-    print('PASS current candidate INI round-trip and both finite browser-load profiles; loopback, simulated-only')
+    print('PASS one-time source migration, SQLite-only saved state, split web service, and both finite browser-load profiles; loopback, simulated-only')
 
 
 if __name__ == '__main__':

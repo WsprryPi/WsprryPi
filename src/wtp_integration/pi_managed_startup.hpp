@@ -13,6 +13,9 @@ class PiManagedStartup {
 public:
     using ConfigurationGate=std::function<void(const std::function<void()> &)>;
     PiManagedStartup(std::string ini,std::string self,std::function<void(PiPairInitializationProof)> pairing = {});
+    // Admitted migration or explicit first-install seed. Preparation never
+    // imports files or reclassifies missing established history as fresh.
+    explicit PiManagedStartup(std::shared_ptr<SqliteStateStore>,std::function<void(PiPairInitializationProof)> pairing = {});
     ~PiManagedStartup();
     PiManagedStartup(const PiManagedStartup &)=delete;
     PiManagedStartup &operator=(const PiManagedStartup &)=delete;

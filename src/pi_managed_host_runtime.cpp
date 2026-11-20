@@ -1,5 +1,7 @@
+#include "application_recovery/restore_hold.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_managed_host_runtime.hpp"
+#include "application_storage/application_state.hpp"
 #include "config_handler.hpp"
 #include "wtp_pi_control.hpp"
 #include "wtp_endpoint/runtime.hpp"
@@ -45,8 +47,32 @@ std::shared_ptr<PiManagedHost> prepare_pi_managed_host(const std::string &ini){
     }catch(...){return {};}
 }
 std::shared_ptr<PiManagedHost> pi_managed_host(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.host.lock();}
+std::shared_ptr<PiManagedHost> prepare_pi_managed_host(std::shared_ptr<SqliteStateStore> database){
+    auto &registry=slot();std::lock_guard lock(registry.mutex);
+    if(registry.selected)throw std::logic_error("managed_host_already_selected");
+    registry.selected=true;
+    set_wtp_pi_management_readiness([]{return false;});
+    iniFile.set_file_reader([](const std::string &)->std::string{refuse();return {};});
+    iniFile.set_file_writer([](const std::string &,const std::string &){refuse();});
+    set_config_persistence_owner([](const auto &,const auto &){refuse();},[](const auto &){refuse();},
+        [](const auto &,const auto &){refuse();},{},[](const std::string &){refuse();});
+    WtpPiBootIdentity identity;registry.boot=identity.new_boot_id();
+    try{
+        if(!database||application_database()!=database||database->role()!=StateRole::Pi)refuse();
+        registry.self=wtp_pi_device_id();
+        if(registry.self!=database->identity())refuse();
+        std::function<void(PiPairInitializationProof)> pairing;
+        try{const auto owner=prepare_pi_pair_owner(registry.self);pairing=[owner](PiPairInitializationProof proof){owner->provision(std::move(proof));};}
+        catch(...){/* Pairing recovery remains independent. */}
+        auto host=std::make_shared<PiManagedHost>(database,registry.boot,wtp_pi_management_observation,std::move(pairing));
+        host->prepare();registry.host=host;return host;
+    }catch(...){return {};}
+}
 std::string pi_managed_host_process_boot(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.boot;}
-void poll_pi_managed_migration() noexcept {try{if(const auto host=pi_managed_host())host->advance_migration();}catch(...){}}
+void poll_pi_managed_migration() noexcept {
+    if(local_restore_output_held()||restore_maintenance_active())return;
+    try{if(const auto host=pi_managed_host())host->advance_migration();}catch(...){}
+}
 bool pi_managed_host_selected(){auto &registry=slot();std::lock_guard lock(registry.mutex);return registry.selected;}
 bool pi_managed_host_protected_recovery_path(std::string_view path){
     return pi_managed_host_selected()&&(path=="/api/control/v1/host/readiness"||

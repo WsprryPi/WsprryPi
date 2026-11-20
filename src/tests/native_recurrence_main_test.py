@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Actual main, protected APIs, simulated output, and durable restart fences."""
 import argparse
-import configparser
 import copy
 import json
 from pathlib import Path
@@ -10,6 +9,8 @@ import subprocess
 import tempfile
 import time
 from controller_only_test import free_port, request as raw_request
+from software_backend_admission import backend_admission
+from software_web_service import start_software_web_service, stop_software_web_service
 
 
 _last_request = {}
@@ -28,36 +29,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--fixture', required=True)
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix='native-recurrence-main-') as temporary:
+    with backend_admission(args.fixture), tempfile.TemporaryDirectory(prefix='native-recurrence-main-') as temporary:
         root = Path(temporary)
-        ini, ledger = root / 'native.ini', root / 'ledger'
+        state, ledger = root / 'state', root / 'ledger'
         trace = Path(str(ledger) + '.simulated-trace.json')
-        progress = Path(str(ini) + '.recurrence-progress.json')
-        source = configparser.ConfigParser(interpolation=None)
-        source.optionxform = str
-        source.read(Path(__file__).resolve().parents[2] / 'config/wsprrypi.ini')
+        progress = state / 'generation-1/configuration.recurrence-progress.json'
         port = free_port()
-        source['Operation'].update({'Transmit Backend': 'gpio', 'Transmit': 'false', 'Enable on Boot': 'Never',
-            'Use LED': 'false', 'Use Amp': 'false', 'Use Shutdown': 'false', 'Web Port': str(port), 'Socket Port': str(port + 1)})
-        source['WSPR'].update({'Call Sign': 'AA0NT', 'Grid Square': 'EM18', 'TX Power': '20'})
-        source['WTP Server']['Enabled'] = 'false'
-        source['WTP'].update({'Transport': 'network_plain', 'Hostname': '127.0.0.1', 'TCP Port': '31417', 'Device ID': 'b' * 32})
-        with ini.open('w') as output:
-            source.write(output)
-        ini.chmod(0o600)
-        stock = Path(str(ini) + '.stock')
-        stock.write_bytes(ini.read_bytes())
-        stock.chmod(0o600)
+        fixture = str(Path(args.fixture).resolve())
+        initialized = subprocess.run([fixture, str(ledger), '--initialize-state', '--state-directory', str(state)],
+                                     capture_output=True, text=True, timeout=15)
+        assert initialized.returncode == 0, initialized.stderr
         # Keep realtime start diagnostics in the captured failure log; hosted
         # runners can refuse an occurrence at the strict launch boundary.
-        command = [str(Path(args.fixture).resolve()), str(ledger), '--backend', 'simulated', '-i', str(ini),
+        command = [fixture, str(ledger), '--backend', 'simulated', '--state-directory', str(state),
+            '--web-port', str(port), '--socket-port', str(port + 1),
             '--socket-loopback-only', '--socket-loopback-family', 'ipv4', '--debug-logging']
+        web = None
         process, log = None, (root / 'service.log').open('w')
         headers = {'Origin': f'http://127.0.0.1:{port}', 'Content-Type': 'application/json', 'X-WsprryPico-Request': '1'}
 
         def launch():
-            nonlocal process
+            nonlocal process, web
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+            if web is None:
+                web = start_software_web_service([fixture,str(ledger)],ledger,log)
 
         def stop(kill=False):
             if process and process.poll() is None:
@@ -74,7 +69,15 @@ def main():
                         return value
                 except OSError:
                     pass
-                assert time.monotonic() < deadline, label + '\n' + (root / 'service.log').read_text()[-12000:]
+                if time.monotonic() >= deadline:
+                    diagnostics = {'progress_path': str(progress), 'progress_exists': progress.exists()}
+                    if progress.exists():
+                        diagnostics['progress'] = json.loads(progress.read_text())
+                    if label == 'Durable accepted occurrence':
+                        diagnostics['status'] = read(base + 'status')
+                        diagnostics['settings'] = read(base + 'settings')
+                    raise AssertionError(label + '\n' + json.dumps(diagnostics, sort_keys=True) + '\n' +
+                                         (root / 'service.log').read_text()[-12000:])
                 time.sleep(.04)
 
         def read(path):
@@ -123,7 +126,7 @@ def main():
             assert recovery['validation'] == 'initialization'
             session()
             candidate = copy.deepcopy(recovery['draft'])
-            candidate['Operation'].update({'Transmit': False, 'Enable on Boot': 'Never'})
+            candidate['Operation'].update({'Transmit': False, 'Enable on Boot': 'Never', 'Web Port': port, 'Socket Port': port + 1})
             candidate['WSPR'].update({'Call Sign': 'AA0NT', 'Grid Square': 'EM18', 'TX Power': 20})
             unavailable = [(section, key) for section, group in candidate.items() for key, value in group.items()
                 if isinstance(value, dict) and value.get('state') == 'unavailable']
@@ -247,6 +250,7 @@ def main():
             action('disable', 'target-action')
             print('PASS: actual main protected native enable/disable, independent Transmit/boot, drain, autonomous output, restart retention, and interrupted-reservation no replay')
         finally:
+            stop_software_web_service(web)
             stop()
             log.close()
 

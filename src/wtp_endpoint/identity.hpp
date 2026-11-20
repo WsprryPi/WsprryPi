@@ -17,6 +17,11 @@ std::string wtp_pi_device_id();
 std::string wtp_pi_device_id(const std::string& machine_id_path);
 // Pure Mac mapping used by the OS producer and cross-platform golden tests.
 std::string wtp_pi_macos_device_id(const std::array<std::uint8_t,16>& host_uuid);
+namespace testing {
+// Actual-main, separate-installation software fixtures only. Must be selected
+// before first identity use; never exposed by production arguments or input.
+void select_wtp_pi_device_identity(const std::string &identity);
+}
 
 class WtpPiBootIdentity final : public wsprrypico::wtp::IdentitySource {
 public:

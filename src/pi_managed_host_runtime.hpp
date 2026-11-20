@@ -8,6 +8,7 @@ namespace wsprrypi {
 // role or identity. The returned owner outlives every listener/output worker.
 std::optional<std::string> pi_managed_ini_argument(int argc,char *argv[]);
 std::shared_ptr<PiManagedHost> prepare_pi_managed_host(const std::string &ini);
+std::shared_ptr<PiManagedHost> prepare_pi_managed_host(std::shared_ptr<SqliteStateStore>);
 std::shared_ptr<PiManagedHost> pi_managed_host();
 // The actual pre-parser process boot, independent of transmitter readiness.
 std::string pi_managed_host_process_boot();

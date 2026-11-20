@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_pair_remote_controller.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "pi_pair_peers.hpp"
 #include "controller_contract.hpp"
 #include "control_contract.hpp"
@@ -300,6 +301,7 @@ PiPairHttpReply PiPairRemoteController::read(const BrowserRequest &request,const
     }catch(...){return failure(503,"authority_pending");}
 }
 PiPairHttpReply PiPairRemoteController::write(const BrowserRequest &request,const std::string &profile,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return failure(503,"recovery_required");
     try{
         require(bool(cancelled)&&!cancelled());
         if(!request.mutation_context)return failure(403,"csrf_failed");
@@ -394,6 +396,7 @@ PiPairHttpReply PiPairRemoteController::write(const BrowserRequest &request,cons
 }
 PiPairHttpReply PiPairRemoteController::write_pico(const BrowserRequest &request,const std::string &profile,const std::string &context,
     const std::string &operation_id,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return failure(503,"recovery_required");
     try{
         require(bool(cancelled)&&!cancelled());if(!request.mutation_context)return failure(403,"csrf_failed");
         constexpr std::string_view prefix="/api/control/v1/targets/";
@@ -520,6 +523,7 @@ PiPairHttpReply PiPairRemoteController::write_pico(const BrowserRequest &request
     }catch(...){return failure(503,"recovery_required");}
 }
 PiPairHttpReply PiPairRemoteController::review(const BrowserRequest &request,const std::string &profile,const std::function<bool()> &cancelled){
+    if(restored_remote_authority_held())return failure(503,"recovery_required");
     try{
         require(bool(cancelled)&&!cancelled());if(!request.mutation_context)return failure(403,"csrf_failed");
         constexpr std::string_view prefix="/api/control/v1/targets/";

@@ -58,7 +58,7 @@ $viewMetadata = [
         'bodyClass' => '',
         'htmlTheme' => 'light',
         'css' => ['maintenance.css'],
-        'js' => ['maintenance.js', 'recurrence-migration.js', 'pairing-client.js', 'pairing.js'],
+        'js' => ['maintenance.js', 'backup-restore.js', 'recurrence-migration.js', 'pairing-client.js', 'pairing.js'],
         'partial' => __DIR__ . '/views/maintenance.php',
     ],
 ];

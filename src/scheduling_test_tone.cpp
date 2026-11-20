@@ -1,3 +1,4 @@
+#include "application_recovery/restore_hold.hpp"
 /**
  * @file scheduling_test_tone.cpp
  * @brief Owns transient test-tone and operator stop orchestration.
@@ -226,6 +227,10 @@ static TestToneStartResult start_test_tone_locked(const TestToneRequest &tone_re
 {
     std::unique_lock config_lock(set_config_mtx);
     TestToneStartResult result;
+    if(wsprrypi::local_restore_output_held()){
+        result.message="Restored settings require destination review in Maintenance before local output can resume.";
+        return result;
+    }
     if (exiting_wspr.load()) { result.message = "Application is stopping."; return result; }
     result.source = tone_request.source;
     if (!web_test_tone.load() && current_test_tone_status().state == "unknown") {

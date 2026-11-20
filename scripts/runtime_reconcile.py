@@ -65,7 +65,7 @@ class Linux:
         companion.inspect_service_command()
 
     def backend(self):
-        return companion.configured_backend(companion.trusted(companion.CONFIG)[0])
+        return companion.state()['backend']
 
     def bootstrap_capable(self):
         companion.inspect_service()
@@ -120,10 +120,8 @@ class Linux:
         return strict_json(raw)
 
     def configuration(self):
-        parsed = companion.configuration(companion.trusted(companion.CONFIG)[0])
-        return {'backend': parsed.get('Operation', 'Transmit Backend').lower(),
-                'route': 'gpio'+str(parsed.getint('GPIO', 'Transmit Pin')),
-                'transmit': parsed.getboolean('Operation', 'Transmit')}
+        value = companion.state()
+        return {key: value[key] for key in ('backend', 'route', 'transmit')}
 
     def checkpoint(self):
         try:

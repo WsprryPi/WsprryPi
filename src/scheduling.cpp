@@ -40,6 +40,7 @@
 
 // Primary header for this source file
 #include "scheduling.hpp"
+#include "application_recovery/restore_hold.hpp"
 #include "scheduling_internal.hpp"
 #include "recurrence_admission.hpp"
 #include "native_recurrence.hpp"
@@ -1832,6 +1833,7 @@ bool run_startup_quiesce_gate(const ArgParserConfig &cfg)
 
 bool runtime_transmit_requested(const ArgParserConfig &cfg) noexcept
 {
+    if(wsprrypi::local_restore_output_held())return false;
     if (!cfg.use_ini)
     {
         if (cfg.mode == ModeType::TONE &&

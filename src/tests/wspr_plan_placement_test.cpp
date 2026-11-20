@@ -408,7 +408,11 @@ void export_scheduler_vectors(const char *path) {
         const auto plan = wsprrypi::ExecutionPlanCompiler{}.compile(*request);
         nlohmann::json events=nlohmann::json::array();
         for(const auto &event:plan.events){
-            const auto frequency=static_cast<std::uint64_t>(std::round(static_cast<long double>(event.frequency_hz)*1'000'000'000.0L));
+            // Keep the integer and fractional products separate: on hosts where
+            // long double is binary64, a 14 MHz nanohertz value exceeds 2^53.
+            const auto whole=static_cast<std::uint64_t>(std::floor(event.frequency_hz));
+            const auto frequency=whole*1'000'000'000ULL+static_cast<std::uint64_t>(
+                std::round((event.frequency_hz-static_cast<double>(whole))*1'000'000'000.0));
             events.push_back({{"offset_ns",std::to_string(event.offset_from_start.count())},
                 {"duration_ns",std::to_string(event.duration.count())},{"rf_on",event.rf_on},{"frequency_nhz",std::to_string(frequency)}});
         }

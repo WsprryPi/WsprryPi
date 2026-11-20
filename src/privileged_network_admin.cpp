@@ -85,6 +85,12 @@ std::optional<std::string> read_privileged_network_ini_value(
     return scan.value;
 }
 
+PrivilegedNetworkModeParseResult parse_privileged_network_ini_mode(const std::string &contents) {
+    const auto scan=scan_ini(contents);
+    return parse_privileged_network_mode(scan.security_sections>1||scan.setting_lines>1?
+        std::optional<std::string>("<ambiguous>"):scan.value);
+}
+
 std::optional<std::string> render_privileged_network_ini(
     const std::string &existing, const std::string &value) {
     if (!parse_privileged_network_mode(value).valid) return std::nullopt;
@@ -208,9 +214,12 @@ bool run_privileged_network_command(const std::vector<std::string> &arguments) {
 }
 
 PrivilegedNetworkAdmin::PrivilegedNetworkAdmin(
-    PrivilegedNetworkAdminPaths paths, PrivilegedNetworkCommandRunner runner,PrivilegedNetworkIniIO ini_io)
-    : paths_(std::move(paths)), runner_(std::move(runner)),ini_io_(std::move(ini_io)) {
+    PrivilegedNetworkAdminPaths paths, PrivilegedNetworkCommandRunner runner,PrivilegedNetworkIniIO ini_io,
+    PrivilegedNetworkSettingsIO settings_io)
+    : paths_(std::move(paths)), runner_(std::move(runner)),ini_io_(std::move(ini_io)),settings_io_(std::move(settings_io)) {
     if(bool(ini_io_.read)!=bool(ini_io_.write))throw std::invalid_argument("Install both INI read and write owners");
+    if(bool(settings_io_.read)!=bool(settings_io_.write)|| (settings_io_.read&&ini_io_.read))
+        throw std::invalid_argument("Install one complete network settings owner");
 }
 
 std::optional<std::string> PrivilegedNetworkAdmin::read_application_ini() const {
@@ -226,12 +235,16 @@ bool PrivilegedNetworkAdmin::write_application_ini(const std::string &contents){
 
 PrivilegedNetworkTransactionSnapshot PrivilegedNetworkAdmin::snapshot() const {
     const auto runtime = privileged_network_runtime_state();
+    if(settings_io_.read) {
+        const auto saved=settings_io_.read();
+        const auto policy=read_text_file(paths_.apache_policy_file);
+        const auto mode=saved?saved->mode:PrivilegedNetworkMode::enforced;
+        return {mode,runtime.active,saved.has_value(),runtime.active_known,
+            mode_value(mode),policy.value_or(""),saved?saved->revision:std::string{},saved.has_value(),false};
+    }
     const auto ini = read_application_ini();
     const auto policy = read_text_file(paths_.apache_policy_file);
-    const auto scan = ini ? scan_ini(*ini) : IniScan{};
-    const bool ambiguous = scan.security_sections > 1 || scan.setting_lines > 1;
-    auto parsed = parse_privileged_network_mode(ambiguous ?
-        std::optional<std::string>("<ambiguous>") : scan.value);
+    const auto parsed=ini?parse_privileged_network_ini_mode(*ini):parse_privileged_network_mode(std::nullopt);
     return {parsed.mode, runtime.active, ini.has_value(), runtime.active_known,
             mode_value(parsed.mode), policy.value_or(""), ini.value_or(""),
             parsed.valid, parsed.missing};
@@ -258,9 +271,24 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
     std::lock_guard<std::mutex> lock(mutex_);
     const auto previous = snapshot();
     std::string expected_policy;
+    auto expected_revision=previous.application_configuration;
+    const auto write_setting=[&](PrivilegedNetworkMode mode) {
+        try {
+            const auto before=settings_io_.read();
+            if(!before||before->revision!=expected_revision)return false;
+            const auto committed=settings_io_.write(expected_revision,mode);
+            if(!committed)return false;
+            expected_revision=*committed;
+            const auto after=settings_io_.read();
+            if(!after||after->mode!=mode||after->revision!=expected_revision||
+                (mode!=before->mode&&after->revision==before->revision))return false;
+            return true;
+        }catch(...){return false;}
+    };
     const auto operations = PrivilegedNetworkTransactionOperations{
         [&](const PrivilegedNetworkTransactionCandidate &candidate) {
             if (!previous.configured_known) return false;
+            if(settings_io_.read)return !expected_revision.empty();
             const auto rendered = render_privileged_network_ini(
                 previous.application_configuration, candidate.persisted_setting);
             return rendered.has_value() &&
@@ -272,6 +300,9 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
             return validate_apache_candidate(policy);
         },
         [&](const PrivilegedNetworkTransactionCandidate &candidate) {
+            if(settings_io_.read)
+                return write_setting(candidate.requested)&&
+                    write_text_file_atomically(paths_.apache_policy_file,candidate.apache_policy);
             const auto rendered = render_privileged_network_ini(
                 previous.application_configuration, candidate.persisted_setting);
             return rendered.has_value() &&
@@ -281,6 +312,13 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
         },
         [&] { return runner_({paths_.system_control, "reload", "apache2"}); },
         [&](PrivilegedNetworkMode mode) {
+            if(settings_io_.read) {
+                const auto saved=settings_io_.read();
+                const auto policy=read_text_file(paths_.apache_policy_file);
+                if(!saved||saved->mode!=mode||saved->revision!=expected_revision||!policy||*policy!=expected_policy)return false;
+                set_privileged_network_runtime_mode(mode);
+                return true;
+            }
             const auto ini = read_application_ini();
             const auto policy = read_text_file(paths_.apache_policy_file);
             const auto parsed = ini
@@ -295,6 +333,9 @@ PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(
             return true;
         },
         [&](const PrivilegedNetworkTransactionSnapshot &state) {
+            if(settings_io_.read)
+                return state.configured_known&&write_setting(state.configured)&&
+                    write_text_file_atomically(paths_.apache_policy_file,state.apache_policy);
             return state.configured_known &&
                 write_application_ini(state.application_configuration) &&
                 write_text_file_atomically(paths_.apache_policy_file,

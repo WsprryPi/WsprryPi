@@ -11,6 +11,7 @@ if ($basePath === '/' || $basePath === '.') {
 $pathConfig = [
     'basePath' => $basePath,
     'sharedApiPath' => $basePath . '/api/control/v1',
+    'recoveryPath' => $basePath . '/api/recovery',
     'configPath' => $basePath . '/config',
     'versionPath' => $basePath . '/version',
     'uiIdentityPath' => $basePath . '/ui-version.php',

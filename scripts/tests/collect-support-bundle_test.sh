@@ -498,4 +498,76 @@ mkdir "$legacy"
 [[ -f "$legacy/$(basename "$archive")" ]] || fail "legacy current-directory archive missing"
 assert_valid_json "$legacy/$(basename "$archive").result.json"
 
+# Current settings come from the supported backend export, never a project
+# runtime tree or retired INI. A private source sentinel must not enter a bundle.
+original_collector="$COLLECTOR"
+mkdir -p "$TEST_ROOT/diagnostic-bin" "$TEST_ROOT/diagnostic-project/config" \
+  "$TEST_ROOT/diagnostic-project/runtime/pairing" "$TEST_ROOT/diagnostic-project/runtime/evidence" \
+  "$TEST_ROOT/diagnostic-out" "$TEST_ROOT/diagnostic-no-configs-out" "$TEST_ROOT/diagnostic-invalid-out"
+printf '%s\n' '{"public_policy":true}' > "$TEST_ROOT/diagnostic-project/config/picotool-release.json"
+printf '%s\n' '{"opaque_identity":"PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS"}' > "$TEST_ROOT/diagnostic-project/runtime/pairing/authority.json"
+printf '%s\n' '{"opaque_evidence":"PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS"}' > "$TEST_ROOT/diagnostic-project/runtime/evidence/source.json"
+printf '%s\n' 'PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS' > "$TEST_ROOT/diagnostic-project/config/wsprrypi.ini"
+printf '%s\n' 'SQLite format 3 PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS' > "$TEST_ROOT/diagnostic-project/runtime/state.sqlite3"
+python3 - "$TEST_ROOT/diagnostic.json" <<'PY'
+import json,sys
+value={'schema':'diagnostic-settings/1','status':'available','role':'controller',
+ 'backend':{'version':'fixture','branch':'fixture','source_revision':'a'*40,'dirty':'false','boot':'b'*32},
+ 'storage':{'format':'application-state/1','schema_version':1,'sqlite_version':'3.40.1','held':False,
+            'namespace':'/var/lib/wsprrypi/application-state/generation-2/configuration','revision':'7','settings_revision':'6'},
+ 'web_service':{'http_port':35001,'websocket_port':35002},
+ 'restore_hold':{'schema':'restore-hold-status/1','local_output_held':False,'remote_authority_held':False,'maintenance_active':False,'job_id':None,'revision':None},
+ 'saved_settings':{'schema':'local-settings/1','role':'controller','configuration':{'Operation':{'Web Port':35001,'Socket Port':35002}},
+                   'private':{'debug_logging':True,'network_safety':'enforced'}},
+ 'advanced_saved':{'Meta.debug_logging':True,'Operation.Web Port':35001,'Operation.Socket Port':35002}}
+with open(sys.argv[1],'w') as output:json.dump(value,output)
+PY
+cat > "$TEST_ROOT/diagnostic-bin/wsprrypi" <<'EOF'
+#!/usr/bin/bash
+if [[ "$1" == --diagnostic-export ]]; then /bin/cat "$DIAGNOSTIC_FIXTURE_JSON"; else exit 2; fi
+EOF
+chmod 700 "$TEST_ROOT/diagnostic-bin/wsprrypi"
+python3 - "$original_collector" "$TEST_ROOT/diagnostic-collector.sh" "$TEST_ROOT/diagnostic-bin" <<'PY'
+from pathlib import Path
+import sys
+source=Path(sys.argv[1]).read_text().replace('INSTALLED_EXE="/usr/local/bin/wsprrypi"', 'INSTALLED_EXE="'+sys.argv[3]+'/wsprrypi"')
+source=source.replace('INSTALLED_DEBUG_EXE="/usr/local/bin/wsprrypi_debug"', 'INSTALLED_DEBUG_EXE="'+sys.argv[3]+'/missing-debug"')
+Path(sys.argv[2]).write_text(source)
+PY
+COLLECTOR="$TEST_ROOT/diagnostic-collector.sh"
+export DIAGNOSTIC_FIXTURE_JSON="$TEST_ROOT/diagnostic.json"
+run_collector "$TEST_ROOT/diagnostic-out" "$TEST_ROOT/mocks" "$TEST_ROOT/diagnostic-i2c.log" --path "$TEST_ROOT/diagnostic-project" > "$TEST_ROOT/diagnostic.stdout"
+mkdir "$TEST_ROOT/diagnostic-extracted"
+tar -xzf "$TEST_ROOT/diagnostic-out/$(basename "$archive")" -C "$TEST_ROOT/diagnostic-extracted"
+diagnostic_bundle="$TEST_ROOT/diagnostic-extracted/bundle"
+assert_valid_json "$diagnostic_bundle/configs/installed/saved-settings.json"
+assert_contains "$diagnostic_bundle/configs/installed/saved-settings.json" '"Meta.debug_logging": true'
+assert_contains "$diagnostic_bundle/web/wsprrypi-web-ports.txt" 'Saved Web Port: 35001'
+assert_contains "$diagnostic_bundle/web/wsprrypi-web-ports.txt" 'Observed active HTTP port: 35001'
+assert_file "$diagnostic_bundle/configs/project/config/picotool-release.json"
+[[ ! -e "$diagnostic_bundle/configs/project/runtime" && ! -e "$diagnostic_bundle/project/wsprrypi.ini" ]] || fail "private project runtime or retired INI collected"
+if grep -rFl 'PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS' "$diagnostic_bundle" >/dev/null; then fail "private source content entered diagnostics"; fi
+[[ ! -e "$diagnostic_bundle/configs/installed/.saved-settings-export.json" ]] || fail "unvalidated diagnostic staging retained"
+assert_file "$diagnostic_bundle/configs/systemd/systemctl-show-wsprrypi-web.txt"
+assert_file "$diagnostic_bundle/configs/systemd/systemctl-show-wsprrypi-maintenance.txt"
+
+run_collector "$TEST_ROOT/diagnostic-no-configs-out" "$TEST_ROOT/mocks" "$TEST_ROOT/diagnostic-no-configs-i2c.log" --no-configs > "$TEST_ROOT/diagnostic-no-configs.stdout"
+mkdir "$TEST_ROOT/diagnostic-no-configs-extracted"
+tar -xzf "$TEST_ROOT/diagnostic-no-configs-out/$(basename "$archive")" -C "$TEST_ROOT/diagnostic-no-configs-extracted"
+[[ ! -e "$TEST_ROOT/diagnostic-no-configs-extracted/bundle/configs/installed/saved-settings.json" ]] || fail "--no-configs included settings"
+assert_contains "$TEST_ROOT/diagnostic-no-configs-extracted/bundle/web/storage-status.json" '"status": "available"'
+
+mv "$TEST_ROOT/diagnostic-project/config" "$TEST_ROOT/diagnostic-project/public-config"
+mkdir "$TEST_ROOT/diagnostic-private"
+printf '%s\n' 'PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS' > "$TEST_ROOT/diagnostic-private/picotool-release.json"
+ln -s "$TEST_ROOT/diagnostic-private" "$TEST_ROOT/diagnostic-project/config"
+printf '%s\n' '{"schema":"diagnostic-settings/1","status":"available","private_records":"PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS"}' > "$DIAGNOSTIC_FIXTURE_JSON"
+run_collector "$TEST_ROOT/diagnostic-invalid-out" "$TEST_ROOT/mocks" "$TEST_ROOT/diagnostic-invalid-i2c.log" --path "$TEST_ROOT/diagnostic-project" > "$TEST_ROOT/diagnostic-invalid.stdout"
+mkdir "$TEST_ROOT/diagnostic-invalid-extracted"
+tar -xzf "$TEST_ROOT/diagnostic-invalid-out/$(basename "$archive")" -C "$TEST_ROOT/diagnostic-invalid-extracted"
+assert_contains "$TEST_ROOT/diagnostic-invalid-extracted/bundle/web/storage-status.json" '"status": "unavailable"'
+assert_contains "$TEST_ROOT/diagnostic-invalid-extracted/bundle/web/wsprrypi-web-ports.txt" 'Saved Web Port: unavailable'
+if grep -rFl 'PRIVATE_SOURCE_MUST_NOT_ENTER_DIAGNOSTICS' "$TEST_ROOT/diagnostic-invalid-extracted" >/dev/null; then fail "malformed export retained private content"; fi
+COLLECTOR="$original_collector"
+
 echo "collect-support-bundle tests: PASS"

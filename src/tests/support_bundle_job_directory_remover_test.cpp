@@ -22,7 +22,7 @@ fs::path make_private_directory(const char *prefix) {
     std::vector<char> writable(pattern.begin(), pattern.end());
     writable.push_back('\0');
     assert(mkdtemp(writable.data()) != nullptr);
-    const fs::path path(writable.data());
+    const fs::path path = fs::canonical(writable.data());
     assert(chmod(path.c_str(), 0700) == 0);
     return path;
 }

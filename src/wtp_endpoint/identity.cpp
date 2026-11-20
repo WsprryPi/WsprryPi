@@ -13,9 +13,14 @@
 #include <unistd.h>
 #include <algorithm>
 #include <ctime>
+#include <mutex>
+#include <optional>
 
 namespace wsprrypi {
 namespace {
+std::mutex identity_mutex;
+std::optional<std::string> fixture_identity;
+bool identity_selected{};
 std::string hex16(std::span<const std::uint8_t> bytes) {
     constexpr char digits[] = "0123456789abcdef";
     std::string result;
@@ -42,6 +47,8 @@ std::string wtp_pi_macos_device_id(const std::array<std::uint8_t,16>& host_uuid)
 }
 
 std::string wtp_pi_device_id() {
+    std::lock_guard lock(identity_mutex);identity_selected=true;
+    if(fixture_identity)return *fixture_identity;
 #ifdef __APPLE__
     std::array<std::uint8_t,16> host_uuid{};
     const timespec timeout{2,0}; // Zero would mean an unbounded OS wait.
@@ -51,6 +58,13 @@ std::string wtp_pi_device_id() {
 #else
     return wtp_pi_device_id("/etc/machine-id");
 #endif
+}
+
+void testing::select_wtp_pi_device_identity(const std::string &identity){
+    std::lock_guard lock(identity_mutex);
+    if(identity_selected||fixture_identity||identity.size()!=32||identity.find_first_not_of("0123456789abcdef")!=std::string::npos)
+        throw std::logic_error("Software installation identity must be selected once before use");
+    fixture_identity=identity;
 }
 
 std::string wtp_pi_device_id(const std::string& machine_id_path) {

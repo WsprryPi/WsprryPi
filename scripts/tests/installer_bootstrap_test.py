@@ -27,8 +27,8 @@ for step in process_args enforce_sudo setup_log validate_depends validate_sys_ac
     check_arch check_internet set_time \
     validate_apache_web_availability capture_install_sem_ver remove_legacy_services \
     remove_legacy_files_and_dirs manage_exe manage_support_bundle_runtime \
-    manage_pico_usb_runtime manage_route_application manage_config manage_i2c \
-    manage_service manage_udp_logging activate_rp1_gpclk_runtime_administration manage_web \
+    manage_pico_usb_runtime manage_route_application manage_application_state manage_maintenance_service manage_i2c \
+    manage_service manage_browser_service manage_udp_logging activate_rp1_gpclk_runtime_administration manage_web \
     manage_apache validate_wsprrypi_runtime manage_sound \
     cleanup_files_in_directories restore_daemon_state flag_need_reboot \
     begin_application_ownership complete_application_ownership remove_application_ownership \
@@ -158,8 +158,8 @@ if [[ "$ACTION" == uninstall ]]; then
     }
     for step in prepare_owned_rp1_gpclk_runtime_removal remove_owned_rp1_gpclk_dkms_provider \
         preserve_shared_picotool \
-        manage_apache manage_web manage_udp_logging manage_service manage_i2c \
-        manage_config manage_route_application manage_pico_usb_runtime \
+        manage_apache manage_web manage_browser_service manage_udp_logging manage_service manage_i2c \
+        manage_application_state manage_maintenance_service manage_route_application manage_pico_usb_runtime \
         manage_support_bundle_runtime manage_exe manage_sound; do
         eval "$step() { record remove:$step; }"
     done

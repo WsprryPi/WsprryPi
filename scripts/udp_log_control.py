@@ -202,12 +202,13 @@ def provision(action,ini,application,root=Path('/'),run=execute):
     sock=physical('/etc/systemd/system/'+SOCKET)
     binary=physical('/usr/local/bin/wsprrypi-log')
     helper=physical('/usr/local/lib/wsprrypi/udp_log_control.py')
+    worker_policy=physical('/var/lib/wsprrypi-logging/policy.json')
     generation=physical('/etc/systemd/system/'+SERVICE+'.d/50-udp-policy.conf')
     restart_installed=False
     production=root==Path('/')
     if production and os.getuid()!=0: raise ValueError('Logging installation requires root')
     ini=Path(ini)
-    if not ini.is_absolute():raise ValueError('Absolute INI path required')
+    if not ini.is_absolute():raise ValueError('Absolute saved-state namespace required')
     for managed in (unit,sock,generation):
         if managed.is_symlink() or (managed.exists() and not managed.read_text().startswith(MANAGED+'\n')):
             raise ValueError('Refusing unmanaged logging unit: '+str(managed))
@@ -216,7 +217,7 @@ def provision(action,ini,application,root=Path('/'),run=execute):
     if action=='remove':
         names=[name for name in (SERVICE,SOCKET) if physical('/etc/systemd/system/'+name).exists()]
         if names:run('systemctl','disable','--now',*names)
-        for item in (unit,sock,generation,binary,helper):
+        for item in (unit,sock,generation,binary,helper,worker_policy):
             if item.is_symlink():raise ValueError('Refusing unknown managed symlink')
             item.unlink(missing_ok=True)
         run('systemctl','daemon-reload');return
@@ -256,7 +257,7 @@ Type=simple
 User=wsprrylog
 Group=wsprrylog
 SupplementaryGroups=systemd-journal
-ExecStart=/usr/local/bin/wsprrypi-log --ini INI_ARGUMENT
+ExecStart=/usr/local/bin/wsprrypi-log --policy POLICY_ARGUMENT
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=5
@@ -280,12 +281,39 @@ MemoryMax=32M
 TasksMax=2
 [Install]
 WantedBy=multi-user.target
-'''.replace('INI_ARGUMENT',quoted(str(ini)))
+'''.replace('POLICY_ARGUMENT',quoted('/var/lib/wsprrypi-logging/policy.json'))
         restart_installed |= not unit.exists() or unit.read_bytes()!=content.encode()
         atomic(unit,content.encode())
         run('systemctl','daemon-reload')
     elif action!='configure':raise ValueError('Unsupported logging action')
     value=policy(ini,owner=0 if production else os.getuid(),verify_identity=production,managed_socket=sock)
+    # The independent worker receives only its validated policy. It cannot
+    # traverse the backend's private state directory or read its database.
+    directory=worker_policy.parent
+    if directory.is_symlink():raise ValueError('Unsafe worker policy directory')
+    if directory.exists():
+        info=directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022:
+            raise ValueError('Unsafe worker policy directory')
+    directory.mkdir(mode=0o750,parents=True,exist_ok=True)
+    group=grp.getgrnam('wsprrylog').gr_gid if production else os.getgid()
+    os.chown(directory,os.geteuid(),group)
+    os.chmod(directory,0o750)
+    if worker_policy.exists() or worker_policy.is_symlink():
+        info=worker_policy.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o022 or info.st_nlink!=1:
+            raise ValueError('Unsafe worker policy')
+    if value is None:
+        worker_policy.unlink(missing_ok=True)
+    else:
+        atomic(worker_policy,json.dumps(value,separators=(',',':')).encode(),0o640)
+        os.chown(worker_policy,os.geteuid(),group)
+        descriptor=os.open(worker_policy,os.O_RDONLY|os.O_NOFOLLOW)
+        try:os.fsync(descriptor)
+        finally:os.close(descriptor)
+    descriptor=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:os.fsync(descriptor)
+    finally:os.close(descriptor)
     enabled=value is not None and (value['sender']['enabled'] or value['collector']['enabled'])
     if production and enabled and not resource_controllers_available():
         managed=[name for name in (SOCKET,SERVICE) if physical('/etc/systemd/system/'+name).exists()]
@@ -313,8 +341,8 @@ WantedBy=multi-user.target
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=('install','configure','remove','status'))
-    parser.add_argument('--ini',required=True,type=Path)
+    parser.add_argument('--state-namespace',required=True,type=Path)
     parser.add_argument('--application',default='/usr/local/bin/wsprrypi',type=Path)
     args=parser.parse_args()
-    if args.action=='status':print(json.dumps(support_status(args.ini),sort_keys=True))
-    else:provision(args.action,args.ini,args.application)
+    if args.action=='status':print(json.dumps(support_status(args.state_namespace),sort_keys=True))
+    else:provision(args.action,args.state_namespace,args.application)

@@ -20,7 +20,7 @@ fs::path make_private_root(const char *prefix) {
     std::vector<char> writable(pattern.begin(), pattern.end());
     writable.push_back('\0');
     assert(mkdtemp(writable.data()) != nullptr);
-    const fs::path root(writable.data());
+    const fs::path root = fs::canonical(writable.data());
     assert(chmod(root.c_str(), 0700) == 0);
     return root;
 }

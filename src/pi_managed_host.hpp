@@ -11,6 +11,8 @@ class PiManagedHost {
 public:
     PiManagedHost(std::string ini,std::string self,std::string process_boot,
         PiLocalManagementService::Observe,std::function<void(PiPairInitializationProof)> pairing = {});
+    PiManagedHost(std::shared_ptr<SqliteStateStore>,std::string process_boot,
+        PiLocalManagementService::Observe,std::function<void(PiPairInitializationProof)> pairing = {});
     void prepare();
     void parsed();
     bool retry_saved_configuration();

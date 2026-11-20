@@ -79,6 +79,34 @@
     padding: 1.2rem 1.2rem 1.25rem;
 }
 
+#backupRestore {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+}
+
+#backupRestore > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+#backupRestore .btn-outline-secondary {
+    --bs-btn-disabled-color: var(--bs-body-color);
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] #backupRestore .btn-outline-primary {
+    --bs-btn-color: #a5b9ff;
+    --bs-btn-border-color: #a5b9ff;
+    --bs-btn-hover-bg: #a5b9ff;
+    --bs-btn-hover-border-color: #a5b9ff;
+    --bs-btn-hover-color: #212529;
+    --bs-btn-active-bg: #a5b9ff;
+    --bs-btn-active-border-color: #a5b9ff;
+    --bs-btn-active-color: #212529;
+    --bs-btn-disabled-color: #a5b9ff;
+    --bs-btn-disabled-border-color: #a5b9ff;
+}
+
 .maintenance-pane--primary {
     background-color: color-mix(in srgb, var(--bs-body-bg) 90%, var(--bs-warning-bg-subtle) 10%);
 }

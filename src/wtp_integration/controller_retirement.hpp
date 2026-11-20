@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include <map>
 #include "json.hpp"
 #include "pi_management_journal.hpp"
 #include "pi_pair_initialization.hpp"
@@ -24,10 +25,14 @@ public: ControllerRetirementConflict():std::runtime_error("controller_retirement
 enum class RetirementWritePoint {Prepared,Committed,Published,EstablishmentPrepared,EstablishmentCommitted,EstablishmentPublished};
 class ControllerRetirementBook {
 public:
+    // A storage migration may retain the original namespace identity while
+    // supplying the new live assignment path. The backend obtains this fixed
+    // digest from validated initialization provenance, never a browser field.
     ControllerRetirementBook(const std::string &directory,const std::string &source,
         const std::string &self,const nlohmann::json &assignments,
         std::function<void(RetirementWritePoint)> checkpoint = {},
-        std::function<void(PiPairInitializationProof)> pairing = {});
+        std::function<void(PiPairInitializationProof)> pairing = {},
+        const std::string &retained_source_binding = {});
     nlohmann::json read(const std::string &incarnation,const nlohmann::json &assignments);
     nlohmann::json retire(const nlohmann::json &intent,const std::string &revision,
         const std::string &incarnation,const nlohmann::json &assignments,const nlohmann::json &observation = nullptr,
@@ -70,13 +75,14 @@ public:
     // fence. Bind its first machine proof without replacing that old receipt.
     std::optional<nlohmann::json> retired_fence(const nlohmann::json &request);
     void bind_retired(const nlohmann::json &request,const std::string &before_revision,const nlohmann::json &response);
+    void with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &);
 private:
     std::optional<nlohmann::json> replay_locked(const nlohmann::json &,const std::string &) const;
     void validate(const nlohmann::json &) const;
     void verify();
     void publish(nlohmann::json,const std::optional<PiManagementJournal::Image> &assignment = {});
     nlohmann::json projection(const std::string &,const nlohmann::json &) const;
-    std::string self_,source_,revision_,anchor_bytes_;
+    std::string self_,source_,revision_,anchor_bytes_,authority_path_;
     nlohmann::json data_;
     std::unique_ptr<PiManagementJournal> journal_;
     std::mutex mutex_;

@@ -381,10 +381,11 @@ using ConfigStockCoordinator = std::function<void(const nlohmann::json &,const s
 using ConfigIniInputGuard = std::function<void(const std::string &)>;
 using ConfigPrivateCoordinator = std::function<void(const nlohmann::json &,
     const std::string &,const std::string &)>;
+using ConfigAdvancedCoordinator = ConfigPrivateCoordinator;
 // Install all three before admitting writers. Unchanged monitor reloads validate a
 // snapshot without writing or advancing a revision. No UI can replace these.
 void set_config_persistence_owner(ConfigPersistenceCoordinator,ConfigSnapshotValidator,
-    ConfigStockCoordinator,ConfigIniDraftObserver = {},ConfigIniInputGuard = {},ConfigPrivateCoordinator = {});
+    ConfigStockCoordinator,ConfigIniDraftObserver = {},ConfigIniInputGuard = {},ConfigPrivateCoordinator = {},ConfigAdvancedCoordinator = {});
 // Return false only when no managed owner applies. Managed reads never fall
 // through to an unsafe file reader, and managed private writes never fall
 // through to an unrelated rename. The private writer accepts only the existing
@@ -392,6 +393,13 @@ void set_config_persistence_owner(ConfigPersistenceCoordinator,ConfigSnapshotVal
 bool read_owned_ini_snapshot(const std::string &path,std::optional<std::string> &bytes);
 bool persist_owned_network_safety_ini(const std::string &path,
     const std::string &before,const std::string &after);
+// Typed database policy edit. The expected token and returned token belong to
+// the saved configuration record; no INI text or public settings mutation.
+std::string persist_owned_network_safety_setting(const std::string &expected_revision,
+    bool insecure_disabled);
+// Verified administrator IPC only. Exactly the closed advanced field registry;
+// no SQL, network-safety edit, startup counter, or general configuration merge.
+std::string persist_owned_advanced_settings(const std::string &expected_revision,const nlohmann::json &changes);
 // Existing operator Stop saves only the saved Transmit permission. Returns
 // false solely when no managed owner applies; a held owner never falls back
 // to a direct component write. Transient runtime settings are not saved.
@@ -401,12 +409,25 @@ bool persist_owned_transmit_disabled(const ConfigPersistenceCoordinator &reserve
 void validate_config_ini_input(const std::string &filename);
 // Private metadata guard for an owning-parser snapshot, never a browser path.
 bool config_ini_draft_is_current(const ConfigIniDraftSnapshot &);
+// Authoritative source fencing for saved-state consumers. The logical SQL
+// namespace is never interpreted as a file or an INI projection.
+std::string configuration_input_signature(const std::string &);
 // Explicit first-install draft only; does not publish or validate runtime state.
 nlohmann::json initial_configuration_draft();
+// Current installed defaults, independent of an operator INI or stock file.
+nlohmann::json installed_configuration_draft();
+// One-time migration of saved startup policy, not live iteration counters.
+std::pair<bool,int> saved_ini_startup_policy(const std::string &bytes);
+namespace wsprrypi {struct PrivateConfiguration;}
+wsprrypi::PrivateConfiguration saved_ini_private_configuration(const std::string &bytes,bool native_settings = true);
 // Validate a private stock preview through the owning INI/config parser, then
 // join the installed transaction owner. Does not publish runtime state or start
 // the file monitor. Repair/Reset uses this before its existing reload lifecycle.
 void persist_stock_configuration(bool preserve_compatible_values);
+// Recovery staging validates a typed saved image against the current destination
+// parser/backend policy without publication, output admission, or an INI file.
+namespace wsprrypi {struct PersistentConfiguration;}
+PreparedConfigCandidate prepare_saved_recovery_configuration(const wsprrypi::PersistentConfiguration &);
 // Recovery-only saved after-image, using the same non-live owning INI validator
 // as stock preview. The trusted caller restores private references first. No
 // backend construction, runtime publication, monitor, or output admission.

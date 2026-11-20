@@ -40,6 +40,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <memory>
 
 #include "websocket_listener_config.hpp"
 #include "support_request_guard.hpp"
@@ -52,6 +53,12 @@
  * to `WebSocketServer::start()`.
  */
 extern const uint32_t SOCKET_KEEPALIVE;
+
+struct WebSocketBackendSession {
+    std::string key;
+    std::function<bool()> current;
+    std::function<std::string(const std::string &)> command;
+};
 
 /**
  * @class WebSocketServer
@@ -101,6 +108,17 @@ public:
 
     /** Returns the exact bound literal while the listener is running. */
     const std::string &listening_address() const noexcept;
+    std::optional<int> listening_port() const noexcept;
+
+    // Backend command lifetime is separate from browser socket lifetime.
+    void start_command_runtime(bool loopback_only);
+    void stop_command_runtime();
+    std::string dispatch_local_command(const std::string &,std::uint64_t &owned_tone_generation);
+    void release_local_command_session(std::uint64_t owned_tone_generation);
+    using BackendSessionFactory=std::function<std::shared_ptr<WebSocketBackendSession>(const std::string &,const std::string &)>;
+    void set_backend_session_factory(BackendSessionFactory);
+    void refresh_backend_sessions();
+    void resynchronize_backend_sessions();
 
     /**
      * @brief Stops the server and closes any open connections.
@@ -144,16 +162,19 @@ private:
     {
         std::string peer_address;
         std::string upgrade_request;
+        std::shared_ptr<WebSocketBackendSession> backend{};
     };
 
     int listen_fd_;             ///< Socket file descriptor for listening.
     std::atomic<bool> running_; ///< Indicates whether the server is running.
+    std::atomic<std::uint16_t> listening_port_{0};
     uint32_t keep_alive_secs_;  ///< Interval for keep-alive pings.
 
     // For each connection:
     std::mutex clients_mutex_;
     std::vector<int> client_sockets_;
     std::map<int, ClientAuthorizationContext> client_authorizations_;
+    BackendSessionFactory backend_session_factory_;
     std::vector<int> handshaking_sockets_;
     std::size_t active_client_handlers_{0};
     bool client_registration_closed_{false};
@@ -243,7 +264,8 @@ private:
     bool performHandshake(
         int client,
         const std::string &peer_address,
-        std::string &upgrade_request);
+        std::string &upgrade_request,
+        std::shared_ptr<WebSocketBackendSession> &backend_session);
     [[nodiscard]] bool clientAuthorizationCurrent(
         const ClientAuthorizationContext &authorization) const;
 
@@ -273,6 +295,11 @@ private:
      * @param message The decoded and unmasked client message.
      */
     void handleMessage(const std::string &message);
+    struct LocalDispatch {WebSocketServer *server;std::string *reply;std::uint64_t *generation;};
+    static thread_local LocalDispatch local_dispatch_;
+    std::atomic_bool command_runtime_{false};
+    std::atomic_bool command_loopback_{false};
+    void note_local_tone(std::uint64_t generation) noexcept;
 
     /** Stops and joins any bounded-tone command owned by this server. */
     void stopBoundedTone();

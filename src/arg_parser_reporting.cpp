@@ -66,8 +66,9 @@ void print_usage(const std::string &message, int exit_code)
 
     std::cerr << "\nUsage:\n"
               << "  (sudo) wsprrypi [options] CALLSIGN GRID POWER FREQ [FREQ...]\n"
-              << "  (sudo) wsprrypi -i /path/to/wsprrypi.ini\n"
-              << "  wsprrypi --controller-only -i /path/to/controller.ini [listener/logging options]\n"
+              << "  (sudo) wsprrypi --state-directory /var/lib/wsprrypi/application-state\n"
+              << "  wsprrypi --controller-only --state-directory /path/to/state [listener/logging options]\n"
+              << "  (sudo) wsprrypi --migrate-state --state-directory /var/lib/wsprrypi/application-state --ini-source /path/to/wsprrypi.ini\n"
               << "  (sudo) wsprrypi --test-tone BAND_OR_RF_FREQ [backend/options]\n"
               << "  (sudo) wsprrypi --mode QRSS --cw-message TEXT --cw-base-frequency FREQ [cw/options]\n"
               << "  (sudo) wsprrypi --qrss-message TEXT --qrss-frequency HZ --qrss-dot-seconds SEC\n"
@@ -79,14 +80,20 @@ void print_usage(const std::string &message, int exit_code)
               << "      --list-backends                List compiled transmission backends.\n"
               << "      --si5351-transport            Report the compiled Si5351 transport; no probe.\n"
               << "      --list-i2c-adapters            List selected transport metadata and stable identities; no probe.\n"
-              << "  -i, --ini-file <file>              Load and monitor an INI file for daemon/service style operation.\n"
+              << "      --state-directory <directory>  Use established SQLite saved state for service operation.\n"
+              << "      --initialize-state             Explicitly create fresh, unconfirmed saved state.\n"
+              << "      --migrate-state --ini-source <file>\n"
+              << "                                     Import existing INI state once and retire the source.\n"
+              << "      --settings --help              Validated local saved advanced-settings commands.\n"
+              << "      --maintenance help             Local encrypted backup, restore, and destination review.\n"
+              << "      --diagnostic-export            Read supported saved settings through the running backend.\n"
               << "  -r, --repeat                       Repeat direct CLI transmissions until stopped.\n"
               << "  -x, --terminate <count>            Stop after count iterations of the direct CLI WSPR frequency list.\n"
               << "  -J, --journald                     Use journald for log output.\n"
               << "  -D, --date-time-log                Prefix stream log output with date/time stamps.\n"
               << "  --debug-logging, --no-debug-logging\n"
               << "                                     Enable or disable DEBUG-level application logging.\n\n"
-              << "Experimental Frequency Policy (CLI/INI only):\n"
+              << "Experimental Frequency Policy (CLI/saved settings):\n"
               << "  --allow-unqualified-frequency, --no-allow-unqualified-frequency\n"
               << "                                     Allow or deny unqualified backend/mode combinations.\n"
               << "  --allow-non-amateur-frequency, --no-allow-non-amateur-frequency\n"
@@ -139,7 +146,7 @@ void print_usage(const std::string &message, int exit_code)
               << "  --si5351-reference-source <source> external_tcxo or crystal.\n"
               << "  --si5351-crystal-load-capacitance <pf>  Crystal load: 6, 8, or 10 pF.\n"
               << "  --si5351-tx-output <CLK0|CLK1|CLK2>\n"
-              << "                                     Transmit clock output. CLI/INI only; not exposed in the Web UI.\n\n"
+              << "                                     Transmit clock output. CLI/saved settings only; not exposed in the Web UI.\n\n"
               << "CW, QRSS, FSKCW, And DFCW:\n"
               << "  --mode <WSPR|QRSS|FSKCW|DFCW>      Select direct CLI mode. Non-WSPR modes use the CW options below.\n"
               << "  --cw-message <text>                Message for QRSS, FSKCW, or DFCW.\n"
@@ -190,7 +197,7 @@ void print_usage(const std::string &message, int exit_code)
               << "Test Tone:\n"
               << "  -t, --test-tone <band|rf_frequency> Start one steady carrier: WSPR band dial + 1500 Hz, or the exact numeric RF in Hz/kHz/MHz/GHz. No random placement.\n"
               << "                                     Standard 20m targets 14097100 Hz; numeric 14095600 targets exactly 14095600 Hz.\n"
-              << "                                     Invalid with --ini-file.\n\n";
+              << "                                     Invalid with --state-directory.\n\n";
 
     // Handle exit behavior
     switch (exit_code)

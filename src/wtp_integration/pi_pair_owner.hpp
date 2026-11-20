@@ -10,6 +10,7 @@ public:
     PiPairOwner(std::string directory,std::string self);
     void provision(PiPairInitializationProof);
     std::shared_ptr<PiPairHistory> history();
+    void with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &);
     // After all service/worker references are released, reopen the same selected
     // history. Never initialize or replace unavailable records. Dirty shutdown
     // accounting is recovered exactly as at process startup.

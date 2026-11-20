@@ -16,109 +16,56 @@ SOURCE = Path(__file__).resolve().parents[2]
 
 
 class Tests(unittest.TestCase):
-    def setUp(self):
-        self.data = (SOURCE/'config/wsprrypi.ini').read_bytes().replace(
-            b'Transmit Backend = gpio', b'Transmit Backend = rp1-gpclk')
+    def snapshot(self, **changes):
+        return dict(contract=app.CONTRACT, backend='rp1-gpclk', route='gpio20', transmit=False,
+                    config=str(app.STATE)+'/generation-1/configuration', **changes)
 
-    def test_backend_classification_is_independent_of_route_fields(self):
-        for value, expected in [('gpio', 'gpio'), (' Si5351 ', 'si5351'),
-                                ('WTP', 'wtp'), ('RP1-GPCLK', 'rp1-gpclk'), ('', 'gpio')]:
-            with self.subTest(value=value):
-                raw = ('[Operation]\nTransmit Backend = '+value+'\n').encode()
-                self.assertEqual(app.configured_backend(raw), expected)
-        self.assertEqual(app.configured_backend(b'[Operation]\n'), 'gpio')
-        for raw in (b'[Other]\n', b'[Operation]\nTransmit Backend = unknown\n',
-                    b'[Operation]\nTransmit Backend = simulated\n',
-                    b'[DEFAULT]\nTransmit Backend = gpio\n[Operation]\n',
-                    b'[Operation]\nTransmit Backend = gpio\n[Operation]\nTransmit Backend = si5351\n'):
-            with self.subTest(raw=raw), self.assertRaises((ValueError, app.configparser.Error)):
-                app.configured_backend(raw)
-        # The public restoration parser keeps its existing closed validation.
-        with self.assertRaises(ValueError):
-            app.configuration(self.data.replace(b'rp1-gpclk', b'wtp'))
+    def test_route_request_uses_backend_command_and_never_opens_state(self):
+        value=self.snapshot()
+        with patch.object(app,'trusted',return_value=(b'--route-maintenance',None)) as trusted, \
+             patch.object(app.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(value).encode(),b'')) as run:
+            self.assertEqual(app.configure('gpio20'),value)
+        trusted.assert_called_once_with(app.BINARY)
+        self.assertEqual(run.call_args.args[0],[str(app.BINARY),'--route-maintenance','--state-directory',str(app.STATE),'--configure-route','gpio20'])
 
-    def test_explicit_route_selects_runtime_backend_pin_and_inhibits_transmit(self):
-        for backend in (b'gpio', b'si5351'):
-            for policy in (b'Never', b'Follow', b'Always'):
-                with self.subTest(backend=backend, policy=policy):
-                    original = self.data.replace(
-                        b'Transmit Backend = rp1-gpclk',
-                        b'Transmit Backend = '+backend).replace(
-                        b'Enable on Boot = Never', b'Enable on Boot = '+policy).replace(
-                        b'Transmit = False', b'Transmit = True')
-                    expected = original.replace(
-                        b'\nTransmit Backend = '+backend+b'\n',
-                        b'\nTransmit Backend = rp1-gpclk\n').replace(
-                        b'Transmit Pin = 4', b'Transmit Pin = 20').replace(
-                        b'Transmit = True', b'Transmit = False')
-                    self.assertEqual(app.edit(original, 'gpio20'), expected)
-                    self.assertEqual(app.edit(expected, 'gpio20'), expected)
+    def test_invalid_route_refuses_before_invoking_backend(self):
+        with patch.object(app,'trusted',side_effect=AssertionError('binary touched')):
+            with self.assertRaises(ValueError):app.configure('gpio19')
 
-    def test_neutral_inspection_accepts_gpio_and_si5351_without_mutating_them(self):
-        for backend in (b'gpio', b'si5351'):
-            with self.subTest(backend=backend):
-                original = self.data.replace(
-                    b'Transmit Backend = rp1-gpclk',
-                    b'Transmit Backend = '+backend)
-                parsed = app.configuration(original)
-                self.assertEqual(
-                    parsed.get('Operation', 'Transmit Backend'), backend.decode())
-                self.assertEqual(original, self.data.replace(
-                    b'Transmit Backend = rp1-gpclk',
-                    b'Transmit Backend = '+backend))
-                with self.assertRaises(ValueError):
-                    app.configuration(original, require_runtime_backend=True)
+    def test_closed_route_state_and_confirmed_outcome(self):
+        valid=self.snapshot()
+        invalid=[{**valid,'extra':True},{**valid,'transmit':1},{**valid,'route':'gpio4'},
+                 {**valid,'backend':'gpio'},{**valid,'config':'/another/configuration'},
+                 {**valid,'contract':'unknown'},None]
+        for value in invalid:
+            with self.subTest(value=value),patch.object(app,'trusted',return_value=(b'--route-maintenance',None)), \
+                 patch.object(app.subprocess,'run',return_value=subprocess.CompletedProcess([],0,json.dumps(value).encode(),b'')):
+                with self.assertRaises(ValueError):app.configure('gpio20')
 
-    def test_idle_route_retains_exact_bytes_for_managed_integrity(self):
-        for value in (b'False', b'false', b'FALSE', b'0', b'no'):
-            with self.subTest(transmit=value):
-                original = self.data.replace(b'Transmit = False', b'Transmit = '+value)
-                self.assertEqual(app.edit(original, 'gpio4'), original)
+    def test_failed_backend_is_not_a_file_edit_fallback(self):
+        with patch.object(app,'trusted',return_value=(b'--route-maintenance',None)), \
+             patch.object(app.subprocess,'run',side_effect=subprocess.CalledProcessError(2,['fixture'])):
+            with self.assertRaises(subprocess.CalledProcessError):app.configure('gpio20')
 
-    def test_crlf_and_unknown_settings_are_preserved(self):
-        data = self.data.replace(b'\n', b'\r\n')+b'\r\n[Custom]\r\nValue = literal%value\r\n'
-        self.assertEqual(app.edit(data, 'gpio20'), data.replace(b'Transmit Pin = 4', b'Transmit Pin = 20'))
-
-    def test_invalid_duplicate_and_unsupported_backend_do_not_edit(self):
-        for data in (self.data+b'\n[GPIO]\nTransmit Pin = 20\n',
-                     self.data.replace(b'Transmit Backend = rp1-gpclk', b'Transmit Backend = simulated'),
-                     self.data.replace(b'Transmit Pin = 4', b'Transmit Pin = 19'),
-                     self.data.replace(b'Enable on Boot = Never', b'Enable on Boot = unknown')):
-            with self.assertRaises(Exception): app.edit(data, 'gpio20')
-
-    def test_appended_sections_preserve_bytes_and_new_keys(self):
-        # Model an older file before the current stock schema acquired 8m.
-        # The appended key must be new, not a duplicate of a stock assignment.
-        original = self.data.replace(b'\n8m =\n', b'\n').replace(b'\n8m Active High = false\n', b'\n')
-        data = original + b'\n[Band GPIO]\n8m = \n[GPIO]\nRP1 Future Setting = 2\n'
-        self.assertEqual(app.configuration(data).getint('GPIO', 'RP1 Future Setting'), 2)
-        self.assertEqual(app.edit(data, 'gpio20'),
-                         data.replace(b'Transmit Pin = 4', b'Transmit Pin = 20'))
-        with self.assertRaises(Exception):
-            app.configuration(data + b'\n[GPIO]\nRP1 Future Setting = 4\n')
-
-    def test_atomic_configuration_and_mode_preservation(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)/'application.ini'
-            path.write_bytes(self.data)
-            path.chmod(0o640)
-            with patch.object(app, 'CONFIG', path), patch.object(app, 'trusted', side_effect=lambda p:(p.read_bytes(), p.stat())), patch.object(os, 'fchown'):
-                app.configure('gpio20')
-            self.assertEqual(path.read_bytes(), app.edit(self.data, 'gpio20'))
-            self.assertEqual(path.stat().st_mode & 0o777, 0o640)
-            self.assertEqual(list(Path(directory).iterdir()), [path])
-
-    def test_failed_replace_keeps_original(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)/'application.ini'
-            path.write_bytes(self.data)
-            with patch.object(app, 'CONFIG', path), patch.object(app, 'trusted', side_effect=lambda p:(p.read_bytes(), p.stat())), patch.object(os, 'fchown'), patch.object(os, 'replace', side_effect=OSError('crash')):
-                with self.assertRaises(OSError): app.configure('gpio20')
-            self.assertEqual(path.read_bytes(), self.data)
+    def test_online_route_read_uses_verified_ipc_and_only_unavailability_selects_stopped_admission(self):
+        value=self.snapshot()
+        successful=subprocess.CompletedProcess([],0,json.dumps(value).encode(),b'')
+        with patch.object(app,'trusted',return_value=(b'--route-maintenance',None)), \
+             patch.object(app.subprocess,'run',return_value=successful) as run:
+            self.assertEqual(app.state(),value)
+            self.assertEqual(run.call_args.args[0],[str(app.BINARY),'--route-observation'])
+        with patch.object(app,'trusted',return_value=(b'--route-maintenance',None)), \
+             patch.object(app.subprocess,'run',side_effect=[subprocess.CompletedProcess([],3,b'',b'unavailable'),successful]) as run:
+            self.assertEqual(app.state(),value)
+            self.assertEqual(run.call_args_list[1].args[0],[str(app.BINARY),'--route-maintenance','--state-directory',str(app.STATE)])
+        with patch.object(app,'trusted',return_value=(b'--route-maintenance',None)), \
+             patch.object(app.subprocess,'run',return_value=subprocess.CompletedProcess([],2,b'',b'protocol refused')) as run:
+            with self.assertRaises(subprocess.CalledProcessError):app.state()
+            self.assertEqual(run.call_count,1)
 
     def test_installed_service_layouts_and_old_binary_rejection(self):
         for suffix in ('', ' --no-web'):
-            text = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini'+suffix+' ; ignore_errors=no ; }\n'
+            text = '{ path=/usr/local/bin/wsprrypi ; argv[]=/usr/local/bin/wsprrypi -J --state-directory /var/lib/wsprrypi/application-state'+suffix+' ; ignore_errors=no ; }\n'
             with patch.object(app.subprocess, 'check_output', return_value=text), patch.object(app, 'trusted', return_value=(b'WSPRRYPI_ROUTE_RESTORE_IDLE', None)):
                 app.inspect_service()
             with patch.object(app.subprocess, 'check_output', return_value=text), patch.object(app, 'trusted', return_value=(b'old binary', None)):
@@ -127,7 +74,7 @@ class Tests(unittest.TestCase):
             with self.assertRaises(ValueError): app.inspect_service()
 
     def test_transient_confirmation_and_only_supported_service_options(self):
-        base = '/usr/local/bin/wsprrypi -J -i /usr/local/etc/wsprrypi.ini'
+        base = '/usr/local/bin/wsprrypi -J --state-directory /var/lib/wsprrypi/application-state'
         confirmation = dict(enabled=True, route='GPIO20', operation_id='managed-operation-21',
             physical_connection_confirmed=True, attenuation_and_load_confirmed=True,
             bounded_operation_confirmed=True, non_radiating_topology_confirmed=True,

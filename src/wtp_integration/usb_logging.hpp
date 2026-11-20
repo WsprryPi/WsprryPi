@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "network_http.hpp"
+#include <functional>
 namespace wsprrypi {
-void start_usb_logging(const std::string &ini_path);
+using UsbLoggingCatalogSnapshot=std::function<nlohmann::json()>;
+void start_usb_logging(const std::string &ini_path,UsbLoggingCatalogSnapshot catalog = {});
 void stop_usb_logging() noexcept;
+// Read-only validation through the collector's actual saved-policy validator.
+void validate_saved_usb_logging_policy(const std::string &bytes,const std::string &collector_id);
 namespace testing {
 // Policy-only manager with synthetic identity; never inventories or opens USB.
-void start_usb_logging_policy(const std::string &ini_path, const std::string &machine_id_path);
+void start_usb_logging_policy(const std::string &ini_path, const std::string &machine_id_path,UsbLoggingCatalogSnapshot catalog = {});
 }
 PicoHttpResponse usb_logging_api(const std::string &method,
                                  const std::string &body,

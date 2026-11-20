@@ -129,13 +129,7 @@ fixture-only launch is insufficient.
 
 ### Slice 2 — state and transports
 
-Wire explicit native paths and secure storage ownership without changing existing
-locations/identities implicitly. Provision first-install identity once under the
-service account; distinguish empty enrollment from lost established keys/state.
-Never package initialized credentials or promise local detection of complete clones.
-Preserve accepted recovery, atomic replacement, durability, locking, private keys,
-and interrupted-operation evidence. Path/identity/platform migrations stay outside
-scope unless separately approved with crash/rollback semantics.
+Wire explicit native paths and secure storage ownership without changing existing locations/identities implicitly. Provision first-install identity once under the service account; distinguish empty enrollment from lost established keys/state. Never package initialized credentials or promise local detection of complete clones. Preserve accepted recovery, atomic replacement, durability, locking, private keys, and interrupted-operation evidence. Use the accepted encrypted recovery engine for explicit supported computer moves, with destination identity/authority retention and persistent review holds. Do not add platform-specific identity conversion or a second migration/backup engine.
 
 Implement native networking, USB identity/interface binding/exclusive access and
 CDC, permissions, cancellation/reconnect, and portable existing logging. Do not
@@ -167,12 +161,7 @@ do not download a latest-channel Pi binary as fallback. Dispatch explicit Linux
 controller installation before hardware checks; retain ordinary Pi installation.
 Use native macOS/Windows entry points sharing declarative contracts.
 
-Provision only the required configuration, private state, dedicated unprivileged
-service account, native service, browser hosting/proxy, and narrow device permissions.
-Preserve accepted network guards. Test effective identity and ACLs, not just unit
-file contents. No broad sudo, root/admin runtime, world-writable devices, or access
-to unrelated interactive-user secrets. Preserve configuration, pairing, identity,
-journals, and reinstall ownership; refuse conflicting roles/unsafe paths.
+Provision only the required configuration, private state, dedicated unprivileged service account, native service, browser hosting/proxy, and narrow device permissions. Preserve accepted network guards. Test effective identity and ACLs, not just unit file contents. No broad sudo, root/admin backend or browser runtime, world-writable devices, or access to unrelated interactive-user secrets. Keep any required privileged maintenance lifecycle in its separate narrow native adapter. Preserve configuration, pairing, identity, journals, and reinstall ownership; refuse conflicting roles/unsafe paths.
 
 Stage/verify replacements, preserve rollback assets, and never run an incompatible
 old writer or erase accepted outcomes. Uninstall removes only owned service/files/
@@ -264,3 +253,9 @@ progress, `✅` complete. Prompt preparation is not implementation progress.
 Stop after reporting the authorized slice; do not publish, advance another slice,
 or claim universal platform, installation, hardware, or release readiness without
 the corresponding evidence.
+
+## Accepted SQLite and service boundary
+
+Follow the [SQLite/process contract](sqlite-storage-contract.md) and [recovery contract](../../src/application_recovery/README.md) when implementing a qualified #475 profile. Settings are backend-owned SQLite state; INI input is one-time migration only, with no ongoing projection or fallback. Preserve the current UI, validated local advanced-settings command, administrator diagnostic export, Maintenance encrypted backup/download/upload/restore, retained generations/evidence, and separate destination-review holds.
+
+Keep ordinary Pi operation hybrid, including simultaneous local output and permitted remote management. The explicit controller-only artifact has zero local output backends and needs no station fields. Separate the backend, HTTP/browser-WebSocket service, and bounded maintenance lifecycle; frontend restart must not reset identity, stop remote autonomy, or rearm local work. A native controller backend and frontend remain unprivileged; any privileged native maintenance adapter is a distinct narrow service with fixed operations and private recovery state. Never weaken permissions or merge owners to emulate Linux service commands on another OS. Implement and qualify only separately authorized native profiles.

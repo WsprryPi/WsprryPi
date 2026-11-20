@@ -30,7 +30,7 @@ Concurrency groups include the commit SHA so a documentation-only successor cann
 
 ## Production application and browser regressions
 
-The Linux application regression builds the current source with the explicit simulated backend and ancillary GPIO disabled. It starts the explicit simulated backend in a private network namespace, verifies canonical INI values and safe refusal of case-mismatched keys and DEFAULT values used in place of required canonical keys through the actual application, and runs finite browser-read profiles with synthetic schedule time. Reads must preserve both saved INI bytes and exposed configuration. It opens no transmitter device and supplies no RF qualification.
+The Linux application regression builds the current source with the explicit simulated backend and ancillary GPIO disabled. It starts the explicit simulated backend in a private network namespace, verifies one-time migration and refusal of invalid source configuration through the actual application, and runs finite browser-read profiles with synthetic schedule time. A separate frontend serves reads, which must preserve the SQLite/WAL image, retired source backup, and exposed configuration. It opens no transmitter device and supplies no RF qualification.
 
 ```sh
 make -C src production-browser-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= TEST_NETNS_RUNNER="sudo unshare --net"
@@ -70,6 +70,10 @@ Software checks do not qualify physical USB, installation, services, GPIO, trans
 The production TLS pair uses a logical UTC epoch advanced by one monotonic clock; it does not repeatedly correlate independently sampled host wall/steady clocks. Its future scheduled-job case selects a full UTC second at least 60 seconds ahead. The actual Pico dry-run engine retains its UTC-second launch window and 1-ms uncertainty policy. `wtp_fixture_clock_test` checks exact projection, a valid start, and narrow-window, late-start, and inconsistent-clock refusals without sleeping. Host results do not qualify UTC accuracy or physical launch timing.
 
 The USB pair lane uses the named Ubuntu 24.04 runner's installed CMake, Python, Node, C++ compiler, Make, and OpenSSL development tools. It checks executable availability, records versions and OpenSSL flags, then performs the actual CMake configure, compiled endpoint/client builds, and production pair checks. Missing or unusable tools fail the lane; setup does not silently install alternative CMake or Node packages. These image tools are inventoried inputs, not a claim of byte-reproducible system libraries.
+
+## SQLite, local control, and recovery
+
+The [storage and process contract](sqlite-storage-contract.md) describes authoritative settings, one-time migration, private owners, separated services, and platform boundaries. The [local control guide](../../src/application_control/README.md) documents advanced settings and diagnostics. The [recovery guide](../../src/application_recovery/README.md) documents the shared CLI/Maintenance engine, encrypted archives, explicit confirmation, computer moves, and destination-review holds. `make recovery-integration-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=` runs the bounded actual-process role, relocation, round-trip, listener-override, and crash matrix. Browser checks use the separate `recovery-maintenance-browser-test` and `recovery-maintenance-controller-browser-test` targets with the existing local browser harness.
 
 ## Work and cleanup
 

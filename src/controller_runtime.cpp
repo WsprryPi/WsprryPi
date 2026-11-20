@@ -1,6 +1,11 @@
+#include "application_control/backend_services.hpp"
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "controller_runtime.hpp"
+#include "application_storage/application_state.hpp"
+#include "application_storage/controller_settings.hpp"
+#include "application_storage/sqlite_catalog.hpp"
+#include "application_control/local_transport.hpp"
 
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
@@ -27,6 +32,8 @@
 namespace {
 std::atomic_bool controller_role{false}, controller_ready{false};
 std::string controller_identity,controller_boot;
+std::unique_ptr<wsprrypi::ControllerSettings> controller_settings;
+std::unique_ptr<wsprrypi::WtpCatalog> controller_catalog;
 
 int port_number(const std::string &value) {
     int port{};
@@ -44,11 +51,13 @@ bool controller_only_requested(int argc, char *argv[]) noexcept {
     return false;
 }
 bool controller_only_mode() noexcept { return controller_role.load(std::memory_order_acquire); }
+bool controller_only_ready() noexcept { return controller_ready.load(std::memory_order_acquire); }
 
 void configure_controller_only(int argc, char *argv[]) {
     if (controller_only_mode()) throw std::logic_error("Controller role is already configured");
     std::string ini;
     std::optional<int> web_port, socket_port;
+    std::optional<bool> debug_override;
     bool role_seen = false;
     // Parse the complete invocation before loading files. Reject transmitter
     // flags and positional arguments rather than ignoring conflicting intent.
@@ -71,9 +80,30 @@ void configure_controller_only(int argc, char *argv[]) {
         else if (option == "--no-http") config.enable_http = false;
         else if (option == "--journald" || option == "-J") config.use_journald = true;
         else if (option == "--date-time-log" || option == "-D") config.date_time_log = true;
-        else if (option == "--debug-logging") config.debug_logging = true;
-        else if (option == "--no-debug-logging") config.debug_logging = false;
+        else if (option == "--debug-logging") {config.debug_logging = true;debug_override=true;}
+        else if (option == "--no-debug-logging") {config.debug_logging = false;debug_override=false;}
         else throw std::invalid_argument("Unsupported or repeated option in controller-only mode");
+    }
+    if(wsprrypi::application_database_selected()) {
+        const auto database=wsprrypi::application_database();
+        if(!role_seen||!ini.empty()||database->role()!=wsprrypi::StateRole::Controller)
+            throw std::invalid_argument("Controller settings require the explicitly selected controller state");
+        auto settings=std::make_unique<wsprrypi::ControllerSettings>(database);
+        const auto saved=settings->snapshot().settings;
+        config.ini_filename=wsprrypi::application_configuration_namespace();config.use_ini=true;
+        config.transmit=false;config.loop_tx=false;
+        config.web_port=web_port.value_or(saved.configuration.at("Operation").at("Web Port").get<int>());
+        config.socket_port=static_cast<std::uint16_t>(socket_port.value_or(saved.configuration.at("Operation").at("Socket Port").get<int>()));
+        config.debug_logging=debug_override.value_or(saved.private_settings.debug_logging);
+        if(config.enable_web&&config.enable_http&&config.web_port==config.socket_port)
+            throw std::invalid_argument("Controller HTTP and WebSocket ports must differ");
+        auto catalog=std::make_unique<wsprrypi::WtpCatalog>(wsprrypi::sqlite_catalog_storage(database));
+        (void)catalog->snapshot({});
+        iniFile.set_file_reader([](const std::string &)->std::string{throw std::runtime_error("Controller database does not read INI files");});
+        iniFile.set_file_writer([](const std::string &,const std::string &){throw std::runtime_error("Controller database does not write INI files");});
+        initialize_privileged_network_runtime(saved.private_settings.network_safety==wsprrypi::SavedNetworkSafety::Enforced?"enforced":"insecure-disabled");
+        controller_settings=std::move(settings);controller_catalog=std::move(catalog);
+        controller_role.store(true,std::memory_order_release);return;
     }
     if (!role_seen || ini.empty())
         throw std::invalid_argument("--controller-only requires -i <file> for controller-owned state");
@@ -113,6 +143,34 @@ void configure_controller_only(int argc, char *argv[]) {
 }
 
 std::string controller_only_process_boot(){return controller_ready.load(std::memory_order_acquire)?controller_boot:std::string{};}
+std::string prepare_controller_process_boot(){
+    if(!controller_only_mode())throw std::logic_error("Controller role has not been selected");
+    if(controller_boot.empty())controller_boot=wsprrypi::WtpPiBootIdentity{}.new_boot_id();
+    return controller_boot;
+}
+std::string persist_controller_advanced_settings(const std::string &expected,const nlohmann::json &changes){
+    std::lock_guard lock(config_update_mutex());
+    if(!controller_only_mode()||!controller_settings)throw wsprrypi::LocalCommandRefused(wsprrypi::LocalRefusal::StorageUnavailable);
+    if(!controller_ready.load(std::memory_order_acquire)||exiting_wspr.load())
+        throw wsprrypi::LocalCommandRefused(wsprrypi::LocalRefusal::Busy);
+    const auto revision=controller_settings->persist_advanced(expected,changes);
+    if(changes.contains("Meta.debug_logging")){
+        config.debug_logging=changes.at("Meta.debug_logging").get<bool>();refresh_logger_level_from_config();
+    }
+    // Listener processes retain their actual bindings until explicit restart.
+    return revision;
+}
+wsprrypi::WtpCatalog &controller_storage_catalog(){
+    if(!controller_only_mode()||!wsprrypi::application_database_selected()||!controller_catalog)
+        throw std::runtime_error("controller_storage_unavailable");
+    return *controller_catalog;
+}
+std::string persist_controller_network_safety_setting(const std::string &revision,bool insecure_disabled){
+    if(!controller_only_mode()||!wsprrypi::application_database_selected()||!controller_settings)
+        throw std::runtime_error("controller_storage_unavailable");
+    return controller_settings->persist_network_safety(revision,insecure_disabled?
+        wsprrypi::SavedNetworkSafety::InsecureDisabled:wsprrypi::SavedNetworkSafety::Enforced);
+}
 
 nlohmann::json controller_only_status() {
     return {{"role", "controller-only"}, {"controller_ready", controller_ready.load()},
@@ -129,6 +187,7 @@ bool controller_http_allowed(std::string_view method, std::string_view path) {
         (method=="POST"&&wsprrypi::local_pairing_mutation_path(path))||wsprrypi::pi_pair_bootstrap_path(method,path))return true;
     if(path=="/api/control/v1/targets"||path.starts_with("/api/control/v1/targets/"))
         return method=="GET"||method=="PUT"||method=="POST"||method=="DELETE";
+    if(path=="/api/recovery/session")return method=="POST";
     if(path=="/api/control/v1/host/management-session")return method=="POST";
     if (method == "GET" && (path == "/api/control/v1/host/devices" ||
         path == "/api/control/v1/host/discovery" || path == "/api/control/v1/host/fleet" ||
@@ -151,7 +210,9 @@ bool controller_only_loop(const std::string &fixture_identity) {
         // shutdown. Explicit-identity fixtures never select host private state.
         if(fixture_identity.empty())try{pairing_owner=wsprrypi::prepare_pi_pair_owner(controller_identity);}catch(...){/* Independent pairing hold. */}
         stage = "catalog";
-        wsprrypi::WtpCatalog catalog(config.ini_filename + ".wtp-devices.json");
+        const auto file_catalog=wsprrypi::application_database_selected()?std::unique_ptr<wsprrypi::WtpCatalog>{}:
+            std::make_unique<wsprrypi::WtpCatalog>(config.ini_filename+".wtp-devices.json");
+        auto &catalog=wsprrypi::application_database_selected()?controller_storage_catalog():*file_catalog;
         (void)catalog.snapshot({});
         stage = "Pico management recovery";
         // Loading one journal validates the complete bounded directory and
@@ -169,7 +230,7 @@ bool controller_only_loop(const std::string &fixture_identity) {
         if (!state.is_object() || state.at("storage_error") != "" ||
             state.at("replacement_pending") != false || state.at("clock_fault") != false)
             throw std::runtime_error("Controller Fleet recovery state is invalid");
-        if (config.enable_web && config.enable_http) {
+        if (config.enable_web && config.enable_http&&!wsprrypi::application_database_selected()) {
             stage = "HTTP listener";
             webServer.start(config.web_port);
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -178,7 +239,7 @@ bool controller_only_loop(const std::string &fixture_identity) {
             if (!webServer.isListening()) throw std::runtime_error("Controller HTTP listener unavailable");
         }
         stage = "WebSocket listener";
-        if (config.enable_web && !socketServer.start(config.socket_port, SOCKET_KEEPALIVE,
+        if (config.enable_web&&!wsprrypi::application_database_selected() && !socketServer.start(config.socket_port, SOCKET_KEEPALIVE,
                 config.socket_loopback_only, config.socket_loopback_family))
             throw std::runtime_error("Controller WebSocket listener unavailable");
         controller_ready.store(true, std::memory_order_release);
@@ -193,6 +254,7 @@ bool controller_only_loop(const std::string &fixture_identity) {
     controller_ready.store(false, std::memory_order_release);
     webServer.stop();
     socketServer.stop();
+    wsprrypi::stop_backend_services();
     wsprrypi::stop_wtp_fleet();
     return result;
 }

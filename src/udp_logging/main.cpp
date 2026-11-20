@@ -200,7 +200,7 @@ class Worker {
   }
   void reload() {
     try {
-      const auto bytes = read_file(ini_ + ".udp-logs.json", 16384, 0, true);
+      const auto bytes = read_file(ini_, 16384, 0, true);
       Json p;
       if (bytes.empty()) {
         p = defaults();
@@ -746,7 +746,7 @@ public:
 };
 } // namespace
 int main(int argc, char **argv) {
-  if (argc != 3 || std::string_view(argv[1]) != "--ini")
+  if (argc != 3 || std::string_view(argv[1]) != "--policy")
     return 2;
   std::signal(SIGTERM, stop);
   std::signal(SIGINT, stop);

@@ -54,5 +54,8 @@ namespace testing {
 // Install before listeners start; clear after they stop. There is no runtime
 // selector for this host-only source-pair fixture dependency.
 void set_pico_target_controller(std::shared_ptr<PicoTargetController>);
+// Preserve the production controller and selected catalog while injecting only
+// the exact software peer transport for actual-main source-pair integration.
+void set_pico_management_target_fixtures(PicoTargetController::Fixtures);
 }
 } // namespace wsprrypi

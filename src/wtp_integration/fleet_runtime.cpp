@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
+#include <system_error>
 #include "fleet_runtime.hpp"
+#include "application_storage/application_state.hpp"
 #include "fleet_test.hpp"
 #include "fleet_store.hpp"
 #include "controller_retirement.hpp"
@@ -44,7 +46,8 @@ public:
         const auto saved=store_.snapshot();config_=saved.first;etag_=saved.second;
         const auto retirement_directory=hooks_.retirement_directory.empty()?private_device_state_directory(PrivateDeviceDomain::ControllerRetirements,self):hooks_.retirement_directory;
         retirement_book_=std::make_unique<ControllerRetirementBook>(retirement_directory,ini+".wtp-assignments.json",self,config_.at("assignments"),
-            std::function<void(RetirementWritePoint)>{},pairing_);
+            std::function<void(RetirementWritePoint)>{},pairing_,application_database_selected()?
+                PiManagementJournal::digest(application_origin_namespace()+".wtp-assignments.json"):std::string{});
         // Book recovery may atomically publish a committed resume assignment.
         // The pre-recovery cache must never seed stale connection contexts.
         const auto recovered=store_.reload();config_=recovered.first;etag_=recovered.second;
@@ -137,6 +140,14 @@ public:
         if(method!="POST" || resource!="fleet")return {405,R"({"error":{"code":"method_not_allowed"}})",{}};
         (void)body; (void)revision;
         return controller_target_error(409,"migration_required");
+    }
+    void with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &capture){
+        std::unique_lock lock(mutex_,std::try_to_lock);
+        if(!lock.owns_lock())throw std::system_error(std::make_error_code(std::errc::device_or_resource_busy));
+        if(!accepting_||!capture)throw std::runtime_error("fleet_backup_unavailable");
+        const auto assignments=store_.snapshot();const auto contexts=journal_.snapshot();
+        retirement_book_->with_backup_files(capture);
+        if(store_.snapshot()!=assignments||journal_.snapshot()!=contexts)throw std::runtime_error("fleet_backup_changed");
     }
 private:
     std::uint64_t now_ms() const {
@@ -276,6 +287,13 @@ void stop_wtp_fleet() noexcept {
     std::shared_ptr<Fleet> old;{std::lock_guard lock(manager_mutex);old=manager;}
     if(old)old->shutdown();
     {std::lock_guard lock(manager_mutex);manager.reset();}
+}
+void wtp_fleet_with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &capture){
+    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
+    if(!lifecycle.owns_lock())throw std::system_error(std::make_error_code(std::errc::device_or_resource_busy));
+    std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}
+    if(!current)throw std::runtime_error("fleet_backup_unavailable");
+    current->with_backup_files(capture);
 }
 std::optional<Json> wtp_fleet_resume(const PiPairResumeGrantProof &proof,PiPairHistory &history,const std::function<bool()> &cancelled){
     std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);if(!lifecycle.owns_lock())return {};

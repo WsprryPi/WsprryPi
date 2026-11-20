@@ -27,6 +27,7 @@
  */
 
 #include "web_socket.hpp"
+#include "application_control/event_feed.hpp"
 #include "support_request_guard.hpp"
 #include "privileged_network_runtime.hpp"
 #include "websocket_upgrade_guard.hpp"
@@ -97,6 +98,7 @@ WebSocketServer::WebSocketServer()
 WebSocketServer::~WebSocketServer()
 {
     stop();
+    stop_command_runtime();
 }
 
 /**
@@ -118,6 +120,7 @@ WebSocketServer::~WebSocketServer()
  */
 void WebSocketServer::closeFailedListener() noexcept
 {
+    listening_port_.store(0,std::memory_order_release);
     if (listen_fd_ >= 0)
     {
         close(listen_fd_);
@@ -325,6 +328,7 @@ bool WebSocketServer::start(
         return false;
     }
 
+    listening_port_.store(port,std::memory_order_release);
     if (!finishStart(keep_alive_secs))
         return false;
 
@@ -343,6 +347,29 @@ bool WebSocketServer::start(
 const std::string &WebSocketServer::listening_address() const noexcept
 {
     return listening_address_;
+}
+std::optional<int> WebSocketServer::listening_port() const noexcept{
+    const auto port=listening_port_.load(std::memory_order_acquire);
+    return running_.load(std::memory_order_acquire)&&port?std::optional<int>(port):std::nullopt;
+}
+void WebSocketServer::set_backend_session_factory(BackendSessionFactory factory){
+    std::lock_guard lock(stop_mutex_);
+    if(running_||server_thread_.joinable())throw std::logic_error("Cannot change a running browser transport");
+    backend_session_factory_=std::move(factory);
+}
+void WebSocketServer::refresh_backend_sessions(){
+    std::lock_guard lock(clients_mutex_);
+    for(const auto &[fd,authorization]:client_authorizations_)
+        if(authorization.backend&&!clientAuthorizationCurrent(authorization))shutdown(fd,SHUT_RDWR);
+}
+void WebSocketServer::resynchronize_backend_sessions(){
+    std::vector<std::shared_ptr<WebSocketBackendSession>> sessions;
+    {std::lock_guard lock(clients_mutex_);for(const auto &[fd,authorization]:client_authorizations_){
+        (void)fd;if(authorization.backend)sessions.push_back(authorization.backend);
+    }}
+    for(const auto &session:sessions)try{
+        if(session->current())sendAllClients(session->command("{\"command\":\"get_tx_state\"}"));
+    }catch(...){/* Failed sessions are retired by refresh, never replayed. */}
 }
 
 /**
@@ -365,6 +392,7 @@ void WebSocketServer::stop()
         return;
 
     running_ = false;
+    listening_port_.store(0,std::memory_order_release);
 
     // Wake keep-alive thread if sleeping
     keep_alive_cv_.notify_all();
@@ -388,7 +416,7 @@ void WebSocketServer::stop()
             shutdown(fd, SHUT_RDWR);
     }
 
-    stopBoundedTone();
+    if(!backend_session_factory_)stopBoundedTone();
 
     // Detached handlers release their own thread resources on exit.  Do not
     // destroy server state until every handler has observed shutdown and left.
@@ -707,6 +735,7 @@ void WebSocketServer::sendToClient(const std::string &message)
  */
 void WebSocketServer::sendAllClients(const std::string &message)
 {
+    if(this==&socketServer)(void)wsprrypi::backend_events().publish(message);
     std::lock_guard<std::mutex> lock(clients_mutex_);
     const std::size_t client_count = client_sockets_.size();
 
@@ -841,7 +870,8 @@ void WebSocketServer::serverLoop()
         }
 
         std::string upgrade_request;
-        if (!performHandshake(client, peer_ip, upgrade_request))
+        std::shared_ptr<WebSocketBackendSession> backend_session;
+        if (!performHandshake(client, peer_ip, upgrade_request,backend_session))
         {
             llog.logE(WARN, "Handshake failed for new client");
             std::lock_guard<std::mutex> lock(clients_mutex_);
@@ -875,7 +905,7 @@ void WebSocketServer::serverLoop()
             }
             client_sockets_.push_back(client);
             const ClientAuthorizationContext authorization{
-                peer_ip, std::move(upgrade_request)};
+                peer_ip, std::move(upgrade_request),std::move(backend_session)};
             client_authorizations_.emplace(client, authorization);
             ++active_client_handlers_;
             try
@@ -1004,6 +1034,7 @@ void WebSocketServer::clientLoop(
         {
         case 0x1: // Text frame
             if (inbound_message_for_test_) inbound_message_for_test_(message);
+            else if(authorization.backend)sendAllClients(authorization.backend->command(message));
             else handleMessage(message);
             break;
 
@@ -1111,7 +1142,8 @@ void WebSocketServer::keepAliveLoop(uint32_t interval)
 bool WebSocketServer::performHandshake(
     int client,
     const std::string &peer_address,
-    std::string &upgrade_request)
+    std::string &upgrade_request,
+    std::shared_ptr<WebSocketBackendSession> &backend_session)
 {
     const int buf_size = 4096;
     char buf[buf_size];
@@ -1129,9 +1161,20 @@ bool WebSocketServer::performHandshake(
             return false;
     }
 
-    const auto guard = evaluate_websocket_upgrade(
-        request, peer_address, network_snapshot_provider_(),
-        active_privileged_network_mode());
+    WebSocketUpgradeGuardResult guard;
+    if(backend_session_factory_){
+        try{
+            backend_session=backend_session_factory_(request,peer_address);
+            if(!backend_session)guard.decision=WebSocketUpgradeGuardDecision::rejected;
+            else{
+                if(!backend_session->current||!backend_session->command||backend_session->key.size()>128)throw std::runtime_error("Invalid backend session");
+                guard.decision=WebSocketUpgradeGuardDecision::allowed;guard.key=backend_session->key;
+            }
+        }catch(...){
+            constexpr char unavailable[]="HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+            (void)send(client,unavailable,sizeof unavailable-1,0);return false;
+        }
+    }else guard=evaluate_websocket_upgrade(request,peer_address,network_snapshot_provider_(),active_privileged_network_mode());
     if (guard.decision != WebSocketUpgradeGuardDecision::allowed)
     {
         if (guard.decision == WebSocketUpgradeGuardDecision::malformed)
@@ -1178,6 +1221,7 @@ bool WebSocketServer::performHandshake(
 bool WebSocketServer::clientAuthorizationCurrent(
     const ClientAuthorizationContext &authorization) const
 {
+    if(authorization.backend){try{return authorization.backend->current();}catch(...){return false;}}
     return evaluate_websocket_upgrade(
                authorization.upgrade_request,
                authorization.peer_address,

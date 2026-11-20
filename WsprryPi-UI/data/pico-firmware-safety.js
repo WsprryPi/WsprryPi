@@ -6,6 +6,12 @@
     const held = new Map();
     const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle"]);
     function allowed(control) {
+        if(control.closest('#backupRestore')) {
+            // Independent maintenance remains reachable through backend loss.
+            // Its own protected owner validates capture, restore, and review;
+            // these controls cannot dispatch Pico firmware or output commands.
+            held.delete(control);return true;
+        }
         if(control.closest('#controllerAccess')) {
             // Pairing/removal has its own protected host owner and cannot
             // dispatch Pico settings, firmware, WTP or output work.

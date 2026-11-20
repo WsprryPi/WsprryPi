@@ -35,6 +35,7 @@
 
 // Project headers
 #include "config_handler.hpp"
+#include "application_storage/application_state.hpp"
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 #include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
@@ -350,7 +351,7 @@ void callback_ini_changed()
     {
         llog.logS(
             INFO,
-            "INI file changed during transmission.");
+            wsprrypi::application_database_selected()?"Saved settings changed during transmission.":"INI file changed during transmission.");
         llog.logS(
             INFO,
             "Deferring managed reload until the current TX completes (generation ",
@@ -359,12 +360,15 @@ void callback_ini_changed()
         return;
     }
 
-    llog.logS(INFO, "INI file changed, reloading.");
+    llog.logS(INFO, wsprrypi::application_database_selected()?"Saved settings changed, reloading.":"INI file changed, reloading.");
     (void)set_config(true);
 }
 
 void start_runtime_config_monitor(const std::string &filename)
 {
+    if(wsprrypi::application_database_selected()){
+        validate_config_ini_input(filename);return;
+    }
     iniMonitor.filemon(filename, callback_ini_changed);
     iniMonitor.setPriority(SCHED_RR, 10);
 }
@@ -2595,7 +2599,7 @@ bool parse_command_line(int argc, char *argv[])
     }
 
     // Check if any arguments (besides the program name) were provided.
-    if (argc == 1) // No arguments or options provided.
+    if (argc == 1 && !wsprrypi::application_database_selected()) // No arguments or saved state provided.
     {
         print_usage("No arguments provided.", EXIT_FAILURE);
     }
@@ -2623,11 +2627,33 @@ bool parse_command_line(int argc, char *argv[])
     json_to_config();
     std::vector<char *> args(argv, argv + argc); // Copy arguments for modification
 
+    if(wsprrypi::application_database_selected()){
+        if(wsprrypi::application_database()->role()!=wsprrypi::StateRole::Pi)
+            throw std::invalid_argument("Native startup requires native application state");
+        const auto name=wsprrypi::application_configuration_namespace();
+        const auto simulated=config.simulated_backend_override;
+        config.use_ini=true;config.ini_filename=name;
+        std::string error;std::vector<std::string> warnings;bool loaded=false;
+        try{loaded=load_json(name,&error,&warnings);}catch(const std::exception &failure){error=failure.what();}
+        for(const auto &warning:warnings)defer_startup_diagnostic(WARN,warning);
+        if(!loaded){
+            defer_startup_diagnostic(ERROR,"Saved settings unavailable or unconfirmed: "+error);
+            init_default_config();config.use_ini=true;config.ini_filename=name;config.transmit=false;
+            config.simulated_backend_override=simulated;
+            if(simulated)config.transmit_backend=TransmitBackendKind::SIMULATED;
+            config_to_json();startup_config_handoff_ready.store(true,std::memory_order_release);
+        }
+        const auto saved=wsprrypi::database_configuration_input();
+        initialize_privileged_network_runtime(saved.settings.private_settings.network_safety==wsprrypi::SavedNetworkSafety::Enforced?"enforced":"insecure-disabled");
+        if(const auto host=wsprrypi::pi_managed_host())host->restore_recovery_listener_ports();
+    }
+
     // First pass: Look for "-i <file>" before processing other options
     for (auto it = args.begin() + 1; it != args.end(); ++it)
     {
         if ((std::string(*it) == "-i" || std::string(*it) == "--ini-file") && (it + 1) != args.end())
         {
+            if(wsprrypi::application_database_selected())throw std::invalid_argument("Active INI input is unavailable after SQLite selection");
             config.ini_filename = *(it + 1);
             config.use_ini = true;
             config.loop_tx = true;
@@ -3012,7 +3038,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--mode is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--mode is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.mode = parse_mode_option(optarg);
             }
@@ -3026,7 +3052,7 @@ bool parse_command_line(int argc, char *argv[])
         {
             if (config.use_ini)
             {
-                print_usage("--cw-message is invalid when using INI file.", EXIT_FAILURE);
+                print_usage("--cw-message is invalid when using saved settings.", EXIT_FAILURE);
             }
             const std::string message = trim_copy_string(optarg == nullptr ? "" : optarg);
             if (message.empty())
@@ -3044,7 +3070,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-base-frequency is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-base-frequency is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 const double frequency_hz =
                     parse_frequency_hz_option(optarg, "--cw-base-frequency");
@@ -3069,7 +3095,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-shift-hz is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-shift-hz is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.modulation_fsk_offset_hz =
                     parse_double_option(optarg, "--cw-shift-hz");
@@ -3087,7 +3113,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-dot-seconds is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-dot-seconds is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.modulation_dot_seconds =
                     parse_double_option(optarg, "--cw-dot-seconds");
@@ -3105,7 +3131,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-intra-element-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-intra-element-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_intra_element_gap =
                     parse_double_option(optarg, "--cw-intra-element-gap");
@@ -3122,7 +3148,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-inter-character-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-inter-character-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_inter_character_gap =
                     parse_double_option(optarg, "--cw-inter-character-gap");
@@ -3139,7 +3165,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-inter-word-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-inter-word-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_inter_word_gap =
                     parse_double_option(optarg, "--cw-inter-word-gap");
@@ -3156,7 +3182,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-fade-shape is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-fade-shape is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_fade_shape = parse_cw_fade_shape_option(optarg);
             }
@@ -3172,7 +3198,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-fade-in-ms is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-fade-in-ms is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_fade_in_ms =
                     parse_integer_option(optarg, "--cw-fade-in-ms");
@@ -3189,7 +3215,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-fade-out-ms is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-fade-out-ms is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_fade_out_ms =
                     parse_integer_option(optarg, "--cw-fade-out-ms");
@@ -3206,7 +3232,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-fade-slice-ms is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-fade-slice-ms is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.cw_fade_slice_ms =
                     parse_integer_option(optarg, "--cw-fade-slice-ms");
@@ -3223,7 +3249,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-start-minute is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-start-minute is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.schedule_start_minute =
                     parse_integer_option(optarg, "--cw-start-minute");
@@ -3240,7 +3266,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-repeat-minutes is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-repeat-minutes is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.schedule_repeat_minutes =
                     parse_integer_option(optarg, "--cw-repeat-minutes");
@@ -3257,7 +3283,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--cw-start-second is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--cw-start-second is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.schedule_start_second =
                     parse_integer_option(optarg, "--cw-start-second");
@@ -3406,7 +3432,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--dfcw-intra-element-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--dfcw-intra-element-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.dfcw_intra_element_gap =
                     parse_double_option(optarg, "--dfcw-intra-element-gap");
@@ -3423,7 +3449,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--dfcw-inter-character-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--dfcw-inter-character-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.dfcw_inter_character_gap =
                     parse_double_option(optarg, "--dfcw-inter-character-gap");
@@ -3440,7 +3466,7 @@ bool parse_command_line(int argc, char *argv[])
             {
                 if (config.use_ini)
                 {
-                    print_usage("--dfcw-inter-word-gap is invalid when using INI file.", EXIT_FAILURE);
+                    print_usage("--dfcw-inter-word-gap is invalid when using saved settings.", EXIT_FAILURE);
                 }
                 config.dfcw_inter_word_gap =
                     parse_double_option(optarg, "--dfcw-inter-word-gap");
@@ -3643,7 +3669,7 @@ bool parse_command_line(int argc, char *argv[])
             }
             else
             {
-                print_usage("Test tone is invalid when using INI file.", EXIT_FAILURE);
+                print_usage("Test tone is invalid when using saved settings.", EXIT_FAILURE);
             }
             break;
         }
@@ -3889,7 +3915,7 @@ bool parse_command_line(int argc, char *argv[])
         // from the INI while binding one explicit finite startup request.
         if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
-            print_usage("QRSS test mode is invalid when using INI file.", EXIT_FAILURE);
+            print_usage("QRSS test mode is invalid when using saved settings.", EXIT_FAILURE);
         }
 
         if (qrss_message_arg.empty() ||
@@ -3929,7 +3955,7 @@ bool parse_command_line(int argc, char *argv[])
     {
         if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
-            print_usage("FSKCW test mode is invalid when using INI file.", EXIT_FAILURE);
+            print_usage("FSKCW test mode is invalid when using saved settings.", EXIT_FAILURE);
         }
 
         if (fskcw_message_arg.empty() ||
@@ -3980,7 +4006,7 @@ bool parse_command_line(int argc, char *argv[])
     {
         if (config.use_ini && config.transmit_backend != TransmitBackendKind::WTP)
         {
-            print_usage("DFCW test mode is invalid when using INI file.", EXIT_FAILURE);
+            print_usage("DFCW test mode is invalid when using saved settings.", EXIT_FAILURE);
         }
 
         if (dfcw_message_arg.empty() ||

@@ -7,6 +7,7 @@
 #include "recurrence_authority.hpp"
 #include "wtp_integration/catalog.hpp"
 #include "wtp_integration/pi_managed_store.hpp"
+#include "application_storage/sqlite_catalog.hpp"
 #include "wtp_integration/pi_managed_records.hpp"
 #include "wtp_integration/pi_pair_history.hpp"
 #include "wtp_integration/controller_retirement.hpp"
@@ -453,6 +454,50 @@ int main(int argc,char **argv){
           "Actual committed disabled setup retains its exact historical receipt and candidate without keys or a circular revision");
       PiManagedStore restarted(initial,self,catalog.pi_management_anchor(self,{}));restarted.recover();
       check(restarted.replay(setup)==cold.replay(setup)&&restarted.recurrence_authority()==cold.recurrence_authority()&&restarted.disabled_snapshot()==disabled,"Cold readback retains exact setup receipt, disabled snapshot and authority");
+      {
+          // Exercise the real managed settings/receipt/authority owner over SQL,
+          // using its verified current source rather than a parallel test owner.
+          PrivateConfiguration private_settings;
+          private_settings.debug_logging=internal["Meta"]["debug_logging"].get<bool>();
+          private_settings.allow_unqualified_frequency=internal["Experimental"]["Allow Unqualified Frequency"].get<bool>();
+          private_settings.allow_non_amateur_frequency=internal["Experimental"]["Allow Non-Amateur Frequency"].get<bool>();
+          const auto image=cold.database_import_image(internal,private_settings);
+          const auto repeat=cold.database_import_image(internal,private_settings);
+          check(image.source_revision==repeat.source_revision&&!image.progress_bytes,"Read-only stable migration capture");
+          const auto destination=root+"/sqlite-"+kind;check(!mkdir(destination.c_str(),0700),"Private database destination");
+          auto database=std::make_shared<SqliteStateStore>(destination,self,StateRole::Pi,StateOpen::CreateNew);
+          database->commit("0",image.records);
+          WtpCatalog database_catalog(sqlite_catalog_storage(database));
+          PiManagedStore selected(database,database_catalog.pi_management_anchor(self,{}));selected.recover();
+          check(selected.settings()["configuration"]==cold.settings()["configuration"]&&selected.replay(setup)==cold.replay(setup),
+              "Database import preserves current configuration and exact historical operation receipts");
+          const auto source_before=bytes(initial),revision=database->snapshot().revision;
+          auto edited=internal;edited["CW"]["Message"]="SQL OWNED SAVE";
+          edited["Meta"]["debug_logging"]=!private_settings.debug_logging;
+          selected.persist(edited,[&]{selected.write_committed_ini(encode_persistent_configuration(edited,private_settings,StateRole::Pi));});
+          const auto persisted=configuration_from_snapshot(database->snapshot(),StateRole::Pi);
+          check(persisted.configuration["CW"]["Message"]=="SQL OWNED SAVE"&&persisted.private_settings==private_settings,
+              "Real SQL save preserves private values instead of persisting transient CLI flags");
+          check(database->snapshot().revision==std::to_string(std::stoull(revision)+1)&&bytes(initial)==source_before&&
+              !std::filesystem::exists(destination+"/configuration"),"One SQL decision, no INI projection or source rewrite");
+          Json enable_request;
+          for(const auto &entry:vectors["cases"])if(entry.value("family",std::string{})=="target-enable"&&entry.value("valid",false)){
+              enable_request=entry.at("value");break;
+          }
+          check(enable_request.is_object(),"Current production enable fixture required");
+          enable_request["binding"]["device_id"]=self;enable_request["operation_id"]=std::string(32,'8');
+          enable_request["expected_revision"]=selected.settings()["revision"];
+          enable_request["candidate_digest"]=selected.settings()["candidate_digest"];
+          PiManagedStore::Operation enable{self,"1","/api/control/v1/targets/"+self+"/enable",enable_request};
+          selected.persist_scheduling(enable,true);
+          check(selected.recurrence_authority()["state"]=="native"&&selected.settings()["scheduling"]["enabled"]==true&&
+              selected.settings()["configuration"]["Operation"]["Transmit"]==false&&selected.recurrence_progress()&&selected.replay(enable),
+              "SQL native enable commits authority, initialization and receipt without granting Transmit or output");
+          PiManagedStore database_restart(database,database_catalog.pi_management_anchor(self,{}));database_restart.recover();
+          check(database_restart.settings()==selected.settings()&&database_restart.replay(setup)==selected.replay(setup)&&
+              database_restart.replay(enable)==selected.replay(enable)&&database_restart.recurrence_progress()->snapshot()==selected.recurrence_progress()->snapshot(),
+              "Cold SQL managed-owner readback preserves settings, receipts and independently owned progress");
+      }
       check(!unlink((initial+".recurrence-authority.json").c_str()),"Delete authority fixture");
       PiManagedStore missing(initial,self,catalog.pi_management_anchor(self,{}));refuses([&]{missing.recover();});
   }

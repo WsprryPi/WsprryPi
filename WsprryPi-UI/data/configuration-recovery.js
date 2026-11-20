@@ -17,7 +17,7 @@
         if (!active) return;
         root.suspendConfigAutosave?.(true);
         root.document.querySelectorAll('#main-content input,#main-content select,#main-content textarea,#main-content button').forEach(item => {
-            if (!item.closest('#configurationRecoveryPanel') && !item.disabled) item.disabled = true;
+            if (!item.closest('#configurationRecoveryPanel') && !item.closest('#backupRestore') && !item.disabled) item.disabled = true;
         });
         for (const id of ['wsprform','configTabs','operationLocalView']) {
             const item = node(id);if (item) {item.hidden = true;item.inert = true;}

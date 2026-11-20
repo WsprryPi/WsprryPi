@@ -26,7 +26,7 @@ bool apply_service(const std::string &ini) {
   if (pid == 0) {
     ::setpgid(0, 0);
     ::execl("/usr/bin/python3", "python3",
-            "/usr/local/lib/wsprrypi/udp_log_control.py", "configure", "--ini",
+            "/usr/local/lib/wsprrypi/udp_log_control.py", "configure", "--state-namespace",
             ini.c_str(), static_cast<char *>(nullptr));
     ::_exit(127);
   }
@@ -143,13 +143,7 @@ PicoHttpResponse udp_logging_api(const std::string &method,
     auto saved = udp::defaults();
     std::string etag = "\"udp-host-" + self + "-0\"";
     if (!bytes.empty()) {
-      const auto disk = udp::parse(bytes);
-      udp::require(udp::fields(disk, {"schema", "collector_id", "revision",
-                                      "sender", "collector"}) &&
-                       disk["schema"] == "host-udp-logging/1" &&
-                       disk["collector_id"] == self &&
-                       udp::text(disk["revision"], 128),
-                   "udp_policy_binding");
+      const auto disk = udp::saved_host_policy(bytes,self);
       saved = {{"sender", disk["sender"]}, {"collector", disk["collector"]}};
       udp::settings(saved);
       etag = disk["revision"].get<std::string>();

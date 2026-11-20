@@ -6,12 +6,20 @@
 #include "pico_management_history.hpp"
 #include "pi_management_anchor.hpp"
 #include <mutex>
+#include <functional>
 #include <optional>
 #include <string>
 
 namespace wsprrypi {
 class PiPairRemoteController;
 class WtpCatalog;
+// Backend-selected storage, never a browser path or SQL interface. Publication
+// compares the complete observed image; the managed settings owner may instead
+// commit its exact catalog after-image alongside its other records.
+struct CatalogStorage {
+  std::function<std::optional<std::string>()> read;
+  std::function<void(const std::optional<std::string> &, const std::string &)> publish;
+};
 // Constructible only by the actual authenticated observation owner. This is
 // private enrollment bookkeeping, never a browser-provided authority token.
 class RemoteManagementEnrollment {
@@ -33,6 +41,12 @@ struct WtpCatalogProfile {
 class WtpCatalog {
 public:
   explicit WtpCatalog(std::string path) : path_(std::move(path)) {}
+  explicit WtpCatalog(CatalogStorage);
+  // Pure initial image; current image is a validated private read that refuses
+  // absence rather than creating an implicit import/initialization baseline.
+  static std::string initial_storage_image();
+  static std::string database_import_image(const std::string &validated_source_bytes);
+  std::string current_storage_image();
   std::pair<nlohmann::json, std::string> snapshot(
       const std::optional<WtpSettings> &active);
   std::pair<nlohmann::json, std::string> mutate(
@@ -49,9 +63,12 @@ public:
       const std::optional<WtpSettings> &active);
 private:
   std::string path_;
+  std::optional<CatalogStorage> storage_;
+  std::optional<std::string> observed_storage_;
   std::mutex mutex_;
-  nlohmann::json load(const std::optional<WtpSettings> &active,std::string *source_bytes=nullptr);
-  void save(const nlohmann::json &value);
+  nlohmann::json load(const std::optional<WtpSettings> &active,std::string *source_bytes=nullptr,bool initialize_missing=true);
+  void save(nlohmann::json &value);
+  static nlohmann::json parse_storage_image(const std::string &,bool database_format);
 };
 std::string wtp_catalog_revision(const nlohmann::json &);
 } // namespace wsprrypi

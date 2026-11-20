@@ -4,16 +4,13 @@ set -o pipefail
 umask 077
 
 PROJECT_NAME="WsprryPi"
-SERVICE_NAMES=("wsprrypi" "apache2")
-SYSLOG_IDENTIFIERS=("wsprrypi" "apache2")
+SERVICE_NAMES=("wsprrypi" "wsprrypi-web" "wsprrypi-maintenance" "apache2")
+SYSLOG_IDENTIFIERS=("wsprrypi" "wsprrypi-web" "wsprrypi-maintenance" "apache2")
 INSTALLED_EXE="/usr/local/bin/wsprrypi"
 INSTALLED_DEBUG_EXE="/usr/local/bin/wsprrypi_debug"
-INSTALLED_INI="/usr/local/etc/wsprrypi.ini"
 INSTALLED_SERVICE="/etc/systemd/system/wsprrypi.service"
 LEGACY_LOG_DIR="/var/log/wsprrypi"
 INSTALL_LOG_NAME="wsprrypi.log"
-DEFAULT_WEB_PORT="31415"
-DEFAULT_SOCKET_PORT="31416"
 RP1_DKMS="/usr/sbin/dkms"
 RP1_MODINFO="/usr/sbin/modinfo"
 RP1_PYTHON="/usr/bin/python3"
@@ -749,42 +746,114 @@ detect_project_path() {
   echo ""
 }
 
-ini_value() {
-  local file="$1"
-  local section="$2"
-  local key="$3"
-  local fallback="$4"
-
-  if [[ ! -f "$file" ]]; then
-    echo "$fallback"
-    return
+collect_saved_settings() {
+  local selected raw status service_launch
+  raw="${OUT_DIR}/configs/installed/.saved-settings-export.json"
+  service_launch=$(systemctl show wsprrypi --property=ExecStart --value 2>/dev/null) || service_launch=""
+  selected=$("$RP1_PYTHON" - "$INSTALLED_EXE" "$INSTALLED_DEBUG_EXE" "$service_launch" <<'PY_DIAGNOSTIC_BINARY'
+import os, re, stat, sys
+from pathlib import Path
+marker = b'--diagnostic-export'
+names = sys.argv[1:3]
+for name in tuple(names):
+    if re.search(r'(?:path=|argv\[\]=)' + re.escape(name) + r'(?=[\s;}])', sys.argv[3]):
+        names.remove(name);names.insert(0, name);break
+for name in names:
+    path = Path(name)
+    try:
+        for parent in path.parents:
+            info = parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, os.geteuid()) or (info.st_mode & 0o022 and not (info.st_uid == 0 and info.st_mode & stat.S_ISVTX)):
+                raise ValueError()
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid not in (0, os.geteuid()) or info.st_mode & 0o022 or not info.st_mode & 0o111:
+                raise ValueError()
+            with os.fdopen(os.dup(fd), 'rb') as stream:
+                tail = b''
+                while chunk := stream.read(65536):
+                    data = tail + chunk
+                    if marker in data:
+                        print(path);sys.exit(0)
+                    tail = data[-len(marker):]
+        finally:
+            os.close(fd)
+    except (OSError, ValueError):
+        pass
+sys.exit(1)
+PY_DIAGNOSTIC_BINARY
+) || selected=""
+  status=3
+  if [[ -n "$selected" ]]; then
+    "$RP1_TIMEOUT" 20 "$selected" --diagnostic-export > "$raw" 2>/dev/null
+    status=$?
   fi
+  printf 'Selected supported executable: %s\nExport exit status: %s\n' "${selected:-unavailable}" "$status" > "${OUT_DIR}/commands/diagnostic-export.txt"
+  "$RP1_PYTHON" - "$raw" "${OUT_DIR}/web/storage-status.json" "${OUT_DIR}/configs/installed/saved-settings.json" "$INCLUDE_CONFIGS" <<'PY_DIAGNOSTIC_DOCUMENT'
+import json, os, sys
+from pathlib import Path
+raw, status_path, settings_path = map(Path, sys.argv[1:4])
+def unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result: raise ValueError()
+        result[key] = value
+    return result
+value = {'schema': 'diagnostic-settings/1', 'status': 'unavailable', 'reason': 'supported_backend_export_unavailable'}
+try:
+    if raw.stat().st_size > 2 * 1024 * 1024: raise ValueError()
+    candidate = json.loads(raw.read_bytes(), object_pairs_hook=unique)
+    if not isinstance(candidate, dict) or candidate.get('schema') != 'diagnostic-settings/1' or candidate.get('status') not in ('available', 'unavailable'):
+        raise ValueError()
+    allowed = {'schema', 'status', 'reason', 'role', 'backend', 'storage', 'web_service', 'restore_hold', 'saved_settings', 'advanced_saved'}
+    if set(candidate) - allowed: raise ValueError()
+    if candidate['status'] == 'available':
+        required = allowed - {'reason'}
+        if set(candidate) != required or candidate['role'] not in ('pi', 'controller'): raise ValueError()
+        saved = candidate['saved_settings']
+        if not isinstance(saved, dict) or set(saved) != {'schema', 'role', 'configuration', 'private'} or saved['schema'] != 'local-settings/1' or saved['role'] != candidate['role']:
+            raise ValueError()
+        configuration = saved['configuration']
+        if not isinstance(configuration, dict) or not isinstance(configuration.get('Operation'), dict): raise ValueError()
+        operation = configuration['Operation']
+        if any(type(operation.get(key)) is not int or not 1024 <= operation[key] <= 49151 for key in ('Web Port', 'Socket Port')): raise ValueError()
+        if not isinstance(candidate['advanced_saved'], dict): raise ValueError()
+    value = candidate
+except (OSError, ValueError, TypeError, KeyError):
+    pass
+finally:
+    raw.unlink(missing_ok=True)
+metadata = {key: item for key, item in value.items() if key not in ('saved_settings', 'advanced_saved')}
+metadata['schema'] = 'diagnostic-status/1'
+metadata['saved_listener_ports'] = None
+metadata['saved_transmit_pin'] = None
+if value['status'] == 'available':
+    configuration = value['saved_settings']['configuration']
+    operation = configuration['Operation']
+    ports = {name: operation[key] for name, key in [('web_port', 'Web Port'), ('socket_port', 'Socket Port')]}
+    if all(type(port) is int and 1024 <= port <= 49151 for port in ports.values()): metadata['saved_listener_ports'] = ports
+    if value['role'] == 'pi': metadata['saved_transmit_pin'] = configuration.get('GPIO', {}).get('Transmit Pin')
+if sys.argv[4] == '1':
+    settings_path.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
+status_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + '\n')
+PY_DIAGNOSTIC_DOCUMENT
+}
 
-  awk -v section="$section" -v key="$key" -v fallback="$fallback" '
-    BEGIN { in_section = 0; found = "" }
-    /^[[:space:]]*;/ { next }
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*\[/ {
-      current = $0
-      gsub(/^[[:space:]]*\[/, "", current)
-      gsub(/\][[:space:]]*$/, "", current)
-      in_section = (tolower(current) == tolower(section))
-      next
-    }
-    in_section {
-      line = $0
-      split(line, parts, "=")
-      candidate = parts[1]
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", candidate)
-      if (tolower(candidate) == tolower(key)) {
-        value = substr(line, index(line, "=") + 1)
-        sub(/[;#].*$/, "", value)
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-        found = value
-      }
-    }
-    END { print found != "" ? found : fallback }
-  ' "$file" 2>/dev/null
+diagnostic_value() {
+  "$RP1_PYTHON" - "${OUT_DIR}/web/storage-status.json" "$1" <<'PY_DIAGNOSTIC_VALUE'
+import json, sys
+try:
+    with open(sys.argv[1]) as stream: value = json.load(stream)
+    key = sys.argv[2]
+    if key in ('web_port', 'socket_port'): item = (value.get('saved_listener_ports') or {}).get(key)
+    elif key == 'transmit_pin': item = value.get('saved_transmit_pin')
+    elif key == 'namespace': item = (value.get('storage') or {}).get('namespace')
+    else: item = (value.get('web_service') or {}).get(key)
+    if item is not None and type(item) in (int, str): print(item);sys.exit(0)
+except (OSError, ValueError, TypeError, KeyError): pass
+sys.exit(1)
+PY_DIAGNOSTIC_VALUE
 }
 
 log "Collecting ${PROJECT_NAME} support information..."
@@ -801,7 +870,8 @@ Bundle contents may include:
 - Raspberry Pi and Linux system information, including 32/64-bit OS and CPU details
 - WsprryPi installed runtime metadata and binary architecture checks
 - WsprryPi project/git metadata when a checkout is detected
-- Installed and project WsprryPi INI files, redacted
+- Allowlisted supported saved settings, including advanced values, exported by the backend and redacted
+- Storage/schema availability and separate backend, browser, and maintenance service observations
 - Installed systemd unit, merged systemctl cat output, and service directive inspection
 - Journald logs for WsprryPi and Apache services
 - A point-in-time system process/tree/cgroup snapshot and WsprryPi memory, task, and file-descriptor counts
@@ -941,25 +1011,20 @@ if [[ -n "$PROJECT_PATH" && -d "$PROJECT_PATH" ]]; then
 
   copy_if_exists "$PROJECT_PATH/Makefile" "${OUT_DIR}/project"
   copy_if_exists "$PROJECT_PATH/CMakeLists.txt" "${OUT_DIR}/project"
-  copy_if_exists "$PROJECT_PATH/config/wsprrypi.ini" "${OUT_DIR}/project"
   copy_if_exists "$PROJECT_PATH/systemd/generic.service" "${OUT_DIR}/project"
   copy_if_exists "$PROJECT_PATH/systemd/systemd.md" "${OUT_DIR}/project"
 
   if [[ "$INCLUDE_CONFIGS" -eq 1 ]]; then
     mkdir -p "${OUT_DIR}/configs/project"
-    find "$PROJECT_PATH" -maxdepth 4 -type f \( \
-      -name "*.conf" -o \
-      -name "*.ini" -o \
-      -name "*.json" -o \
-      -name "*.yaml" -o \
-      -name "*.yml" -o \
-      -name "*.service" \
-    \) -print0 2>/dev/null |
-      while IFS= read -r -d '' file; do
-        rel="${file#"$PROJECT_PATH"/}"
-        mkdir -p "${OUT_DIR}/configs/project/$(dirname "$rel")"
-        cp "$file" "${OUT_DIR}/configs/project/$rel" 2>/dev/null || true
-      done
+    # Public source policies only. Never recursively copy runtime JSON, SQL,
+    # credential stores, decrypted restore staging, or inactive recovery evidence.
+    for file in "$PROJECT_PATH/config/pico-usb-installer.json" "$PROJECT_PATH/config/picotool-release.json" \
+      "$PROJECT_PATH/systemd/generic.service" "$PROJECT_PATH/systemd/browser.service" "$PROJECT_PATH/systemd/maintenance.service"; do
+      [[ -f "$file" && ! -L "$file" && ! -L "$(dirname "$file")" ]] || continue
+      rel="${file#"$PROJECT_PATH"/}"
+      mkdir -p "${OUT_DIR}/configs/project/$(dirname "$rel")"
+      cp "$file" "${OUT_DIR}/configs/project/$rel" 2>/dev/null || true
+    done
   fi
 else
   echo "Project path was not detected. Re-run with --path /path/to/WsprryPi if needed." > "${OUT_DIR}/project/project-not-found.txt"
@@ -967,10 +1032,10 @@ fi
 
 log "Collecting installed WsprryPi runtime information..."
 
-if [[ "$INCLUDE_CONFIGS" -eq 1 ]]; then
-  copy_if_exists "$INSTALLED_INI" "${OUT_DIR}/configs/installed"
-fi
+collect_saved_settings
 copy_if_exists "$INSTALLED_SERVICE" "${OUT_DIR}/configs/systemd"
+copy_if_exists /etc/systemd/system/wsprrypi-web.service "${OUT_DIR}/configs/systemd"
+copy_if_exists /etc/systemd/system/wsprrypi-maintenance.service "${OUT_DIR}/configs/systemd"
 
 if [[ -f "$INSTALLED_SERVICE" ]]; then
   {
@@ -1029,6 +1094,14 @@ systemctl show wsprrypi --no-pager > "${OUT_DIR}/configs/systemd/systemctl-show-
 systemctl show wsprrypi --no-pager --property=Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,UnitFileState,ExecStart,User,Group,WorkingDirectory,Environment,StandardOutput,StandardError,SyslogIdentifier,Restart,RestartUSec,Wants,Requires,After,Before > "${OUT_DIR}/configs/systemd/systemctl-show-wsprrypi-summary.txt" 2>&1 || true
 systemctl is-enabled wsprrypi > "${OUT_DIR}/logs/systemd-enabled-wsprrypi.txt" 2>&1 || true
 systemctl is-active wsprrypi > "${OUT_DIR}/logs/systemd-active-wsprrypi.txt" 2>&1 || true
+for companion in wsprrypi-web wsprrypi-maintenance; do
+  systemctl cat "$companion" > "${OUT_DIR}/configs/systemd/systemctl-cat-${companion}.txt" 2>&1 || true
+  systemctl show "$companion" --no-pager --property=Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,ExecStart,User,Group,Restart,Wants,Requires,After,Before > "${OUT_DIR}/configs/systemd/systemctl-show-${companion}.txt" 2>&1 || true
+  systemctl is-enabled "$companion" > "${OUT_DIR}/logs/systemd-enabled-${companion}.txt" 2>&1 || true
+  systemctl is-active "$companion" > "${OUT_DIR}/logs/systemd-active-${companion}.txt" 2>&1 || true
+done
+
+run_cmd application_ipc_listeners ss -xlpn
 
 log "Collecting process and resource snapshot..."
 
@@ -1055,7 +1128,12 @@ done
 log "Collecting UDP logging counters and service metadata..."
 systemctl show wsprrypi-log.service -p ActiveState -p SubState -p User -p MemoryCurrent -p TasksCurrent > "${OUT_DIR}/logs/udp-logging-service.txt" 2>&1 || true
 if [[ -f /usr/local/lib/wsprrypi/udp_log_control.py && -x "$RP1_PYTHON" ]]; then
-  "$RP1_PYTHON" /usr/local/lib/wsprrypi/udp_log_control.py status --ini "$INSTALLED_INI" > "${OUT_DIR}/logs/udp-logging-status.json" 2>/dev/null || true
+  logging_namespace=$(diagnostic_value namespace) || logging_namespace=""
+  if [[ -n "$logging_namespace" ]]; then
+    "$RP1_PYTHON" /usr/local/lib/wsprrypi/udp_log_control.py status --state-namespace "$logging_namespace" > "${OUT_DIR}/logs/udp-logging-status.json" 2>/dev/null || true
+  else
+    printf '%s\n' '{"schema":"udp-logging-support/1","available":false,"reason":"backend_namespace_unavailable"}' > "${OUT_DIR}/logs/udp-logging-status.json"
+  fi
 fi
 
 log "Collecting general logs (network log bodies omitted)..."
@@ -1195,15 +1273,21 @@ run_cmd apache_document_roots sh -c "grep -RhiE '^[[:space:]]*(DocumentRoot|Alia
 run_cmd apache_enabled_config_tree sh -c "find /etc/apache2/sites-enabled /etc/apache2/conf-enabled -maxdepth 2 -printf '%M %u %g %s %TY-%Tm-%Td %TH:%TM %p -> %l\n' 2>/dev/null || true"
 run_cmd var_www_tree sh -c "find /var/www -maxdepth 3 -printf '%M %u %g %s %TY-%Tm-%Td %TH:%TM %p -> %l\n' 2>/dev/null || true"
 
-WEB_PORT="$(ini_value "$INSTALLED_INI" "Operation" "Web Port" "$DEFAULT_WEB_PORT")"
-SOCKET_PORT="$(ini_value "$INSTALLED_INI" "Operation" "Socket Port" "$DEFAULT_SOCKET_PORT")"
+WEB_PORT="$(diagnostic_value web_port)" || WEB_PORT="unavailable"
+SOCKET_PORT="$(diagnostic_value socket_port)" || SOCKET_PORT="unavailable"
+ACTIVE_HTTP_PORT="$(diagnostic_value http_port)" || ACTIVE_HTTP_PORT="unavailable"
+ACTIVE_SOCKET_PORT="$(diagnostic_value websocket_port)" || ACTIVE_SOCKET_PORT="unavailable"
 {
-  echo "Configured Web Port: $WEB_PORT"
-  echo "Configured Socket Port: $SOCKET_PORT"
+  echo "Saved Web Port: $WEB_PORT"
+  echo "Saved Socket Port: $SOCKET_PORT"
+  echo "Observed active HTTP port: $ACTIVE_HTTP_PORT"
+  echo "Observed active WebSocket port: $ACTIVE_SOCKET_PORT"
 } > "${OUT_DIR}/web/wsprrypi-web-ports.txt"
 
-if command -v curl >/dev/null 2>&1; then
-  run_cmd wsprrypi_web_root_probe curl -fsS --max-time 3 "http://127.0.0.1:${WEB_PORT}/"
+if command -v curl >/dev/null 2>&1 && [[ "$ACTIVE_HTTP_PORT" =~ ^[0-9]+$ ]]; then
+  run_cmd wsprrypi_web_root_probe curl -fsS --max-time 3 "http://127.0.0.1:${ACTIVE_HTTP_PORT}/"
+else
+  printf '%s\n' 'Active HTTP listener unavailable from backend diagnostics; no default port inferred.' > "${OUT_DIR}/commands/wsprrypi_web_root_probe.txt"
 fi
 
 log "Collecting network summary..."
@@ -1305,7 +1389,8 @@ run_cmd rp1_gpclk_route_journals sh -c "find /var/lib/rp1-gpclk-dkms/route-trans
   echo "DKMS registration and kernel-specific module identity: captured as passive command reports"
   echo "WsprryPi ownership record: bounded identity whitelist; full record contents are not copied"
   echo "Runtime provider readiness: captured through the read-only inspect operation when available"
-  echo "Persisted route: GPIO$(ini_value "$INSTALLED_INI" "GPIO" "Transmit Pin" "unavailable")"
+  saved_transmit_pin=$(diagnostic_value transmit_pin) || saved_transmit_pin="unavailable"
+  if [[ "$saved_transmit_pin" =~ ^[0-9]+$ ]]; then echo "Persisted route: GPIO${saved_transmit_pin}"; else echo "Persisted route: unavailable from backend diagnostics"; fi
   echo "Active route and operation readiness: reported through the runtime provider protocol"
   echo "Qualification: not established by this support bundle"
 } > "${OUT_DIR}/hardware/rp1-gpclk/evidence-summary.txt"

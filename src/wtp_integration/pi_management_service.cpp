@@ -84,7 +84,12 @@ PiLocalManagementService::PolicyInstallation PiLocalManagementService::install_l
         {"capability_revision",PiManagementJournal::digest(canonical_pi_management_json(capabilities(*current)))},
         {"operation_id",WtpPiBootIdentity{}.new_boot_id()},{"expected_revision",saved["revision"]},
         {"expected_authority_generation",authority["generation"]},{"controllers",authority["controllers"]}}};
-    store_.persist_migration(jConfig,[]{},intent,false);
+    // Handover changes scheduling authority, not configuration. Startup-only
+    // listener overrides must neither become saved values nor make the
+    // unchanged authoritative candidate appear to have changed.
+    auto migration_input=jConfig;
+    for(const auto &[section,value]:saved["configuration"].items())migration_input[section]=value;
+    store_.persist_migration(migration_input,[]{},intent,false);
     const auto receipt=store_.replay(intent);
     const auto after=store_.recurrence_authority(),settings=store_.settings();
     if(!receipt||(*receipt)["state"]!="committed"||after["state"]!="staged"||
@@ -458,7 +463,9 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
                 std::optional<Json> job;
                 if(!migration_idle(*current))job=Json{{"controller_id",self_},{"job_id",current->output.job_id.value_or(WtpPiBootIdentity{}.new_boot_id())},
                     {"boot_id",bound["boot_id"]},{"state","accepted"}};
-                auto admission=admit();store_.persist_migration(jConfig,[]{},operation,false,job);
+                auto migration_input=jConfig;
+                for(const auto &[section,value]:saved["configuration"].items())migration_input[section]=value;
+                auto admission=admit();store_.persist_migration(migration_input,[]{},operation,false,job);
                 const auto receipt=store_.replay(operation);if(!receipt)return refuse(503,"recovery_required");
                 return operation_document(*receipt);
             }

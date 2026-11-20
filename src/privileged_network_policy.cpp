@@ -91,6 +91,10 @@ PrivilegedOperationClass classify_privileged_http_operation(
         return PrivilegedOperationClass::reject;
     }
 
+    if (path.starts_with("/api/recovery/"))
+        return method=="GET"||method=="HEAD"||method=="POST"
+            ?PrivilegedOperationClass::protected_operation:PrivilegedOperationClass::reject;
+
     if (path.starts_with("/api/control/v1/")) {
         if((wsprrypi::local_pairing_read_path(path)&&method=="GET")||
             (wsprrypi::local_pairing_mutation_path(path)&&method=="POST"))

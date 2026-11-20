@@ -12,6 +12,8 @@ import struct
 import subprocess
 import tempfile
 import time
+from software_backend_admission import backend_admission
+from software_web_service import start_software_web_service, stop_software_web_service
 
 
 def free_port():
@@ -68,7 +70,7 @@ def websocket_command(connection, command):
 
 def fingerprints(directory):
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in directory.iterdir() if p.is_file() and p.name != "service.log"}
+            for p in directory.iterdir() if p.is_file() and p.name != "service.log" and not p.name.endswith(".web-listeners.json")}
 
 
 def main():
@@ -82,7 +84,7 @@ def main():
     def rejected(command):
         return subprocess.run(command, timeout=5, stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL).returncode
-    with tempfile.TemporaryDirectory(prefix="wsprrypi-controller-") as temporary:
+    with backend_admission(fixture), tempfile.TemporaryDirectory(prefix="wsprrypi-controller-") as temporary:
         directory = Path(temporary)
         launcher = [fixture] + ([str(directory / "fixture-ledger")] if arguments.private_state else [])
         ini = directory / "controller.ini"
@@ -96,19 +98,29 @@ def main():
         ini.write_text(original)
         ini.chmod(0o600)
         base = launcher + ["--controller-only", "-i", str(ini)]
+        migration_number = 0
+        def migration(source):
+            nonlocal migration_number
+            migration_number += 1
+            return launcher + ["--migrate-state", "--controller-only", "--state-directory",
+                               str(directory / ("migration-" + str(migration_number))), "--ini-source", str(source)]
+        source_failure = 2 if arguments.production_main else rejection_exit
+        def source_rejected(source):
+            command = migration(source) if arguments.production_main else launcher + ["--controller-only", "-i", str(source)]
+            return rejected(command)
         # Every actual input read must reject unsafe file kinds/permissions;
         # no preflight check may reopen a different file through the parser.
         unsafe = directory / "unsafe.ini"
         unsafe.symlink_to(ini)
-        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert source_rejected(unsafe) == source_failure
         unsafe.unlink();os.link(ini, unsafe)
-        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert source_rejected(unsafe) == source_failure
         unsafe.unlink();os.mkfifo(unsafe, 0o600)
-        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert source_rejected(unsafe) == source_failure
         unsafe.unlink();unsafe.write_bytes(b"x" * 1048577);unsafe.chmod(0o600)
-        assert rejected(launcher + ["--controller-only", "-i", str(unsafe)]) == rejection_exit
+        assert source_rejected(unsafe) == source_failure
         unsafe.unlink();ini.chmod(0o666)
-        assert rejected(base) == rejection_exit
+        assert source_rejected(ini) == source_failure
         ini.chmod(0o600)
         assert ini.read_text() == original
         for options in (["--backend", "simulated"], ["--test-tone", "20m"],
@@ -127,7 +139,7 @@ def main():
             corrupt.write_text('{"corrupt":true}')
             corrupt.chmod(0o600)
             before = corrupt.read_bytes()
-            assert subprocess.run(base + ["--no-web"], timeout=5).returncode == 1, suffix
+            assert source_rejected(ini) == (2 if arguments.production_main else 1), suffix
             assert corrupt.read_bytes() == before
             corrupt.unlink()
 
@@ -137,10 +149,17 @@ def main():
         corrupt.write_text('{"corrupt":true}')
         corrupt.chmod(0o600)
         before = corrupt.read_bytes()
-        assert subprocess.run(base + ["--no-web"], timeout=5).returncode == 1
+        assert source_rejected(ini) == (2 if arguments.production_main else 1)
         assert corrupt.read_bytes() == before
         corrupt.unlink()
         management.rmdir()
+        if arguments.production_main:
+            command = migration(ini)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+            assert result.returncode == 0, result.stderr
+            base = launcher + ["--controller-only", "--state-directory", command[command.index("--state-directory") + 1]]
+            assert not ini.exists()
+            ini = Path(str(ini) + ".sqlite-migrated")
 
         port = free_port()
         # Reserve the first choice while choosing a distinct second listener.
@@ -150,6 +169,7 @@ def main():
         with (directory / "service.log").open("w") as log:
             process = subprocess.Popen(base + ["--web-port", str(port), "--socket-port", str(socket_port)],
                                        stdout=log, stderr=subprocess.STDOUT)
+            web=start_software_web_service(launcher,directory / "fixture-ledger",log) if arguments.production_main else None
             try:
                 deadline = time.monotonic() + 8
                 while True:
@@ -300,6 +320,7 @@ def main():
                 assert fingerprints(directory) == before
                 assert ini.read_text() == original
             finally:
+                stop_software_web_service(web)
                 process.terminate()
                 try:
                     process.wait(timeout=6)

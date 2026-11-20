@@ -344,51 +344,12 @@ check_log_absent "${auto_paired_log}" "Type1Single"
 check_log_absent "${auto_paired_log}" \
     "Paired WSPR planning explicitly requested."
 
-ini_auto_paired_log="${LOG_DIR}/auto_paired_ini_startup.log"
-ini_auto_paired_file="${LOG_DIR}/auto_paired_startup.ini"
-cat >"${ini_auto_paired_file}" <<'EOF'
-[Meta]
-Mode = WSPR
-
-[Control]
-Transmit = True
-
-[Common]
-Call Sign = W0/AA0NT
-Grid Square = EM18IG
-TX Power = 20
-Frequency = 80m
-Transmit Pin = 4
-
-[Extended]
-PPM = 0.0
-Use NTP = False
-Offset = False
-Use LED = False
-LED Pin = 18
-Power Level = 7
-
-[Server]
-Web Port = 31425
-Socket Port = 31426
-Use Shutdown = False
-Shutdown Button = 19
-
-[Band GPIO]
-80m = -1
-80m Active High = false
-EOF
-
-run_log_check \
-    "INI-backed auto-upgrade to paired WSPR plan works" \
-    "${ini_auto_paired_log}" \
-    "cd '${SRC_ROOT}' && timeout --foreground 5s sudo -n stdbuf -oL -eL ./build/bin/wsprrypi -i '${ini_auto_paired_file}' || true" \
-    "Auto-upgrading to paired WSPR plan because callsign is compound and locator is 6 characters." \
-    "Selected WSPR plan: Type2Type3Paired, frames: 2, paired requested: false, auto-upgraded: true."
-check_log_absent "${ini_auto_paired_log}" \
-    "A direct RF test tone will be generated at:"
-check_log_absent "${ini_auto_paired_log}" \
-    "Paired WSPR planning explicitly requested."
+# The retired INI entry point must refuse before any output or identity work.
+# Saved-state paired planning is covered by the database runtime fixtures.
+check_command_fails \
+    "Retired INI startup is rejected" \
+    "cd '${SRC_ROOT}' && ./build/bin/wsprrypi --ini-file '${LOG_DIR}/retired-input.ini'" \
+    "INI input is available only through --migrate-state --ini-source"
 
 if [[ "${RUN_RF:-0}" != "1" ]]; then
     step "Manual RF checklist"

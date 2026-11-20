@@ -57,13 +57,13 @@ function spawnIsolatedProcess(command, args) {
     return spawnFixtureChild(command, args, { detached: process.platform !== "win32" });
 }
 
-async function stopChild(child) {
+async function stopChild(child, timeoutMs = 2000) {
     if (!child) return;
     const error = children.get(child)?.error;
     if (error && !child.pid) throw error;
     if (exited(child)) return;
     child.kill("SIGTERM");
-    if (await waitForExit(child, 2000)) return;
+    if (await waitForExit(child, timeoutMs)) return;
     child.kill("SIGKILL");
     if (!await waitForExit(child, 2000)) throw new Error(`Fixture child ${child.pid} did not exit`);
 }

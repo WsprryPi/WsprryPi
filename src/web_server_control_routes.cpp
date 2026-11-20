@@ -10,6 +10,7 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "json.hpp"
 #include "config_handler.hpp"
+#include "application_storage/application_state.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/browser_http.hpp"
 #include "wtp_integration/catalog.hpp"
@@ -42,6 +43,7 @@ std::optional<WtpSettings> selected_wtp() {
 
 }
 wsprrypi::WtpCatalog &catalog() {
+    if(wsprrypi::application_database_selected())return wsprrypi::application_catalog();
     // The main-owned host outlives every HTTP worker. Reuse its mutex and
     // atomic anchor owner; a second catalog instance could lose concurrent
     // management history updates even though both name the same file.
@@ -52,15 +54,18 @@ wsprrypi::WtpCatalog &catalog() {
 struct TargetControllerSlot {
     std::mutex mutex;
     std::shared_ptr<wsprrypi::PicoTargetController> production,fixture;
+    wsprrypi::PicoTargetController::Fixtures source_pair_fixtures;
+    bool stopped{};
 };
 TargetControllerSlot &target_controller_slot(){static TargetControllerSlot value;return value;}
 std::shared_ptr<wsprrypi::PicoTargetController> target_controller() {
     auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);
+    if(slot.stopped)throw std::runtime_error("backend_control_owners_stopped");
     if(slot.fixture)return slot.fixture;
     if(!slot.production) {
         const auto identity=controller_only_mode()?controller_only_status().at("device_id").get<std::string>():wsprrypi::wtp_pi_device_id();
         slot.production=std::make_shared<wsprrypi::PicoTargetController>(catalog(),selected_wtp,
-            config.ini_filename+".management",identity,wsprrypi::PicoTargetController::Fixtures{},
+            config.ini_filename+".management",identity,slot.source_pair_fixtures,
             controller_only_mode()?controller_only_process_boot():wsprrypi::pi_managed_host_process_boot());
     }
     return slot.production;
@@ -202,9 +207,22 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
 void wsprrypi::testing::set_pico_target_controller(std::shared_ptr<PicoTargetController> controller) {
     auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);slot.fixture=std::move(controller);
 }
+void wsprrypi::testing::set_pico_management_target_fixtures(PicoTargetController::Fixtures fixtures){
+    auto &slot=target_controller_slot();std::lock_guard lock(slot.mutex);
+    if(fixtures&&slot.production)throw std::logic_error("Source-pair transport must be selected before controller startup");
+    if(!fixtures)slot.production.reset();
+    slot.source_pair_fixtures=std::move(fixtures);
+}
 
 namespace web_server_routes
 {
+void shutdown_backend_control_owners() noexcept{
+    std::shared_ptr<wsprrypi::PicoTargetController> production,fixture;
+    auto &slot=target_controller_slot();
+    {std::lock_guard lock(slot.mutex);slot.stopped=true;
+        production=std::move(slot.production);fixture=std::move(slot.fixture);slot.source_pair_fixtures={};}
+    // Destruction may drain target work; never join it under the registry lock.
+}
 std::shared_ptr<wsprrypi::PiPairMachineBackend> pairing_machine_backend(){
     const auto owner=wsprrypi::pi_pair_owner();
     if(!owner)throw std::runtime_error("pairing_owner_unavailable");
@@ -234,7 +252,6 @@ void register_control(
         response.set_header("Cache-Control", "no-store");
         response.set_content(controller_only_status().dump(), "application/json");
     });
-    wsprrypi::start_wtp_discovery();
     static wsprrypi::WtpBrowserApi api(
         [] { return nlohmann::json::parse(wtp_runtime_json()); },
         wtp_runtime_management,

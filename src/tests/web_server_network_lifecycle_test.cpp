@@ -1,5 +1,6 @@
 #include "../privileged_network_runtime.hpp"
 #include "../web_server.hpp"
+#include "../application_control/backend_services.hpp"
 #include "../httplib.hpp"
 #include "../json.hpp"
 
@@ -134,6 +135,20 @@ public:
         assert(std::chrono::steady_clock::now() - stop_started <
                std::chrono::seconds(2));
         assert(!server.isListening());
+        const auto retained=wsprrypi::backend_support_jobs();
+        server.start(port);
+        const auto restarted_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+        while(!server.isListening()&&std::chrono::steady_clock::now()<restarted_deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        assert(server.isListening());
+        assert(server.supportBundleJobManager_==retained);
+        require_status("",404);
+        server.stop();
+        assert(wsprrypi::backend_support_jobs()==retained);
+        wsprrypi::stop_backend_services();
+        bool refused=false;
+        try{(void)wsprrypi::backend_support_jobs();}catch(const std::exception &){refused=true;}
+        assert(refused); // Backend exit cannot lazily recreate a job owner.
         std::cout << "web_server_network_lifecycle_test: PASS\n";
         return 0;
     }

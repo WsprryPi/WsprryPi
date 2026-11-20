@@ -32,6 +32,27 @@
 #include "si5351_inventory_process.hpp"
 #include "controller_runtime.hpp"
 #include "pi_managed_host_runtime.hpp"
+#include "application_storage/state_entry.hpp"
+#include "application_storage/application_state.hpp"
+#include "application_storage/state_migration.hpp"
+#include "application_storage/route_maintenance.hpp"
+#include "application_control/local_entry.hpp"
+#include "application_control/diagnostic_export.hpp"
+#include "application_control/advanced_runtime.hpp"
+#include "application_control/runtime_options.hpp"
+#include "application_control/backend_services.hpp"
+#include "application_control/browser_sessions.hpp"
+#include "application_control/http_sessions.hpp"
+#include "application_control/http_domain.hpp"
+#include "application_control/web_presence.hpp"
+#include "application_control/web_service.hpp"
+#include "application_recovery/helper_image.hpp"
+#include "application_recovery/backend_entry.hpp"
+#include "application_recovery/maintenance_cli.hpp"
+#include "application_recovery/maintenance_service.hpp"
+#include "web_server.hpp"
+#include "web_socket.hpp"
+#include "wtp_endpoint/identity.hpp"
 #include "web_server_routes.hpp"
 
 // Project headers
@@ -228,6 +249,29 @@ void callback_signal_handler(int signum, bool is_critical)
  */
 int main(int argc, char *argv[])
 {
+    if(const auto result=wsprrypi::recovery_helper_image_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::maintenance_service_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::web_service_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::local_command_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::diagnostic_export_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::recovery_backend_entry(argc,argv))return *result;
+    if(const auto result=wsprrypi::maintenance_cli_main(argc,argv))return *result;
+    if(const auto result=wsprrypi::state_command_main(argc,argv,SINGLETON_PORT))return *result;
+    wsprrypi::BackendStateArguments state_arguments;
+    try{state_arguments=wsprrypi::backend_state_arguments(argc,argv);}
+    catch(const std::exception &error){std::cerr<<error.what()<<'\n';return EXIT_FAILURE;}
+    argc=static_cast<int>(state_arguments.arguments.size())-1;argv=state_arguments.arguments.data();
+    if(state_arguments.runtime_directory&&!state_arguments.directory){
+        std::cerr<<"A backend runtime directory requires --state-directory.\n";return EXIT_FAILURE;
+    }
+    for(int index=1;index<argc;++index){
+        const std::string_view option=argv[index];
+        if(option=="-i"||option=="--ini-file"||option.starts_with("--ini-file=")||
+            (option.starts_with("-i")&&!option.starts_with("--"))){
+            std::cerr<<"INI input is available only through --migrate-state --ini-source; use --state-directory for saved settings.\n";
+            return EXIT_FAILURE;
+        }
+    }
     const bool controller_only = controller_only_requested(argc, argv);
     // Role parsing must precede even diagnostic helpers: mixed invocations
     // cannot use an early hardware-inventory exit to evade role validation.
@@ -327,7 +371,7 @@ int main(int argc, char *argv[])
     else {
         for (int i = 1; i < argc; ++i)
             if (std::string_view(argv[i]) == "--help" || std::string_view(argv[i]) == "-h")
-                print_usage("Controller-only mode has no local transmitter; use -i <file> for controller state.", EXIT_SUCCESS);
+                print_usage("Controller-only mode has no local transmitter; use --state-directory <directory> for controller state.", EXIT_SUCCESS);
     }
 
     // Preserve the pre-parse privilege boundary for every executable capable
@@ -349,21 +393,67 @@ int main(int argc, char *argv[])
 
     // Keep the managed owner alive until the scheduling loop has stopped all
     // workers. Recover durable input before the component first opens the INI.
+    std::unique_ptr<wsprrypi::ApplicationStateSelection> selected_state;
     std::shared_ptr<wsprrypi::PiManagedHost> managed_host;
+    struct BackendControlLifetime {
+        ~BackendControlLifetime(){web_server_routes::shutdown_backend_control_owners();}
+    } backend_control_lifetime;
+    std::unique_ptr<wsprrypi::LocalControlServer> control_server;
+    std::unique_ptr<wsprrypi::LocalControlServer> event_server;
+    std::unique_ptr<wsprrypi::LocalControlServer> browser_server;
+    std::unique_ptr<wsprrypi::LocalControlServer> http_server;
+    std::unique_ptr<wsprrypi::LocalControlServer> web_presence_server;
+    wsprrypi::BackendRequestDrain request_drain([&]{
+        if(web_presence_server)web_presence_server->stop();
+        if(http_server)http_server->stop();
+        wsprrypi::stop_backend_http_domain();
+        if(browser_server)browser_server->stop();
+        if(event_server)event_server->stop();
+        if(control_server)control_server->stop();
+    });
     // Now do the full arguments check
     try
     {
+        if(state_arguments.directory){
+            auto database=wsprrypi::open_application_state(*state_arguments.directory,wsprrypi::wtp_pi_device_id(),
+                controller_only?wsprrypi::StateRole::Controller:wsprrypi::StateRole::Pi);
+            selected_state=std::make_unique<wsprrypi::ApplicationStateSelection>(database);
+            if(wsprrypi::pi_managed_ini_argument(argc,argv))throw std::invalid_argument("Use --ini-source only with the explicit one-time migration command");
+        }
+        if(controller_only&&!selected_state)
+            throw std::invalid_argument("Controller startup requires --state-directory");
         if (controller_only)
         {
             configure_controller_only(argc, argv);
         }
         else
         {
-            if(const auto ini=wsprrypi::pi_managed_ini_argument(argc,argv))
-                managed_host=wsprrypi::prepare_pi_managed_host(*ini);
+            if(wsprrypi::application_database_selected())
+                managed_host=wsprrypi::prepare_pi_managed_host(wsprrypi::application_database());
             if(!parse_command_line(argc, argv))
                 print_usage("Failure parsing command line.", EXIT_FAILURE);
             if(managed_host)managed_host->parsed();
+        }
+        if(selected_state){
+            const auto database=wsprrypi::application_database();
+            const auto boot=controller_only?prepare_controller_process_boot():wsprrypi::pi_managed_host_process_boot();
+            wsprrypi::prepare_backend_web_bootstrap(database,boot);
+            const auto handler=[database,boot](wsprrypi::LocalPeer peer,const wsprrypi::LocalRequest &request){
+                return wsprrypi::backend_local_request(database,peer,request,boot);
+            };
+            auto options=wsprrypi::backend_control_options(state_arguments.runtime_directory);
+            control_server=std::make_unique<wsprrypi::LocalControlServer>(options,boot,handler);
+            options.channel=wsprrypi::LocalChannel::Events;
+            event_server=std::make_unique<wsprrypi::LocalControlServer>(options,boot,handler);
+            options.channel=wsprrypi::LocalChannel::Browser;
+            browser_server=std::make_unique<wsprrypi::LocalControlServer>(options,boot,handler,
+                [](wsprrypi::LocalPeer,const std::string &connection){wsprrypi::backend_browser_disconnected(connection);});
+            options.channel=wsprrypi::LocalChannel::Http;
+            http_server=std::make_unique<wsprrypi::LocalControlServer>(options,boot,handler,
+                [](wsprrypi::LocalPeer,const std::string &connection){wsprrypi::backend_http_disconnected(connection);});
+            options.channel=wsprrypi::LocalChannel::WebService;
+            web_presence_server=std::make_unique<wsprrypi::LocalControlServer>(options,boot,handler,
+                [](wsprrypi::LocalPeer,const std::string &connection){wsprrypi::backend_web_disconnected(connection);});
         }
     }
     catch (const std::exception &e)
@@ -427,6 +517,15 @@ int main(int argc, char *argv[])
     // Startup WSPR loop
     try
     {
+        if(control_server){
+            wsprrypi::start_backend_services(config.web_port,webServer.loopback_fixture());
+            socketServer.start_command_runtime(config.socket_loopback_only);
+            control_server->start();
+            event_server->start();
+            browser_server->start();
+            http_server->start();
+            web_presence_server->start();
+        }
         if (!wspr_loop())
         {
             retval = EXIT_FAILURE;
@@ -443,6 +542,14 @@ int main(int argc, char *argv[])
         retval = EXIT_FAILURE;
     }
 
+    if(web_presence_server)web_presence_server->stop();
+    if(http_server)http_server->stop();
+    wsprrypi::stop_backend_http_domain();
+    if(browser_server)browser_server->stop();
+    socketServer.stop_command_runtime();
+    if(event_server)event_server->stop();
+    if(control_server)control_server->stop();
+    wsprrypi::stop_backend_services();
     web_server_routes::retire_control_management();
     // Stop the SignalHandler.
     signalHandler.stop();

@@ -3,6 +3,12 @@
 // spot-proxy or journal handlers, and never allow direct-port fallback.
 $root = realpath(__DIR__ . '/../data');
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$prefixed = getenv('WSPRRYPI_UI_FIXTURE_PREFIX') === '/wsprrypi' && str_starts_with($path, '/wsprrypi/');
+if ($prefixed) {
+    $path = substr($path, strlen('/wsprrypi'));
+    $_SERVER['SCRIPT_NAME'] = '/wsprrypi' . $path;
+    $_SERVER['PHP_SELF'] = $_SERVER['SCRIPT_NAME'];
+}
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'none'; frame-src 'none'");
 // Optional native-host fixture: production templates/scripts, synthetic host data.
 if (getenv('WSPRRYPI_NATIVE_HOST_FIXTURE') === '1') {
@@ -39,6 +45,17 @@ $static = ['css', 'js', 'ttf', 'woff2', 'png', 'ico', 'webmanifest'];
 if ($path === '/' || ($file && str_starts_with($file, $root . '/') &&
     (in_array(ltrim($path, '/'), $pages, true) ||
      in_array(pathinfo($file, PATHINFO_EXTENSION), $static, true)))) {
+    if ($prefixed && $file) {
+        if (in_array(ltrim($path, '/'), $pages, true)) {
+            chdir($root);
+            require $file;
+        } else {
+            $types = ['css' => 'text/css', 'js' => 'application/javascript', 'woff2' => 'font/woff2', 'ttf' => 'font/ttf', 'png' => 'image/png', 'ico' => 'image/x-icon', 'webmanifest' => 'application/manifest+json'];
+            header('Content-Type: ' . $types[pathinfo($file, PATHINFO_EXTENSION)]);
+            readfile($file);
+        }
+        return true;
+    }
     return false;
 }
 http_response_code(503);

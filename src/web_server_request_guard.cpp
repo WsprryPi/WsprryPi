@@ -4,6 +4,7 @@
  */
 
 #include "web_server_routes.hpp"
+#include "application_recovery/restore_hold.hpp"
 
 #include "backend_http_guard.hpp"
 #include "httplib.hpp"
@@ -32,6 +33,10 @@ void register_request_guard(
         [network_snapshot_provider](
             const httplib::Request &request,
             httplib::Response &response) {
+            if(wsprrypi::restore_maintenance_active()&&request.method!="GET"&&request.method!="HEAD"&&request.method!="OPTIONS"&&request.path!="/control/stop"){
+                response.status=409;response.set_content(R"({"error":{"code":"restore_maintenance","message":"A confirmed restore is holding application changes."}})","application/json");
+                return httplib::Server::HandlerResponse::Handled;
+            }
             const std::optional<std::string> origin =
                 request.has_header("Origin")
                 ? std::optional<std::string>(

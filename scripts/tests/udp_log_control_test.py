@@ -99,4 +99,19 @@ class Lifecycle(unittest.TestCase):
 
     def test_systemd_argument_escaping(self):
         self.assertEqual(control.quoted('/a $b %c "d"'),r'"/a $$b %%c \"d\""')
+
+    def test_worker_reads_only_exported_policy_outside_private_state(self):
+        self.run_control('install')
+        value=defaults()
+        Path(str(self.ini)+'.udp-logs.json').write_text(json.dumps(value))
+        self.run_control('configure')
+        exported=self.root/'var/lib/wsprrypi-logging/policy.json'
+        self.assertEqual(json.loads(exported.read_text()),value)
+        self.assertEqual(exported.stat().st_mode&0o777,0o640)
+        self.assertEqual(exported.parent.stat().st_mode&0o777,0o750)
+        unit=(self.root/'etc/systemd/system/wsprrypi-log.service').read_text()
+        self.assertIn('--policy "/var/lib/wsprrypi-logging/policy.json"',unit)
+        self.assertNotIn(str(self.ini),unit)
+        self.run_control('remove')
+        self.assertFalse(exported.exists())
 if __name__=='__main__':unittest.main()

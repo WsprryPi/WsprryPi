@@ -18,6 +18,11 @@
 
 namespace wsprrypi {
 namespace {
+nlohmann::json empty_catalog() {
+  return {{"version",2},{"generation","1"},{"profiles",nlohmann::json::array()},
+      {"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},
+      {"pi_management_history",nullptr},{"remote_management",nlohmann::json::object()}};
+}
 bool identity(const std::string &id) {
   return id.size() == 32 && std::all_of(id.begin(), id.end(), [](char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
@@ -130,9 +135,32 @@ std::string catalog_storage_bytes(const nlohmann::json &value) {
   const auto bytes=sealed.dump(2)+"\n";if(bytes.size()>262144)throw std::runtime_error("WTP catalog exceeds size limit");
   return bytes;
 }
+void database_catalog(nlohmann::json &value){
+  value["version"]=3;
+  for(auto &row:value.at("profiles"))row["settings"]=management_profile_settings_json(parse(row).settings);
 }
-void WtpCatalog::save(const nlohmann::json &value) {
+}
+WtpCatalog::WtpCatalog(CatalogStorage storage) : storage_(std::move(storage)) {
+  if(!storage_->read || !storage_->publish)throw std::invalid_argument("Complete catalog storage required");
+}
+std::string WtpCatalog::initial_storage_image() {
+  auto value=empty_catalog();database_catalog(value);return catalog_storage_bytes(value);
+}
+std::string WtpCatalog::database_import_image(const std::string &source){
+  auto value=parse_storage_image(source,false);database_catalog(value);return catalog_storage_bytes(value);
+}
+std::string WtpCatalog::current_storage_image() {
+  std::lock_guard lock(mutex_);
+  return catalog_storage_bytes(load({},nullptr,false));
+}
+void WtpCatalog::save(nlohmann::json &value) {
+  if(storage_)database_catalog(value);
   const auto bytes=catalog_storage_bytes(value);
+  if(storage_){
+    storage_->publish(observed_storage_,bytes);
+    observed_storage_=bytes;
+    return;
+  }
   const auto temp = path_ + ".tmp." + local_id();
   const int fd = ::open(temp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0) throw std::runtime_error("Could not create WTP catalog");
@@ -155,13 +183,21 @@ void WtpCatalog::save(const nlohmann::json &value) {
     ::unlink(temp.c_str()); throw;
   }
 }
-nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::string *source_bytes) {
-  const int fd=::open(path_.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
-  if(fd<0) {
+nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::string *source_bytes,bool initialize_missing) {
+  std::string bytes;
+  if(storage_){
+    if(active)throw std::runtime_error("Database catalog cannot infer an active connection");
+    const auto saved=storage_->read();
+    if(!saved)throw std::runtime_error("Established catalog is missing");
+    if(saved->size()>262144)throw std::runtime_error("Catalog exceeds size limit");
+    bytes=*saved;
+  }else{
+   const int fd=::open(path_.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
+   if(fd<0) {
     if(errno!=ENOENT)throw std::runtime_error("WTP catalog is unreadable");
+    if(!initialize_missing)throw std::runtime_error("Import catalog is missing");
     guard_missing_management_catalog(path_);
-    nlohmann::json fresh={{"version",2},{"generation","1"},{"profiles",nlohmann::json::array()},
-        {"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr},{"remote_management",nlohmann::json::object()}};
+    nlohmann::json fresh=empty_catalog();
     if(active) {
       WtpCatalogProfile legacy{local_id(),"Current WTP device","manual","",*active,active->device_id.empty()};
       fresh["profiles"].push_back(serialize(legacy));
@@ -173,11 +209,19 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
   if(::fstat(fd,&information)||!S_ISREG(information.st_mode)||information.st_nlink!=1||
       (information.st_mode&0077)||information.st_uid!=::geteuid()||information.st_size<0||information.st_size>262144)
     throw std::runtime_error("WTP catalog must be a bounded private regular host-owned file");
-  std::string bytes;char block[4096];
+  char block[4096];
   for(;;){const auto n=::read(fd,block,sizeof(block));if(n<0&&errno==EINTR)continue;
     if(n<0)throw std::runtime_error("WTP catalog is unreadable");
     if(!n)break;
     bytes.append(block,static_cast<std::size_t>(n));if(bytes.size()>262144)throw std::runtime_error("WTP catalog exceeds size limit");}
+  }
+  auto value=parse_storage_image(bytes,bool(storage_));
+  if(source_bytes)*source_bytes=bytes;
+  if(storage_)observed_storage_=bytes;
+  return value;
+}
+nlohmann::json WtpCatalog::parse_storage_image(const std::string &bytes,bool database_format){
+  if(bytes.size()>262144)throw std::runtime_error("Catalog exceeds size limit");
   std::vector<std::set<std::string>> objects;
   auto value=nlohmann::json::parse(bytes,[&](int depth,nlohmann::json::parse_event_t event,nlohmann::json &v){
     if(depth>16)throw std::runtime_error("WTP catalog nesting limit");
@@ -189,7 +233,8 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
   if(!value.is_object()||!value.contains("version")||!value["version"].is_number_integer()||
       !value.contains("profiles")||!value["profiles"].is_array()||value["profiles"].size()>64)
     throw std::runtime_error("Unsupported WTP catalog version or size");
-  if(value["version"]==1) {
+  if(database_format && value["version"]!=3)throw std::runtime_error("Unsupported database catalog version");
+  if(!database_format && value["version"]==1) {
     // One legacy-storage migration, never a second public control view. Reads
     // preserve the old file; the next explicit mutation writes current storage.
     if(value.size()!=2)throw std::runtime_error("Invalid legacy catalog");
@@ -198,7 +243,7 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     value={{"version",2},{"generation",std::to_string(std::max<std::uint64_t>(1,index))},
         {"profiles",rows},{"management_history",nlohmann::json::object()},{"management_retired",nlohmann::json::object()},{"pi_management_history",nullptr},{"remote_management",nlohmann::json::object()}};
   } else {
-    if(value["version"]!=2||(value.size()!=7&&value.size()!=8)||
+    if(value["version"]!=(database_format?3:2)||(value.size()!=7&&value.size()!=8)||
         (value.size()==8&&!value.contains("remote_management"))||!value.contains("generation")||!generation(value["generation"])||
         !value.contains("management_history")||!value["management_history"].is_object()||value["management_history"].size()>96||
         !value.contains("management_retired")||!value["management_retired"].is_object()||
@@ -231,13 +276,13 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
   std::set<std::string> ids;std::vector<WtpSettings> settings;
   const auto counter=value["generation"].get<std::string>();
   for(const auto &item:value["profiles"]) {
+    if(database_format)(void)parse_management_profile_settings(item.at("settings"),true);
     const auto p=parse(item);
     if(p.generation.size()>counter.size()||(p.generation.size()==counter.size()&&p.generation>counter)||
         !ids.insert(p.id).second||std::find(settings.begin(),settings.end(),p.settings)!=settings.end())
       throw std::runtime_error("Invalid profile generation or duplicate catalog identity");
     settings.push_back(p.settings);
   }
-  if(source_bytes)*source_bytes=bytes;
   return value;
 }
 std::pair<nlohmann::json, std::string> WtpCatalog::snapshot(
@@ -334,7 +379,7 @@ PicoManagementHistoryAuthority WtpCatalog::management_history_authority(
   PicoManagementHistoryAuthority authority;
   authority.read=[this,active]{
     std::lock_guard lock(mutex_);PicoManagementHistoryView view;struct stat information{};
-    if(::lstat(path_.c_str(),&information)){
+    if(!storage_&&::lstat(path_.c_str(),&information)){
       if(errno==ENOENT)return view;
       throw std::runtime_error("Management catalog is unreadable");
     }
@@ -412,7 +457,12 @@ PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
   };
   PiManagementAnchor authority;
   authority.read=[this,active,epoch]{
-    std::lock_guard lock(mutex_);struct stat information{};
+    std::lock_guard lock(mutex_);
+    if(storage_){
+      if(!storage_->read())return std::optional<std::string>{};
+      return epoch(load(active));
+    }
+    struct stat information{};
     if(::lstat(path_.c_str(),&information)){
       if(errno==ENOENT)return std::optional<std::string>{};
       throw std::runtime_error("Pi management catalog is unreadable");
@@ -434,8 +484,10 @@ PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
     }
     const std::string after=changed?catalog_storage_bytes(value):before;
     commit(before,after);
-    struct stat published{};
-    if(::lstat(path_.c_str(),&published))throw std::runtime_error("Pi management catalog disappeared during commit");
+    if(!storage_){
+      struct stat published{};
+      if(::lstat(path_.c_str(),&published))throw std::runtime_error("Pi management catalog disappeared during commit");
+    }
     std::string committed;const auto observed=load(active,&committed);
     if(epoch(observed)!=std::optional<std::string>(history)||committed!=after)
       throw std::runtime_error("Pi management history transaction was not committed");

@@ -1,5 +1,7 @@
+#include "application_recovery/restore_hold.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_managed_host.hpp"
+#include "application_storage/application_state.hpp"
 #include "config_handler.hpp"
 #include "wtp_integration/pi_pair_history.hpp"
 #include "scheduling.hpp"
@@ -10,6 +12,11 @@ PiManagedHost::PiManagedHost(std::string ini,std::string self,std::string boot,
     PiLocalManagementService::Observe observe,std::function<void(PiPairInitializationProof)> pairing)
     :owner_(ini,self,std::move(pairing)),recovery_(owner_,self,std::move(boot),[this]{return state();}),
      management_(owner_.store(),self,"This device",std::move(observe)),ini_(std::move(ini)){}
+PiManagedHost::PiManagedHost(std::shared_ptr<SqliteStateStore> database,std::string boot,
+    PiLocalManagementService::Observe observe,std::function<void(PiPairInitializationProof)> pairing)
+    :owner_(database,std::move(pairing)),recovery_(owner_,database->identity(),std::move(boot),[this]{return state();}),
+     management_(owner_.store(),database->identity(),"This device",std::move(observe)),
+     ini_(application_configuration_namespace()){}
 void PiManagedHost::prepare(){
     if(prepared_)throw std::logic_error("host_already_prepared");
     prepared_=true;
@@ -62,7 +69,8 @@ bool PiManagedHost::retry_saved_configuration(){
         if(!tone.owns_lock()){signal_saved_configuration();return false;}
         std::unique_lock lock(config_update_mutex(),std::try_to_lock);
         if(!lock.owns_lock()){signal_saved_configuration();return false;}
-        if(state()!=PiHostReadiness::ConfigurationRecovery||iniFile.hasPendingChanges())return false;
+        if(state()!=PiHostReadiness::ConfigurationRecovery||
+            (!application_database_selected()&&iniFile.hasPendingChanges()))return false;
         const auto revision=owner_.store().recovery_revision();
         if(revision==last_attempt_)return false;
         last_attempt_=revision;
@@ -108,6 +116,7 @@ PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,bool au
 nlohmann::json PiManagedHost::target(){return management_.target();}
 PicoHttpResponse PiManagedHost::management(const BrowserRequest &request,const PiPairPrincipal &principal,PiPairHistory &history,std::string *readback_revision){
     if(readback_revision)readback_revision->clear();
+    if(request.method!="GET"&&restored_remote_authority_held())return controller_target_error(503,"recovery_required");
     const auto receipts="/api/control/v1/targets/"+device_id()+"/operations/";
     if(state()!=PiHostReadiness::Ready&&!(request.method=="GET"&&request.path.starts_with(receipts)))
         return controller_target_error(503,"authority_pending");

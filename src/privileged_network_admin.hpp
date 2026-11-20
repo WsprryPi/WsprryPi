@@ -22,12 +22,22 @@ struct PrivilegedNetworkIniIO {
     std::function<std::optional<std::string>(const std::string &)> read;
     std::function<bool(const std::string &,const std::string &,const std::string &)> write;
 };
+struct PrivilegedNetworkSavedSetting {
+    PrivilegedNetworkMode mode;
+    std::string revision;
+};
+struct PrivilegedNetworkSettingsIO {
+    std::function<std::optional<PrivilegedNetworkSavedSetting>()> read;
+    std::function<std::optional<std::string>(const std::string &,PrivilegedNetworkMode)> write;
+};
 
 [[nodiscard]] std::optional<std::string> read_text_file(
     const std::string &path);
 [[nodiscard]] std::optional<std::string> render_privileged_network_ini(
     const std::string &existing, const std::string &value);
 [[nodiscard]] std::optional<std::string> read_privileged_network_ini_value(
+    const std::string &contents);
+[[nodiscard]] PrivilegedNetworkModeParseResult parse_privileged_network_ini_mode(
     const std::string &contents);
 [[nodiscard]] bool write_text_file_atomically(
     const std::string &path, const std::string &contents);
@@ -39,7 +49,8 @@ public:
     explicit PrivilegedNetworkAdmin(
         PrivilegedNetworkAdminPaths paths,
         PrivilegedNetworkCommandRunner runner = run_privileged_network_command,
-        PrivilegedNetworkIniIO ini_io = {});
+        PrivilegedNetworkIniIO ini_io = {},
+        PrivilegedNetworkSettingsIO settings_io = {});
 
     [[nodiscard]] PrivilegedNetworkTransactionSnapshot status();
     [[nodiscard]] PrivilegedNetworkTransactionResult apply(
@@ -54,5 +65,6 @@ private:
     PrivilegedNetworkAdminPaths paths_;
     PrivilegedNetworkCommandRunner runner_;
     PrivilegedNetworkIniIO ini_io_;
+    PrivilegedNetworkSettingsIO settings_io_;
     mutable std::mutex mutex_;
 };

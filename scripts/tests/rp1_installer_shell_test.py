@@ -758,8 +758,10 @@ manage_apache() { record_step manage_apache; }
 manage_web() { record_step manage_web; }
 manage_service() { record_step manage_service; }
 manage_udp_logging() { record_step manage_udp_logging; }
+manage_browser_service() { record_step manage_browser_service; }
+manage_maintenance_service() { record_step manage_maintenance_service; }
 manage_i2c() { record_step manage_i2c; }
-manage_config() { record_step manage_config; }
+manage_application_state() { record_step manage_application_state; }
 manage_route_application() { record_step manage_route_application; }
 remove_application_ownership() { record_step remove_application_ownership; }
 manage_support_bundle_runtime() { record_step manage_support_bundle_runtime; }
@@ -802,14 +804,14 @@ printf 'return_status=%s\n' "$status" >>"$CAPTURE"
 
     def test_provider_removal_precedes_teardown_and_later_failures_fail_uninstall(self):
         expected_teardown = {
-            "manage_apache", "manage_web", "manage_service", "manage_udp_logging", "manage_i2c",
-            "manage_config", "manage_route_application",
+            "manage_apache", "manage_web", "manage_browser_service", "manage_service", "manage_udp_logging", "manage_i2c",
+            "manage_application_state", "manage_maintenance_service", "manage_route_application",
             "manage_support_bundle_runtime", "manage_pico_usb_runtime",
             "manage_exe", "manage_sound",
             "flag_need_reboot", "prepare_owned_rp1_gpclk_runtime_removal",
         }
         for failing_step in (
-            "manage_service", "manage_udp_logging", "manage_route_application", "manage_pico_usb_runtime", "manage_exe",
+            "manage_browser_service", "manage_service", "manage_udp_logging", "manage_route_application", "manage_pico_usb_runtime", "manage_exe",
         ):
             with self.subTest(failing_step=failing_step):
                 lines, stdout = self.run_uninstall_orchestration(failing_step)
@@ -829,7 +831,8 @@ printf 'return_status=%s\n' "$status" >>"$CAPTURE"
         provider = lines.index("remove_owned_rp1_gpclk_dkms_provider")
         self.assertGreater(provider, lines.index("prepare_owned_rp1_gpclk_runtime_removal"))
         self.assertLess(provider, lines.index("manage_udp_logging"))
-        self.assertLess(lines.index("manage_udp_logging"), lines.index("manage_service"))
+        self.assertLess(lines.index("manage_browser_service"), lines.index("manage_service"))
+        self.assertLess(lines.index("manage_service"), lines.index("manage_udp_logging"))
         self.assertLess(provider, lines.index("manage_service"))
         self.assertLess(provider, lines.index("manage_exe"))
         self.assertIn("finish_status=0", lines)

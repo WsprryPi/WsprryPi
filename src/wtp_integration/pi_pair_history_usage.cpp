@@ -127,7 +127,7 @@ std::optional<PiPairMutationGuard> PiPairHistory::admit_mutation(const PiPairPri
 std::optional<PiPairMutationGuard> PiPairHistory::admit_outgoing_mutation(const std::string &profile,const std::string &generation,
     const PiPairPrincipal &principal,bool checkpoint_counters){
     try{
-        PiPairPolicyAdmission policy;require(policy.allowed());std::unique_lock history(mutex_,std::try_to_lock);require(history.owns_lock()&&running_marked_&&service_permits());
+        PiPairPolicyAdmission policy;require(policy.allowed()&&!restored_remote_authority_held());std::unique_lock history(mutex_,std::try_to_lock);require(history.owns_lock()&&running_marked_&&service_permits());
         require(principal.self_id()==self_&&principal.identity().purpose==PiPairTlsPurpose::Management);verify_selection();const auto state=store_->snapshot();
         const auto peers=parse_pi_pair_peers(state.peers->bytes,self_);bool matched=false;
         for(const auto &row:peers["profiles"])if(row["profile_id"]==profile&&row["profile_generation"]==generation&&row["stage"]=="active"&&

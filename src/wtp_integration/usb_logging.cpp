@@ -134,9 +134,9 @@ struct Source {
 };
 class Collector {
 public:
-  explicit Collector(std::string ini, std::string self = wtp_pi_device_id(), bool allow_devices = true)
+  explicit Collector(std::string ini, std::string self = wtp_pi_device_id(), bool allow_devices = true,UsbLoggingCatalogSnapshot catalog = {})
       : ini_(std::move(ini)), path_(ini_ + ".usb-logs.json"),
-        self_(std::move(self)), allow_devices_(allow_devices) {
+        self_(std::move(self)), allow_devices_(allow_devices),catalog_(std::move(catalog)) {
     reload();
     thread_ = std::thread([this] { run(); });
   }
@@ -160,8 +160,7 @@ public:
         throw std::runtime_error("logging_collector_changed");
       // Verify every identity against the saved Fleet catalog. Discovery
       // alone never enrolls or retargets a collector source.
-      WtpCatalog catalog(ini_ + ".wtp-devices.json");
-      const auto profiles = catalog.snapshot({}).first;
+      const auto profiles = catalog_snapshot();
       for (const auto &item : input.at("sources")) {
         bool found = false;
         for (const auto &profile : profiles.at("profiles"))
@@ -191,8 +190,7 @@ public:
     result["status"] = status_;
     result["journal_available"] = bool(LIB_JOURNALD);
     result["candidates"] = Json::array();
-    WtpCatalog catalog(ini_ + ".wtp-devices.json");
-    const auto known = catalog.snapshot({}).first;
+    const auto known = catalog_snapshot();
     for (const auto &profile : known.at("profiles")) {
       const auto settings = parse_wtp_settings(profile.at("settings"), true);
       if (settings.transport == "usb" && identity(settings.device_id))
@@ -211,6 +209,12 @@ public:
   }
 
 private:
+  Json catalog_snapshot() const {
+    if(catalog_)return catalog_();
+    WtpCatalog catalog(ini_+".wtp-devices.json");
+    return catalog.snapshot({}).first;
+  }
+public:
   static void validate(const Json &value) {
     if (!value.is_object() || value.size() != 3 ||
         value.at("schema") != "host-usb-logging/1" ||
@@ -230,6 +234,7 @@ private:
           !ids.insert(source.at("device_id").get<std::string>()).second)
         throw std::runtime_error("invalid_logging_source");
   }
+private:
   void reload() {
     Json loaded = {{"contract","Wsprry-Control/1"},{"schema", "host-usb-logging/1"},
                    {"collector_id", self_},
@@ -464,8 +469,7 @@ private:
         }
         const auto now = millis();
         if (now >= scan) {
-          WtpCatalog catalog(ini_ + ".wtp-devices.json");
-          profiles = catalog.snapshot({}).first.at("profiles");
+          profiles = catalog_snapshot().at("profiles");
           scan = now + 5000;
         }
         Json status = Json::object();
@@ -525,6 +529,7 @@ private:
   }
   std::string ini_, path_, self_;
   const bool allow_devices_;
+  UsbLoggingCatalogSnapshot catalog_;
   Json saved_ = {{"contract","Wsprry-Control/1"},{"schema", "host-usb-logging/1"},
                  {"collector_id", self_},
                  {"sources", Json::array()}};
@@ -537,6 +542,11 @@ private:
 std::mutex manager_mutex;
 std::shared_ptr<Collector> manager;
 } // namespace
+void validate_saved_usb_logging_policy(const std::string &bytes,const std::string &collector_id){
+  if(bytes.size()>4096)throw std::runtime_error("logging_settings_too_large");
+  const auto policy=strict_json(bytes);Collector::validate(policy);
+  if(policy.at("collector_id")!=collector_id)throw std::runtime_error("logging_collector_changed");
+}
 Json usb_logging_attached_sources(const Json &discovery) {
   Json result = Json::array();
   if (discovery.value("scope",Json(nullptr))!="pico-management-usb/1" || !discovery.value("available", false)) return result;
@@ -662,11 +672,11 @@ Json parse_usb_log(const std::string &line, const std::string &device,
     throw std::runtime_error("log_timestamp_mismatch");
   return value;
 }
-void start_usb_logging(const std::string &ini) {
+void start_usb_logging(const std::string &ini,UsbLoggingCatalogSnapshot catalog) {
   if (const auto *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
       disabled && std::string(disabled) == "1")
     return;
-  auto candidate = std::make_shared<Collector>(ini);
+  auto candidate = std::make_shared<Collector>(ini,wtp_pi_device_id(),true,std::move(catalog));
   std::shared_ptr<Collector> old;
   {
     std::lock_guard lock(manager_mutex);
@@ -674,8 +684,8 @@ void start_usb_logging(const std::string &ini) {
     manager = std::move(candidate);
   }
 }
-void testing::start_usb_logging_policy(const std::string &ini, const std::string &machine_id_path) {
-  auto candidate = std::make_shared<Collector>(ini, wtp_pi_device_id(machine_id_path), false);
+void testing::start_usb_logging_policy(const std::string &ini, const std::string &machine_id_path,UsbLoggingCatalogSnapshot catalog) {
+  auto candidate = std::make_shared<Collector>(ini, wtp_pi_device_id(machine_id_path), false,std::move(catalog));
   std::shared_ptr<Collector> old;
   {
     std::lock_guard lock(manager_mutex);

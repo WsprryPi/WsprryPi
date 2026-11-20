@@ -93,10 +93,11 @@ jobs:
 
       - name: Select OpenSSL 4 development and fixture tools
         run: |
-          brew install openssl@4
+          brew install openssl@4 sqlite
           macos_openssl_prefix=$(brew --prefix openssl@4)
+          macos_sqlite_prefix=$(brew --prefix sqlite)
           echo "${macos_openssl_prefix}/bin" >> "$GITHUB_PATH"
-          echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig:${macos_sqlite_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
           "${macos_openssl_prefix}/bin/openssl" version
 
       - name: Check bounded USB logging parser and policy
@@ -111,6 +112,10 @@ jobs:
           make controller-only-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-target-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-journal-test pico-management-history-test pico-target-controller-test controller-contract-test pico-usb-settings-test pi-config-persistence-coordinator-test pi-management-anchor-test pi-management-journal-test pi-managed-records-test pi-managed-store-test pi-management-service-test pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test pi-private-network-persistence-test pi-managed-wtp-main-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Run bounded recovery role, relocation, and restart matrix
+        working-directory: src
+        run: make recovery-integration-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Run TLS adapter and certificate regressions
         working-directory: src
@@ -152,8 +157,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Select OpenSSL development libraries
         run: |
-          brew install openssl@4
-          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@4)/lib/pkgconfig" >> "$GITHUB_ENV"
+          brew install openssl@4 sqlite
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@4)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: Build the explicit native physical profile without opening hardware
         run: make -j2 -C src release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
       - name: Exercise transport selection and scripted HID failures
@@ -191,7 +196,7 @@ jobs:
         run: |
           sudo sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
-          sudo apt-get install -y libssl-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
+          sudo apt-get install -y libssl-dev libsqlite3-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
@@ -307,6 +312,8 @@ jobs:
           make --version
           pkg-config --modversion openssl
           pkg-config --cflags --libs openssl
+          pkg-config --modversion sqlite3
+          pkg-config --cflags --libs sqlite3
       - name: Require immutable Pico selection
         env:
           PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
@@ -355,7 +362,7 @@ jobs:
           sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           apt-get -o Acquire::https::CaInfo=/runner-ca-certificates.crt update
           DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::https::CaInfo=/runner-ca-certificates.crt install -y --no-install-recommends \
-            build-essential ca-certificates git libssl-dev libavahi-client-dev libsystemd-dev pkg-config \
+            build-essential ca-certificates git libssl-dev libsqlite3-dev libavahi-client-dev libsystemd-dev pkg-config \
             python3 strace
 
       - name: Check out source
@@ -390,7 +397,7 @@ jobs:
           sudo sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential git libgpiod-dev libssl-dev libavahi-client-dev libsystemd-dev pkg-config python3
+            build-essential git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev libsystemd-dev pkg-config python3
 
       - name: Check out source
         uses: actions/checkout@v7
@@ -441,7 +448,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libavahi-client-dev \
+            age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
             libsystemd-dev nodejs npm php-cli pkg-config python3 shellcheck strace
 
       - name: Check out source
@@ -513,6 +520,7 @@ jobs:
         working-directory: WsprryPi-UI
         run: |
           npm run test:browser
+          make -C ../src -j1 recovery-maintenance-browser-test recovery-maintenance-controller-browser-test SUDO=
           make -C ../src controller-only-test pico-management-target-test SUDO=
           WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/controller_only_fixture" node tests/controller_mode_browser_test.js
 

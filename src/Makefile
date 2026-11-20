@@ -47,6 +47,8 @@ HAVE_JOURNALD  := 0
 
 OPENSSL_CFLAGS := $(strip $(shell pkg-config --cflags openssl 2>/dev/null))
 OPENSSL_LIBS   := $(strip $(shell pkg-config --libs openssl 2>/dev/null))
+SQLITE_CFLAGS := $(strip $(shell pkg-config --cflags sqlite3 2>/dev/null))
+SQLITE_LIBS := $(or $(strip $(shell pkg-config --libs sqlite3 2>/dev/null)),-lsqlite3)
 AVAHI_AVAILABLE := $(shell pkg-config --exists avahi-client && echo 1)
 AVAHI_CFLAGS := $(if $(filter Linux,$(shell uname -s 2>/dev/null)),$(if $(AVAHI_AVAILABLE),$(shell pkg-config --cflags avahi-client) -DWSPRRYPI_HAVE_AVAHI))
 AVAHI_LIBS := $(if $(filter Linux,$(shell uname -s 2>/dev/null)),$(if $(AVAHI_AVAILABLE),$(shell pkg-config --libs avahi-client)))
@@ -68,9 +70,8 @@ CXXVER := 20
 # Prefix for executing tests, "sudo" if required (set SUDO= to disable)
 SUDO ?= sudo
 
-# INI File(s)
-# INI_FILE := ../../../config/wsprrypi.ini
-INI_FILE := /usr/local/etc/wsprrypi.ini
+# Already admitted application state for explicit manual test/debug launches.
+STATE_DIRECTORY ?= /var/lib/wsprrypi/application-state
 
 # WSPR Parameters
 WSPR_PARAMS := AA0NT EM18 20 40m
@@ -224,6 +225,55 @@ VERSION_DEBUG_OBJECT := $(OBJ_DIR_DEBUG)/./version.o
 
 .DEFAULT_GOAL := release
 
+# Parent-owned application storage and focused configuration checks.
+.PHONY: sqlite-state-store-test
+sqlite-state-store-test: $(BIN_DIR)/sqlite_state_store_test
+	$(Q)./$(BIN_DIR)/sqlite_state_store_test
+
+$(BIN_DIR)/sqlite_state_store_test: tests/sqlite_state_store_test.cpp tests/software_child_process.hpp application_storage/sqlite_state_store.cpp application_storage/sqlite_state_store.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) -I. tests/sqlite_state_store_test.cpp application_storage/sqlite_state_store.cpp $(SQLITE_LIBS) -o $@
+
+.PHONY: persistent-configuration-test
+persistent-configuration-test: $(BIN_DIR)/persistent_configuration_test
+	$(Q)./$(BIN_DIR)/persistent_configuration_test wtp_integration/contract/control-controller-vectors.json
+
+$(BIN_DIR)/persistent_configuration_test: tests/persistent_configuration_test.cpp application_storage/persistent_configuration.cpp application_storage/persistent_configuration.hpp application_storage/sqlite_state_store.cpp application_storage/sqlite_state_store.hpp wtp_integration/controller_contract.cpp wtp_integration/control_contract.hpp wtp_integration/controller_contract.hpp wtp_integration/browser_api.cpp wtp_integration/browser_api.hpp wtp_integration/network_http.hpp json.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) -I. tests/persistent_configuration_test.cpp application_storage/persistent_configuration.cpp application_storage/sqlite_state_store.cpp wtp_integration/controller_contract.cpp wtp_integration/browser_api.cpp $(SQLITE_LIBS) -o $@
+
+.PHONY: sqlite-catalog-test
+.PHONY: controller-settings-test
+controller-settings-test: $(BIN_DIR)/controller_settings_test
+	$(Q)./$(BIN_DIR)/controller_settings_test
+
+$(BIN_DIR)/controller_settings_test: tests/controller_settings_test.cpp application_storage/controller_settings.cpp application_storage/controller_settings.hpp application_control/advanced_settings.cpp application_control/advanced_settings.hpp application_storage/persistent_configuration.cpp application_storage/sqlite_state_store.cpp wtp_integration/controller_contract.cpp wtp_integration/browser_api.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) -I. $(filter %.cpp,$^) $(SQLITE_LIBS) -o $@
+
+sqlite-catalog-test: $(BIN_DIR)/sqlite_catalog_test
+	$(Q)./$(BIN_DIR)/sqlite_catalog_test
+
+$(BIN_DIR)/sqlite_catalog_test: tests/sqlite_catalog_test.cpp application_storage/sqlite_catalog.cpp application_storage/sqlite_catalog.hpp application_storage/sqlite_state_store.cpp application_storage/sqlite_state_store.hpp wtp_integration/catalog.cpp wtp_integration/catalog.hpp wtp_settings_json.hpp wtp_settings.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) $(OPENSSL_CFLAGS) -I. tests/sqlite_catalog_test.cpp application_storage/sqlite_catalog.cpp application_storage/sqlite_state_store.cpp wtp_integration/catalog.cpp $(SQLITE_LIBS) $(OPENSSL_LIBS) -o $@
+
+.PHONY: companion-files-test
+companion-files-test: $(BIN_DIR)/companion_files_test
+	$(Q)./$(BIN_DIR)/companion_files_test
+
+$(BIN_DIR)/companion_files_test: tests/companion_files_test.cpp application_storage/companion_files.cpp application_storage/companion_files.hpp application_storage/sqlite_state_store.cpp application_storage/sqlite_state_store.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) $(OPENSSL_CFLAGS) -I. $(filter %.cpp,$^) $(SQLITE_LIBS) $(OPENSSL_LIBS) -o $@
+
+.PHONY: state-migration-test
+state-migration-test: $(BIN_DIR)/state_migration_test
+	$(Q)./$(BIN_DIR)/state_migration_test
+
+$(BIN_DIR)/state_migration_test: tests/state_migration_test.cpp tests/software_child_process.hpp application_storage/state_migration.cpp application_storage/state_migration.hpp application_storage/generation_selection.cpp application_storage/generation_selection.hpp application_storage/companion_files.cpp application_storage/companion_files.hpp application_storage/sqlite_state_store.cpp application_storage/sqlite_state_store.hpp application_storage/persistent_configuration.cpp application_storage/sqlite_catalog.cpp owned_state_directory.cpp wtp_integration/pi_management_journal.cpp wtp_integration/catalog.cpp wtp_integration/controller_contract.cpp wtp_integration/browser_api.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG $(SQLITE_CFLAGS) $(OPENSSL_CFLAGS) -I. $(filter %.cpp,$^) $(SQLITE_LIBS) $(OPENSSL_LIBS) -o $@
+
 include ../scripts/build_metadata_rules.mk
 include ../scripts/backend_capability_rules.mk
 
@@ -319,7 +369,7 @@ WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp)
 WTP_APPLICATION_SOURCES += $(wildcard WTP-Server/src/*.cpp)
 WTP_APPLICATION_SOURCES += $(filter-out wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp,$(wildcard wtp_endpoint/*.cpp))
 WTP_APPLICATION_SOURCES += $(if $(filter si5351,$(BACKEND_LIST)),wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp)
-CPP_SOURCES := $(WTP_APPLICATION_SOURCES) $(LOCAL_CPP_SOURCES) $(COMPONENT_CPP_SOURCES) $(TRANSMITTER_SHARED_CPP_SOURCES) $(SELECTED_BACKEND_CPP_SOURCES)
+CPP_SOURCES := $(WTP_APPLICATION_SOURCES) $(LOCAL_CPP_SOURCES) $(wildcard application_storage/*.cpp) $(wildcard application_control/*.cpp) $(wildcard application_recovery/*.cpp) $(COMPONENT_CPP_SOURCES) $(TRANSMITTER_SHARED_CPP_SOURCES) $(SELECTED_BACKEND_CPP_SOURCES)
 REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
 
 CPP_OBJECTS       := $(patsubst %.cpp, $(OBJ_DIR_RELEASE)/%.o,$(REL_CPP_SOURCES))
@@ -670,6 +720,7 @@ CXXFLAGS := $(SI5351_TRANSPORT_FLAGS) $(if $(findstring clang,$(CXX_VERSION_LINE
            $(COMMON_FLAGS) \
            $(PKG_CFLAGS) \
            $(OPENSSL_CFLAGS) \
+           $(SQLITE_CFLAGS) \
            $(AVAHI_CFLAGS) \
            $(SYSTEMD_CFLAGS) \
            -DGPIOD_API_MAJOR=$(GPIOD_API_MAJOR) \
@@ -695,6 +746,7 @@ ATOMIC_LIB :=
 endif
 
 LDFLAGS = $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
+           $(SQLITE_LIBS) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
            $(AVAHI_LIBS) \
@@ -1343,7 +1395,7 @@ debug: $(BIN_DIR)/$(TEST_OUT) pairing-notices
 
 test: debug
 	$(Q)echo "Running test with sudo privileges."
-	$(Q)$(SUDO) ./$(BIN_DIR)/$(TEST_OUT) -D -i $(INI_FILE)
+	$(Q)$(SUDO) ./$(BIN_DIR)/$(TEST_OUT) -D --state-directory "$(STATE_DIRECTORY)"
 
 test-tone: debug
 	$(Q)echo "Running test tone with sudo privileges."
@@ -1359,7 +1411,7 @@ test-oneshot: debug
 legacy-tone-frequency-test:
 	$(Q)$(MAKE) -C WSPR-Transmitter/src legacy-tone-frequency-test SUDO=
 
-semantics-test-full semantics-test-portable-profile: legacy-tone-frequency-test
+semantics-test-full semantics-test-portable-profile: legacy-tone-frequency-test sqlite-state-store-test persistent-configuration-test sqlite-catalog-test state-migration-test companion-files-test application-companion-capture-test sqlite-state-entry-test recovery-capture-backend-test recovery-age-unit-test recovery-archive-test recovery-publication-test restored-generation-test recovery-maintenance-test recovery-evidence-test recovery-destination-settings-test recovery-browser-admission-test recovery-jobs-test recovery-worker-process-test diagnostic-export-test browser-http-resource-test web-bootstrap-test local-control-transport-test local-event-feed-test database-configuration-runtime-test database-managed-startup-test database-fresh-startup-test controller-settings-test controller-retirement-storage-binding-test database-controller-runtime-test
 ifeq ($(HOST_OS),Linux)
 semantics-test-portable-profile: si5351-inventory-process-test
 endif
@@ -1871,7 +1923,7 @@ endif
 
 gdb: debug
 	$(Q)echo "Running debug session."
-	$(Q)$(SUDO) gdb --args ./$(BIN_DIR)/$(TEST_OUT) -D -i $(INI_FILE)
+	$(Q)$(SUDO) gdb --args ./$(BIN_DIR)/$(TEST_OUT) -D --state-directory "$(STATE_DIRECTORY)"
 
 install-binary: release install-pairing-notices
 	$(Q)echo "Installing $(OUT) binary to $(PREFIX)."
@@ -2049,21 +2101,61 @@ pico-target-controller-test: $(BIN_DIR)/pico_target_controller_test
 .PHONY: pi-managed-host-runtime-test
 .PHONY: pi-private-network-persistence-test
 .PHONY: pi-managed-main-test
+.PHONY: sqlite-state-entry-test
+sqlite-state-entry-test: $(BIN_DIR)/controller_only_production_fixture
+	$(Q)python3 -B tests/sqlite_state_entry_test.py $(BIN_DIR)/controller_only_production_fixture
+
+.PHONY: web-bootstrap-test
+$(BIN_DIR)/web_bootstrap_test: tests/web_bootstrap_test.cpp application_control/web_bootstrap.cpp application_control/web_bootstrap.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $(filter %.cpp,$^) -o $@
+web-bootstrap-test: $(BIN_DIR)/web_bootstrap_test
+	$(Q)"$(BIN_DIR)/web_bootstrap_test"
+
+.PHONY: browser-http-resource-test
+$(BIN_DIR)/browser_http_resource_test: tests/browser_http_resource_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+browser-http-resource-test: $(BIN_DIR)/browser_http_resource_test
+	$(Q)"$(BIN_DIR)/browser_http_resource_test"
+
+.PHONY: browser-session-backend-test
+$(BIN_DIR)/browser_session_backend_fixture: tests/browser_session_backend_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+browser-session-backend-test: $(BIN_DIR)/browser_session_backend_fixture
+	$(Q)python3 -B tests/browser_session_backend_test.py $(BIN_DIR)/browser_session_backend_fixture
+
+.PHONY: local-event-feed-test
+$(BIN_DIR)/local_event_feed_test: tests/local_event_feed_test.cpp application_control/event_feed.cpp application_control/event_feed.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -pthread -I. $(filter %.cpp,$^) -o $@
+local-event-feed-test: $(BIN_DIR)/local_event_feed_test
+	$(Q)"$(BIN_DIR)/local_event_feed_test"
+
+.PHONY: local-control-transport-test
+$(BIN_DIR)/local_control_transport_test: tests/local_control_transport_test.cpp tests/software_child_process.hpp application_control/local_transport.cpp application_control/local_transport.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -pthread -I. -Itests $(filter %.cpp,$^) -o $@
+local-control-transport-test: $(BIN_DIR)/local_control_transport_test
+	$(Q)"$(BIN_DIR)/local_control_transport_test"
 .PHONY: pi-managed-wtp-main-test
-$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp
+$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
 $(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 $(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 # Two isolated actual-main targets with independent identity and approved typed
 # clock-health fixtures; production identity itself is exercised elsewhere.
 $(BIN_DIR)/scheduling_autonomy_fixture: tests/scheduling_autonomy_fixture.cpp main.cpp $(filter-out %/wtp_endpoint/identity.o,$(SEMANTICS_TEST_DEPS))
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter-out main.cpp,$^) -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$(filter-out main.cpp,$^)) -o $@ $(LDFLAGS)
+
+$(addprefix $(BIN_DIR)/,controller_only_production_fixture pi_managed_main_fixture pi_managed_wtp_main_fixture shared_setup_main_fixture scheduling_autonomy_fixture): tests/software_control_runtime.hpp
 
 .PHONY: scheduling-autonomy-test
 scheduling-autonomy-test: $(BIN_DIR)/scheduling_autonomy_fixture
@@ -2077,11 +2169,11 @@ pi-managed-main-test: $(BIN_DIR)/pi_managed_main_fixture
 
 $(BIN_DIR)/shared_setup_main_fixture: tests/shared_setup_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 
 $(BIN_DIR)/pi_managed_wtp_main_fixture: tests/pi_managed_wtp_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 # Actual-main fixtures deliberately retain the production singleton boundary.
 # Serialize them even when the parent validation target uses parallel make.
 pi-managed-wtp-main-test: pi-managed-main-test $(BIN_DIR)/pi_managed_wtp_main_fixture
@@ -2303,6 +2395,49 @@ $(BIN_DIR)/pi_managed_store_test: tests/pi_managed_store_test.cpp $(SEMANTICS_TE
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
 pi-managed-store-test: $(BIN_DIR)/pi_managed_store_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_managed_store_test" wtp_integration/contract/control-controller-vectors.json
+
+.PHONY: database-configuration-runtime-test
+$(BIN_DIR)/database_configuration_runtime_test: tests/database_configuration_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+database-configuration-runtime-test: $(BIN_DIR)/database_configuration_runtime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/database_configuration_runtime_test" ../config/wsprrypi.ini
+
+.PHONY: database-managed-startup-test
+$(BIN_DIR)/database_managed_startup_test: tests/database_managed_startup_test.cpp tests/software_child_process.hpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+database-managed-startup-test: $(BIN_DIR)/database_managed_startup_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/database_managed_startup_test" wtp_integration/contract/control-controller-vectors.json
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/database_managed_startup_test" wtp_integration/contract/control-controller-vectors.json --native
+
+.PHONY: database-fresh-startup-test
+$(BIN_DIR)/database_fresh_startup_test: tests/database_fresh_startup_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+database-fresh-startup-test: $(BIN_DIR)/database_fresh_startup_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/database_fresh_startup_test" wtp_integration/contract/control-controller-vectors.json
+
+.PHONY: controller-retirement-storage-binding-test
+$(BIN_DIR)/controller_retirement_storage_binding_test: tests/controller_retirement_storage_binding_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+controller-retirement-storage-binding-test: $(BIN_DIR)/controller_retirement_storage_binding_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/controller_retirement_storage_binding_test"
+
+.PHONY: database-controller-runtime-test
+.PHONY: application-companion-capture-test
+$(BIN_DIR)/application_companion_capture_test: tests/application_companion_capture_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+application-companion-capture-test: $(BIN_DIR)/application_companion_capture_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/application_companion_capture_test"
+
+$(BIN_DIR)/database_controller_runtime_test: tests/database_controller_runtime_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+database-controller-runtime-test: $(BIN_DIR)/database_controller_runtime_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/database_controller_runtime_test"
 
 .PHONY: pi-managed-records-test
 $(BIN_DIR)/pi_managed_records_test: tests/pi_managed_records_test.cpp $(SEMANTICS_TEST_DEPS)
@@ -2534,6 +2669,24 @@ $(UDP_WORKER_HEADER): ../scripts/embed_udp_worker.py
 	$(Q)python3 ../scripts/embed_udp_worker.py unavailable $@
 endif
 $(OBJ_DIR_RELEASE)/./udp_worker_image.o $(OBJ_DIR_DEBUG)/./udp_worker_image.o: $(UDP_WORKER_HEADER)
+
+# Recovery encryption is bundled with the verified application artifact. Its
+# maintained age/Go inputs are pinned independently from support-intake crypto.
+RECOVERY_AGE_ROOT := $(abspath build/recovery-age)
+RECOVERY_AGE_HEADER := $(BUILD_METADATA_DIR)/recovery_age_image.inc
+RECOVERY_AGE_GO ?=
+RECOVERY_AGE_BUILD = python3 ../scripts/build_recovery_age.py --root "$(RECOVERY_AGE_ROOT)" --compiler "$(CXX)" $(if $(RECOVERY_AGE_GO),--go "$(RECOVERY_AGE_GO)")
+$(RECOVERY_AGE_HEADER): $(wildcard application_recovery/age_helper/*.go) application_recovery/age_helper/go.mod application_recovery/age_helper/go.sum ../scripts/recovery_age_provider.json ../scripts/build_recovery_age.py
+	$(Q)$(RECOVERY_AGE_BUILD) --embed "$@" >/dev/null
+$(OBJ_DIR_RELEASE)/application_recovery/helper_image.o $(OBJ_DIR_DEBUG)/application_recovery/helper_image.o: $(RECOVERY_AGE_HEADER)
+.PHONY: recovery-age-unit-test recovery-archive-test
+recovery-age-unit-test:
+	$(Q)$(RECOVERY_AGE_BUILD) --test >/dev/null
+recovery-archive-test:
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_RECOVERY_AGE_HELPER="$$helper" python3 -B ../scripts/tests/recovery_archive_test.py
+.PHONY: recovery-capture-backend-test
+recovery-capture-backend-test: $(BIN_DIR)/browser_session_backend_fixture
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/browser_session_backend_test.py $(BIN_DIR)/browser_session_backend_fixture "$$helper"
 udp-logging-test:
 	$(Q)mkdir -p build/udp-logging
 	$(Q)$(CXX) -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Client/include tests/udp_logging_test.cpp -o build/udp-logging/udp_logging_test
@@ -2565,11 +2718,17 @@ mcp2221a-transport-test:
 
 
 .PHONY: ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test ci-installer-offline-test
-ci-focused-state-test: guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
+ci-focused-state-test: sqlite-state-store-test persistent-configuration-test sqlite-catalog-test state-migration-test companion-files-test application-companion-capture-test sqlite-state-entry-test recovery-capture-backend-test recovery-age-unit-test recovery-archive-test recovery-publication-test restored-generation-test recovery-maintenance-test recovery-evidence-test recovery-destination-settings-test recovery-browser-admission-test recovery-jobs-test recovery-worker-process-test diagnostic-export-test browser-http-resource-test web-bootstrap-test local-control-transport-test local-event-feed-test database-configuration-runtime-test database-managed-startup-test database-fresh-startup-test controller-settings-test controller-retirement-storage-binding-test database-controller-runtime-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
 ci-network-policy-test: support-request-guard-test privileged-network-policy-test backend-http-guard-test websocket-upgrade-guard-test privileged-network-transaction-test privileged-network-runtime-test privileged-network-admin-test
 ci-support-lifecycle-test: support-bundle-result-validator-test support-bundle-runtime-test support-bundle-download-file-test support-bundle-checksum-file-test support-bundle-archive-digest-test support-bundle-download-preparation-test support-bundle-job-directory-remover-test support-bundle-startup-cleanup-test
-ci-installer-offline-test: support-bundle-runtime-installer-test pico-usb-installer-offline-test
+ci-installer-offline-test: application-state-installer-test recovery-runtime-package-test support-bundle-runtime-installer-test pico-usb-installer-offline-test
 	$(Q)python3 -B ../scripts/tests/apache_privileged_network_policy_renderer_test.py
+
+.PHONY: application-state-installer-test
+application-state-installer-test:
+	$(Q)python3 -B ../scripts/tests/application_state_install_test.py
+	$(Q)python3 -B ../scripts/tests/application_state_install_shell_test.py
+	$(Q)python3 -B ../scripts/tests/browser_service_install_test.py
 
 .PHONY: gpio-line-resolver-test non-wspr-repeat-policy-test
 
@@ -2661,3 +2820,97 @@ pairing-notices:
 install-pairing-notices: pairing-notices
 	$(Q)$(SUDO) install -d "$(PREFIX)/../share/licenses/wsprrypi"
 	$(Q)$(SUDO) install -m 644 "$(BIN_DIR)/BOTAN-LICENSE.txt" "$(PREFIX)/../share/licenses/wsprrypi/BOTAN-LICENSE.txt"
+
+.PHONY: restored-generation-test
+$(BIN_DIR)/restored_generation_test: tests/restored_generation_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
+restored-generation-test: $(BIN_DIR)/restored_generation_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/restored_generation_test
+
+.PHONY: recovery-publication-test
+recovery-publication-test:
+	$(Q)python3 -B ../scripts/tests/recovery_publication_test.py
+
+.PHONY: recovery-worker-process-test
+$(BIN_DIR)/recovery_worker_process_test: tests/recovery_worker_process_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+recovery-worker-process-test: $(BIN_DIR)/recovery_worker_process_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && $(BIN_DIR)/recovery_worker_process_test /usr/bin/python3 "$$helper"
+
+.PHONY: recovery-jobs-test
+recovery-jobs-test:
+	$(Q)python3 -B ../scripts/tests/recovery_jobs_test.py
+
+.PHONY: recovery-browser-admission-test
+$(BIN_DIR)/recovery_browser_admission_test: tests/recovery_browser_admission_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+recovery-browser-admission-test: $(BIN_DIR)/recovery_browser_admission_test
+	$(Q)$(BIN_DIR)/recovery_browser_admission_test
+
+$(BIN_DIR)/recovery_maintenance_fixture: tests/recovery_maintenance_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+
+.PHONY: recovery-maintenance-test
+recovery-maintenance-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper"
+
+.PHONY: recovery-maintenance-browser-test recovery-maintenance-crash-test recovery-runtime-package-test
+recovery-maintenance-browser-test: $(BIN_DIR)/recovery_maintenance_fixture
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --browser
+recovery-maintenance-crash-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && for phase in stopping_backend retaining_evidence publishing_generation starting_backend verifying_backend complete; do WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" "$$phase" || exit 1; done
+recovery-runtime-package-test:
+	$(Q)python3 -B ../scripts/tests/recovery_runtime_install_test.py
+	$(Q)python3 -B ../scripts/tests/recovery_proxy_test.py
+	$(Q)python3 -B ../scripts/tests/browser_service_install_test.py
+
+.PHONY: recovery-maintenance-controller-test recovery-maintenance-move-test
+recovery-maintenance-controller-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --controller
+recovery-maintenance-move-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --move
+
+.PHONY: recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test
+recovery-maintenance-roundtrip-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --roundtrip
+recovery-maintenance-listener-override-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --listener-override
+
+.PHONY: diagnostic-export-test
+$(BIN_DIR)/diagnostic_export_test: tests/diagnostic_export_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+diagnostic-export-test: $(BIN_DIR)/diagnostic_export_test
+	$(Q)$(BIN_DIR)/diagnostic_export_test
+
+.PHONY: recovery-destination-settings-test
+$(BIN_DIR)/recovery_destination_settings_test: tests/recovery_destination_settings_test.cpp application_recovery/destination_settings.cpp application_recovery/destination_settings.hpp application_recovery/definition_adaptation.hpp application_storage/persistent_configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/browser_api.cpp application_storage/sqlite_state_store.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp,$^) -o $@ $(LDFLAGS)
+recovery-destination-settings-test: $(BIN_DIR)/recovery_destination_settings_test
+	$(Q)$(BIN_DIR)/recovery_destination_settings_test
+
+.PHONY: recovery-evidence-test
+$(BIN_DIR)/recovery_evidence_test: tests/recovery_evidence_test.cpp application_recovery/evidence.cpp wtp_integration/pi_management_journal.cpp application_control/local_transport.cpp wtp_integration/browser_api.cpp wtp_integration/controller_contract.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp,$^) -o $@ $(LDFLAGS)
+recovery-evidence-test: $(BIN_DIR)/recovery_evidence_test
+	$(Q)python3 -B ../scripts/tests/recovery_evidence_test.py $(BIN_DIR)/recovery_evidence_test
+
+# Serialize the actual-process matrix because fixtures reserve the same bounded
+# listener range. These checks never invoke installed services or hardware.
+.PHONY: recovery-integration-test
+recovery-integration-test:
+	$(Q)$(MAKE) --no-print-directory -j1 recovery-maintenance-controller-test recovery-maintenance-move-test recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test recovery-maintenance-history-test recovery-maintenance-crash-test
+
+.PHONY: recovery-maintenance-controller-browser-test
+recovery-maintenance-controller-browser-test: $(BIN_DIR)/recovery_maintenance_fixture
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --controller-browser
+
+.PHONY: recovery-maintenance-history-test
+recovery-maintenance-history-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --history

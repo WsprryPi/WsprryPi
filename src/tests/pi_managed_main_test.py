@@ -4,11 +4,14 @@ import argparse
 import configparser
 import copy
 import json
+import sqlite3
 from pathlib import Path
 import subprocess
 import tempfile
 import time
 from controller_only_test import free_port, request as raw_request
+from software_backend_admission import backend_admission
+from software_web_service import start_software_web_service, stop_software_web_service
 
 _last_request = {}
 
@@ -50,7 +53,7 @@ def main():
     parser.add_argument("--policy-upgrade", action="store_true")
     args = parser.parse_args()
     executable = str(Path(args.fixture).resolve())
-    with tempfile.TemporaryDirectory(prefix="pi-managed-main-") as temporary:
+    with backend_admission(executable), tempfile.TemporaryDirectory(prefix="pi-managed-main-") as temporary:
         root = Path(temporary)
         ini = root / "native.ini"
         ledger = root / "revocation-v1"
@@ -72,7 +75,9 @@ def main():
         source["WTP"].update({"Transport": "network_plain", "Hostname": "127.0.0.1",
                               "TCP Port": "31417", "Device ID": "b" * 32})
         source["WTP Server"]["Enabled"] = "false"
-        source["CW"]["Fade Shape"] = "raised_cosine" if args.initialization or args.policy_upgrade else "invalid"
+        source["CW"]["Fade Shape"] = "raised_cosine"
+        if not args.initialization and not args.policy_upgrade:
+            source["CW"]["Fade In Ms"] = "-1"
         if args.policy_upgrade:
             start = time.localtime(time.time() + 3)
             source["Operation"].update({"Transmit": "true", "Enable on Boot": "Always", "Mode": "QRSS"})
@@ -84,15 +89,27 @@ def main():
         with ini.open("w") as output:
             source.write(output)
         ini.chmod(0o600)
-        if args.initialization:
-            stock = Path(str(ini) + ".stock")
-            stock.write_bytes(ini.read_bytes())
-            stock.chmod(0o600)
         original = ini.read_bytes()
-        command = [executable, str(ledger), "--backend", "simulated", "-i", str(ini),
+        state = root / "state"
+        if args.initialization:
+            ini.unlink()
+            prepare = [executable, str(ledger), "--initialize-state", "--state-directory", str(state)]
+        else:
+            prepare = [executable, str(ledger), "--migrate-state", "--state-directory", str(state), "--ini-source", str(ini)]
+        prepared = subprocess.run(prepare, capture_output=True, text=True, timeout=15)
+        assert prepared.returncode == 0, prepared.stderr
+        assert not ini.exists()
+        def records():
+            with sqlite3.connect((state / "generation-1/state.sqlite3").resolve().as_uri()+"?mode=ro", uri=True) as connection:
+                return dict(connection.execute("SELECT kind,payload FROM records"))
+        def record(kind):
+            return json.loads(records()[kind])
+        command = [executable, str(ledger), "--backend", "simulated", "--state-directory", str(state),
+                   "--web-port", str(port), "--socket-port", str(port + 1),
                    "--socket-loopback-only", "--socket-loopback-family", "ipv4"]
         with (root / "service.log").open("w") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+            web = start_software_web_service([executable,str(ledger)],ledger,log)
             try:
                 if args.policy_upgrade:
                     deadline = time.monotonic() + 10
@@ -134,7 +151,9 @@ def main():
                         pass
                     assert time.monotonic() < deadline, "Production recovery readiness deadline"
                     time.sleep(0.03)
-                assert ini.read_bytes() == original and not ledger.exists()
+                assert not ini.exists() and not ledger.exists()
+                if not args.initialization:
+                    assert Path(str(ini)+".sqlite-migrated").read_bytes() == original
                 assert not trace.exists(), "Invalid startup must never construct or clean a backend"
                 status, body = request(port, "GET", "/config")
                 assert status == 409 and json.loads(body)["schema"] == "configuration-recovery"
@@ -144,6 +163,8 @@ def main():
                 assert (doc["validation"] == "initialization") == args.initialization
                 candidate = copy.deepcopy(doc["draft"])
                 candidate["CW"]["Fade Shape"] = "raised_cosine"
+                candidate["CW"]["Fade In Ms"] = 20
+                candidate["Operation"].update({"Web Port": port, "Socket Port": port + 1})
                 if args.initialization:
                     candidate["WSPR"].update({"Call Sign": "AA0NT", "Grid Square": "EM18", "TX Power": 20})
                 assert "WTP" not in candidate and "WTP Server" not in candidate
@@ -166,10 +187,10 @@ def main():
                 status, reply = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, context)
                 assert status == 200, reply
                 if args.initialization:
-                    record = json.loads((Path(str(ledger) + ".recurrence-" + doc["binding"]["device_id"]) / "authority.json").read_text())
-                    settings = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
-                    assert record["state"] == "staged" and record["clean_proof"]
-                    assert record["staged_revision"] == settings["revision"]
+                    authority_record = record("recurrence-authority")
+                    settings = record("managed-settings")
+                    assert authority_record["state"] == "staged" and authority_record["clean_proof"]
+                    assert authority_record["staged_revision"] == settings["revision"]
                     assert settings["scheduling"]["enabled"] is False
                 deadline = time.monotonic() + 10
                 while True:
@@ -181,9 +202,8 @@ def main():
                     assert time.monotonic() < deadline, (root / "service.log").read_text()
                     time.sleep(0.03)
                 assert json.loads(body)["Operation"]["Transmit"] is False
-                native_authority = Path(str(ledger) + ".recurrence-" + doc["binding"]["device_id"]) / "authority.json"
-                installed = json.loads(native_authority.read_text())
-                installed_settings = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
+                installed = record("recurrence-authority")
+                installed_settings = record("managed-settings")
                 assert installed["state"] == "staged", installed
                 assert installed_settings["scheduling"]["enabled"] is False
                 assert installed["staged_revision"] == installed_settings["revision"]
@@ -194,15 +214,14 @@ def main():
                 if args.network_safety_off:
                     # Off remains the ordinary policy. Only exact native-host
                     # recovery/session observations have independent protection.
-                    actual = configparser.ConfigParser(interpolation=None);actual.optionxform = str;actual.read(ini)
-                    assert actual["Security"]["Privileged Network Safety"] == "insecure-disabled"
+                    assert record("configuration")["private"]["network_safety"] == "insecure-disabled"
                     policy_deadline = time.monotonic() + 5
                     while request(port, "GET", "/api/control/v1/targets")[0] != 403:
                         assert time.monotonic() < policy_deadline, "Saved network safety Off did not resume after native readiness"
                         time.sleep(0.03)
                     status, readiness = request(port, "GET", "/api/control/v1/host/readiness")
                     assert status == 200 and json.loads(readiness)["state"] == "ready"
-                    before = {path: path.read_bytes() for path in root.glob("native.ini*") if path.is_file()}
+                    before = records()
                     for path in ("/api/control/v1/host/readiness", "/api/control/v1/host/configuration-recovery"):
                         assert request(port, "GET", path, headers={"Origin": "http://outside.invalid"})[0] == 403
                         assert request(port, "GET", path, headers={"X-WsprryPi-Client-Address": "203.0.113.42"})[0] == 403
@@ -224,7 +243,7 @@ def main():
                     new_operation = json.loads(mutation);new_operation["operation_id"] = "f" * 32
                     assert request(port, "PUT", "/api/control/v1/host/configuration-recovery", json.dumps(new_operation), renewed)[0] == 503
                     assert request(port, "GET", "/api/control/v1/targets/" + doc["binding"]["device_id"] + "/settings")[0] == 403
-                    assert all(path.read_bytes() == content for path, content in before.items()), "Off-mode refusal/replay must not write saved history"
+                    assert records() == before, "Off-mode refusal/replay must not write saved history"
                 else:
                     status, replay = request(port, "PUT", "/api/control/v1/host/configuration-recovery", mutation, context)
                     assert status == 200 and replay == reply, (status, replay, reply)
@@ -262,8 +281,13 @@ def main():
                     # this host, even with a valid local browser session and
                     # an otherwise complete candidate/revision.
                     remote_id = "a" * 32 if self_id != "a" * 32 else "b" * 32
-                    protected_files = lambda: {str(path.relative_to(root)): path.read_bytes()
-                        for path in root.rglob("*") if path.is_file() and path.relative_to(root).parts[0].startswith("native.ini")}
+                    def protected_files():
+                        result={"record/"+kind:value for kind,value in records().items()}
+                        result.update({"file/"+str(path.relative_to(root)):path.read_bytes()
+                            for path in root.rglob("*") if path.is_file() and
+                            (path.relative_to(root).parts[0].startswith("native.ini") or
+                             (path.is_relative_to(state) and not path.name.startswith("state.sqlite3")))})
+                        return result
                     before_remote = protected_files()
                     remote_base = f"/api/control/v1/targets/{remote_id}/"
                     remote_binding = {**stop_context["binding"], "device_id": remote_id}
@@ -294,14 +318,14 @@ def main():
                     stop_path = f"/api/control/v1/targets/{self_id}/stop"
                     status, stop_receipt = request(port, "POST", stop_path, stop_command, stop_headers)
                     assert status == 200 and json.loads(stop_receipt)["state"] == "committed", stop_receipt
-                    stop_bytes = ini.read_bytes()
+                    stop_bytes = records()
                     status, retry_stop = request(port, "POST", stop_path, stop_command, stop_headers)
                     assert status == 200, (status, retry_stop)
-                    assert retry_stop == stop_receipt and ini.read_bytes() == stop_bytes, (status, retry_stop, stop_receipt, ini.read_bytes() == stop_bytes)
-                before_stop = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
+                    assert retry_stop == stop_receipt and records() == stop_bytes, (status, retry_stop, stop_receipt, records() == stop_bytes)
+                before_stop = record("managed-settings")
                 status, stopped = request(port, "POST", "/control/stop", json.dumps({"command": "stop"}), context)
                 assert status == 200 and json.loads(stopped)["persisted"] is True, stopped
-                after_stop = json.loads(Path(str(ini) + ".managed-settings.json").read_text())
+                after_stop = record("managed-settings")
                 assert after_stop["configuration_generation"] != before_stop["configuration_generation"]
                 assert after_stop["configuration"]["Operation"]["Transmit"] is False
                 assert after_stop["scheduling"] == before_stop["scheduling"]
@@ -314,6 +338,7 @@ def main():
                 process.terminate()
                 assert process.wait(timeout=10) == 0, (root / "service.log").read_text()
             finally:
+                stop_software_web_service(web)
                 if process.poll() is None:
                     process.terminate()
                     try:
