@@ -15,7 +15,7 @@ Remaining feature items:
 
 4. ✅ Retire WTP while preserving device-owned recurring scheduling and management APIs.
 
-5. ▧ Keep HTTP/80 as the Pi and Pico dashboard default. Add [optional HTTPS with a local shack CA and automatic LAN renewal](docs/development/browser-hop-security-plan.md). [Implementation prompt](docs/development/browser-hop-security-implementation-prompt.md)
+5. ▧ Keep HTTP/80 as the Pi and Pico dashboard default. Add [optional HTTPS with a local shack CA and automatic LAN renewal](docs/development/browser-hop-security-plan.md). Track [WsprryPi issue #476](https://github.com/WsprryPi/WsprryPi/issues/476). [Implementation prompt](docs/development/browser-hop-security-implementation-prompt.md)
 
 6. ✅ Implement the Fleet Operations device selector, per-device status and controls, required coordinated Pi/Pico changes, documentation, and validation. Follow the [implementation prompt](release_tools/Fleet%20Operations%20Implementation%20Prompt.md).
 
