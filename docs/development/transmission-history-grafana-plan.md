@@ -12,7 +12,34 @@ An operator can compare reception across bands, UTC hours, distances, and direct
 
 The initial charts describe observed reception. They do not establish receiver availability, decode probability, independent RF accuracy, actual radiated power, antenna gain, or propagation failure from an absence of spots.
 
+## Feature overview: planned capabilities
+
+The following headlines and descriptions summarize planned end-user capabilities for Wsprry-History. They do not describe implemented or released features. Availability depends on completion of the applicable implementation slices, supported observation access, retained evidence, and their acceptance criteria.
+
+- **See where your signal goes.** Explore reception by band, distance, direction, and receiving station.
+- **Find your station's best operating windows.** Discover which bands and UTC hours consistently produce reports. These are observed reception patterns, not guarantees or automatic schedule changes.
+- **Put every observed transmission on the timeline.** Review Pi and Pico activity together, including completed, failed, aborted, and skipped transmissions where supported observations establish those outcomes. Collection gaps remain visible; a complete record of all transmissions is not promised.
+- **Connect each transmission to its reception reports.** Select a WSPR frame to inspect who heard it, how far it travelled, and its reported signal strength. Unmatched reports and ambiguous associations remain explicit.
+- **Follow your station's performance over time.** Compare reception across days and revisit earlier operating periods within the selected retention policy.
+- **Spot frequency drift before it becomes a mystery.** Track apparent frequency offsets across receivers and distinguish stable patterns from changing observations. Receiver and propagation effects remain part of the interpretation.
+- **Get correction advice backed by evidence.** Eligible manually calibrated configurations can receive advisory suggestions when verified references and sufficient evidence support them. Changes remain under operator control, and ordinary receiver consensus alone does not qualify a suggestion.
+- **Know when the picture is incomplete.** Clearly marked collection gaps, delayed reports, and ambiguous matches help prevent misleading conclusions.
+- **Keep collecting when the dashboard is closed.** Background collection retains history independently of the browser, subject to source availability and the configured retention policy.
+- **Check your station from a desktop or phone.** Planned Grafana views provide a broad reception overview and focused transmission details, with desktop and mobile review included in implementation acceptance.
+
+Reception charts and the observed transmission timeline come first. Frequency advice is a later advisory-only slice, initially limited to selected configurations and single-frame WSPR qualification on 20 m with a 40 m cross-check. The approximately 1 Hz target remains provisional, and no accuracy claim or automatic correction is implied. The detailed scope, eligibility rules, unresolved decisions, and acceptance criteria below govern these descriptions.
+
 ## Architecture and ownership
+
+### Selected repository and open deployment choice
+
+The selected repository is `WsprryPi/Wsprry-History`, separate from the Pi and Pico application repositories. It will own the independently testable collector and observation adapters, analytical schemas and migrations, spot matching and advisory analysis, Grafana dashboard definitions, deployment definitions, tests, and its operator documentation. Application-owned producer interfaces remain in their respective repositories. Repository creation is not authorized by this decision and has not been performed as part of this plan.
+
+The deployment choice remains open between a dedicated Linux VM and a spare Raspberry Pi. The exact host, Pi model if applicable, operating-system version, and storage device are not selected. The provisional sizing target is 2 vCPUs for a VM, or comparable available CPU capacity on a Pi, 4 GB RAM, and 100 GB of SSD-backed storage for the colocated collector, PostgreSQL, and Grafana. These are planning resources, not measured requirements or a hardware purchase decision; validate them against actual ingestion, queries, retention, and maintenance headroom. Backup capacity is additional.
+
+The proposed deployment keeps those services on one always-on Linux host, separate from active transmitter execution and browser lifecycle. Service packaging and exact resource limits remain open. A central host cannot directly consume another Pi's local journal without a supported read-only access/export route; slice A must resolve that route and any station-side adapter requirement. Selecting the repository or a host class authorizes no deployment, installation, service changes, or implementation.
+
+### Data flow and authority
 
 ```text
 Pi runtime observations and journal ----+
@@ -227,7 +254,7 @@ The slices are sequential review boundaries. Saving this plan authorizes none of
 
 ### Slice A: Data foundation and access verification
 
-Deliver the shared analytical schema, source-to-field mapping, evidence/identity rules, observation-access inventory, representative recorded or synthetic fixtures, and a concrete collector repository/deployment proposal. Distinguish fields available through supported interfaces from internal-only values and unavailable historical values.
+Deliver the shared analytical schema, source-to-field mapping, evidence/identity rules, observation-access inventory, representative recorded or synthetic fixtures, and a deployment proposal for the selected `WsprryPi/Wsprry-History` repository. Compare the still-open dedicated-VM and spare-Pi options without assuming either is selected. Distinguish fields available through supported interfaces from internal-only values and unavailable historical values.
 
 Acceptance criteria:
 
@@ -291,6 +318,30 @@ After slices A–D, deliver observational estimates of apparent transmitter freq
 
 For each matched frame, compare reported frequency with the intended frequency expressed using the validated decoder reporting convention. The residual combines transmitter error, receiver error, propagation Doppler, and decoder/reporting effects. Agreement between receivers supports an apparent-offset estimate; agreement alone does not establish absolute accuracy. Precisely referenced receivers can still observe propagation-induced shifts; see the [Doppler measurement explanation](https://hamsci.org/doppler-instructions).
 
+Selected calibration goals and initial eligibility defaults:
+
+The initial goal is persistent frequency-offset and stability diagnosis, followed by reference-supported manual correction advice where qualified evidence permits it. Identify repeatable offsets, distinguish receiver/path changes where possible, and withhold a setting suggestion unless its predicted improvement exceeds the approved uncertainty. Ordinary receiver consensus remains diagnostic-only.
+
+Start advisory qualification with ordinary single-frame WSPR on 20 m, followed by a 40 m cross-check. Evaluate whether a persistent offset can be reduced to approximately 1 Hz on the tested band. The 1 Hz value is a provisional engineering target, not an established accuracy specification, qualified acceptance threshold, or promise of achievable performance. Validate feasibility against integer-Hz spot resolution, backend realization, reference evidence, and the full uncertainty budget before approving a numerical target. Other bands may retain reception and attributable diagnostic views but are outside initial correction-advice qualification.
+
+| Configuration | Diagnostic eligibility | Initial correction-advice default |
+| --- | --- | --- |
+| Pi Si5351, crystal reference, fixed manual correction | Attributable frames with comparable frequency conventions | First-group validation candidate |
+| Pico direct GPIO, fixed manual correction, automatic RF calibration disabled | Attributable frames with comparable frequency conventions | First-group validation candidate |
+| Pico Si5351, crystal reference, fixed manual correction, automatic calibration disabled | Attributable frames with comparable frequency conventions | First-group validation candidate |
+| Pi legacy GPIO, fixed manual correction | Attributable frames with comparable frequency conventions | Second group; first validate processor-specific correction composition and provenance |
+| Pi RP1 GPCLK, fixed manual correction | Attributable frames with comparable frequency conventions | Second group; first validate clock model, realization, and correction semantics |
+| Pi GPIO using system-clock estimates or direct PPS calibration | Diagnostics separated by correction/reference epoch | Diagnostic-only initially |
+| Pico GPIO or Si5351 using automatic GPS-derived calibration | Diagnostics separated by correction/reference epoch | Diagnostic-only initially |
+| Si5351 driven by an external frequency reference | Diagnostics where attribution and conventions support them | Diagnostic-only initially; establish reference ownership and correction authority before any later expansion |
+| Experimental backends, unsupported profiles, or incomplete frequency provenance | Only the observations justified by available evidence | No configuration suggestions |
+
+Candidate means selected for validation, not qualified or already supported for advice. Eligibility is determined by the physical executor and its actual correction/reference path, not by whether a Pi or Pico controller submitted the job. No configuration may receive a setting suggestion before its provenance, reference, uncertainty, matching-bias, and backend-specific gates pass.
+
+For first-group candidates, require a stationary, uniquely attributable transmitter, a conventional callsign in an ordinary single-frame WSPR message, and a fixed backend/reference configuration and manual correction throughout the evidence window. Retain exact accepted frequency context, including actual random placement and available synthesis adjustments, and validate the receiver/reporting convention. Random placement is eligible only when its selected value is known; incomplete context blocks advice. Two-frame plans and other identities remain supported by the broader history/matching design but are outside initial correction-advice qualification.
+
+Advice targets the applicable existing operator-facing manual correction, not intrinsic chipset compensation or a replacement GPS-derived estimate. A single-band result cannot qualify a global PPM setting across all bands. Use the 40 m cross-check to evaluate consistency before recommending broader applicability; if evidence is inconsistent, withhold broader advice. Even a successful two-band check does not qualify untested bands or conditions. Exact setting names, formulas, and validation procedures remain open until the backend mapping is verified.
+
 Prerequisites:
 
 - Reliable frame associations from slice D, including explicit handling of concurrent same-callsign transmitters, two-frame plans, and ambiguous reports.
@@ -308,11 +359,47 @@ Output eligibility:
 | Apparent-offset/stability diagnostics | Comparable frequency conventions and attributable observations; ordinary receivers may support descriptive apparent offsets and stable-cohort trends, with receiver/path bias unresolved. No suggested configuration value follows from this class alone |
 | Reference-supported correction suggestion | All frequency-provenance, matching-bias, support, freshness, reference-evidence, and uncertainty gates pass for an explicitly approved backend/mode. A verified receiver or reference-beacon method needs an approved uncertainty basis; a reference label alone does not qualify advice |
 
-Until the backend/mode eligibility matrix, numerical error targets, reference method, and uncertainty budget are approved and validated, correction suggestions remain unavailable. Proposed initial policy is diagnostic-only for automatically calibrated configurations; whether any such configuration may receive a residual-trim suggestion remains an unresolved decision. Ordinary-receiver consensus is not sufficient to recommend a configuration change, regardless of receiver count or apparent agreement.
+The selected defaults above define qualification scope, not completed qualification. Until the detailed backend/mode matrix, numerical error targets, reference method, and uncertainty budget are validated and approved for use, correction suggestions remain unavailable. Automatically calibrated and externally referenced configurations are diagnostic-only initially; any later residual-trim eligibility requires a separate scope decision. Ordinary-receiver consensus is not sufficient to recommend a configuration change, regardless of receiver count or apparent agreement.
 
 Correction advice must distinguish observed residual error, a proposed setting delta, and the resulting replacement setting value. Name the exact backend setting and units, retain its execution baseline/revision and all composed correction components, and validate composition without double-applying an existing correction. A suggestion targets only that recorded baseline; it is not a portable global PPM recommendation. The exact permitted target settings and composition methods remain unresolved until the backend matrix is reviewed.
 
 Invalidate current advice on a relevant settings/correction-generation change, automatic calibration update, backend/profile/reference change, conflicting provenance, expired reference evidence, lost supporting evidence, or age limit. A reboot invalidates advice unless a separately validated identity/baseline continuity rule proves applicability; no such exception is assumed initially. Retain invalidated results as historical evidence with a reason, never as current advice. An automatically changing correction must not be mistaken for a stable manual baseline.
+
+Reference choices and trial minimum evidence:
+
+The following values are selected planning defaults for qualification experiments, not established accuracy guarantees, production-qualified thresholds, or a substitute for a validated uncertainty method. They do not enable advice by themselves. Keep the approximately 1 Hz outcome target provisional, and withhold configuration suggestions until reference verification, source conventions, backend semantics, matching-bias checks, and the uncertainty decision rule are approved and validated.
+
+| Reference choice | Initial use |
+| --- | --- |
+| Ordinary public receivers | Apparent-offset and stability diagnostics; no configuration suggestions |
+| Two independently referenced receiver systems | Preferred basis for initial reference-supported advice, subject to documented active frequency accuracy and a complete path/reporting uncertainty budget |
+| Trusted WSPR reference beacons heard by the same receivers | Defer receiver-bias subtraction initially; later inclusion requires separate beacon enrollment, provenance, query/storage budget, and treatment of different propagation paths |
+| An independently referenced local receiver or frequency measurement | Useful independent validation when available and separately authorized; not a mandatory new sensor or hardware operation in the initial collector scope |
+
+A verified receiver needs retained evidence of its actual frequency-reference connection, active receiver configuration and reporting convention, reference accuracy, and lock or valid holdover covering the included observation window. GPS location and UTC synchronization alone do not qualify it. Two callsigns sharing receiver hardware or an oscillator do not count as two independently referenced systems. Independent reference systems also do not prove independent propagation errors. The actual receiver identities, reference devices, verification procedures, provenance format, and acceptable holdover rules remain open; no existing station is designated verified by this plan.
+
+| Evidence gate | Trial default |
+| --- | --- |
+| Verified references | Two independently referenced receiver systems with evidence covering the included frames |
+| Additional corroboration | At least one additional receiver as a diagnostic cross-check; define its required overlap during qualification rather than treating any unrelated report as corroboration |
+| Common observations | At least 12 distinct transmitted frames heard by both verified receivers, with one retained report per receiver/frame for support counting |
+| Observation span | At least two hours within one unchanged transmitter/backend/reference/manual-correction epoch |
+| Temporal stability | Compare two chronological blocks containing at least six common frames each; blocks are a stability check, not a claim of statistical independence |
+| Receiver agreement | Verified receivers' window estimates agree within 1 Hz and are consistent with their documented uncertainty budgets |
+| Attribution and selection | Unambiguous frame identity, accepted-frequency provenance, and passed offset-injection and matching-sensitivity checks |
+| Reference state | Reference evidence covers included frames; unsupported lock/holdover intervals are excluded |
+| Freshness at generation | The latest included transmitted frame is no older than 30 minutes, measured from frame time rather than collection receipt |
+| Advice lifetime | At most one hour from generation, with earlier invalidation on any baseline, reference-validity, supporting-evidence, or relevant configuration change |
+
+Twelve common frames at a ten-minute cadence can require more than two hours when reports are missing. Longer evidence windows are acceptable only within a stable, relevant baseline. Define a maximum window age/span during qualification; the minimum two-hour span and fresh last frame do not justify including arbitrarily old observations. Do not average genuine transmitter drift away to satisfy receiver agreement.
+
+The additional receiver does not gain reference status through corroboration and cannot dominate the verified-reference estimate by supplying more reports. Disagreement must be visible and investigated. An unexplained conflict is not silently discarded, but an unverified receiver's bias does not automatically veto otherwise qualified reference evidence. Define the conflict-resolution and withholding rule before permitting suggestions.
+
+Let U denote a conservative uncertainty allowance in Hz for the reference-supported residual, including reference error, propagation, reporting quantization, backend realization, and observed variability. The uncertainty construction, coverage interpretation, dependence treatment, and systematic-error bounds remain unresolved. U is not merely receiver spread, a standard error calculated from report count, or an assumed confidence interval.
+
+The trial 20 m advice gate requires U ≤ 1 Hz, an apparent offset magnitude of at least 2 Hz, and that magnitude strictly greater than 2U. Evaluate the rounded, permitted setting change through the validated backend model and withhold it if its predicted improvement does not survive the uncertainty allowance. The precise improvement decision rule and any correction-size limit remain open pending qualification. Passing these coarse-offset gates does not establish that the corrected transmitter will be accurate to 1 Hz; that remains a provisional outcome to evaluate independently.
+
+After an operator applies a correction, use a new observation window meeting the same evidence gates. The training window is never reused as validation evidence. Perform the planned 40 m cross-check before recommending broader applicability, comparing inferred PPM behavior and uncertainty rather than requiring identical Hz offsets. Withhold fixed-correction advice when drift or incompatible block estimates prevent a stable result, with a reason such as “Frequency changing—fixed correction withheld.” No trial policy authorizes scheduling or transmitting the required observations.
 
 Proposed analysis and views:
 
@@ -335,6 +422,10 @@ Acceptance criteria:
 - Repeated reports do not create false statistical independence. Display receiver count, frame count, cohort, empirical spread, and systematic/reference uncertainty separately; any confidence interval states its assumptions.
 - Ordinary-receiver consensus is labelled apparent frequency error. Stronger absolute-calibration language requires documented reference evidence and an uncertainty budget that includes path and reporting effects.
 - Ordinary reports alone never produce a suggested configuration value. Eligibility tests refuse advice for unapproved backend/mode combinations, unresolved absolute-reference uncertainty, automatic calibration under the initial diagnostic-only policy, and incomplete frequency provenance.
+- Eligibility tests enforce the selected first/second-group boundaries, ordinary single-frame/conventional-callsign scope, stationary uniquely attributable execution, and stable manual-correction/reference epochs. External-reference and automatic-calibration configurations remain diagnostic-only initially. Unsupported bands or identities cannot acquire suggestion eligibility merely because general history/matching supports them.
+- Evaluate the provisional approximately 1 Hz target on 20 m against source resolution and the complete uncertainty budget, then document the 40 m cross-check and limits of any broader applicability. Report infeasibility or inconclusive evidence explicitly; do not convert the provisional target into an accuracy claim or silently weaken it to pass qualification.
+- Validate the trial reference/support, two-hour/common-frame, block-stability, agreement, freshness, uncertainty, and expiry gates with deterministic boundary and refusal cases. Below-threshold, stale, duplicate, non-overlapping, shared-reference, unsupported-holdover, and changing-baseline observations cannot qualify advice. Trial values require evidence-supported approval before use; the remaining reference identities, verification procedures, uncertainty method, overlap/window limits, and improvement rule stay explicit blockers.
+- Before emitting a suggestion, demonstrate that the rounded permitted change's predicted improvement exceeds the approved uncertainty decision rule. Test the distinct ≥2 Hz, U ≤1 Hz, and strict >2U trial boundaries without equating successful gating with the provisional 1 Hz accuracy outcome. Test post-change evaluation on separate observations and 40 m consistency in PPM with uncertainty.
 - Frequency-matching tests from slice D demonstrate offset recovery or explicit refusal, including displaced reports outside the normal association window. Evaluate sensitivity to matching/outlier thresholds and report rejected support; no selection rule may manufacture a near-zero consensus by excluding the signal error under investigation.
 - Validate same-frame estimates and across-frame trends separately with changing and partially overlapping receiver cohorts. Numerical precision/accuracy targets are defined per approved band/backend and tested against source quantization and the full uncertainty budget, not only estimator spread.
 - Advice identifies the exact baseline, target setting, delta, and resulting value. Tests verify correction composition and invalidation after manual/automatic updates, backend/reference changes, reboot, expired evidence, and changed source data or matcher decisions; stale results remain historical and cannot appear current.
@@ -367,8 +458,9 @@ Implementation documentation must cover enrollment, read-only access, retention,
 
 | Decision | Proposed direction | Needed before |
 | --- | --- | --- |
-| Collector ownership and repository | A coherent independently testable collector, with a repository selected explicitly | Slice A implementation |
-| Deployment host | An existing always-on Linux host, with collection independent of transmitter/browser lifecycle | Slices A–B |
+| Repository creation and setup | Repository name and ownership selected: `WsprryPi/Wsprry-History`; creation, visibility, licensing, and initial setup remain unapproved or unresolved | Separate authorization before creation/setup |
+| Deployment host | Open: dedicated Linux VM or spare Raspberry Pi; choose the exact host, OS, CPU allocation, and SSD after validating the provisional 2-vCPU/comparable-Pi, 4-GB-RAM, 100-GB-SSD target | Deployment proposal in slice A; select before deployment |
+| Central observation access | Establish supported read-only access to remote Pi observations and Pi-collected Pico USB logs; decide whether a station-side adapter is required | Slice A feasibility; slice C implementation |
 | Enrolled devices and callsigns | Explicit stable device identities, callsigns, association periods, and bands | Slice B |
 | Supported Pi observation access | Reuse supported read-only observations; inventory authorization and reconnect/resynchronization behavior first | Slice C |
 | Pico topology and coverage | Reuse Pi-collected USB logs where available; network polling exposes reduced history | Slice C |
@@ -381,14 +473,15 @@ Implementation documentation must cover enrollment, read-only access, retention,
 | Matching tolerances | Define UTC/frequency rules from actual frame semantics; leave ambiguous candidates unresolved | Slice D |
 | Grafana access and upstream terms | Decide private/shared access, authentication, and compliance with upstream use conditions | Deployment |
 | Historical import | Select available logs and dates; mark gaps and do not promise reconstruction before collection began | Slices B–C |
-| Initial calibration goal and precision | Set useful band/backend targets for apparent offsets, stability, and reference-supported advice; do not choose thresholds before the goal | Slice A design; validate before slice E advice |
+| Calibration target qualification | Goal selected: persistent-offset/stability diagnosis and reference-supported manual advice; start single-frame WSPR on 20 m with a 40 m cross-check. Approximately 1 Hz remains provisional; validate or explicitly revisit its feasibility and uncertainty basis | Slice A evidence design; qualify before slice E advice |
 | Frequency provenance and observability | Specify the complete execution-bound chain; decide reduced eligibility versus a separately approved producer interface where observations are missing | Slice A; collect in slice C |
 | Frequency-report conventions | Validate intended, realized, and reported references, units, resolution, and supported decoder/backend combinations | Model in slice A; validate before slice E |
 | Calibration matching policy | Select attributable candidate rules and bias/sensitivity gates without circular frequency filtering; unresolved collisions refuse advice | Slice D; validate in slice E |
-| Consensus evidence thresholds | Select receiver/frame support, stable-cohort rules, age limits, robust estimator, and systematic-uncertainty treatment | Slice E |
-| Verified frequency references | Select receiver/reference-beacon evidence, provenance, and freshness requirements; keep unverified consensus separate | Slice E |
-| Reference-beacon collection | Decide whether it belongs in initial slice E; explicitly enroll/budget additional data and preserve its reference evidence | Before reference-beacon collection |
-| Correction-advice eligibility | Approve backend/mode/reference matrix; ordinary consensus remains diagnostics-only; decide whether automatic calibration may ever receive trim advice | Before slice E configuration suggestions |
+| Trial evidence qualification | Validate two verified references plus one corroborating receiver, 12 common frames over at least two hours, two ≥6-frame blocks, ≤1 Hz reference agreement, 30-minute last-frame freshness, and one-hour advice lifetime; approve or explicitly revise defaults from evidence | Before slice E configuration suggestions |
+| Remaining evidence rules | Select maximum window span/age, corroborating overlap, stable-cohort/outlier estimator, conflict handling, uncertainty construction/coverage, systematic bounds, rounded-change improvement rule, and correction-size limit | Before slice E configuration suggestions |
+| Verified frequency references | Preferred reference class selected; receiver identities, reference hardware, evidence format, verification procedures, and valid-holdover requirements remain open. Ordinary consensus stays diagnostic-only | Slice A evidence design; qualify before slice E advice |
+| Reference-beacon collection | Deferred initially; any later inclusion needs explicit enrollment, budget, provenance, retention, and path-error analysis | Before reference-beacon collection |
+| Correction-advice qualification | Initial groups selected in slice E; verify the exact backend/profile/settings matrix and evidence gates. Ordinary consensus, automatic calibration, and external references remain diagnostic-only initially; later expansion requires a separate decision | Before slice E configuration suggestions |
 | Advisory correction semantics | Select exact target settings, delta/replacement semantics, composition, baseline bindings, invalidation, expiry, and independent post-change evaluation | Before slice E configuration suggestions |
 | Advisory evidence lifecycle | Select evidence package, pinning/retention duration, source-revision invalidation, and historical-result behavior after expiry | Before publishing slice E advice |
 | Stronger producer history | Reconsider only if observed gaps justify a new replayable history interface | Later separately approved work |
