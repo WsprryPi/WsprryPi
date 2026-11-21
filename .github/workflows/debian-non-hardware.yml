@@ -146,9 +146,9 @@ jobs:
       matrix:
         runner: [macos-15, macos-15-intel]
     runs-on: ${{ matrix.runner }}
-    # Intel cold physical and simulated pairing builds reached the 30-minute
-    # boundary after their assertions passed; retain time for final checks/cleanup.
-    timeout-minutes: 45
+    # Intel cold physical and simulated pairing builds can reach 45 minutes
+    # while generating debug symbols; retain every profile and its final checks.
+    timeout-minutes: ${{ matrix.runner == 'macos-15-intel' && 60 || 45 }}
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
