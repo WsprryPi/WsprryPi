@@ -14,7 +14,7 @@ Remaining feature items:
 
 4. ✅ Retire WTP while preserving device-owned recurring scheduling and management APIs.
 
-5. ▧ Review and propose automatic security for the browser-to-device hop, covering web pages, API requests and WebSockets, including pairing-code display and submission. Evaluate HTTPS/WSS, initial browser trust, device address changes and ownership transfer without manual certificate or key provisioning; define Linux/macOS packaging and recovery requirements before implementation. Selected UX: desktop enrollment with offline LAN operation, including Windows enrollment. Follow the [implementation plan](docs/development/browser-hop-security-plan.md).
+5. ▧ Keep HTTP/80 as the Pi and Pico dashboard default. Add [optional HTTPS with a local shack CA and automatic LAN renewal](docs/development/browser-hop-security-plan.md).
 
 6. ✅ Implement the Fleet Operations device selector, per-device status and controls, required coordinated Pi/Pico changes, documentation, and validation. Follow the [implementation prompt](release_tools/Fleet%20Operations%20Implementation%20Prompt.md).
 
