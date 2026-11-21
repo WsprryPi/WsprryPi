@@ -4,9 +4,10 @@ Status: ▧ not started · ⏳ in progress · ✅ complete.
 
 Remaining feature items:
 
-**1a.** ▧ Implement Pi-local I²C band selection for [issue #470](https://github.com/WsprryPi/WsprryPi/issues/470). Follow [Prompt 1a for WsprryPi](release_tools/Issue%20470%20I2C%20Band%20Selection%20Implementation%20Prompt.md).
+1. ▧ Implement I²C band selection for [issue #470](https://github.com/WsprryPi/WsprryPi/issues/470).
 
-**1b.** ▧ Implement Pico-local I²C band selection for [issue #470](https://github.com/WsprryPi/WsprryPi/issues/470). Follow [Prompt 1b for WsprryPico](release_tools/Issue%20470%20Prompt%201b%20Pico%20I2C%20Band%20Selection%20Implementation.md).
+   - ▧ Implement Pi-local I²C band selection for [issue #470](https://github.com/WsprryPi/WsprryPi/issues/470). Follow [Prompt 1a for WsprryPi](release_tools/Issue%20470%20I2C%20Band%20Selection%20Implementation%20Prompt.md).
+   - ▧ Implement Pico-local I²C band selection for [issue #470](https://github.com/WsprryPi/WsprryPi/issues/470). Follow [Prompt 1b for WsprryPico](release_tools/Issue%20470%20Prompt%201b%20Pico%20I2C%20Band%20Selection%20Implementation.md).
 
 2. ✅ Implement shared device Setup controls and device-owned solar day/night and gray-line scheduling, including remote devices and concomitant Docs updates. Track [WsprryPi issue #473](https://github.com/WsprryPi/WsprryPi/issues/473) and follow the [implementation plan and prompt](docs/development/device-owned-solar-scheduling-plan.md).
 
