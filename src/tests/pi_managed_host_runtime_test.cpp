@@ -75,13 +75,21 @@ void gateway(const nlohmann::json &valid,int port){
     const auto oversized_header=client.Get("/api/control/v1/host/readiness",{{"X-Fixture-Padding-A",std::string(4200,'x')},{"X-Fixture-Padding-B",std::string(4200,'x')}});
     check(oversized_header&&oversized_header->status==431,"Aggregate recovery headers are bounded before document access");
     const std::string chunked_data(32769,'x');
-    const auto chunked=client.Put("/api/control/v1/host/configuration-recovery",[&](std::size_t offset,httplib::DataSink &sink){
+    // Rejection can precede the client's separately written chunk terminator.
+    // Keep this connection open for the response, then discard it: unread
+    // oversized input must never contaminate the following management request.
+    httplib::Client chunked_client("127.0.0.1",port);
+    chunked_client.set_keep_alive(true);chunked_client.set_read_timeout(2,0);chunked_client.set_write_timeout(2,0);
+    const auto chunked=chunked_client.Put("/api/control/v1/host/configuration-recovery",[&](std::size_t offset,httplib::DataSink &sink){
         const auto size=std::min<std::size_t>(4096,chunked_data.size()-offset);
         if(size&&!sink.write(chunked_data.data()+offset,size))return false;
         if(offset+size==chunked_data.size())sink.done();
         return true;
     },"application/json");
-    check(chunked&&chunked->status==413,"Unknown-length recovery input stops at the same body bound");
+    if(!chunked)throw std::runtime_error("Unknown-length recovery response: "+httplib::to_string(chunked.error()));
+    if(chunked->status!=413)throw std::runtime_error("Unknown-length recovery status: "+std::to_string(chunked->status)+" "+chunked->body);
+    check(nlohmann::json::parse(chunked->body)["error"]["code"]=="payload_too_large","Chunked recovery refuses at the body bound before configuration handling");
+    chunked_client.stop();
     auto doc=nlohmann::json::parse(current->body);auto configuration=config_handler_serialization::saved_configuration_from_internal_json(valid);
     check(!configuration.contains("WTP")&&!configuration.contains("WTP Server"),"Recovery uses the current settings projection");
     const nlohmann::json command{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery-save"},{"binding",doc["binding"]},
