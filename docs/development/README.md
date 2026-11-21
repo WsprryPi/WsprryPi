@@ -77,6 +77,8 @@ The [storage and process contract](sqlite-storage-contract.md) describes authori
 
 ## Work and cleanup
 
+The [shared Pi/Pico transmission history and Grafana plan](transmission-history-grafana-plan.md) proposes reception charts, retained transmission observations, and conservative spot association. It records implementation slices, acceptance criteria, source limitations, and unresolved decisions; it does not describe implemented behavior or authorize deployment.
+
 The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected work authority. Beta 1 preparation retains its exact candidate identities, artifacts and unfinished acceptance gates; a later source commit does not replace that candidate or establish release readiness.
 
 Follow the [repository and work-harness cleanup instructions](repository-cleanup-prompt.md) for an explicit cleanup request. Inventory exact deletion, rewrite, retention and hold decisions first. Preserve current dependencies, active work and recovery assets; retire obsolete prompts and evidence without creating an archive.
