@@ -264,10 +264,26 @@ def run(fixture, helper, fault_phase=None):
             assert request('POST', path + '/validate', {'purpose': purpose, 'passphrase': 'wrong phrase'})[0] == 200
             assert wait_state(('failed',))['error'] == 'archive_invalid'
             time.sleep(.05)
-            checked = cli(['validate', '--job-id', restore['job_id'], '--purpose', purpose], [('--passphrase-fd', phrase)])
-            assert checked.returncode == 0, checked.stderr
-            observed = wait_state(('preview', 'failed'))
-            assert observed['state'] == 'preview', (observed, [(proof.name, proof.read_text()) for proof in Path(str(ledger) + '.maintenance/jobs/' + restore['job_id']).glob('*result.json')])
+            def explicit_validation(action):
+                # The owning backend can temporarily hold its configuration
+                # gate. Only a durable, definite busy refusal permits another
+                # explicit validation; never replay an unknown outcome.
+                proof_path = Path(str(ledger) + '.maintenance/jobs/' + restore['job_id']) / 'validation-result.json'
+                for attempt in range(5):
+                    action()
+                    observed = wait_state(('preview', 'failed'))
+                    if observed['state'] == 'preview':
+                        return observed
+                    proof = json.loads(proof_path.read_text()) if proof_path.exists() else None
+                    assert observed['error'] == 'validation_failed' and proof is not None, (observed, proof)
+                    assert proof['schema'] == 'recovery-validation-result/1' and proof['job_id'] == restore['job_id'] \
+                        and proof['state'] == 'failed' and proof['error'] == 'busy', (observed, proof)
+                    assert attempt < 4, (observed, proof)
+                    time.sleep(.05)
+            def validate_cli():
+                checked = cli(['validate', '--job-id', restore['job_id'], '--purpose', purpose], [('--passphrase-fd', phrase)])
+                assert checked.returncode == 0, checked.stderr
+            observed = explicit_validation(validate_cli)
             preview = observed['preview']
             assert preview['purpose'] == purpose and preview['local_output_held'] and preview['remote_authority_held'] and not preview['remote_jobs_adopted']
             assert preview['listeners']['current_web_port'] == ports[0]
@@ -276,9 +292,10 @@ def run(fixture, helper, fault_phase=None):
             # An explicit preview refresh reuses the admitted encrypted upload,
             # reruns the actual owner validators, and leaves destination state alone.
             time.sleep(.05)
-            assert request('POST', path + '/validate', {'purpose': purpose, 'passphrase': phrase})[0] == 200
-            observed = wait_state(('preview', 'failed'))
-            assert observed['state'] == 'preview', observed
+            def validate_http():
+                status, _, data = request('POST', path + '/validate', {'purpose': purpose, 'passphrase': phrase})
+                assert status == 200, (status, data)
+            observed = explicit_validation(validate_http)
             preview = observed['preview']
             assert (state / 'authority.json').read_bytes() == before
             private_job = Path(str(ledger) + '.maintenance/jobs/' + restore['job_id'])
