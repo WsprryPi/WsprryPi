@@ -11,6 +11,12 @@ trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
 expect_failure() { if "$@"; then echo "Expected failure: $*" >&2; exit 1; fi; }
 contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"; }
+# These publication fixtures use opaque old/new markers. The real executable
+# probe is covered by application_state_install_shell_test.py.
+publication_storage_compatible=true
+validate_application_state_executable() {
+    [[ "$1" == "$BINARY_STAGE/wsprrypi" && "$publication_storage_compatible" == true ]]
+}
 # Automatic resolution runs before packages/resources, and explicit builds do
 # not consult release metadata. Never compile as a consequence of a failed lookup.
 (
@@ -177,7 +183,10 @@ mkdir -p "$BINARY_INSTALL_DIR" "$BINARY_STAGE" "$LOCAL_REPO_DIR/docs/licenses/bo
 cp "$SCRIPT_DIR/../../docs/licenses/botan/BSD-2-Clause.txt" "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt"
 printf old > "$BINARY_INSTALL_DIR/wsprrypi"
 printf new > "$BINARY_STAGE/wsprrypi"
-systemctl() { printf '%s ' "$@" >> "$fixture/services"; printf '\n' >> "$fixture/services"; return 0; }
+systemctl() {
+    printf '%s ' "$@" >> "$fixture/services"; printf '\n' >> "$fixture/services"
+    [[ "$1" != is-active || "${!#}" == "$WSPR_SERVICE" ]]
+}
 install() {
     local args=("$@") destination="${!#}"
     # Notice installation stays inside this fixture too; never touch /usr/local.
@@ -198,6 +207,10 @@ manage_exe wsprrypi
 [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old ]]
 [[ ! -e "$fixture/services" ]]
 DRY_RUN=false
+publication_storage_compatible=false
+expect_failure manage_exe wsprrypi
+[[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old && ! -e "$fixture/services" ]]
+publication_storage_compatible=true
 mv "$LOCAL_REPO_DIR/docs/licenses/botan/BSD-2-Clause.txt" "$fixture/held-notice"
 expect_failure manage_exe wsprrypi
 [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == old && ! -e "$fixture/services" ]]
@@ -216,7 +229,7 @@ grep -q '^start ' "$fixture/services"
 unset -f mv
 # A failed rollback must retain the only recovery copy.
 BINARY_INSTALLED=true
-systemctl() { [[ "$1" == is-active ]]; }
+systemctl() { [[ "$1" == is-active && "${!#}" == "$WSPR_SERVICE" ]]; }
 expect_failure rollback_executable
 [[ "$BINARY_INSTALLED" == recovery-failed ]]
 expect_failure restore_daemon_state
@@ -245,7 +258,10 @@ grep -q 'sudo reboot' "$fixture/reboot-notice"
     mkdir -p "$BINARY_STAGE" "$BINARY_INSTALL_DIR"
     printf new >"$BINARY_STAGE/wsprrypi"
     printf old >"$BINARY_INSTALL_DIR/wsprrypi"
-    systemctl() { printf '%s\n' "$1" >>"$fixture/logging-services"; }
+    systemctl() {
+        printf '%s\n' "$1" >>"$fixture/logging-services"
+        [[ "$1" != is-active || "${!#}" == "$WSPR_SERVICE" ]]
+    }
     manage_exe wsprrypi >"$fixture/publication-console"
     [[ $(cat "$BINARY_INSTALL_DIR/wsprrypi") == new && "$BINARY_INSTALLED" == true ]]
     grep -Fq "Complete: Stage executable for $BINARY_INSTALL_DIR/wsprrypi." "$fixture/publication-console"

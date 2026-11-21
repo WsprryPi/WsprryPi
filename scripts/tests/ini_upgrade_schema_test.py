@@ -44,13 +44,6 @@ def check_persistent_schema(current: str) -> None:
     for index, section in enumerate(sections):
         end = sections[index + 1].start() if index + 1 < len(sections) else len(allowlist)
         required[section[1]] = set(re.findall(r'key == "([^"]+)"', allowlist[section.end():end]))
-    for section, header, function in (
-        ("WTP", "wtp_settings_json.hpp", "wtp_settings_json"),
-        ("WTP Server", "wtp_server_settings_json.hpp", "wtp_server_settings_json"),
-    ):
-        serializer = (ROOT / "src" / header).read_text(encoding="utf-8").split(function, 1)[1].split("inline ", 1)[0]
-        required[section] = set(re.findall(r'\{"([^"]+)"\s*,', serializer))
-        require(bool(required[section]), f"no runtime keys extracted for {section}")
     bands = source.split("kHamBandJsonKeys =", 1)[1].split("}};", 1)[0]
     required["Band GPIO"] = {key for band in re.findall(r'"([^"]+)"', bands)
                             for key in (band, f"{band} Active High")}
@@ -101,18 +94,11 @@ def main() -> None:
         merged_ini = root / "merged.ini"
         stock_ini = root / "installed.ini.stock"
 
-        require(parse_ini(current).getboolean("WTP Server", "Enabled") is False,
-                "new stock must leave the retired listener disabled")
+        require(not any(parse_ini(current).has_section(section) for section in ("WTP", "WTP Server")),
+                "new stock must omit unsupported transmitter and listener sections")
         custom = {
-            "Operation": {"Transmit Backend": "wtp"},
-            "WTP Server": {"Enabled": "true", "Port": "31499", "Interface": "legacy0"},
+            "Operation": {"Transmit Backend": "si5351"},
             "Si5351": {"Adapter Identity": "usb:04d8:00dd:serial:6164616672756974", "I2C Bus": "17"},
-            "WTP": {"Transport": "network", "Hostname": "station.example", "TCP Port": "31418",
-                    "TLS Server Identity": "station.example", "TLS CA File": "/etc/station/ca.pem",
-                    "TLS Client Certificate": "/etc/station/client.pem", "TLS Client Key": "/etc/station/client.key",
-                    "Endpoint": "/dev/serial/by-id/station", "USB Serial": "001234",
-                    "USB Vendor ID": "11914", "USB Product ID": "10", "Device ID": "0123456789abcdef0123456789abcdef",
-                    "Allow Frequency Adjustment": "true", "Start Uncertainty ns": "1000000"},
             "WSPR": {"Frequency Profile": "wrc15", "Band Preferences": '{"20m":14097100}'},
             "Band GPIO": {"8m": "23", "8m Active High": "true", "5m": "24", "5m Active High": "true"},
         }
@@ -180,7 +166,7 @@ upgrade_ini "$2" "$3" "$4"
         # Exercise the actual shell function, including failure handling. A
         # failed or empty merge must never publish defaults over custom gates.
         for failure in ("nonzero", "empty", "awk-only"):
-            old_ini.write_text("[WTP Server]\nEnabled = false\n", encoding="utf-8")
+            old_ini.write_text("[Operation]\nMode = QRSS\n", encoding="utf-8")
             merged_ini.write_text("previous merged output\n", encoding="utf-8")
             before = old_ini.read_bytes(), merged_ini.read_bytes(), CURRENT_INI.read_bytes()
             result = subprocess.run(
@@ -215,8 +201,8 @@ fi
             require((before[0], before[2]) == (old_ini.read_bytes(), CURRENT_INI.read_bytes()),
                     f"{failure} merge replaced its inputs")
             if failure == "awk-only":
-                require("Enabled = false" in merged_ini.read_text(encoding="utf-8"),
-                        "awk-only merge lost the disabled WTP listener")
+                require(parse_ini(merged_ini.read_text(encoding="utf-8")).get("Operation", "Mode") == "QRSS",
+                        "awk-only merge lost the selected native mode")
             else:
                 require(before[1] == merged_ini.read_bytes(), f"{failure} merge replaced configuration")
             require(Path(f"{old_ini}.pre_migration.bak").read_bytes() == before[0],

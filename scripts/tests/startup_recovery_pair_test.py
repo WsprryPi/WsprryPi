@@ -75,7 +75,7 @@ install() {
 hook() { PYTHONPATH="$FIXTURE/helpers" "$PYTHON" "$FIXTURE/hook.py" prepare; }
 systemctl() {
     case "$1" in
-        is-active) [[ $(cat "$FIXTURE/active") == 1 ]];;
+        is-active) [[ "${!#}" == "$WSPR_SERVICE" && $(cat "$FIXTURE/active") == 1 ]];;
         stop) printf 0 >"$FIXTURE/active";;
         list-unit-files) printf 'wsprrypi.service enabled\n';;
         start)
