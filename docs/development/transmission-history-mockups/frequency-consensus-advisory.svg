@@ -9,7 +9,7 @@
 <rect x="466" y="124" width="260" height="34" rx="3" fill="#181b1f" stroke="#3b414a"/>
 <text x="478" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Band: 20 m</text>
 <rect x="738" y="124" width="330" height="34" rx="3" fill="#181b1f" stroke="#3b414a"/>
-<text x="750" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">21 Nov 2026 · 12:00–18:00 UTC</text>
+<text x="750" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">12:00–18:00 UTC</text>
 <rect x="24" y="174" width="1392" height="54" rx="3" fill="#302b20" stroke="#3b414a"/>
 <text x="38" y="196" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#ffcc66" font-weight="600">CORRECTION SUGGESTION WITHHELD</text>
 <text x="38" y="216" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Ordinary receiver consensus only · no approved frequency-reference evidence · configuration remains untouched</text>
@@ -42,7 +42,7 @@
 <text x="42" y="552" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#ffcc66" font-weight="400">Empirical spread is not an absolute uncertainty bound.</text>
 <rect x="896" y="244" width="520" height="330" rx="3" fill="#181b1f" stroke="#3b414a"/>
 <text x="912" y="271" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#e8edf2" font-weight="600">Advice eligibility</text>
-<text x="912" y="293" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#b7c0ca" font-weight="400">All gates must pass before a setting value can be suggested</text>
+<text x="912" y="293" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#b7c0ca" font-weight="400">Setting suggestions require every eligibility gate</text>
 <text x="914" y="335" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Frame identity</text>
 <text x="1160" y="335" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#73bf69" font-weight="400">Established</text>
 <text x="914" y="378" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Frequency provenance</text>

@@ -9,7 +9,7 @@
 <rect x="466" y="124" width="260" height="34" rx="3" fill="#181b1f" stroke="#3b414a"/>
 <text x="478" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Bands: 40 m / 30 m / 20 m</text>
 <rect x="738" y="124" width="330" height="34" rx="3" fill="#181b1f" stroke="#3b414a"/>
-<text x="750" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">21 Nov 2026 · 18:00–19:00 UTC</text>
+<text x="750" y="146" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">18:00–19:00 UTC</text>
 <rect x="24" y="174" width="1392" height="38" rx="3" fill="#302b20" stroke="#3b414a"/>
 <text x="38" y="198" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#ffcc66" font-weight="400">Coverage notice · Pico B disconnected 18:26–18:41 UTC. That interval remains unknown.</text>
 <rect x="24" y="228" width="1392" height="322" rx="3" fill="#181b1f" stroke="#3b414a"/>

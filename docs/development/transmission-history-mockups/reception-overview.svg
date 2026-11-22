@@ -14,7 +14,7 @@
 <text x="38" y="198" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#e8edf2" font-weight="400">Collection current · 2,880 retained reports · 72 unique receiver labels · recent windows still subject to backfill</text>
 <rect x="24" y="228" width="856" height="325" rx="3" fill="#181b1f" stroke="#3b414a"/>
 <text x="40" y="255" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#e8edf2" font-weight="600">Reception by band and UTC hour</text>
-<text x="40" y="277" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#b7c0ca" font-weight="400">Received cycles, not attempted transmissions · 21 Nov 2026 · cells show distinct reported UTC cycles</text>
+<text x="40" y="277" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#b7c0ca" font-weight="400">Received cycles, not attempted transmissions · cells show distinct reported UTC cycles</text>
 <text x="42" y="334" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#e8edf2" font-weight="400">40 m</text>
 <rect x="108" y="305" width="27" height="46" rx="3" fill="#36775a"/>
 <text x="116" y="333" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#e8edf2" font-weight="400">2</text>
