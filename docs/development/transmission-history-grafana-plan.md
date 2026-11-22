@@ -63,6 +63,25 @@ One collector runs on an explicitly selected always-on Linux host, which may be 
 
 Reuse the existing Pi USB-log collection path rather than competing for a Pico Logging port. Read-only network status can support a network-connected Pico, with explicitly lower historical completeness when event records are unavailable. Determine supported observation access and authorization in slice A; an internal socket or browser route is not automatically an external collector API.
 
+### Product-neutral observations and reuse
+
+The planned observation interface describes station evidence independently of Grafana panels, analytical database tables, or a particular consumer. Keep the bounded, independently versioned observation envelope, source and execution identities, timestamp meanings, provenance, explicit unavailable values, and coverage semantics in the producer contract. Wsprry-History owns its analytical projections, spot associations, retention policies, and presentation choices. Consumer-specific chart fields and derived metrics do not belong in the transmitter export merely because a dashboard uses them.
+
+Wsprry-History is the sole initial consumer in this plan. Product neutrality supports reuse of the approved evidence without expanding the initial field/event allowlists, adding producer capabilities, or building a general-purpose distribution service. Preserve confirmed-completion evidence and minimal supporting context, separate collection health, and separately approved calibration evidence. These observations support history and analysis; they do not establish a complete live execution monitor, unrestricted log feed, or lossless archive.
+
+Potential uses illustrate reuse opportunities, not approved deliverables:
+
+| Potential consumer | Use of approved observations | Boundary |
+| --- | --- | --- |
+| Station logbook | Confirmed transmissions and attributable reception reports | Preserve completion and association uncertainty |
+| Fleet monitor | Collection availability, backlog, freshness, and coverage gaps | Collection health does not establish live transmitter state |
+| Reception explorer | Maps, band comparisons, receiver comparisons, and reception trends | Requires separately retrieved spots and defined analytical semantics |
+| Research tools | Authorized data exports for notebooks and propagation studies | Preserve provenance, retention limits, and applicable upstream terms |
+| Advisory calibration tool | Apparent frequency analysis and evidence-qualified manual advice | Requires the separate calibration evidence and slice E eligibility gates |
+| Notification service | Collection-fault or evidence-supported analytical alerts | Alert delivery and recipients require their own authorization |
+
+Each additional consumer requires separate scope and access authorization, an approved field/origin allowlist, and a defined delivery contract covering authentication, resource limits, replay, acknowledgments, deduplication, retention, and failure handling. Authorization for Wsprry-History does not authorize another recipient or transfer its credentials, journal privileges, or calibration-evidence access. Select whether an approved consumer uses a central analytical export or a separately authorized local observation path; this plan does not choose that topology. Any producer-interface expansion remains explicit, separately reviewed work under the applicable Pi/Pico coordination gates. Consumers receive no transmitter-control authority, and their failures must not affect RF execution or existing USB collection.
+
 ### Station-side adapter and outbound delivery
 
 The selected approach uses a small station-side adapter on each enrolled Pi to read permitted local observations and send bounded batches over authenticated outbound HTTPS to the central collector. It runs independently of an open browser. The existing Pi application remains the sole owner of enrolled Pico USB Logging handles, framing, identity checks, maintenance coordination, and collection policy. The history adapter consumes already imported Pico journal records; it does not open Pico Logging, Console, Management, or transmitter-control ports. A central host does not directly read a remote Pi's local journal.
@@ -541,6 +560,7 @@ Deliver the shared analytical schema, source-to-field mapping, evidence/identity
 Acceptance criteria:
 
 - Every field has a source, unit, timestamp meaning, null/unknown behavior, and retention/completeness classification.
+- The observation contract describes source evidence independently of Grafana panels and database projections. Its initial access and delivery design supports Wsprry-History only; reuse examples grant no additional consumer access, fields, fan-out, or transmitter-control authority.
 - Pi and Pico identity mappings cover boot changes, hostname changes, controller/executor roles, and cloned or conflicting identities.
 - Accepted settings are distinguished from current settings; ARM, observed running, completion, and RF measurement remain separate.
 - Exact time/frequency representations preserve precision; monotonic timestamps cannot be joined across boots as absolute time.
@@ -771,6 +791,7 @@ Implementation documentation must cover enrollment, read-only access, retention,
 | Decision | Proposed direction | Required gate |
 | --- | --- | --- |
 | Repository creation and setup | Repository name and ownership selected: `WsprryPi/Wsprry-History`; creation, visibility, licensing, and initial setup remain unapproved or unresolved | Separate creation/setup authorization |
+| Additional consumers | Product-neutral evidence semantics are selected; each additional consumer requires separate scope/access authorization and a defined delivery contract. Consumer identity, field/origin access, local versus central access, replay, resource isolation, and retention remain open | Separate consumer proposal; not required for initial Wsprry-History delivery |
 | Deployment host | Open: dedicated Linux VM or spare Raspberry Pi; choose the exact host, OS, CPU allocation, and SSD subject to validation of the provisional 2-vCPU/comparable-Pi, 4-GB-RAM, 100-GB-SSD target | Deployment proposal in slice A; select as a deployment prerequisite |
 | Observation-export interface | Defaults selected: dedicated read-only Pi runtime export plus filtered existing journals, local helper, and Unix-domain observation interface to the unprivileged forwarder. Define field/event allowlists, exact schema and field bounds, endpoint and peer authorization, snapshot consistency, replay resource/cadence choices, checkpoint transaction/continuation format, and detailed refusal/recovery behavior under the bounded-contract defaults; review producer changes explicitly | Slice A feasibility and contract design; slice C implementation |
 | Bounded observation contract | Trial four-byte framing, 8-KiB requests, 16-KiB observations, 128-KiB pages/snapshots, 32-item pages, 4-KiB continuations, 16-level nesting, single per-source read, and five-second deadline selected. Strict schemas, durable continuation, and explicit rejection/loss behavior selected; exact layouts, field bounds, scan budgets, continuation encoding/integrity, reason codes, and quarantine/recovery details remain open | Slice A contract design; slice C qualification |
@@ -816,6 +837,7 @@ Implementation documentation must cover enrollment, read-only access, retention,
 - Antenna switching, schedule optimization, output-power control, applying calibration changes, or any other automatic transmitter action. Slice E permits observational estimates and advisory suggestions only.
 - Worldwide spot mirroring, automatic upstream-provider fallback, or silently combining archives.
 - New general-purpose UDP telemetry export, new firmware history storage, or expanded control interfaces without a separate scope decision.
+- Additional consumer integrations, shared-credential access, or a general-purpose multi-consumer distribution service within the initial Wsprry-History scope.
 - Guaranteed lossless transmission history from existing bounded logs and polling.
 - Reinterpreting safety/recovery journals as an analytical transmission archive or giving Grafana access to private application state.
 - Deployment, service changes, live transmission, commits, pushes, or publication as part of saving this plan.
