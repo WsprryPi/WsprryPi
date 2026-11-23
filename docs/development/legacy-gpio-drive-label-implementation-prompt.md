@@ -1,111 +1,87 @@
-# Legacy GPIO drive-label correction: implementation prompt
+# Drive-current mappings across WsprryPi and WsprryPico: implementation prompt
 
-Tracking: [WsprryPi issue #478](https://github.com/WsprryPi/WsprryPi/issues/478). Read the [implementation plan](legacy-gpio-drive-label-implementation-plan.md) before implementation.
+Tracking: [WsprryPi issue #478](https://github.com/WsprryPi/WsprryPi/issues/478). Read the [implementation plan](legacy-gpio-drive-label-implementation-plan.md) and current repository instructions before implementation.
 
-Implement the narrowly scoped WsprryPi UI correction described below. Follow the current repository instructions and preserve all existing work. This prompt authorizes the specified implementation and hardware-free validation when explicitly invoked; its presence in the repository does not authorize execution. Do not stage, commit, push, publish, deploy, install, operate services, or exercise hardware.
+## Task and authority
 
-## Outcome
+When this prompt is explicitly invoked, verify and correct RF-output drive-current mappings end to end across WsprryPi and WsprryPico, including direct GPIO, Si5351, RP1, necessary backend/provider changes, configuration and management interfaces, persistence, tests, and documentation. The previous UI-only scope and exclusions are superseded. Do not omit Pico, Si5351, RP1, necessary backend changes, or documentation on the grounds that they were previously excluded. Verify already-correct paths and retain them when no change is needed.
 
-Correct the nominal drive-current presentation for the legacy GPIO slider on Pi 4, Pi 400, and CM4. Preserve the stored pad code and hardware behavior. The existing `GPIO.Power Level` setting remains an integer from 0 through 7. It is not a value in mA.
+This prompt's creation or publication does not itself invoke implementation. Implementation includes necessary coordinated source and documentation edits in WsprryPi, WsprryPico, and WsprryPi-Docs, and a necessary RP1 provider correction in its owning repository if evidence places the defect there. Follow each repository's instructions and preserve each Git boundary. Do not stage, commit, push, publish, deploy, load firmware, operate services, reboot, change live configuration/GPIO, or transmit unless separately authorized. Broad backend rewrites, platform ports, dependency upgrades, unrelated cleanup, and RF-power recalibration are outside scope.
 
-Use this acceptance matrix for valid stored code `n`:
+## Required behavior
 
-| Platform | Existing platform generation | Nominal current displayed |
-| --- | --- | --- |
-| Pi 1, Pi 2, Pi 3, Zero, and Zero 2 W | 1, 2, or 3 | `2 × (n + 1) mA` |
-| Pi 4, Pi 400, and CM4 | 4 | `(n + 1) mA` |
-| Missing, malformed, or unrecognized platform identity | Unknown | Raw level and an explicit indication that nominal drive is unavailable |
-| Pi 5 and other supported RP1 platforms | Existing RP1 path | Preserve the separate 2, 4, 8, or 12 mA control |
+| Output/platform | Legal nominal drive currents |
+| --- | --- |
+| Si5351 in both products | 2, 4, 6, or 8 mA |
+| Pi 1, Pi 2, Pi 3, Zero, and Zero 2 W GPIO | 2, 4, 6, 8, 10, 12, 14, or 16 mA |
+| Pi 4, Pi 400, and CM4 GPIO | 1, 2, 3, 4, 5, 6, 7, or 8 mA |
+| Pi 5 and other supported RP1 platforms | 2, 4, 8, or 12 mA |
+| Pico RP2350 direct GPIO | 2, 4, 8, or 12 mA |
 
-For example, code 0 displays 1 mA on Pi 4 and 2 mA on Pi 3; code 7 displays 8 mA on Pi 4 and 16 mA on Pi 3. A UI update must never change code 7 to another code to preserve the old displayed current.
+Drive current is nominal electrical selection, not frequency, measured pad current, calibrated RF output, or reported WSPR dBm. Preserve valid saved values, defaults, and existing representation wherever possible. In particular, Pi legacy `GPIO.Power Level` stays code 0–7: earlier models display `2 × (code + 1)` mA and generation 4 displays `code + 1` mA. Default code 7 therefore means 16 mA on Pi 3 and 8 mA on Pi 4 without changing the stored code. Pi Si5351 level 1–4 must map to 2/4/6/8 mA; do not confuse indices with fields already stored in mA. Do not silently normalize custom settings or invent a migration. Raise material unresolved compatibility or migration decisions before choosing behavior.
 
-## Scope and non-goals
+## Inspect and establish a per-row evidence map
 
-- Change only the legacy GPIO label calculation, its necessary refresh and accessibility behavior, and focused tests and test registration.
-- Preserve the existing slider range, step, default code 7, setting name, serialization, validation, persistence, autosave policy, draft handling, backend selection, output eligibility, and hardware programming.
-- Preserve the existing layout and design language. Do not redesign the settings page, rename unrelated controls, or introduce new workflows.
-- Preserve earlier-model current labels and their existing secondary dBm presentation. Do not carry those dBm estimates into generation 4 or unknown-platform labels, and do not calculate replacement dBm estimates from nominal current.
-- Do not change Si5351 mappings, RP1 drive selection, WsprryPico, Pico qualification profiles, WSPR reported-power metadata, RF-power calculations, or transmitter components.
-- Do not add configuration keys, API fields, capability descriptors, schema versions, model-selection controls, migrations, dependencies, or a new platform-detection subsystem.
-- Do not edit the sibling operator-documentation repository. Review and report its required follow-up only.
-- Do not fix unrelated findings or preexisting test failures as incidental work.
+Inspect each repository's branch, revision, complete staged/unstaged/untracked state, applicable nested instructions, component ownership, and whitespace checks before builds or edits. Preserve all existing changes. Read Pico README, CONTRACT, and engineering architecture; read operator-doc instructions. Historical revisions in the plan are context, not checkout instructions. Avoid blanket staging, resets, stashes, synchronization, or overwrites.
 
-## Inspect before editing
+For every matrix row, trace legal advertised values and defaults through controls, parsing/validation, internal configuration, saved serialization, runtime consumption, register or SDK encoding, and output selection. Include Pico standalone and Pi-managed Pico paths over network and USB, strict descriptors and validators, generated assets, saved drafts, boot-active state, and pad observation. Record evidence before declaring a row correct.
 
-1. Read the applicable `AGENTS.md` files, inspect the current branch and complete working tree, and review staged and unstaged changes. Run `git diff --check` and `git diff --cached --check`. Confirm affected UI files are ordinary parent-repository content.
-2. Treat all existing changes as user work. The planning baseline was WsprryPi `devel` at `51257fdb`, with substantial existing changes, including `WsprryPi-UI/package.json`. This is historical context, not an instruction to check out that revision or overwrite current files.
-3. Read and apply the Impeccable skill before UI work. Follow its context-loading instructions and read its craft-floor guidance immediately before editing. Do not commit skill or runtime artifacts.
-4. Inspect `updateGpioPowerLabel()`, configuration population, draft restoration, default reset, backend switching, and platform refresh. Inspect `syncGpioDriveControls()` and existing RP1 and Si5351 behavior as regression boundaries.
-5. Trace `get_raspberry_pi_generation()` in `src/version.cpp`, the existing public platform serialization, and `site.js` population of `window.WSPRRYPI_PLATFORM.raspberryPiGeneration`. Confirm the intended named models are classified appropriately, including Pi 400, CM4, Zero, and Zero 2 W. Account for actual model strings and processor fallback; do not infer that a board's marketing name equals its processor generation.
-6. Reconfirm that legacy `GPIO.Power Level` is passed unchanged as the 0–7 pad code to the transmitter. This is source verification, not physical pad or RF qualification.
-7. Inspect existing test launchers before running them. Identify their fixtures, side effects, prerequisites, and output paths.
+Inspect the known legacy UI table in `WsprryPi-UI/data/index.js`, platform population in `data/site.js`, public configuration serialization, `src/version.cpp`, and legacy/RP1/Si5351 backends in `src/WSPR-Transmitter`. Inspect Pico `src/standalone`, `src/network`, `src/hardware/si5351*`, `src/rf/si5351*`, and `src/rf/pico` with their tests. Follow actual current interfaces rather than assuming those paths exhaust the implementation.
 
-If platform classification or backend encoding prevents the stated behavior, stop that dependent implementation, report the exact evidence, and ask for direction before changing detection, backend code, or public contracts. Do not conceal the problem with a JavaScript model-name parser or a guessed fallback. Preserve independent completed work.
+Verify Pi 400, CM4, Zero, Zero 2 W, and supported RP1 identities through current model and processor detection. Fix a necessary detection defect at its owner; do not mask it with a duplicate browser model parser. Missing, malformed, stale, or unsupported identity must not produce guessed current or grant hardware eligibility.
 
-## Implementation
+Check register encodings and units against primary device documentation and pinned SDK/provider definitions, recording their sources and revisions. Do not use the UI table or tests derived from production code as independent evidence of hardware encoding. If authoritative evidence conflicts with the required matrix, report that conflict before implementing an incompatible interpretation.
 
-The expected primary file is `WsprryPi-UI/data/index.js`. Modify `WsprryPi-UI/data/site.js` only if the existing metadata lifecycle requires an explicit label refresh. Modify `WsprryPi-UI/data/views/config.php` only if necessary for the affected control's accessible presentation. Keep tests within `WsprryPi-UI/tests` and make only additive, focused test-registration changes to the existing package scripts. Do not create a generic formatting framework.
+Pico's ordinary qualified Si5351 profile was restricted to 8 mA during the initial inspection. Verify current behavior and distinguish legal register values, accepted configuration, engineering execution, ordinary qualified execution, and physical evidence. Keep existing safeguards unless an evidence-backed change is justified. If intended availability cannot be achieved without qualification-policy decisions or physical evidence, report the exact blocker and obtain that direction; do not silently exclude those values or claim qualified operation.
 
-Use a small, testable formatter or equivalent focused logic driven by the existing platform generation and selected pad code. Reuse the established platform-data contract; do not accept arbitrary truthy values or coerce blank, null, or malformed identities into a known generation. A valid slider value arrives as a string, so distinguish legitimate integer strings from invalid or empty inputs without changing configuration validation.
+## Implement necessary corrections at each owner
 
-For recognized generations, display the matrix's nominal current. For unknown identity, preserve the raw valid code and use neutral wording such as `Level 7 — nominal drive unavailable`. For invalid codes, show an unavailable state without inventing a current or silently repairing the setting. A later identity refresh must clear a stale current label when identity becomes unknown. Unknown identity must not newly enable, disable, or expose hardware controls; preserve existing availability policy.
+Correct defective domains, defaults, validation, persistence, serialization, internal units, runtime selection, backend register/SDK programming, provider admission, and output targeting. Explain each component defect and why the correction belongs there, preserve reusable boundaries, and run component and parent tests. Necessary mapping-related backend/component changes are authorized by this scope; incidental cleanup is not.
 
-Keep visible and accessible values consistent. Set the slider's `aria-valuetext`, or use the established equivalent, so keyboard and assistive-technology users receive the same nominal-current meaning. Preserve the native range control and its 0–7 value semantics. Do not describe nominal current as measured current or calibrated RF power.
+Prefer existing metadata and interfaces. New API/schema fields are allowed if demonstrably necessary for the mapping objective, with all producers and consumers updated together. Do not force a display-only fix for an encoding or runtime defect, and do not change correct paths solely to create edits. Keep source, generated assets, and documentation consistent.
 
-Ensure the presentation refreshes after platform metadata and the selected code are available on initial load, configuration reload, reconnect, draft restoration, default reset, and backend switching. Reuse existing refresh calls where sufficient. If another call is needed, invoke the presentation function directly; do not dispatch input/change events solely to refresh labels. Label-only updates must not alter slider position, saved payloads, drafts, dirty state, or network mutation counts.
+Align Pi-local, Pico standalone, and Pi-managed Pico controls with their actual supported domains and activation rules. Use Impeccable before UI changes, including required context and craft guidance, and preserve the established design. Match visible and accessible mA values. Show raw valid level plus nominal drive unavailable for unknown identity; invalid inputs must not fabricate current or silently repair settings. Clear stale labels on identity/boot/target changes.
 
-Distinguish presentation refreshes from intentional operator edits. Resetting defaults or changing the selected backend may already change configuration under existing policy; preserve that policy. Tests must compare the same workflow before and after the correction, isolating any extra writes caused by label rendering rather than forbidding the workflow's legitimate writes.
+Suppress legacy current-table dBm estimates on generation 4 and unknown identity; retain unrelated earlier-model presentation. Do not calculate replacements from current. Preserve reported-power metadata, independent backend visibility, controller-only limits, output admission, and explicit read/save/apply/restart workflows. Saved, boot-active, cached readback, and measured electrical state are different observations; unavailable members must not display observed defaults.
 
-Preserve separate RP1 control visibility and enablement, Si5351 labels, and controller-only behavior. A hidden legacy control must not affect active RP1 or Si5351 configuration.
+Refresh labels after identity and selection are available, using direct rendering calls rather than synthetic events that trigger persistence. Preserve drafts, slider position, dirty state, and payloads on label-only updates. Intentional user edits, resets, and backend changes retain their legitimate write behavior; tests must isolate extra rendering-induced writes. Lost replies must not trigger automatic retries, restarts, or hidden fallback.
 
-## Tests and validation
+## Shared contracts and paired integration
 
-Add focused tests following the existing UI infrastructure. Exercise production formatter/rendering code rather than a duplicate implementation embedded in tests. Browser coverage must load the real application assets through local fixtures, not a standalone mock page.
+Read and follow both repositories' current coordinated capability/protocol gate for any descriptor, advertised limit/unit, API/schema, or protocol-facing change. Validate shape before field access and reject extra/missing fields, wrong types, unsupported versions/values, inconsistent descriptors, and stale device/boot/revision/profile bindings before writes. Update runtime consumers, serialization, generated assets, paired adapters, and docs in the same task.
 
-Cover these acceptance cases:
+Follow authoritative Pico `control-policy.json`: retain the single current prerelease control major, identifier, and namespace at 1 until the explicit stable transition; do not introduce historical views, loose version ranges, downgrade/carrier fallback, or weaker validation. Keep WTP, transport/authentication, and storage formats independent. Existing fixture names do not authorize restoring retired WTP execution.
 
-- Every valid code 0–7 for generations 1, 2, 3, and 4, including exact endpoint and default labels.
-- Pi 400 and CM4 classification through the existing producer-to-UI metadata path. Supply evidence for the named earlier-model classifications too. Browser fixtures alone do not prove native model detection; use existing native test seams or source-path evidence where appropriate. Do not add a production override or duplicate detector solely for testing.
-- Missing platform object, missing generation, unknown/unsupported generation, malformed identity, and invalid code inputs. No fabricated current, stale current, or fallback to the earlier-model mapping.
-- Initial load before metadata, metadata arrival after the slider value, configuration reload/reconnect, known-to-unknown identity refresh, draft restoration, default reset, and backend switching.
-- Generation 4 and unknown labels have no inherited dBm estimate; earlier-model presentation is preserved.
-- Visible and accessible values agree, including keyboard changes.
-- Serializing an unchanged selection preserves its original code. Label-only lifecycle refreshes send zero additional mutation requests and preserve unsaved drafts and dirty state. Deliberate user changes retain the existing autosave behavior.
-- RP1 and Si5351 controls retain their current mappings, visibility, and enablement; controller-only hosts gain no local transmission capability.
+Require both production network and USB hardware-free integration suites for this cross-product task, even if some mappings remain unchanged. Use checked-in WsprryPi `.github/workflows/debian-non-hardware.yml` recipes for `wtp-network-loopback` and `wtp-usb-management-pair`: network `wtp-network-runtime-test`, `wtp-network-interop-test`, and `wtp-config-interop-test`; USB actual Pico `usb_management_driver`, `wtp-usb-pair-client-build`, `wtp-usb-management-test`, and `WsprryPi-UI/tests/wtp_usb_pair_test.js`. Explicitly select the intended current Pico/Pi sources and pinned dependencies, and record revisions plus tested uncommitted changes.
 
-From `WsprryPi-UI`, run the new focused tests and the following existing commands after inspecting their launchers:
+Do not substitute mock-only tests, stale refs, prior CI, or standalone builds. Failed/cancelled/timed-out/skipped required checks remain blockers. Resolve companion mismatches affecting the changed contract as integration work, and distinguish local candidate validation from companion availability on intended paired refs. Do not claim delivery on devel/main without that evidence.
 
-```sh
-node tests/conditional_transmit_gpio_integration_test.js
-node tests/rp1_route_ui_test.js
-node tests/native_host_ui_test.js
-npm run test:unit
-```
+## Validation
 
-Run the applicable existing browser coverage for configuration loading and backend switching, registering any new browser test in the established runner. Record the exact commands selected and their results. Report unavailable prerequisites and unrelated failures accurately; do not weaken assertions or claim a skipped check passed.
+Inspect launchers before execution. Use installed tools and checked-in build/test recipes, safe local fixtures, and pinned dependencies. Do not use a running appliance, physical device, installer, or service as a validation workaround; report environment blockers without changing pins or weakening assertions. Physical testing requires separate explicit setup authorization.
 
-Use the existing installed test tooling and local fixture endpoints. Do not add dependencies, download a browser or SDK, connect to a physical Pi or Pico, or invoke a running appliance as a validation workaround. If a prerequisite is unavailable, report the exact blocked check and continue independent in-scope work. If an existing test launcher exercises hardware or services, do not run it; report why that named check remains unperformed and use only a demonstrably hardware-free equivalent for additional evidence.
+Test all legal values for every matrix row and negative boundaries/intermediate values; defaults; stored round trips; index-versus-mA errors; identity classification and changes; actual runtime output/register selection; encoding and unrelated-bit preservation where applicable; provider refusal; rejected-write invariants; and activation, pending-restart, fault, and readback semantics. Use production code with independent expected mappings and fake register/SDK adapters or existing test seams. Do not copy the implementation formula into tests or assert unsupported electrical measurements.
 
-Use Impeccable to inspect the actual rendered control at desktop and mobile sizes, in light and dark themes. Review an earlier-model state, generation 4, and unknown identity, including keyboard operation and the accessible value. Capture visual evidence outside tracked source paths, and record the viewport sizes, states, and evidence locations. Do not substitute DOM-only assertions for rendered inspection.
+Run affected standalone component tests, parent regression checks, Pico host tests, firmware builds when affected, and both paired suites. Choose Pi semantics explicitly from `src`: on macOS or unsupported Linux hosts use `make semantics-test-portable SUDO=`; on Linux with libgpiod C++ headers use `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make semantics-test SUDO=`. Portable coverage is a subset and cannot qualify a changed physical backend. Use canonical Linux CI coverage where needed and document remaining limits.
 
-No application transmission, installation, service, hardware, or RF validation is authorized. This task does not require a C++ semantics build when production C++ remains unchanged. Hardware-free fixture results qualify software presentation and persistence behavior only.
+From Pi `WsprryPi-UI`, run new focused tests, `node tests/conditional_transmit_gpio_integration_test.js`, `node tests/rp1_route_ui_test.js`, `node tests/native_host_ui_test.js`, `npm run test:unit`, and affected real-page browser checks. Select Pico drive, Si5351, schema, and browser tests from its current documented registrations. Register new focused coverage without overwriting existing test scripts or user changes. Record exact commands/results and meaningful warnings/skips.
 
-The planned correction consumes existing platform metadata and changes presentation only; it does not change advertised limits, wire units, schemas, shared control semantics, or companion interfaces. Therefore, the coordinated Pi/Pico network and USB integration gate is not triggered by this scope. If implementation would cross that boundary, stop for scope direction; any authorized expansion must satisfy the full repository gate with the intended source pair.
+Exercise initialization, delayed metadata, reload/reconnect, known-to-unknown identity, target/boot changes, backend switching, default reset, draft restoration, keyboard changes, and errors. Assert visible/accessibility agreement, unchanged serialized selection, no extra rendering-induced mutations, retained drafts/dirty state, and intended writes for deliberate edits. Preserve RP1/Si5351 visibility and controller-only restrictions.
 
-## Documentation impact
+Inspect actual rendered Pi and Pico affected interfaces with Impeccable at desktop/mobile sizes in light/dark themes. Cover every affected backend and unknown/disabled/pending/error states. Preserve screenshots and logs outside tracked sources and record viewports and evidence paths. DOM assertions do not replace rendered inspection. Hardware-free evidence does not qualify electrical behavior, timing, installation, service lifecycle, frequency accuracy, or RF output.
 
-The available operator repository at planning time was `/Users/lbussy/GitHub/WsprryPi-Docs`; the `Wsprry_Pi_Docs` spelling in the application instructions did not exist. Verify the current location and read its instructions before inspecting it. Do not write there under this prompt.
+## Documentation is included
 
-Report the exact follow-up for `docs/User_Interface/Setup/Transmitter/index.md`, under `GPIO Power Level`, which presents the earlier-model mapping generally, and `docs/Advanced_Operations/rf_electrical.md`, which gives a general approximate 16 mA maximum. The follow-up should distinguish nominal current by model, explain the retained 0–7 pad code where useful, and avoid deriving calibrated RF power from drive current. Review affected screenshots and recommend replacement only if materially inaccurate. Do not broaden into a full electrical-documentation rewrite.
+Update affected operator documentation in `/Users/lbussy/GitHub/WsprryPi-Docs` after verifying its actual location and instructions. The application instruction's `Wsprry_Pi_Docs` spelling was absent during planning. Cross-repository documentation changes are authorized for this implementation; do not defer them as outside scope. Preserve each repository's branch and user changes and edit only its owned content.
 
-The implementation report must include a `Documentation Impact` section listing documentation updated, documentation considered but unchanged, and documentation still required. Cross-repository follow-up remains outstanding until separately authorized and validated. Do not describe the whole effort as complete while required implementation checks or documentation work remain unresolved; distinguish a validated UI correction from the outstanding documentation boundary.
+Review operator `docs/User_Interface/Setup/Transmitter/index.md`, `docs/Advanced_Operations/rf_electrical.md`, transmitter-backend configuration pages, RP1 pages, and Pico installation/drive/Si5351 pages. Review Pi `docs/wtp-gpio-drive.md`, Pico `engineering/development/gpio-drive.md`, and affected Si5351 and contract guides. Correct affected values, defaults, units, activation steps, qualification statements, and saved/active/readback distinctions. Replace screenshots only if materially inaccurate. Do not undertake an unrelated rewrite, RF-power recalibration, or publication.
 
-## Adversarial review and completion
+Keep prose paragraphs on one physical source line, use Oxford commas, and preserve code blocks/directives/tables. Build operator docs through its documented virtual environment with `python -m sphinx -b html docs docs/_build/html`; run Pico's documented docs checks. Inspect affected rendered documentation with Impeccable at desktop/mobile sizes and verify links. Resolve in-scope errors and record unrelated warnings or blocked prerequisites.
 
-After implementing, assess the entire change against this prompt. Challenge model classification, boundary values, malformed and changing metadata, accessible labels, dBm handling, persistence compatibility, incidental autosaves, initialization ordering, hidden-backend interference, test realism, dirty-tree preservation, and documentation claims. Fix in-scope issues, rerun affected checks, and then perform another full assessment. Repeat until no actionable in-scope issues remain. Report blockers and out-of-scope findings rather than silently expanding scope or asserting uncertainty has disappeared.
+## Adversarial assessment and completion
 
-State the material assessment findings and their resolutions in the final report. An unresolved required check remains unresolved even when no additional source defect is found. Do not add permanent review diaries or extra planning artifacts to the repository.
+Assess the full cross-product matrix after implementation, including backend code, generated assets, strict validators, both carriers, bindings, persistence, qualification boundaries, output safety, UI/accessibility, documentation, test realism, and scope. Fix actionable in-scope findings, rerun affected checks, then perform another full assessment. Repeat until no further actionable findings remain. Unavailable required validation remains a blocker; a clean source review does not erase it. Report out-of-scope discoveries without expanding into unrelated work.
 
-Review the complete affected component diff, the focused package-script changes, and any new files. Run a final whitespace check and inspect staged, unstaged, and untracked state. Ensure no unrelated existing changes were overwritten or included in the implementation's claimed scope.
+Review each complete affected repository/component diff and new files, run final whitespace checks, and inspect staged/unstaged/untracked state. Preserve unrelated changes. Do not stage, commit, push, publish, install, or operate hardware under this prompt without separate authorization.
 
-Report the behavior implemented, important files changed, exact automated commands and results, Impeccable workflow and visual evidence, documentation impact, remaining validation or blockers, branch and working-tree state, and whether anything was staged, committed, or pushed. There must be no staging, commit, or push under this prompt. State explicitly that no physical pad, RF, installation, or service qualification was performed.
+Report implemented behavior and verified-unchanged mappings, modified repositories/components and source revisions, tested uncommitted changes, standalone and parent tests, both paired suite results and applicable CI links, UI workflows and visual evidence, hardware/runtime evidence actually obtained, remaining blockers, and Git state per repository. Include a Documentation Impact section listing updates, considered-but-unchanged material, required builds/rendering, and any unresolved documentation work. Do not declare completion until necessary code/backend/contract work, required integration, UI review, and documentation updates/checks are complete. Keep software evidence distinct from unperformed physical qualification.
