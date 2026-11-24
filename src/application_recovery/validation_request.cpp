@@ -18,6 +18,7 @@
 #include "wtp_integration/pi_pair_owner.hpp"
 #include <filesystem>
 #include <mutex>
+#include <system_error>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -34,16 +35,22 @@ bool hex(const Json &value,std::size_t size){return value.is_string()&&value.get
 std::string recovery_destination_context(std::shared_ptr<SqliteStateStore> database){
     std::unique_lock configuration(config_update_mutex(),std::try_to_lock);if(!configuration.owns_lock())throw LocalCommandRefused(LocalRefusal::Busy);
     require(database&&database==application_database()&&!database->held());const auto pair=pi_pair_owner();require(bool(pair));std::string result;
-    pair->with_backup_files([&](const auto &pairs){wtp_fleet_with_backup_files([&](const auto &retirement){
-        Json context{{"identity",database->identity()},{"role",database->role()==StateRole::Pi?"pi":"controller"},{"revision",database->snapshot().revision}};
-        const auto state_root=std::filesystem::path(database->directory()).parent_path();
-        const auto selector=Journal::read_private_record((state_root/"authority.json").string());require(bool(selector));context["selector"]=Journal::digest(selector->signature);
-        const auto hold=Journal::read_private_record((state_root/"restore-hold.json").string());context["hold"]=hold?Json(Journal::digest(hold->signature)):Json(nullptr);
-        for(const auto &[logical,path]:pairs){const auto record=Journal::read_private_record(path);require(bool(record));context["pairing"][logical]=Journal::digest(record->signature);}
-        for(const auto &[logical,path]:retirement){const auto record=Journal::read_private_record(path);require(bool(record));context["retirement"][logical]=Journal::digest(record->signature);}
-        const auto companions=capture_application_companions(database->directory()+"/configuration",database->identity(),application_catalog());
-        context["companions"]=companion_manifest(companions);result=Journal::digest(context.dump());
-    });});return result;
+    try{
+        pair->with_backup_files([&](const auto &pairs){wtp_fleet_with_backup_files([&](const auto &retirement){
+            Json context{{"identity",database->identity()},{"role",database->role()==StateRole::Pi?"pi":"controller"},{"revision",database->snapshot().revision}};
+            const auto state_root=std::filesystem::path(database->directory()).parent_path();
+            const auto selector=Journal::read_private_record((state_root/"authority.json").string());require(bool(selector));context["selector"]=Journal::digest(selector->signature);
+            const auto hold=Journal::read_private_record((state_root/"restore-hold.json").string());context["hold"]=hold?Json(Journal::digest(hold->signature)):Json(nullptr);
+            for(const auto &[logical,path]:pairs){const auto record=Journal::read_private_record(path);require(bool(record));context["pairing"][logical]=Journal::digest(record->signature);}
+            for(const auto &[logical,path]:retirement){const auto record=Journal::read_private_record(path);require(bool(record));context["retirement"][logical]=Journal::digest(record->signature);}
+            const auto companions=capture_application_companions(database->directory()+"/configuration",database->identity(),application_catalog());
+            context["companions"]=companion_manifest(companions);result=Journal::digest(context.dump());
+        });});
+    }catch(const std::system_error &error){
+        if(error.code()==std::make_error_code(std::errc::device_or_resource_busy))throw LocalCommandRefused(LocalRefusal::Busy);
+        throw;
+    }
+    return result;
 }
 Json recovery_validation_request(const Json &request,const std::string &boot){
     fields(request,{"job_id"});require(hex(request["job_id"],32));const auto id=request["job_id"].get<std::string>();

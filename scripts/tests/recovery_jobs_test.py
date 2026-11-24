@@ -9,10 +9,11 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import call, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from application_recovery import archive
 from application_recovery.durable import publish_record, read_record
-from application_recovery.jobs import RecoveryBusy, RecoveryJobs, backend_command
+from application_recovery.jobs import BackendUnavailable, RecoveryBusy, RecoveryJobs, backend_command
 
 class RecoveryJobsTest(unittest.TestCase):
     def setUp(self):
@@ -111,6 +112,32 @@ class RecoveryJobsTest(unittest.TestCase):
         with self.assertRaises(archive.RecoveryError):
             self.cancel(job)
         self.assertEqual(self.owner.read(job['job_id']), before)
+
+    def test_restore_retries_only_definite_prepare_busy(self):
+        cases = (
+            ('busy then accepted', [RecoveryBusy(), {}], [0, 1], True),
+            ('busy then lost reply', [RecoveryBusy(), BackendUnavailable()], [0, 1], True),
+            ('busy past deadline', [RecoveryBusy(), RecoveryBusy()], [0, 1, 60], False),
+        )
+        for label, responses, times, reads_proof in cases:
+            with self.subTest(label=label):
+                job_id = self.upload()['job_id']
+                os.close(self.owner.uploads.pop(job_id))
+                job = self.owner.save(dict(self.owner.read(job_id), state='applying', confirmation_sha256='d' * 64))
+                with (patch('application_recovery.jobs.backend_command', side_effect=responses) as command,
+                      patch('application_recovery.jobs.time.monotonic', side_effect=times),
+                      patch('application_recovery.jobs.time.sleep') as sleep,
+                      patch.object(self.owner, 'stop_proof', side_effect=BackendUnavailable) as proof,
+                      patch.object(self.owner.lifecycle, 'stop') as stop):
+                    self.owner.apply(job_id)
+                self.assertEqual(command.call_args_list, [call(self.config, 'prepare', job_id)] * 2)
+                sleep.assert_called_once()
+                if reads_proof:
+                    proof.assert_called_once_with(job)
+                else:
+                    proof.assert_not_called()
+                stop.assert_not_called()
+                self.assertEqual(self.owner.read(job_id)['error'], 'restore_failed')
 
     def test_confirmed_failure_stays_pinned_while_other_terminal_jobs_prune(self):
         job = self.upload()
