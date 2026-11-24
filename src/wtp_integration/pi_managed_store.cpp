@@ -29,6 +29,8 @@
 #include "config_handler.hpp"
 #include "wtp_endpoint/identity.hpp"
 #include <charconv>
+#include <cstdio>
+#include <source_location>
 #include <filesystem>
 #include <limits>
 #include <stdexcept>
@@ -39,7 +41,7 @@
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
-void require(bool condition){if(!condition)throw std::runtime_error("pi_management_storage_hold");}
+void require(bool condition,std::source_location location=std::source_location::current()){if(!condition){std::fprintf(stderr,"CI_MANAGED_REQUIRE line=%u\n",location.line());throw std::runtime_error("pi_management_storage_hold");}}
 void validate_resume_integrity(const Json &authority){
     if(!authority.contains("management"))return;
     const auto validate=[](const Json &value){
@@ -498,6 +500,7 @@ void PiManagedStore::check(){
         require((journal_.database_backed()||std::filesystem::is_directory(std::filesystem::symlink_status(directory_)))&&!journal_.decision());
         for(const auto &[kind,expected]:observations_){
             const auto observed=journal_.inspect(kind);
+            if(!(observed&&observed->signature==expected.signature&&observed->bytes==expected.bytes))std::fprintf(stderr,"CI_MANAGED_CHANGED kind=%s\n",kind.c_str());
             require(observed&&observed->signature==expected.signature&&observed->bytes==expected.bytes);
         }
         if(!observations_.contains("legacy"))require(!journal_.inspect("legacy"));

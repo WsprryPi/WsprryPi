@@ -11,6 +11,8 @@
 #error SQLite 3.31 or later is required for private state storage
 #endif
 #include <array>
+#include <cstdio>
+#include <source_location>
 #include <atomic>
 #include <charconv>
 #include <cerrno>
@@ -40,7 +42,7 @@ constexpr std::string_view versions_schema =
     "CREATE TABLE record_versions (kind TEXT PRIMARY KEY NOT NULL, revision TEXT NOT NULL) WITHOUT ROWID";
 
 [[noreturn]] void fail(Code code = Code::Unavailable) { throw StateStorageError(code); }
-void require(bool value, Code code = Code::Unavailable) { if (!value) fail(code); }
+void require(bool value, Code code = Code::Unavailable,std::source_location location=std::source_location::current()) { if (!value) {std::fprintf(stderr,"CI_SQL_REQUIRE line=%u code=%d errno=%d\n",location.line(),static_cast<int>(code),errno);fail(code);} }
 const char *message(Code code) {
     switch (code) {
     case Code::InvalidInput: return "state_invalid_input";

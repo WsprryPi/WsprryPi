@@ -152,6 +152,7 @@ jobs:
       - name: Run portable semantics profile
         working-directory: src
         run: |
+          make recovery-capture-backend-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
           make controller-only-test application-monitor-boundary-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
