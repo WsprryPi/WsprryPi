@@ -3,6 +3,10 @@ name: Non-hardware validation
 on:
   workflow_dispatch:
     inputs:
+      macos_runtime_only:
+        description: Run native macOS runtime jobs only (other jobs are skipped)
+        type: boolean
+        default: false
       pico_ref:
         description: Pico source ref (defaults to the commit in the vendored contract provenance)
         type: string
@@ -80,7 +84,7 @@ jobs:
   native-controller-components:
     name: Native controller components (${{ matrix.runner }})
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     strategy:
       fail-fast: false
       matrix:
@@ -254,7 +258,7 @@ jobs:
 
   macos-si5351-profile:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     strategy:
       fail-fast: false
       matrix:
@@ -298,7 +302,7 @@ jobs:
 
   wtp-network-loopback:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Cold dependency installation and C++ builds share this budget with TLS,
     # routing, and browser checks; allow the final checks to finish on cold runners.
@@ -406,7 +410,7 @@ jobs:
 
   wtp-usb-management-pair:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -462,7 +466,7 @@ jobs:
 
   strict-i2c-profile:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Cold package downloads can exceed ten minutes before compilation starts.
     # Retain time for the complete strict build and its unchanged audits.
@@ -510,7 +514,7 @@ jobs:
 
   ubuntu-gcc13-release:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Six cold warning-as-error profiles reached the final profile at 30 minutes.
     # Keep every profile and allow the final build and CLI audits to complete.
@@ -559,7 +563,7 @@ jobs:
 
   non-hardware-validation:
     needs: change_scope
-    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Cold native/contract builds and browser checks take about 20 minutes
     # before the retained RP1, installer, support, and component stages begin.

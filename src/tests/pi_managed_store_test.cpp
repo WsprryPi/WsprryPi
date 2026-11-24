@@ -63,7 +63,7 @@ int main(int argc,char **argv){
       check(!store.initialized()&&!store.recovery_revision().empty(),"Cold initial rollback remains verifiable and uninitialized");return 0;
   }
   if(argc!=2)return 2;
-  char pattern[]="/tmp/pi-managed-store-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary,"Temporary fixture");const std::string root=temporary;
+  char pattern[]="/tmp/pi-managed-store-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary,"Temporary fixture");const std::string root=std::filesystem::canonical(temporary).string();
   struct Remove{std::string path;~Remove(){std::filesystem::remove_all(path);}} remove{root};
   const auto ini=root+"/settings.ini";const std::string self(32,'a');WtpCatalog catalog(ini+".wtp-devices.json");
   init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);

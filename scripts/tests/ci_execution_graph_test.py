@@ -226,6 +226,22 @@ class SourceIdentityTests(unittest.TestCase):
         self.assertNotEqual(self.select('record', self.repo / 'nested', GITHUB_OUTPUT=str(output)).returncode, 0)
         self.assertFalse(output.exists())
 
+    def test_manual_macos_runtime_scope_preserves_default_full_validation(self):
+        workflow = yaml.safe_load(WORKFLOW.read_text())
+        # PyYAML's YAML 1.1 loader reads the Actions `on` key as True.
+        triggers = workflow.get('on', workflow.get(True))
+        selection = triggers['workflow_dispatch']['inputs']['macos_runtime_only']
+        self.assertEqual(selection['type'], 'boolean')
+        self.assertIs(selection['default'], False)
+        jobs = workflow['jobs']
+        self.assertNotIn('if', jobs['change_scope'])
+        self.assertNotIn('inputs.macos_runtime_only', jobs['macos-simulated-profile']['if'])
+        for name, job in jobs.items():
+            if name not in ('change_scope', 'macos-simulated-profile'):
+                self.assertIn('inputs.macos_runtime_only != true', job['if'], name)
+                self.assertIn('!cancelled()', job['if'], name)
+                self.assertIn("needs.change_scope.outputs.run_full_ci != 'false'", job['if'], name)
+
     def test_workflow_uses_one_immutable_owner_and_verifies_both_consumers(self):
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',
