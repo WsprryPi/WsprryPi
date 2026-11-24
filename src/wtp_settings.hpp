@@ -3,6 +3,7 @@
 #pragma once
 #include <algorithm>
 #include "wtp_integration/identity.hpp"
+#include "host_references.hpp"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -51,20 +52,28 @@ inline void validate_wtp_settings(const WtpSettings &s, bool selected) {
       }))) throw std::runtime_error("Pico requires a 32 lowercase hex device ID.");
   if (s.transport == "network" || s.transport == "network_plain") {
     if (s.hostname.empty() || !s.tcp_port ||
-        (s.transport == "network" && (!s.tls_ca.starts_with("/") ||
-         !s.tls_certificate.starts_with("/") || !s.tls_key.starts_with("/"))))
+        (s.transport == "network" && (!wsprrypi::host_references::stored_file(s.tls_ca) ||
+         !wsprrypi::host_references::stored_file(s.tls_certificate) || !wsprrypi::host_references::stored_file(s.tls_key))))
       throw std::runtime_error(s.transport == "network"
           ? "TLS Pico requires a hostname/IP, TCP port and absolute local CA, client certificate and private-key references."
           : "Plain LAN Pico requires a hostname/IP and TCP port.");
     return;
   }
-  if (!s.path.starts_with("/dev/") ||
-      s.path.find("/../") != std::string::npos || s.usb_serial.empty() ||
+  if (!wsprrypi::host_references::stored_usb(s.path) || s.usb_serial.empty() ||
       !s.vendor_id || !s.product_id || (!s.device_id.empty() && (s.device_id.size() != 32 ||
       !std::all_of(s.device_id.begin(), s.device_id.end(), [](char c) {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
       }))))
     throw std::runtime_error(
-        "Pico requires an explicit /dev/ WTP endpoint, USB serial, nonzero "
+        "Pico requires an explicit host USB interface, USB serial, nonzero "
         "VID/PID and an optional 32 lowercase hex device ID.");
+}
+inline void validate_native_wtp_settings(const WtpSettings &settings,bool selected){
+    validate_wtp_settings(settings,selected);
+    if(!selected)return;
+    using namespace wsprrypi::host_references;
+    if(settings.transport=="usb"&&!native_usb(settings.path))
+        throw std::runtime_error("Select the dedicated management device interface reported by this host.");
+    if(settings.transport=="network"&&(!native_file(settings.tls_ca)||!native_file(settings.tls_certificate)||!native_file(settings.tls_key)))
+        throw std::runtime_error("TLS credentials require absolute file references on this host.");
 }

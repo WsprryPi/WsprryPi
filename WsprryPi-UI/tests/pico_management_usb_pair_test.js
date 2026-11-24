@@ -18,6 +18,13 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    if(mode)await new Promise(resolve=>setTimeout(resolve,110));
    child.stdin.write(JSON.stringify(command)+'\n');const result=JSON.parse(await line());assert.equal(result.execution_selected,false,'Settings/time must not select a WTP execution backend');assert.equal(result.execution_ready,false,'Settings must not construct/select a WTP execution backend');return result;
   };
+  const refreshOwner=async()=>{
+   // Refresh only between operation chains: observation can retire a browser
+   // context, and must never be inserted between a write and its exact replay.
+   await new Promise(resolve=>setTimeout(resolve,1100));
+   assert.equal((await call({control:'owner',resource:'inventory'})).status,200);
+   assert.equal((await call({control:'owner',resource:'context'})).status,200);
+  };
   const operation=()=>crypto.randomBytes(16).toString('hex');
   const before=await call({control:'status'});assert.equal(before.status,200);assert.equal(before.body.job.owner_id,null);assert.equal(before.body.job.output_active,false);
   if(!mode){
@@ -103,6 +110,7 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    assert.equal((await call({resource:'context',method:'GET'})).status,200);
    assert.equal((await call({resource:'operations/'+parentUnknown,method:'GET'})).status,404,'Review does not disclose the former manager receipt');
    assert.equal((await call({control:'owner',resource:'context'})).status,200);
+   await refreshOwner();
    const readyOwnerName=await call({control:'owner',resource:'hostname'});assert.equal(readyOwnerName.status,200);
    const ownerOperation=operation();
    const ownerSave={control:'owner',resource:'hostname',method:'PUT',context:readyOwnerName.context,revision:readyOwnerName.etag,operation_id:ownerOperation,
@@ -123,13 +131,16 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    // including unconfigured resources and nested/conditional schema families.
    // This is structural response checking only, never mutation authority.
    const invalidReplies=[];
+   await refreshOwner();let inventoryObserved=performance.now();
    for(const resource of ['configuration','application','station','hardware','pins','gpio-drive','gpio-drive-progress','amplifier-timing','filter-selector','si5351','gps','gray-line','progress','udp-logging','udp-logging/capabilities','udp-logging/test/capabilities','wifi','hostname','logging','network']){
+    if(performance.now()-inventoryObserved>=5000){await refreshOwner();inventoryObserved=performance.now();}
     const actual=await call({control:'owner',resource,validate_response:true});
     if(actual.status!==200||actual.response_valid!==true)invalidReplies.push({resource,status:actual.status,body:actual.body});
    }
    assert.equal(invalidReplies.length,0,JSON.stringify(invalidReplies));
-   let ownerFresh=await call({control:'owner',resource:'hostname'});assert.equal(ownerFresh.status,200,JSON.stringify(ownerFresh));
+   let ownerFresh;
    for(const fault of ['malformed-reply','malformed-error']){
+    await refreshOwner();ownerFresh=await call({control:'owner',resource:'hostname'});assert.equal(ownerFresh.status,200,JSON.stringify(ownerFresh));
     const malformedId=operation(),hostname=fault==='malformed-reply'?'Malformed-authenticated-reply.local':'Malformed-authenticated-error.local';
     const malformedOwner={control:'owner',resource:'hostname',method:'PUT',context:ownerFresh.context,revision:ownerFresh.etag,operation_id:malformedId,fault,
      body:JSON.stringify({contract:'Wsprry-Control/1',schema:'hostname',target:ownerFresh.body.target,hostname})};
@@ -145,6 +156,7 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
     ownerFresh=await call({control:'owner',resource:'hostname'});assert.equal(ownerFresh.status,200);
    }
 
+   await refreshOwner();ownerFresh=await call({control:'owner',resource:'hostname'});assert.equal(ownerFresh.status,200);
    const lostOwnerId=operation();
    const lostOwner={...ownerSave,context:ownerFresh.context,revision:ownerFresh.etag,operation_id:lostOwnerId,fault:'lose-reply',
     body:JSON.stringify({contract:'Wsprry-Control/1',schema:'hostname',target:ownerFresh.body.target,hostname:'Unconfirmed-owner-save.local'})};
@@ -157,6 +169,7 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    const ownerStale=await call({...lostOwner,fault:undefined,operation_id:operation()});assert.equal(ownerStale.status,409,JSON.stringify(ownerStale));
    // Exercise the shipped managed-Pico client through the real remote owner,
    // TLS listener, independent parent journal and candidate USB handlers.
+   await refreshOwner();
    let loseShippedReply=false;
    const shipped=require('../data/pico-target-client.js').create({crypto:crypto.webcrypto,fetch:async(url,options={})=>{
     const headers=new Headers(options.headers||{});
@@ -183,6 +196,7 @@ const [binary,driver,mode]=process.argv.slice(2);if(!binary||!driver||mode&&mode
    let shippedName=await attached.request('hostname');assert.equal(shippedName.response.status,200);
    const shippedSave={method:'PUT',revision:shippedName.response.headers.get('ETag'),body:{schema:'hostname',target:shippedName.data.target,hostname:'Shipped-managed-client.local'}};
    const shippedSaved=await attached.request('hostname',shippedSave);assert.equal(shippedSaved.response.status,200,JSON.stringify(shippedSaved.data));
+   await refreshOwner();attached=await shipped.open(descriptor);
    shippedName=await attached.request('hostname');loseShippedReply=true;
    const shippedLost=await attached.request('hostname',{...shippedSave,revision:shippedName.response.headers.get('ETag'),body:{...shippedSave.body,hostname:'Unconfirmed-shipped-client.local'}});
    assert.equal(shippedLost.response.status,503);assert.equal(shippedLost.recovery.operation,shippedLost.operation);

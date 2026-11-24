@@ -39,7 +39,6 @@
 #include "config_types.hpp"
 #include "ini_file.hpp"
 #include "lcblog.hpp"
-#include "monitorfile.hpp"
 #include "version.hpp"
 #include "band_lookup.hpp"
 
@@ -48,23 +47,6 @@
 #include <cstdint>
 #include <optional>
 #include <thread>
-
-/**
- * @brief Global instance of the MonitorFile for INI file change detection.
- *
- * The `iniMonitor` object continuously monitors the specified INI file for changes.
- * It provides real-time notifications when the file is modified, enabling the application
- * to reload configuration settings dynamically without requiring a restart.
- *
- * This instance is typically used alongside the `ini` object to automatically re-validate
- * and apply updated configuration settings.
- *
- * The `iniMonitor` object works by checking the file's last modified timestamp and comparing
- * it with the previous known state. If a change is detected, it returns `true` on `changed()`.
- *
- * @see https://github.com/WsprryPi/MonitorFile for detailed documentation and examples.
- */
-extern MonitorFile iniMonitor;
 
 /**
  * @brief Instance of BandLookup.
@@ -95,21 +77,10 @@ extern BandLookup lookup;
 extern std::atomic<int> wspr_interval;
 
 /**
- * @brief Semaphore indicating a pending INI file reload.
+ * @brief Deferred saved-configuration reload notification.
  *
- * The `ini_reload_pending` atomic flag acts as a semaphore to signal when an
- * INI file change has been detected and a configuration reload is required.
- * This ensures that the reload process does not conflict with an ongoing
- * transmission.
- *
- * - `true` indicates that an INI reload is pending.
- * - `false` indicates that no reload is currently required.
- *
- * This flag is typically set when the `iniMonitor` detects a file change and
- * is checked periodically by the INI monitoring thread. If a transmission is
- * in progress, the reload is deferred until the transmission completes.
- *
- * @note The atomic nature ensures thread-safe access across multiple threads.
+ * Verified persistence advances the generation and signals the scheduler.
+ * Runtime application waits until transmitter ownership permits it.
  */
 extern std::atomic<bool> ini_reload_pending;
 extern std::atomic<std::uint64_t> ini_reload_generation;
@@ -124,14 +95,9 @@ extern std::atomic<bool> ppm_reload_pending;
 
 void apply_runtime_config_side_effects();
 
-/**
- * @brief Called when the INI file is modified.
- *
- * @details
- * Executed by the `MonitorFile` watcher thread. Sets a deferred reload flag
- * (`ini_reload_pending`) to apply changes after the current transmission finishes.
- */
-void callback_ini_changed();
+// Signals a validated saved-setting commit; defers runtime application while
+// a transmission owns the configuration. No file watcher invokes this API.
+void notify_saved_configuration_changed();
 
 /**
  * @brief Prints usage information to standard error.

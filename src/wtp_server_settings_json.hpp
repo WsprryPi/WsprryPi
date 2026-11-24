@@ -10,7 +10,7 @@
 inline nlohmann::json wtp_server_settings_json(const WtpServerSettings& settings) {
     return {{"Enabled", settings.enabled},
             {"Port", settings.port},
-            {"Interface", settings.interface}};
+            {"Interface", settings.listen_interface}};
 }
 
 inline WtpServerSettings parse_wtp_server_settings(const nlohmann::json& value) {
@@ -38,12 +38,12 @@ inline WtpServerSettings parse_wtp_server_settings(const nlohmann::json& value) 
     if (value.contains("Interface")) {
         if (!value.at("Interface").is_string())
             throw std::runtime_error("WTP Server.Interface must be a string.");
-        settings.interface = value.at("Interface").get<std::string>();
+        settings.listen_interface = value.at("Interface").get<std::string>();
     }
-    if (settings.interface != "auto") {
-        if (settings.interface.empty() || settings.interface.size() > 15)
+    if (settings.listen_interface != "auto") {
+        if (settings.listen_interface.empty() || settings.listen_interface.size() > 15)
             throw std::runtime_error("WTP Server.Interface must name a network interface.");
-        for (const char c : settings.interface)
+        for (const char c : settings.listen_interface)
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'))
                 throw std::runtime_error("WTP Server.Interface has an invalid character.");

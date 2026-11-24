@@ -51,10 +51,53 @@
 #include <thread>
 #include <vector>
 
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#endif
 
+
+namespace {
+namespace ns=wsprrypi::native_socket;
+ns::Handle websocket_listener(int family){
+#ifdef _WIN32
+    return ns::open_stream(family);
+#else
+    return ::socket(family,SOCK_STREAM,0);
+#endif
+}
+std::ptrdiff_t websocket_read(ns::Handle socket,char *bytes,std::size_t size,bool immediate){
+#ifdef _WIN32
+    if(!immediate){
+        ns::PollItem pending{socket,ns::readable,0};const auto ready=ns::poll(&pending,1,250);
+        if(ready<0)return -1;
+        if(!ready){::WSASetLastError(WSAEWOULDBLOCK);return -1;}
+    }
+    return ns::receive(socket,bytes,size);
+#else
+    return ::recv(socket,bytes,size,immediate?MSG_DONTWAIT:0);
+#endif
+}
+std::ptrdiff_t websocket_write(ns::Handle socket,const void *bytes,std::size_t size,bool immediate=false){
+#ifdef _WIN32
+    (void)immediate;return ns::send(socket,bytes,size);
+#else
+    int flags=immediate?MSG_DONTWAIT:0;
+#ifdef MSG_NOSIGNAL
+    if(immediate)flags|=MSG_NOSIGNAL;
+#endif
+    return ::send(socket,bytes,size,flags);
+#endif
+}
+void websocket_error(const char *operation){
+#ifdef _WIN32
+    std::cerr<<operation<<": Windows socket error "<<ns::error()<<'\n';
+#else
+    std::perror(operation);
+#endif
+}
+}
 
 // Connect with wscat -c ws://localhost:31416
 
@@ -85,7 +128,7 @@ constexpr const uint32_t SOCKET_KEEPALIVE = 30;
  * - Sets the default keep-alive interval to 30 seconds.
  */
 WebSocketServer::WebSocketServer()
-    : listen_fd_(-1), running_(false), keep_alive_secs_(SOCKET_KEEPALIVE)
+    : listen_fd_(ns::invalid), running_(false), keep_alive_secs_(SOCKET_KEEPALIVE)
 {
 }
 
@@ -121,10 +164,10 @@ WebSocketServer::~WebSocketServer()
 void WebSocketServer::closeFailedListener() noexcept
 {
     listening_port_.store(0,std::memory_order_release);
-    if (listen_fd_ >= 0)
+    if (listen_fd_ != ns::invalid)
     {
-        close(listen_fd_);
-        listen_fd_ = -1;
+        ns::close(listen_fd_);
+        listen_fd_ = ns::invalid;
     }
     listening_address_.clear();
 }
@@ -142,23 +185,23 @@ WebSocketServer::StartupAttempt WebSocketServer::startLoopbackCandidate(
 
     const bool ipv6 = family == WebSocketLoopbackFamily::IPv6;
     const int address_family = ipv6 ? AF_INET6 : AF_INET;
-    listen_fd_ = socket(address_family, SOCK_STREAM, 0);
-    if (listen_fd_ < 0)
-        return {false, StartupFailureStage::Socket, errno};
+    listen_fd_ = websocket_listener(address_family);
+    if (listen_fd_ == ns::invalid)
+        return {false, StartupFailureStage::Socket, ns::error()};
 
-    int opt = 1;
-    if (setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    [[maybe_unused]] int opt = 1;
+    if (!ns::exclusive_listener(listen_fd_))
     {
-        const int error_number = errno;
+        const int error_number = ns::error();
         closeFailedListener();
         return {false, StartupFailureStage::ReuseAddress, error_number};
     }
 
     if (ipv6)
     {
-        if (setsockopt(listen_fd_, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
+        if (ns::option(listen_fd_, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
         {
-            const int error_number = errno;
+            const int error_number = ns::error();
             closeFailedListener();
             return {false, StartupFailureStage::IPv6Only, error_number};
         }
@@ -168,7 +211,7 @@ WebSocketServer::StartupAttempt WebSocketServer::startLoopbackCandidate(
         address.sin6_port = htons(port);
         if (bind(listen_fd_, reinterpret_cast<sockaddr *>(&address), sizeof(address)) < 0)
         {
-            const int error_number = errno;
+            const int error_number = ns::error();
             closeFailedListener();
             return {false, StartupFailureStage::Bind, error_number};
         }
@@ -182,7 +225,7 @@ WebSocketServer::StartupAttempt WebSocketServer::startLoopbackCandidate(
         address.sin_port = htons(port);
         if (bind(listen_fd_, reinterpret_cast<sockaddr *>(&address), sizeof(address)) < 0)
         {
-            const int error_number = errno;
+            const int error_number = ns::error();
             closeFailedListener();
             return {false, StartupFailureStage::Bind, error_number};
         }
@@ -191,7 +234,7 @@ WebSocketServer::StartupAttempt WebSocketServer::startLoopbackCandidate(
 
     if (listen(listen_fd_, 10) < 0)
     {
-        const int error_number = errno;
+        const int error_number = ns::error();
         closeFailedListener();
         return {false, StartupFailureStage::Listen, error_number};
     }
@@ -200,21 +243,21 @@ WebSocketServer::StartupAttempt WebSocketServer::startLoopbackCandidate(
 
 WebSocketServer::StartupAttempt WebSocketServer::startWildcard(uint16_t port)
 {
-    listen_fd_ = socket(AF_INET6, SOCK_STREAM, 0);
-    if (listen_fd_ < 0)
-        return {false, StartupFailureStage::Socket, errno};
+    listen_fd_ = websocket_listener(AF_INET6);
+    if (listen_fd_ == ns::invalid)
+        return {false, StartupFailureStage::Socket, ns::error()};
 
-    int opt = 1;
-    if (setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    [[maybe_unused]] int opt = 1;
+    if (!ns::exclusive_listener(listen_fd_))
     {
-        const int error_number = errno;
+        const int error_number = ns::error();
         closeFailedListener();
         return {false, StartupFailureStage::ReuseAddress, error_number};
     }
 
     int off = 0;
-    if (setsockopt(listen_fd_, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off)) < 0)
-        std::perror("setsockopt IPV6_V6ONLY");
+    if (ns::option(listen_fd_, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(off)) < 0)
+        websocket_error("setsockopt IPV6_V6ONLY");
 
     sockaddr_in6 address{};
     address.sin6_family = AF_INET6;
@@ -222,7 +265,7 @@ WebSocketServer::StartupAttempt WebSocketServer::startWildcard(uint16_t port)
     address.sin6_port = htons(port);
     if (bind(listen_fd_, reinterpret_cast<sockaddr *>(&address), sizeof(address)) < 0)
     {
-        const int error_number = errno;
+        const int error_number = ns::error();
         closeFailedListener();
         return {false, StartupFailureStage::Bind, error_number};
     }
@@ -230,7 +273,7 @@ WebSocketServer::StartupAttempt WebSocketServer::startWildcard(uint16_t port)
 
     if (listen(listen_fd_, 10) < 0)
     {
-        const int error_number = errno;
+        const int error_number = ns::error();
         closeFailedListener();
         return {false, StartupFailureStage::Listen, error_number};
     }
@@ -239,6 +282,10 @@ WebSocketServer::StartupAttempt WebSocketServer::startWildcard(uint16_t port)
 
 bool WebSocketServer::ipv6Unavailable(const StartupAttempt &attempt) noexcept
 {
+#ifdef _WIN32
+    return (attempt.stage==StartupFailureStage::Socket&&(ns::unsupported_family(attempt.error_number)||attempt.error_number==WSAEPFNOSUPPORT))||
+        (attempt.stage==StartupFailureStage::Bind&&attempt.error_number==WSAEADDRNOTAVAIL);
+#else
     if (attempt.stage == StartupFailureStage::Socket)
     {
         return attempt.error_number == EAFNOSUPPORT ||
@@ -252,6 +299,7 @@ bool WebSocketServer::ipv6Unavailable(const StartupAttempt &attempt) noexcept
     }
     return attempt.stage == StartupFailureStage::Bind &&
            attempt.error_number == EADDRNOTAVAIL;
+#endif
 }
 
 bool WebSocketServer::finishStart(uint32_t keep_alive_secs)
@@ -289,7 +337,7 @@ bool WebSocketServer::start(
         llog.logE(ERROR, "Port must be between 1024 and 49151: ", port);
         return false;
     }
-    if (running_ || server_thread_.joinable() || keep_alive_thread_.joinable() || listen_fd_ >= 0)
+    if (running_ || server_thread_.joinable() || keep_alive_thread_.joinable() || listen_fd_ != ns::invalid)
     {
         llog.logE(ERROR, "Socket server is already started.");
         return false;
@@ -323,8 +371,11 @@ bool WebSocketServer::start(
 
     if (!attempt.started)
     {
-        errno = attempt.error_number;
-        std::perror("WebSocket listener startup");
+#ifdef _WIN32
+        ::WSASetLastError(attempt.error_number);websocket_error("WebSocket listener startup");
+#else
+        errno = attempt.error_number;std::perror("WebSocket listener startup");
+#endif
         return false;
     }
 
@@ -360,7 +411,7 @@ void WebSocketServer::set_backend_session_factory(BackendSessionFactory factory)
 void WebSocketServer::refresh_backend_sessions(){
     std::lock_guard lock(clients_mutex_);
     for(const auto &[fd,authorization]:client_authorizations_)
-        if(authorization.backend&&!clientAuthorizationCurrent(authorization))shutdown(fd,SHUT_RDWR);
+        if(authorization.backend&&!clientAuthorizationCurrent(authorization))ns::shutdown(fd);
 }
 void WebSocketServer::resynchronize_backend_sessions(){
     std::vector<std::shared_ptr<WebSocketBackendSession>> sessions;
@@ -370,6 +421,18 @@ void WebSocketServer::resynchronize_backend_sessions(){
     for(const auto &session:sessions)try{
         if(session->current())sendAllClients(session->command("{\"command\":\"get_tx_state\"}"));
     }catch(...){/* Failed sessions are retired by refresh, never replayed. */}
+}
+
+void WebSocketServer::markListenerStopped()
+{
+    // Serialize the state change with the keep-alive wait. Otherwise an
+    // immediate stop can notify between its running check and actual wait.
+    {
+        std::lock_guard lock(keep_alive_mutex_);
+        running_ = false;
+        listening_port_.store(0,std::memory_order_release);
+    }
+    keep_alive_cv_.notify_all();
 }
 
 /**
@@ -391,29 +454,28 @@ void WebSocketServer::stop()
     if (!running_ && !server_thread_.joinable() && !keep_alive_thread_.joinable())
         return;
 
-    running_ = false;
-    listening_port_.store(0,std::memory_order_release);
+    markListenerStopped();
 
-    // Wake keep-alive thread if sleeping
-    keep_alive_cv_.notify_all();
-
+#ifndef _WIN32
     // Close listening socket to break out of accept()
-    if (listen_fd_ != -1)
+    if (listen_fd_ != ns::invalid)
     {
-        shutdown(listen_fd_, SHUT_RDWR);
-        close(listen_fd_);
-        listen_fd_ = -1;
+        ns::shutdown(listen_fd_);
+        ns::close(listen_fd_);
+        listen_fd_ = ns::invalid;
     }
+
+#endif
 
     // Close the registration gate and unblock all sockets owned by the accept
     // loop or handlers.  Socket owners perform the final close exactly once.
     {
         std::lock_guard<std::mutex> lock(clients_mutex_);
         client_registration_closed_ = true;
-        for (int fd : client_sockets_)
-            shutdown(fd, SHUT_RDWR);
-        for (int fd : handshaking_sockets_)
-            shutdown(fd, SHUT_RDWR);
+        for (const auto fd : client_sockets_)
+            ns::shutdown(fd);
+        for (const auto fd : handshaking_sockets_)
+            ns::shutdown(fd);
     }
 
     if(!backend_session_factory_)stopBoundedTone();
@@ -431,6 +493,11 @@ void WebSocketServer::stop()
     // Join the main server thread
     if (server_thread_.joinable())
         server_thread_.join();
+
+#ifdef _WIN32
+    // The polled native listener has no concurrent Winsock user after join.
+    if(listen_fd_!=ns::invalid){ns::close(listen_fd_);listen_fd_=ns::invalid;}
+#endif
 
     // Join the keep-alive ping thread
     if (keep_alive_thread_.joinable())
@@ -480,7 +547,7 @@ std::string WebSocketServer::toLower(const std::string &s)
     std::string result = s;
     std::transform(result.begin(), result.end(), result.begin(),
                    [](unsigned char c)
-                   { return std::tolower(c); });
+                   { return static_cast<char>(std::tolower(c)); });
     return result;
 }
 
@@ -706,21 +773,17 @@ void WebSocketServer::sendToClient(const std::string &message)
     frame.append(message);
 
     // Broadcast to every connected client
-    for (int fd : client_sockets_)
+    for (const auto fd : client_sockets_)
     {
         const auto authorization = client_authorizations_.find(fd);
         if (authorization == client_authorizations_.end() ||
             !clientAuthorizationCurrent(authorization->second))
         {
-            shutdown(fd, SHUT_RDWR);
+            ns::shutdown(fd);
             continue;
         }
-        const auto sent = ::send(fd, frame.data(), frame.size(), MSG_DONTWAIT
-#ifdef MSG_NOSIGNAL
-                                 | MSG_NOSIGNAL
-#endif
-        );
-        if (sent != static_cast<ssize_t>(frame.size())) shutdown(fd, SHUT_RDWR);
+        const auto sent = websocket_write(fd, frame.data(), frame.size(), true);
+        if (sent != static_cast<std::ptrdiff_t>(frame.size())) ns::shutdown(fd);
     }
 }
 
@@ -780,24 +843,20 @@ void WebSocketServer::sendAllClients(const std::string &message)
     frame.append(message);
 
     // Send to every connected client
-    for (int fd : client_sockets_)
+    for (const auto fd : client_sockets_)
     {
         const auto authorization = client_authorizations_.find(fd);
         if (authorization == client_authorizations_.end() ||
             !clientAuthorizationCurrent(authorization->second))
         {
-            shutdown(fd, SHUT_RDWR);
+            ns::shutdown(fd);
             continue;
         }
         // A slow/disconnected observer must not block lifecycle cleanup or a
         // transmitter join. A partial frame cannot be resumed by another send;
         // close that connection and let its owner retire it.
-        const auto sent = ::send(fd, frame.data(), frame.size(), MSG_DONTWAIT
-#ifdef MSG_NOSIGNAL
-                                 | MSG_NOSIGNAL
-#endif
-        );
-        if (sent != static_cast<ssize_t>(frame.size())) shutdown(fd, SHUT_RDWR);
+        const auto sent = websocket_write(fd, frame.data(), frame.size(), true);
+        if (sent != static_cast<std::ptrdiff_t>(frame.size())) ns::shutdown(fd);
     }
 }
 
@@ -815,19 +874,30 @@ void WebSocketServer::serverLoop()
 {
     while (running_)
     {
+#ifdef _WIN32
+        ns::PollItem ready{listen_fd_,ns::readable,0};const auto available=ns::poll(&ready,1,250);
+        if(!running_)break;
+        if(available<0){if(ns::interrupted(ns::error()))continue;websocket_error("WebSocket listener poll");markListenerStopped();break;}
+        if(!available)continue;
+        if(ready.revents&ns::failed){llog.logE(ERROR,"WebSocket listener became unavailable.");markListenerStopped();break;}
+#endif
         sockaddr_storage peer_addr;
-        socklen_t addrlen = sizeof(peer_addr);
-        int client = accept(
+        ns::Length addrlen = sizeof(peer_addr);
+        const auto client = ::accept(
             listen_fd_,
             reinterpret_cast<sockaddr *>(&peer_addr),
             &addrlen);
-        if (client < 0)
+        if (client == ns::invalid)
         {
             if (!running_)
                 break; // stop() was called
-            std::perror("accept");
+            if(!ns::retry(ns::error()))websocket_error("accept");
             continue;
         }
+
+#ifdef _WIN32
+        if(!ns::configure_stream(client)){ns::close(client);continue;}
+#endif
 
 #ifdef LOCAL_ONLY
         // Optionally reject non-localhost connections
@@ -837,7 +907,7 @@ void WebSocketServer::serverLoop()
             if (std::string(inet_ntoa(s4->sin_addr)) != "127.0.0.1")
             {
                 llog.logE(WARN, "Rejected non-localhost connection");
-                close(client);
+                ns::close(client);
                 continue;
             }
         }
@@ -850,7 +920,7 @@ void WebSocketServer::serverLoop()
             std::lock_guard<std::mutex> lock(clients_mutex_);
             if (client_registration_closed_)
             {
-                close(client);
+                ns::close(client);
                 continue;
             }
             handshaking_sockets_.push_back(client);
@@ -876,7 +946,7 @@ void WebSocketServer::serverLoop()
             llog.logE(WARN, "Handshake failed for new client");
             std::lock_guard<std::mutex> lock(clients_mutex_);
             handshaking_sockets_.erase(std::remove(handshaking_sockets_.begin(), handshaking_sockets_.end(), client), handshaking_sockets_.end());
-            close(client);
+            ns::close(client);
             continue;
         }
 
@@ -900,7 +970,7 @@ void WebSocketServer::serverLoop()
             handshaking_sockets_.erase(std::remove(handshaking_sockets_.begin(), handshaking_sockets_.end(), client), handshaking_sockets_.end());
             if (client_registration_closed_)
             {
-                close(client);
+                ns::close(client);
                 continue;
             }
             client_sockets_.push_back(client);
@@ -920,8 +990,8 @@ void WebSocketServer::serverLoop()
                 --active_client_handlers_;
                 client_sockets_.erase(std::remove(client_sockets_.begin(), client_sockets_.end(), client), client_sockets_.end());
                 client_authorizations_.erase(client);
-                shutdown(client, SHUT_RDWR);
-                close(client);
+                ns::shutdown(client);
+                ns::close(client);
                 client_handlers_cv_.notify_all();
             }
         }
@@ -939,18 +1009,18 @@ void WebSocketServer::serverLoop()
  * @param client_fd File descriptor of the accepted client socket.
  */
 void WebSocketServer::clientLoop(
-    int client_fd,
+    SocketHandle client_fd,
     ClientAuthorizationContext authorization)
 {
     struct HandlerExit
     {
         WebSocketServer *server;
-        int fd;
+        SocketHandle fd;
         ~HandlerExit()
         {
             std::lock_guard<std::mutex> lock(server->clients_mutex_);
-            shutdown(fd, SHUT_RDWR);
-            close(fd);
+            ns::shutdown(fd);
+            ns::close(fd);
             server->client_sockets_.erase(std::remove(server->client_sockets_.begin(), server->client_sockets_.end(), fd), server->client_sockets_.end());
             server->client_authorizations_.erase(fd);
             --server->active_client_handlers_;
@@ -980,14 +1050,13 @@ void WebSocketServer::clientLoop(
         // Read available input before dispatching another queued command. Status
         // observations can be slower than polling clients; retain only the latest
         // consecutive observation so End/STOP cannot sit behind stale queries.
-        ssize_t bytes = -1;
+        std::ptrdiff_t bytes = -1;
         if (!input_closed)
         {
-            bytes = recv(client_fd, buf, sizeof(buf),
-                         pending.empty() ? 0 : MSG_DONTWAIT);
+            bytes = websocket_read(client_fd, buf, sizeof(buf), !pending.empty());
             if (bytes == 0) input_closed = true;
-            if (bytes < 0 && errno == EINTR) continue;
-            if (bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) break;
+            if (bytes < 0 && ns::interrupted(ns::error())) continue;
+            if (bytes < 0 && !ns::pending(ns::error())) break;
         }
         if (input_closed && pending.empty()) break;
         if (!clientAuthorizationCurrent(authorization))
@@ -1043,7 +1112,7 @@ void WebSocketServer::clientLoop(
             llog.logS(DEBUG, "Received Close frame from fd: ",
                       client_fd);
             const char close_resp[] = {static_cast<char>(0x88), 0x00};
-            send(client_fd, close_resp, sizeof(close_resp), 0);
+            websocket_write(client_fd, close_resp, sizeof(close_resp));
             connection_open = false;
         }
         break;
@@ -1052,7 +1121,7 @@ void WebSocketServer::clientLoop(
         {
             // llog.logS(DEBUG, "Received Ping; sending Pong to fd: ", client_fd);
             const unsigned char pong[2] = {0x8A, 0x00};
-            send(client_fd, pong, sizeof(pong), 0);
+            websocket_write(client_fd, pong, sizeof(pong));
         }
         break;
 
@@ -1102,22 +1171,18 @@ void WebSocketServer::keepAliveLoop(uint32_t interval)
         {
             std::lock_guard<std::mutex> clients_lock(
                 clients_mutex_);
-            for (int fd : client_sockets_)
+            for (const auto fd : client_sockets_)
             {
                 const auto authorization = client_authorizations_.find(fd);
                 if (authorization == client_authorizations_.end() ||
                     !clientAuthorizationCurrent(authorization->second))
                 {
-                    shutdown(fd, SHUT_RDWR);
+                    ns::shutdown(fd);
                     continue;
                 }
                 unsigned char ping[2] = {0x89, 0x00};
-                const auto sent = ::send(fd, ping, sizeof(ping), MSG_DONTWAIT
-#ifdef MSG_NOSIGNAL
-                                         | MSG_NOSIGNAL
-#endif
-                );
-                if (sent != static_cast<ssize_t>(sizeof(ping))) shutdown(fd, SHUT_RDWR);
+                const auto sent = websocket_write(fd, ping, sizeof(ping), true);
+                if (sent != static_cast<std::ptrdiff_t>(sizeof(ping))) ns::shutdown(fd);
             }
         }
     }
@@ -1140,7 +1205,7 @@ void WebSocketServer::keepAliveLoop(uint32_t interval)
  *       The caller is responsible for cleanup.
  */
 bool WebSocketServer::performHandshake(
-    int client,
+    SocketHandle client,
     const std::string &peer_address,
     std::string &upgrade_request,
     std::shared_ptr<WebSocketBackendSession> &backend_session)
@@ -1150,9 +1215,10 @@ bool WebSocketServer::performHandshake(
     std::string request;
 
     // Read until the end of the HTTP headers.
-    while (request.find("\r\n\r\n") == std::string::npos)
+    while (running_ && request.find("\r\n\r\n") == std::string::npos)
     {
-        ssize_t bytes = recv(client, buf, buf_size - 1, 0);
+        const auto bytes = websocket_read(client, buf, buf_size - 1, false);
+        if(bytes<0&&ns::retry(ns::error()))continue;
         if (bytes <= 0)
             return false;
         buf[bytes] = '\0';
@@ -1161,6 +1227,7 @@ bool WebSocketServer::performHandshake(
             return false;
     }
 
+    if(!running_)return false;
     WebSocketUpgradeGuardResult guard;
     if(backend_session_factory_){
         try{
@@ -1172,7 +1239,7 @@ bool WebSocketServer::performHandshake(
             }
         }catch(...){
             constexpr char unavailable[]="HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
-            (void)send(client,unavailable,sizeof unavailable-1,0);return false;
+            (void)websocket_write(client,unavailable,sizeof unavailable-1);return false;
         }
     }else guard=evaluate_websocket_upgrade(request,peer_address,network_snapshot_provider_(),active_privileged_network_mode());
     if (guard.decision != WebSocketUpgradeGuardDecision::allowed)
@@ -1196,7 +1263,7 @@ bool WebSocketServer::performHandshake(
         const char *status = guard.decision == WebSocketUpgradeGuardDecision::rejected
             ? "HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
             : "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
-        (void)send(client, status, std::strlen(status), 0);
+        (void)websocket_write(client, status, std::strlen(status));
         return false;
     }
 
@@ -1208,9 +1275,9 @@ bool WebSocketServer::performHandshake(
              << "Sec-WebSocket-Accept: " << accept_key << "\r\n\r\n";
     std::string response_str = response.str();
 
-    if (send(client, response_str.c_str(), response_str.size(), 0) < 0)
+    if (websocket_write(client, response_str.c_str(), response_str.size()) < 0)
     {
-        std::perror("send handshake");
+        websocket_error("send handshake");
         return false;
     }
 
@@ -1242,6 +1309,9 @@ bool WebSocketServer::clientAuthorizationCurrent(
  */
 bool WebSocketServer::setThreadPriority(int schedPolicy, int priority)
 {
+#ifdef _WIN32
+    (void)schedPolicy;(void)priority;return false;
+#else
     bool success = true;
     sched_param sch_params;
     sch_params.sched_priority = priority;
@@ -1267,4 +1337,5 @@ bool WebSocketServer::setThreadPriority(int schedPolicy, int priority)
     }
 
     return success;
+#endif
 }

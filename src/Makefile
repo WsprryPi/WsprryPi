@@ -87,12 +87,42 @@ PREFIX ?= /usr/local/bin
 # Compile-time transmission backend set. Each validated selection receives
 # isolated objects and a retained profile executable.
 DEFAULT_BACKENDS := rpi-gpio,rp1-gpclk,si5351,simulated
+BUILD_PROFILE ?= transmitter
+ifeq ($(filter transmitter controller,$(BUILD_PROFILE)),)
+$(error Unknown BUILD_PROFILE '$(BUILD_PROFILE)'; select transmitter or controller)
+endif
+ifneq ($(words $(BUILD_PROFILE)),1)
+$(error Select exactly one BUILD_PROFILE)
+endif
+ifeq ($(BUILD_PROFILE),controller)
+BACKENDS ?=
+ANCILLARY_GPIO ?= 0
+ifneq ($(strip $(BACKENDS)),)
+$(error Controller profile cannot select local BACKENDS)
+endif
+ifneq ($(ANCILLARY_GPIO),0)
+$(error Controller profile requires ANCILLARY_GPIO=0)
+endif
+ifneq ($(filter command line environment override,$(origin SI5351_TRANSPORT)),)
+$(error Controller profile cannot select SI5351_TRANSPORT)
+endif
+# These legacy recipes operate the ordinary transmitter aliases and services.
+# Controller installation and lifecycle qualification are separate work.
+CONTROLLER_LEGACY_GOALS := test test-tone test-oneshot gdb install install-binary debuginstall uninstall install-pairing-notices
+ifneq ($(filter $(CONTROLLER_LEGACY_GOALS),$(MAKECMDGOALS)),)
+$(error Controller profile does not support legacy transmitter run/install targets)
+endif
+else
 BACKENDS ?= $(DEFAULT_BACKENDS)
 ANCILLARY_GPIO ?= 1
+endif
 comma := ,
 BACKEND_LIST := $(subst $(comma), ,$(BACKENDS))
 include WSPR-Transmitter/src/si5351_transport_rules.mk
 BACKEND_PROFILE_KEY := $(subst $(comma),+,$(BACKENDS))+ancillary-gpio$(ANCILLARY_GPIO)$(SI5351_TRANSPORT_KEY)
+ifeq ($(BUILD_PROFILE),controller)
+BACKEND_PROFILE_KEY := controller
+endif
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Components
@@ -103,7 +133,6 @@ COMPONENT_SRCDIRS += $(wildcard ./Chipset-Offsets/src)
 COMPONENT_SRCDIRS += $(wildcard ./Mailbox/src)
 COMPONENT_SRCDIRS += $(wildcard ./INI-Handler/src)
 COMPONENT_SRCDIRS += $(wildcard ./LCBLog/src)
-COMPONENT_SRCDIRS += $(wildcard ./MonitorFile/src)
 COMPONENT_SRCDIRS += $(wildcard ./PPM-Manager/src)
 COMPONENT_SRCDIRS += $(wildcard ./Signal-Handler/src)
 COMPONENT_SRCDIRS += $(wildcard ./Singleton/src)
@@ -202,7 +231,19 @@ BIN_DIR         := build/bin
 PROFILE_BIN_DIR := $(BIN_DIR)/profiles/$(BACKEND_PROFILE_KEY)
 PROFILE_RELEASE_BIN := $(PROFILE_BIN_DIR)/$(OUT)
 PROFILE_DEBUG_BIN := $(PROFILE_BIN_DIR)/$(TEST_OUT)
+PROFILE_LINK_INPUTS := Makefile
+ifeq ($(BUILD_PROFILE),controller)
+PROFILE_LINK_INPUTS += ../scripts/controller_sources.mk
+ifeq ($(HOST_OS),Darwin)
+CONTROLLER_LINK_MAP = -Wl,-map,$@.map
+else
+CONTROLLER_LINK_MAP = -Wl,-Map,$@.map
+endif
+endif
 BUILD_METADATA_DIR := build/generated
+ifeq ($(BUILD_PROFILE),controller)
+BUILD_METADATA_DIR := build/generated/controller
+endif
 BUILD_METADATA_HEADER := $(BUILD_METADATA_DIR)/build_metadata.hpp
 BACKEND_CAPABILITIES_HEADER := $(BUILD_METADATA_DIR)/backend_capabilities.hpp
 BACKEND_CAPABILITIES_GENERATOR := ../scripts/generate_backend_capabilities.py
@@ -226,6 +267,10 @@ VERSION_DEBUG_OBJECT := $(OBJ_DIR_DEBUG)/./version.o
 .DEFAULT_GOAL := release
 
 # Parent-owned application storage and focused configuration checks.
+PRIVATE_ACL_FOCUSED_TESTS := sqlite_state_store_test persistent_configuration_test controller_settings_test sqlite_catalog_test companion_files_test state_migration_test controller_identity_store_test recurrence_progress_test recovery_destination_settings_test recovery_evidence_test
+$(addprefix $(BIN_DIR)/,$(PRIVATE_ACL_FOCUSED_TESTS)): native_private_acl.hpp
+$(BIN_DIR)/sqlite_state_store_test $(BIN_DIR)/companion_files_test $(BIN_DIR)/controller_identity_store_test: tests/software_private_acl.hpp
+
 .PHONY: sqlite-state-store-test
 sqlite-state-store-test: $(BIN_DIR)/sqlite_state_store_test
 	$(Q)./$(BIN_DIR)/sqlite_state_store_test
@@ -278,12 +323,23 @@ include ../scripts/build_metadata_rules.mk
 include ../scripts/backend_capability_rules.mk
 
 HOST_OS := $(shell uname -s 2>/dev/null)
+NATIVE_USB_LIBS := $(if $(filter Darwin,$(HOST_OS)),-framework IOKit -framework CoreFoundation)
+ifeq ($(OS),Windows_NT)
+NATIVE_USB_LIBS := -lsetupapi -lcfgmgr32 -ladvapi32
+NATIVE_HOST_LIBS := -lws2_32 -lbcrypt -ladvapi32 -lshell32 -lole32 -luuid -liphlpapi -lcrypt32 -lmincore
+endif
+NATIVE_CDC_SOURCES := wtp_integration/usb_cdc_posix.cpp wtp_integration/usb_cdc_windows_io.cpp wtp_integration/usb_cdc_windows.cpp wtp_integration/usb_cdc_native.cpp wtp_integration/usb_cdc_macos.cpp wtp_integration/usb_cdc_descriptors.cpp
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Source discovery (C++ only)
 # ─────────────────────────────────────────────────────────────────────────────
 
 LOCAL_CPP_SOURCES := $(shell find . -maxdepth 1 -type f -name '*.cpp' ! -name '._*' 2>/dev/null)
+CONTROLLER_RUNTIME_ADAPTER_SOURCES := ./controller_local_hardware_unavailable.cpp ./transmitter_runtime_bridge_controller.cpp ./arg_parser_runtime_controller.cpp
+LOCAL_CPP_SOURCES := $(filter-out $(CONTROLLER_RUNTIME_ADAPTER_SOURCES),$(LOCAL_CPP_SOURCES))
+ifeq ($(BUILD_PROFILE),controller)
+LOCAL_CPP_SOURCES := $(filter-out ./transmitter_runtime_bridge.cpp ./arg_parser_runtime.cpp,$(LOCAL_CPP_SOURCES)) $(CONTROLLER_RUNTIME_ADAPTER_SOURCES)
+endif
 ANCILLARY_GPIO_REAL_CPP_SOURCES := \
 	./gpio_input.cpp \
 	./gpio_output.cpp \
@@ -340,7 +396,8 @@ SELECTED_BACKEND_CPP_SOURCES := \
 	$(if $(filter simulated,$(BACKEND_LIST)),$(SIMULATED_BACKEND_CPP_SOURCES))
 PPM_MANAGER_TEST_SOURCE := ./PPM-Manager/src/test.cpp
 SIGNAL_HANDLER_TEST_SOURCE := ./Signal-Handler/src/test.cpp
-SINGLETON_TEST_SOURCE := ./Singleton/src/test.cpp
+SIGNAL_HANDLER_WINDOWS_TEST_SOURCE := ./Signal-Handler/src/test_windows.cpp
+SINGLETON_TEST_SOURCE := ./Singleton/src/test.cpp ./Singleton/src/installation_lock_test.cpp
 SI5351_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_backend_harness.cpp
 SI5351_PLANNER_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_planner_test.cpp
 SI5351_TRANSITION_TEST_SOURCE := ./WSPR-Transmitter/src/si5351_transition_test.cpp
@@ -362,7 +419,7 @@ SIMULATED_BACKEND_TEST_SOURCE := ./WSPR-Transmitter/src/simulated_transmit_backe
 SIMULATED_BACKEND_REALTIME_TEST_SOURCE := ./WSPR-Transmitter/src/simulated_transmit_backend_realtime_test.cpp
 TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE := ./WSPR-Transmitter/src/transmission_controller_contract_test.cpp
 THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE := ./WSPR-Transmitter/src/thread_affinity_unavailable_test.cpp
-COMPONENT_CPP_SOURCES := $(filter-out $(PPM_MANAGER_TEST_SOURCE) $(SIGNAL_HANDLER_TEST_SOURCE) $(SINGLETON_TEST_SOURCE) $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(LEGACY_GPIO_CLOCK_MODEL_TEST_SOURCE) $(GPIO_FREQUENCY_CORRECTION_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE) $(RP1_GPCLK_PLANNER_TEST_SOURCE) $(RP1_GPCLK_LIFECYCLE_TEST_SOURCE) $(RP1_GPCLK_TRANSITION_TEST_SOURCE) $(RP1_GPCLK_BACKEND_TEST_SOURCE) $(RP1_GPCLK_LINUX_PROVIDER_TEST_SOURCE) $(RP1_GPCLK_DEVELOPMENT_POLICY_TEST_SOURCE) $(RP1_GPCLK_TRANSMIT_BACKEND_TEST_SOURCE) $(RP1_GPCLK_ADMIN_PROBE_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE),$(COMPONENT_CPP_SOURCES))
+COMPONENT_CPP_SOURCES := $(filter-out $(PPM_MANAGER_TEST_SOURCE) $(SIGNAL_HANDLER_TEST_SOURCE) $(SIGNAL_HANDLER_WINDOWS_TEST_SOURCE) $(SINGLETON_TEST_SOURCE) ./MonitorFile/src/monitorfile.cpp $(SI5351_TEST_SOURCE) $(SI5351_PLANNER_TEST_SOURCE) $(SI5351_TRANSITION_TEST_SOURCE) $(STARTUP_QUIESCE_TEST_SOURCE) $(LEGACY_GPIO_CLOCK_MODEL_TEST_SOURCE) $(GPIO_FREQUENCY_CORRECTION_TEST_SOURCE) $(SI5351_QUALIFICATION_SOURCE) $(SI5351_QUALIFICATION_MAIN_SOURCE) $(SI5351_QUALIFICATION_TEST_SOURCE) $(RP1_GPCLK_PLANNER_TEST_SOURCE) $(RP1_GPCLK_LIFECYCLE_TEST_SOURCE) $(RP1_GPCLK_TRANSITION_TEST_SOURCE) $(RP1_GPCLK_BACKEND_TEST_SOURCE) $(RP1_GPCLK_LINUX_PROVIDER_TEST_SOURCE) $(RP1_GPCLK_DEVELOPMENT_POLICY_TEST_SOURCE) $(RP1_GPCLK_TRANSMIT_BACKEND_TEST_SOURCE) $(RP1_GPCLK_ADMIN_PROBE_SOURCE) $(SIMULATED_BACKEND_TEST_SOURCE) $(SIMULATED_BACKEND_REALTIME_TEST_SOURCE) $(TRANSMISSION_CONTROLLER_CONTRACT_TEST_SOURCE) $(THREAD_AFFINITY_UNAVAILABLE_TEST_SOURCE),$(COMPONENT_CPP_SOURCES))
 COMPONENT_CPP_SOURCES := $(filter-out $(TRANSMITTER_SHARED_CPP_SOURCES) $(TRANSMITTER_BACKEND_CPP_SOURCES),$(COMPONENT_CPP_SOURCES))
 
 WTP_APPLICATION_SOURCES := $(wildcard wtp_integration/*.cpp)
@@ -370,6 +427,10 @@ WTP_APPLICATION_SOURCES += $(wildcard WTP-Server/src/*.cpp)
 WTP_APPLICATION_SOURCES += $(filter-out wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp,$(wildcard wtp_endpoint/*.cpp))
 WTP_APPLICATION_SOURCES += $(if $(filter si5351,$(BACKEND_LIST)),wtp_endpoint/si5351_bridge.cpp wtp_endpoint/si5351_realization.cpp)
 CPP_SOURCES := $(WTP_APPLICATION_SOURCES) $(LOCAL_CPP_SOURCES) $(wildcard application_storage/*.cpp) $(wildcard application_control/*.cpp) $(wildcard application_recovery/*.cpp) $(COMPONENT_CPP_SOURCES) $(TRANSMITTER_SHARED_CPP_SOURCES) $(SELECTED_BACKEND_CPP_SOURCES)
+ifeq ($(BUILD_PROFILE),controller)
+include ../scripts/controller_sources.mk
+CPP_SOURCES := $(CONTROLLER_CPP_SOURCES)
+endif
 REL_CPP_SOURCES := $(patsubst ../../%,%,$(CPP_SOURCES))
 
 CPP_OBJECTS       := $(patsubst %.cpp, $(OBJ_DIR_RELEASE)/%.o,$(REL_CPP_SOURCES))
@@ -469,7 +530,7 @@ QUALIFICATION_GPIO_TEST_MODE_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/qualification_gp
 QUALIFICATION_GPIO_TEST_MODE_TEST_DEPS := $(QUALIFICATION_GPIO_TEST_MODE_TEST_OBJ)
 SUPPORT_REQUEST_GUARD_TEST_SRC := tests/support_request_guard_test.cpp
 SUPPORT_REQUEST_GUARD_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/support_request_guard_test.o
-SUPPORT_REQUEST_GUARD_TEST_DEPS := $(SUPPORT_REQUEST_GUARD_TEST_OBJ) $(OBJ_DIR_DEBUG)/./support_request_guard.o $(OBJ_DIR_DEBUG)/./privileged_network_policy.o
+SUPPORT_REQUEST_GUARD_TEST_DEPS := $(SUPPORT_REQUEST_GUARD_TEST_OBJ) $(OBJ_DIR_DEBUG)/./support_request_guard.o $(OBJ_DIR_DEBUG)/./privileged_network_policy.o $(OBJ_DIR_DEBUG)/./native_windows_network.o
 SUPPORT_BUNDLE_JOB_MANAGER_TEST_SRC := tests/support_bundle_job_manager_test.cpp
 SUPPORT_BUNDLE_JOB_MANAGER_TEST_OBJ := $(OBJ_DIR_DEBUG)/tests/support_bundle_job_manager_test.o
 SUPPORT_BUNDLE_JOB_MANAGER_TEST_DEPS := $(SUPPORT_BUNDLE_JOB_MANAGER_TEST_OBJ) $(OBJ_DIR_DEBUG)/./support_bundle_job_manager.o $(OBJ_DIR_DEBUG)/./support_bundle_result_validator.o $(OBJ_DIR_DEBUG)/./support_bundle_job_directory_remover.o $(OBJ_DIR_DEBUG)/./support_bundle_private_artifact.o
@@ -733,6 +794,9 @@ CXXFLAGS += -I$(abspath .)
 CXXFLAGS += -I$(abspath $(BUILD_METADATA_DIR))
 CXXFLAGS += $(foreach dir,$(COMPONENT_SRCDIRS),-I$(abspath $(dir)))
 CXXFLAGS += -I$(abspath ./WSPR-Reference/src/wspr)
+ifeq ($(OS),Windows_NT)
+CXXFLAGS += -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -DWIN32_LEAN_AND_MEAN -DNOMINMAX -DNOGDI
+endif
 
 # Debug/release variants
 CXX_DEBUG_FLAGS   := $(CXXFLAGS) -g $(DEBUG_DEFS)
@@ -746,6 +810,8 @@ ATOMIC_LIB :=
 endif
 
 LDFLAGS = $(SI5351_TRANSPORT_LIBS) -lpthread $(ATOMIC_LIB) \
+           $(NATIVE_USB_LIBS) \
+           $(NATIVE_HOST_LIBS) \
            $(SQLITE_LIBS) \
            $(PKG_LIBS) \
            $(OPENSSL_LIBS) \
@@ -814,17 +880,19 @@ endef
 $(foreach dir,$(COMPONENT_SRCDIRS),$(eval $(call MAKE_DEBUG_COMPONENT_RULES,$(dir))))
 
 # Link debug binary
-$(PROFILE_DEBUG_BIN): $(CPP_DEBUG_OBJECTS)
+$(PROFILE_DEBUG_BIN): $(CPP_DEBUG_OBJECTS) $(PROFILE_LINK_INPUTS)
 	$(Q)mkdir -p $(PROFILE_BIN_DIR)
 	$(Q)echo "Linking debug: $(TEST_OUT) (libgpiod major: $(GPIOD_API_MAJOR))"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $(filter %.o,$^) -o $@ $(LDFLAGS) $(CONTROLLER_LINK_MAP)
 
 .PHONY: FORCE_PROFILE_BINARY
 FORCE_PROFILE_BINARY:
 
+ifneq ($(BUILD_PROFILE),controller)
 $(BIN_DIR)/$(TEST_OUT): $(PROFILE_DEBUG_BIN) FORCE_PROFILE_BINARY
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)cp $(PROFILE_DEBUG_BIN) $@
+endif
 
 $(SEMANTICS_TEST_OBJ): $(SEMANTICS_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
@@ -929,7 +997,7 @@ $(BIN_DIR)/$(BAND_GPIO_ROTATION_TEST_OUT): $(BAND_GPIO_ROTATION_TEST_OBJ) $(BAND
 $(MONITOR_FILE_REGRESSION_TEST_OBJ): $(MONITOR_FILE_REGRESSION_TEST_SRC)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)echo "Compiling (debug) $< into $@"
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -MF $(@:.o=.d) -c $< -o $@
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -IMonitorFile/src -MF $(@:.o=.d) -c $< -o $@
 
 $(BIN_DIR)/$(MONITOR_FILE_REGRESSION_TEST_OUT): $(MONITOR_FILE_REGRESSION_TEST_OBJ) $(MONITOR_FILE_REGRESSION_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -1218,14 +1286,16 @@ endef
 $(foreach dir,$(COMPONENT_SRCDIRS),$(eval $(call MAKE_RELEASE_COMPONENT_RULES,$(dir))))
 
 # Link release binary
-$(PROFILE_RELEASE_BIN): $(CPP_OBJECTS)
+$(PROFILE_RELEASE_BIN): $(CPP_OBJECTS) $(PROFILE_LINK_INPUTS)
 	$(Q)mkdir -p $(PROFILE_BIN_DIR)
 	$(Q)echo "Linking release: $(OUT) (libgpiod major: $(GPIOD_API_MAJOR))"
-	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) $^ -o $@ $(LDFLAGS)
+	$(Q)$(CXX) $(CXX_RELEASE_FLAGS) $(filter %.o,$^) -o $@ $(LDFLAGS) $(CONTROLLER_LINK_MAP)
 
+ifneq ($(BUILD_PROFILE),controller)
 $(BIN_DIR)/$(OUT): $(PROFILE_RELEASE_BIN) FORCE_PROFILE_BINARY
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)cp $(PROFILE_RELEASE_BIN) $@
+endif
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phony targets
@@ -1272,7 +1342,7 @@ clean:
 	$(Q)$(SUDO) rm -rf build
 	$(Q)$(SUDO) rm -rf ../executables
 
-release: $(BIN_DIR)/$(OUT) pairing-notices
+release: $(if $(filter controller,$(BUILD_PROFILE)),$(PROFILE_RELEASE_BIN),$(BIN_DIR)/$(OUT)) pairing-notices
 
 ifeq ($(BUILD_METADATA_QUERY),)
 	$(Q)echo "Release build completed successfully."
@@ -1289,6 +1359,50 @@ backend-capabilities-regression-test:
 
 backend-capabilities-make-regression-test:
 	$(Q)python3 $(BACKEND_CAPABILITIES_MAKE_REGRESSION_TEST)
+
+.PHONY: controller-build-profile-test controller-profile-entry-test
+controller-build-profile-test:
+	$(Q)python3 ../scripts/tests/controller_build_profile_test.py
+controller-profile-entry-test:
+	$(Q)python3 ../scripts/tests/controller_profile_entry_test.py
+
+.PHONY: controller-identity-store-test
+controller-identity-store-test: $(BIN_DIR)/controller_identity_store_test
+	$(Q)$(BIN_DIR)/controller_identity_store_test
+$(BIN_DIR)/controller_identity_store_test: tests/controller_identity_store_test.cpp application_storage/controller_identity.cpp application_storage/controller_identity_record.hpp native_random.hpp owned_state_directory.cpp wtp_endpoint/identity.cpp wtp_integration/pi_management_journal.cpp WTP-Server/src/sha256.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWTP-Server/include $(OPENSSL_CFLAGS) $(filter %.cpp,$^) $(OPENSSL_LIBS) -o $@
+
+.PHONY: usb-cdc-windows-metadata-test
+usb-cdc-windows-metadata-test: $(BIN_DIR)/usb_cdc_windows_metadata_test
+	$(Q)$(BIN_DIR)/usb_cdc_windows_metadata_test
+$(BIN_DIR)/usb_cdc_windows_metadata_test: tests/usb_cdc_windows_metadata_test.cpp wtp_integration/usb_cdc_windows_metadata.hpp wtp_integration/usb_cdc_native.hpp wtp_integration/usb_cdc.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -I. $(filter %.cpp,$^) -o $@
+
+.PHONY: usb-cdc-descriptors-test
+usb-cdc-descriptors-test: $(BIN_DIR)/usb_cdc_descriptors_test
+	$(Q)$(BIN_DIR)/usb_cdc_descriptors_test
+$(BIN_DIR)/usb_cdc_descriptors_test: tests/usb_cdc_descriptors_test.cpp wtp_integration/usb_cdc_descriptors.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $^ -o $@
+
+.PHONY: usb-cdc-native-test usb-cdc-native-inventory-test
+usb-cdc-native-test: $(BIN_DIR)/usb_cdc_native_test
+	$(Q)$(BIN_DIR)/usb_cdc_native_test
+usb-cdc-native-inventory-test: $(BIN_DIR)/usb_cdc_native_test
+	$(Q)$(BIN_DIR)/usb_cdc_native_test --native-inventory
+$(BIN_DIR)/usb_cdc_native_test: tests/usb_cdc_native_test.cpp $(NATIVE_CDC_SOURCES) wtp_integration/usb_cdc.cpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWTP-Client/include $^ $(NATIVE_USB_LIBS) -o $@
+
+.PHONY: controller-transmitter-boundary-test
+controller-transmitter-boundary-test: $(PROFILE_BIN_DIR)/controller_transmitter_boundary_test
+	$(Q)$(PROFILE_BIN_DIR)/controller_transmitter_boundary_test
+$(PROFILE_BIN_DIR)/controller_transmitter_boundary_test: tests/controller_transmitter_boundary_test.cpp transmitter_runtime_bridge_controller.cpp controller_local_hardware_unavailable.cpp local_frequency_provider.cpp $(BACKEND_CAPABILITIES_HEADER)
+	$(Q)test "$(BUILD_PROFILE)" = controller
+	$(Q)mkdir -p $(PROFILE_BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -UNDEBUG -Itests $(filter %.cpp,$^) -o $@
 
 semantics-make-regression-test:
 	$(Q)python3 $(SEMANTICS_MAKE_REGRESSION_TEST)
@@ -1341,7 +1455,7 @@ wtp-pi-tone-engine-test:
 wtp-pi-identity-test:
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror -I. -IWTP-Server/include \
 		tests/wtp_pi_identity_test.cpp wtp_endpoint/identity.cpp \
-		WTP-Server/src/sha256.cpp -o build/wtp_pi_identity_test
+		WTP-Server/src/sha256.cpp -o build/wtp_pi_identity_test $(if $(filter Windows_NT,$(OS)),-lbcrypt,)
 	$(Q)build/wtp_pi_identity_test
 
 .PHONY: wtp-pi-interface-selection-test
@@ -1376,7 +1490,7 @@ wtp-usb-test:
 	$(Q)mkdir -p "$(WTP_USB_BUILD_DIR)"
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Wpedantic -Werror $(WTP_USB_CXXFLAGS) $(OPENSSL_CFLAGS) -I. -IWTP-Client/include \
 		tests/wtp_usb_cdc_test.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_discovery.cpp \
-		$(OPENSSL_LIBS) $(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
+		$(NATIVE_CDC_SOURCES) $(OPENSSL_LIBS) $(NATIVE_USB_LIBS) $(WTP_USB_LDFLAGS) -o "$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 	$(Q)"$(WTP_USB_BUILD_DIR)/wtp_usb_cdc_test"
 
 backend-profile-factory-test: $(BACKEND_PROFILE_FACTORY_TEST_BIN)
@@ -1390,7 +1504,7 @@ machine-power-control-test: $(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)./$(MACHINE_POWER_UNAVAILABLE_TEST_BIN)
 	$(Q)python3 $(MACHINE_POWER_REGRESSION_TEST)
 
-debug: $(BIN_DIR)/$(TEST_OUT) pairing-notices
+debug: $(if $(filter controller,$(BUILD_PROFILE)),$(PROFILE_DEBUG_BIN),$(BIN_DIR)/$(TEST_OUT)) pairing-notices
 	$(Q)echo "Debug build completed successfully."
 
 test: debug
@@ -1411,7 +1525,7 @@ test-oneshot: debug
 legacy-tone-frequency-test:
 	$(Q)$(MAKE) -C WSPR-Transmitter/src legacy-tone-frequency-test SUDO=
 
-semantics-test-full semantics-test-portable-profile: legacy-tone-frequency-test sqlite-state-store-test persistent-configuration-test sqlite-catalog-test state-migration-test companion-files-test application-companion-capture-test sqlite-state-entry-test recovery-capture-backend-test recovery-age-unit-test recovery-archive-test recovery-publication-test restored-generation-test recovery-maintenance-test recovery-evidence-test recovery-destination-settings-test recovery-browser-admission-test recovery-jobs-test recovery-worker-process-test diagnostic-export-test browser-http-resource-test web-bootstrap-test local-control-transport-test local-event-feed-test database-configuration-runtime-test database-managed-startup-test database-fresh-startup-test controller-settings-test controller-retirement-storage-binding-test database-controller-runtime-test
+semantics-test-full semantics-test-portable-profile: wtp-host-reference-test native-controller-owners-test recovery-context-busy-test legacy-tone-frequency-test sqlite-state-store-test persistent-configuration-test sqlite-catalog-test state-migration-test companion-files-test application-companion-capture-test sqlite-state-entry-test recovery-capture-backend-test recovery-age-unit-test recovery-archive-test recovery-publication-test restored-generation-test recovery-maintenance-test recovery-evidence-test recovery-destination-settings-test recovery-browser-admission-test recovery-jobs-test recovery-worker-process-test diagnostic-export-test browser-http-resource-test web-bootstrap-test local-control-transport-test local-event-feed-test database-configuration-runtime-test database-managed-startup-test database-fresh-startup-test controller-settings-test controller-retirement-storage-binding-test database-controller-runtime-test
 ifeq ($(HOST_OS),Linux)
 semantics-test-portable-profile: si5351-inventory-process-test
 endif
@@ -2134,13 +2248,13 @@ local-event-feed-test: $(BIN_DIR)/local_event_feed_test
 	$(Q)"$(BIN_DIR)/local_event_feed_test"
 
 .PHONY: local-control-transport-test
-$(BIN_DIR)/local_control_transport_test: tests/local_control_transport_test.cpp tests/software_child_process.hpp application_control/local_transport.cpp application_control/local_transport.hpp
+$(BIN_DIR)/local_control_transport_test: tests/local_control_transport_test.cpp tests/software_child_process.hpp application_control/local_transport.cpp application_control/local_transport.hpp application_control/local_protocol.hpp application_control/local_session.hpp native_random.hpp
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -pthread -I. -Itests $(filter %.cpp,$^) -o $@
 local-control-transport-test: $(BIN_DIR)/local_control_transport_test
 	$(Q)"$(BIN_DIR)/local_control_transport_test"
 .PHONY: pi-managed-wtp-main-test
-$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
+$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp controller_instance_lock.hpp Singleton/src/installation_lock.hpp wtp_endpoint/runtime.hpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
 $(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
@@ -2554,6 +2668,20 @@ wtp-tls-test: wtp-tls-probe-build $(NETWORK_BIN_DIR)/wtp_tls_contract_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_tls_contract_test"
 	$(Q)python3 -B tests/wtp_tls_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 
+.PHONY: native-clock-test
+$(BIN_DIR)/native_clock_test: tests/native_clock_test.cpp native_clock.hpp native_calendar_time.hpp native_windows_file.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. $(if $(filter Windows_NT,$(OS)),-D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00,) $(filter %.cpp,$^) -o $@ $(if $(filter Windows_NT,$(OS)),-lmincore,)
+native-clock-test: $(BIN_DIR)/native_clock_test
+	$(Q)$(BIN_DIR)/native_clock_test
+
+.PHONY: native-socket-test
+$(BIN_DIR)/native_socket_test: tests/native_socket_test.cpp wtp_integration/native_socket.hpp
+	$(Q)mkdir -p "$(dir $@)"
+	$(Q)$(CXX) -std=c++20 -pthread -I. "$<" -o "$@" $(if $(filter Windows_NT,$(OS)),-lws2_32,)
+native-socket-test: $(BIN_DIR)/native_socket_test
+	$(Q)"$<"
+
 .PHONY: wtp-plain-tcp-test
 wtp-plain-tcp-test: $(NETWORK_BIN_DIR)/wtp_plain_tcp_test
 	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test.tmp"
@@ -2613,12 +2741,12 @@ wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp $(NATIVE_CDC_SOURCES) wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
 .PHONY: wtp-usb-pair-client-build
 wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
 $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client: $(WTP_USB_PAIR_OBJECTS)
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) $^ $(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$@"
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) $^ $(OPENSSL_LIBS) $(NATIVE_USB_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$@"
 $(WTP_NETWORK_BUILD_DIR)/usb-pair/%.o: %.cpp
 	$(Q)mkdir -p "$(dir $@)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -MMD -MP -c "$<" -o "$@"
@@ -2648,7 +2776,7 @@ wspr-plan-placement-test: $(BIN_DIR)/wspr_plan_placement_test
 .PHONY: usb-logging-test
 usb-logging-test:
 	$(Q)mkdir -p build/usb-logging
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. -IWTP-Client/include -DLIB_JOURNALD=0 $(OPENSSL_CFLAGS) -IWTP-Server/include tests/usb_logging_test.cpp WTP-Server/src/sha256.cpp wtp_integration/usb_logging.cpp wtp_integration/usb_discovery.cpp wtp_integration/usb_cdc.cpp wtp_integration/catalog.cpp wtp_endpoint/identity.cpp $(OPENSSL_LIBS) -o build/usb-logging/usb_logging_test
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. -IWTP-Client/include -DLIB_JOURNALD=0 $(OPENSSL_CFLAGS) -IWTP-Server/include tests/usb_logging_test.cpp WTP-Server/src/sha256.cpp wtp_integration/usb_logging.cpp wtp_integration/usb_discovery.cpp wtp_integration/usb_cdc.cpp $(NATIVE_CDC_SOURCES) wtp_integration/catalog.cpp wtp_endpoint/identity.cpp $(OPENSSL_LIBS) $(NATIVE_USB_LIBS) -o build/usb-logging/usb_logging_test
 	$(Q)build/usb-logging/usb_logging_test
 
 # Dedicated worker is bundled into the verified executable for source and
@@ -2785,9 +2913,9 @@ $(BIN_DIR)/recurrence_progress_test: tests/recurrence_progress_test.cpp recurren
 recurrence-progress-test: $(BIN_DIR)/recurrence_progress_test
 	$(Q)$(BIN_DIR)/recurrence_progress_test
 
-$(BIN_DIR)/solar_clock_test: tests/solar_clock_test.cpp solar_clock.cpp solar_clock.hpp solar_policy.cpp solar_policy.hpp solar_geometry.cpp solar_geometry.hpp
+$(BIN_DIR)/solar_clock_test: tests/solar_clock_test.cpp solar_clock.cpp solar_clock.hpp native_clock.hpp solar_policy.cpp solar_policy.hpp solar_geometry.cpp solar_geometry.hpp
 	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWSPR-Reference/src/wspr tests/solar_clock_test.cpp solar_clock.cpp solar_policy.cpp solar_geometry.cpp -o $@
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. -IWSPR-Reference/src/wspr $(if $(filter Windows_NT,$(OS)),-D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00,) tests/solar_clock_test.cpp solar_clock.cpp solar_policy.cpp solar_geometry.cpp -o $@ $(if $(filter Windows_NT,$(OS)),-lmincore,)
 solar-clock-test: $(BIN_DIR)/solar_clock_test
 	$(Q)$(BIN_DIR)/solar_clock_test
 
@@ -2811,10 +2939,11 @@ pi-pair-runtime-test: $(BIN_DIR)/pi_pair_local_test
 
 # Static Botan code is distributed with its upstream notice and exact pin.
 .PHONY: pairing-notices
+PAIRING_NOTICE_DIR := $(if $(filter controller,$(BUILD_PROFILE)),$(PROFILE_BIN_DIR),$(BIN_DIR))
 pairing-notices:
-	$(Q)mkdir -p "$(BIN_DIR)"
-	$(Q)cp ../docs/licenses/botan/BSD-2-Clause.txt "$(BIN_DIR)/BOTAN-LICENSE.txt"
-	$(Q)cp ../scripts/pairing_provider.json "$(BIN_DIR)/PAIRING-PROVIDER.json"
+	$(Q)mkdir -p "$(PAIRING_NOTICE_DIR)"
+	$(Q)cp ../docs/licenses/botan/BSD-2-Clause.txt "$(PAIRING_NOTICE_DIR)/BOTAN-LICENSE.txt"
+	$(Q)cp ../scripts/pairing_provider.json "$(PAIRING_NOTICE_DIR)/PAIRING-PROVIDER.json"
 
 .PHONY: install-pairing-notices
 install-pairing-notices: pairing-notices
@@ -2853,6 +2982,27 @@ recovery-browser-admission-test: $(BIN_DIR)/recovery_browser_admission_test
 $(BIN_DIR)/recovery_maintenance_fixture: tests/recovery_maintenance_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+
+$(BIN_DIR)/recovery_native_owner_fixture: tests/recovery_native_owner_fixture.cpp tests/recovery_maintenance_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests tests/recovery_native_owner_fixture.cpp $(filter %.o,$^) -o $@ $(LDFLAGS)
+
+.PHONY: recovery-native-owner-controller-test recovery-native-owner-move-test recovery-native-owner-crash-test
+.PHONY: controller-native-accounts-fixture-build
+controller-native-accounts-fixture-build: $(PROFILE_BIN_DIR)/controller_native_accounts_fixture
+$(PROFILE_BIN_DIR)/controller_native_accounts_fixture: tests/controller_native_accounts_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)test "$(BUILD_PROFILE)" = controller
+	$(Q)mkdir -p $(PROFILE_BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+
+recovery-native-owner-controller-test: $(BIN_DIR)/recovery_native_owner_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_native_owner_fixture "$$helper" --controller
+
+recovery-native-owner-move-test: $(BIN_DIR)/recovery_native_owner_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_native_owner_fixture "$$helper" --controller-move
+
+recovery-native-owner-crash-test: $(BIN_DIR)/recovery_native_owner_fixture $(BIN_DIR)/recovery_evidence_test
+	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && for phase in stopping_backend retaining_evidence publishing_generation starting_backend verifying_backend complete; do WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_native_owner_fixture "$$helper" "--controller-crash=$$phase" || exit 1; done
 
 .PHONY: recovery-maintenance-test
 recovery-maintenance-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
@@ -2905,7 +3055,7 @@ recovery-evidence-test: $(BIN_DIR)/recovery_evidence_test
 # listener range. These checks never invoke installed services or hardware.
 .PHONY: recovery-integration-test
 recovery-integration-test:
-	$(Q)$(MAKE) --no-print-directory -j1 recovery-maintenance-controller-test recovery-maintenance-move-test recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test recovery-maintenance-history-test recovery-maintenance-crash-test
+	$(Q)$(MAKE) --no-print-directory -j1 recovery-state-owner-test recovery-worker-process-test recovery-native-owner-controller-test recovery-native-owner-move-test recovery-native-owner-crash-test recovery-maintenance-controller-test recovery-maintenance-move-test recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test recovery-maintenance-history-test recovery-maintenance-crash-test
 
 .PHONY: recovery-maintenance-controller-browser-test
 recovery-maintenance-controller-browser-test: $(BIN_DIR)/recovery_maintenance_fixture
@@ -2914,3 +3064,37 @@ recovery-maintenance-controller-browser-test: $(BIN_DIR)/recovery_maintenance_fi
 .PHONY: recovery-maintenance-history-test
 recovery-maintenance-history-test: $(BIN_DIR)/recovery_maintenance_fixture $(BIN_DIR)/recovery_evidence_test
 	$(Q)helper="$$( $(RECOVERY_AGE_BUILD) )" && WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/recovery_maintenance_test.py $(BIN_DIR)/recovery_maintenance_fixture "$$helper" --history
+
+.PHONY: recovery-context-busy-test
+$(BIN_DIR)/recovery_context_busy_test: tests/recovery_context_busy_test.cpp $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+recovery-context-busy-test: $(BIN_DIR)/recovery_context_busy_test
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/recovery_context_busy_test"
+
+.PHONY: native-controller-owners-test
+$(BIN_DIR)/native_controller_owners_test: tests/native_controller_owners_test.cpp native_controller_owners.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -I. $< -o $@
+native-controller-owners-test: $(BIN_DIR)/native_controller_owners_test
+	$(Q)"$(BIN_DIR)/native_controller_owners_test"
+
+.PHONY: native-controller-identity-runtime-test
+native-controller-identity-runtime-test: $(BIN_DIR)/controller_only_production_fixture
+	$(Q)python3 -B tests/native_controller_identity_runtime_test.py "$(BIN_DIR)/controller_only_production_fixture"
+
+.PHONY: application-monitor-boundary-test
+application-monitor-boundary-test: debug
+	$(Q)python3 -B ../scripts/tests/application_monitor_audit.py "$(PROFILE_DEBUG_BIN)"
+
+.PHONY: recovery-state-owner-test
+recovery-state-owner-test:
+	$(Q)python3 -B ../scripts/tests/recovery_state_owner_test.py
+	$(Q)python3 -B ../scripts/tests/recovery_windows_service_policy_test.py
+
+.PHONY: wtp-host-reference-test
+$(BIN_DIR)/wtp_host_references_test: tests/wtp_host_references_test.cpp host_references.hpp wtp_settings.hpp wtp_settings_json.hpp application_recovery/definition_adaptation.hpp
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $< -o $@
+wtp-host-reference-test: $(BIN_DIR)/wtp_host_references_test
+	$(Q)"$(BIN_DIR)/wtp_host_references_test"

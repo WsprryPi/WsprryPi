@@ -23,7 +23,7 @@ std::string next(const Json &value){
     const auto result=std::from_chars(text.data(),text.data()+text.size(),number);
     require(result.ec==std::errc{}&&result.ptr==text.data()+text.size()&&number<UINT64_MAX);return std::to_string(number+1);
 }
-std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),bytes.size())==1);std::string value;
+std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))==1);std::string value;
     for(const auto byte:bytes){value+="0123456789abcdef"[byte>>4];value+="0123456789abcdef"[byte&15];}return value;}
 Json *initial(Json &peers,const std::string &operation){
     for(const auto *group:{"profiles","uncertain"})for(auto &row:peers[group])

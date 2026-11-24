@@ -19,6 +19,6 @@ public:
     bool owns_http() const noexcept{return http_;}
     bool owns_websocket() const noexcept{return websocket_;}
 private:
-    bool entered_{},http_{},websocket_{},monitor_{},policy_override_{};
+    bool entered_{},http_{},websocket_{},policy_override_{};
 };
 } // namespace wsprrypi

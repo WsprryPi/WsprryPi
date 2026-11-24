@@ -1,10 +1,14 @@
 #include "support_request_guard.hpp"
 #include "privileged_network_policy.hpp"
 
-#include <arpa/inet.h>
+#include "wtp_integration/native_socket.hpp"
+#ifdef _WIN32
+#include "native_windows_network.hpp"
+#else
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -17,6 +21,11 @@
 namespace {
 struct ParsedAddress { int family = AF_UNSPEC; std::array<unsigned char, 16> bytes{}; };
 struct ParsedHost { std::string identity; std::optional<unsigned short> port; };
+#ifdef _WIN32
+constexpr std::size_t interface_zone_limit=16;
+#else
+constexpr std::size_t interface_zone_limit=IF_NAMESIZE;
+#endif
 
 std::string lower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -44,7 +53,7 @@ std::optional<ParsedAddress> address(const std::string &text) {
     if (percent != std::string::npos) {
         const auto literal = text.substr(0, percent);
         const auto zone = text.substr(percent + 1);
-        if (zone.empty() || zone.size() >= IF_NAMESIZE ||
+        if (zone.empty() || zone.size() >= interface_zone_limit ||
             !std::all_of(zone.begin(), zone.end(), [](unsigned char c) {
                 return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                        (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.';
@@ -138,6 +147,7 @@ std::optional<ParsedHost> origin_host(const std::string &origin, bool &https) {
     return host(authority);
 }
 
+#ifndef _WIN32
 bool excluded_interface_name(const std::string &name) {
     static constexpr std::array<std::string_view, 14> prefixes = {
         "lo", "tun", "tap", "utun", "wg", "tailscale", "zt", "docker",
@@ -175,6 +185,7 @@ std::optional<PrivilegedInterfaceKind> discovered_interface_kind(
                                : PrivilegedInterfaceKind::other;
 #endif
 }
+#endif
 }
 
 SupportRequestGuard::SupportRequestGuard(SupportRequestGuardSnapshot snapshot) : snapshot_(std::move(snapshot)) {}
@@ -214,6 +225,9 @@ SupportRequestGuardResult SupportRequestGuard::evaluate(
 }
 
 SupportRequestGuardSnapshot SupportRequestGuard::discover_local_networks() {
+#ifdef _WIN32
+    return wsprrypi::discover_windows_local_networks();
+#else
     SupportRequestGuardSnapshot result; char hostname[256]{};
     if (gethostname(hostname, sizeof(hostname) - 1) == 0) result.hostname = hostname;
     ifaddrs *interfaces = nullptr; if (getifaddrs(&interfaces) != 0) return result;
@@ -251,4 +265,5 @@ SupportRequestGuardSnapshot SupportRequestGuard::discover_local_networks() {
     freeifaddrs(interfaces);
     if (!result.discovery_succeeded) result.networks.clear();
     return result;
+#endif
 }

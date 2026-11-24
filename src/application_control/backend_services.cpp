@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "backend_services.hpp"
+#include "backend_capabilities.hpp"
 #include "controller_runtime.hpp"
 #include "pi_managed_host_runtime.hpp"
 #include "web_server_routes.hpp"
@@ -33,9 +34,11 @@ public:
         std::lock_guard lock(lifecycle_);
         {std::lock_guard selected(selection_);stopped_=true;}
         stop_pairing_supervisor();
+#if !WSPRRYPI_CONTROLLER_ONLY
         std::shared_ptr<SupportBundleJobManager> jobs;
         {std::lock_guard selected(selection_);jobs=std::move(jobs_);}
         if(jobs)jobs->shutdown();
+#endif
     }
     std::shared_ptr<PiPairLocalService> pairing(){
         std::lock_guard lock(pairing_mutex_);
@@ -44,8 +47,12 @@ public:
     std::shared_ptr<SupportBundleJobManager> jobs(){
         std::lock_guard lock(selection_);
         if(stopped_)throw std::runtime_error("backend_services_stopping");
+#if WSPRRYPI_CONTROLLER_ONLY
+        throw std::logic_error("Pi support collection is unavailable in the controller build");
+#else
         if(!jobs_)jobs_=SupportBundleRuntime::create_production();
         return jobs_;
+#endif
     }
     ~BackendServices(){stop();}
 private:

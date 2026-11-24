@@ -1,3 +1,4 @@
+#include "native_calendar_time.hpp"
 /**
  * @file scheduling_websocket_status.cpp
  * @brief Renders scheduler status events for WebSocket clients.
@@ -112,7 +113,7 @@ void send_ws_message(
     auto now = std::chrono::system_clock::now();
     auto now_t = std::chrono::system_clock::to_time_t(now);
     std::tm tm_utc{};
-    gmtime_r(&now_t, &tm_utc);
+    wsprrypi::native_calendar::utc(&now_t, &tm_utc);
 
     std::ostringstream oss;
     oss << std::put_time(&tm_utc, "%Y-%m-%dT%H:%M:%SZ");

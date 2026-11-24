@@ -47,7 +47,7 @@ void validate_configuration(const Json &configuration, StateRole role) {
 PersistentConfiguration unpack(const Json &document, StateRole expected) {
     require(fields(document, {"schema", "role", "configuration", "private"}));
     require(document.at("schema") == "local-settings/1", Code::Unsupported);
-    require(document.at("role") == role_name(expected));
+    require(document.at("role") == std::string(role_name(expected)));
     validate_configuration(document.at("configuration"), expected);
     const auto &settings = document.at("private");
     require(expected == StateRole::Pi

@@ -230,8 +230,9 @@ class SourceIdentityTests(unittest.TestCase):
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',
             'wtp-network-loopback', 'wtp-usb-management-pair', 'strict-i2c-profile',
-            'ubuntu-gcc13-release', 'non-hardware-validation'})
+            'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components'})
         self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-15', 'macos-15-intel'])
+        self.assertEqual(jobs['macos-simulated-profile']['strategy']['matrix']['runner'], ['macos-15', 'macos-15-intel'])
         resolver = jobs['change_scope']
         self.assertEqual(reference(resolver['outputs']['pico_sha']), ('steps', 'pico-output', 'outputs', 'pico_sha'))
         selected = [s for s in resolver['steps'] if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico']
@@ -241,7 +242,7 @@ class SourceIdentityTests(unittest.TestCase):
         recorder = next(s for s in resolver['steps'] if s.get('id') == 'pico-output')
         self.assertEqual(source_arguments(recorder), ['record', selected[0]['with']['path']])
         self.assertFalse(recorder.get('continue-on-error', False))
-        for carrier in ('wtp-network-loopback', 'wtp-usb-management-pair'):
+        for carrier in ('wtp-network-loopback', 'wtp-usb-management-pair', 'macos-simulated-profile'):
             steps = jobs[carrier]['steps']
             checkout = next(i for i, s in enumerate(steps) if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico')
             self.assertEqual(reference(steps[checkout]['with']['ref']), ('needs', 'change_scope', 'outputs', 'pico_sha'))

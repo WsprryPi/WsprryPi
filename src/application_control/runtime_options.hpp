@@ -10,5 +10,6 @@ namespace testing {
 // Private actual-process fixture path, selected before production main runs.
 // No environment fallback or installed-state discovery is exposed.
 void set_application_control_runtime_directory(const std::string &);
+bool application_control_runtime_fixture_selected();
 }
 }

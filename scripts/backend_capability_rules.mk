@@ -1,6 +1,8 @@
 # Shared compile-time backend-capability generation rules.
 
 BACKEND_CAPABILITIES_PYTHON ?= python3
+BUILD_PROFILE ?= transmitter
+BACKEND_CAPABILITIES_PROFILE_ARGUMENT := --profile "$(BUILD_PROFILE)"
 BACKEND_CAPABILITIES_NONBUILD_GOALS := clean help macros backend-capabilities-regression-test backend-capabilities-make-regression-test
 BACKEND_CAPABILITIES_BUILD_GOALS := $(filter-out $(BACKEND_CAPABILITIES_NONBUILD_GOALS),$(MAKECMDGOALS))
 
@@ -18,9 +20,9 @@ FORCE_BACKEND_CAPABILITIES:
 
 $(BACKEND_CAPABILITIES_HEADER): FORCE_BACKEND_CAPABILITIES $(BACKEND_CAPABILITIES_GENERATOR)
 	$(Q)$(BACKEND_CAPABILITIES_PYTHON) $(BACKEND_CAPABILITIES_GENERATOR) \
-		--backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $@
+		$(BACKEND_CAPABILITIES_PROFILE_ARGUMENT) --backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $@
 else
-BACKEND_CAPABILITIES_CHECK_STATUS := $(strip $(shell $(BACKEND_CAPABILITIES_PYTHON) $(BACKEND_CAPABILITIES_GENERATOR) --backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $(BACKEND_CAPABILITIES_HEADER) --check >/dev/null 2>&1; printf '%s' $$?))
+BACKEND_CAPABILITIES_CHECK_STATUS := $(strip $(shell $(BACKEND_CAPABILITIES_PYTHON) $(BACKEND_CAPABILITIES_GENERATOR) $(BACKEND_CAPABILITIES_PROFILE_ARGUMENT) --backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $(BACKEND_CAPABILITIES_HEADER) --check >/dev/null 2>&1; printf '%s' $$?))
 
 ifneq ($(filter 0 3,$(BACKEND_CAPABILITIES_CHECK_STATUS)),)
 else
@@ -30,7 +32,7 @@ endif
 ifneq ($(BACKEND_CAPABILITIES_CHECK_STATUS),0)
 $(BACKEND_CAPABILITIES_HEADER):
 	$(Q)$(BACKEND_CAPABILITIES_PYTHON) $(BACKEND_CAPABILITIES_GENERATOR) \
-		--backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $@
+		$(BACKEND_CAPABILITIES_PROFILE_ARGUMENT) --backends "$(BACKENDS)" --ancillary-gpio "$(ANCILLARY_GPIO)" --output $@
 endif
 endif
 

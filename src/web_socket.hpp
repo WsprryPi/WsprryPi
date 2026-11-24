@@ -42,6 +42,7 @@
 #include <vector>
 #include <memory>
 
+#include "wtp_integration/native_socket.hpp"
 #include "websocket_listener_config.hpp"
 #include "support_request_guard.hpp"
 
@@ -165,17 +166,18 @@ private:
         std::shared_ptr<WebSocketBackendSession> backend{};
     };
 
-    int listen_fd_;             ///< Socket file descriptor for listening.
+    using SocketHandle=wsprrypi::native_socket::Handle;
+    SocketHandle listen_fd_;             ///< Socket file descriptor for listening.
     std::atomic<bool> running_; ///< Indicates whether the server is running.
     std::atomic<std::uint16_t> listening_port_{0};
     uint32_t keep_alive_secs_;  ///< Interval for keep-alive pings.
 
     // For each connection:
     std::mutex clients_mutex_;
-    std::vector<int> client_sockets_;
-    std::map<int, ClientAuthorizationContext> client_authorizations_;
+    std::vector<SocketHandle> client_sockets_;
+    std::map<SocketHandle, ClientAuthorizationContext> client_authorizations_;
     BackendSessionFactory backend_session_factory_;
-    std::vector<int> handshaking_sockets_;
+    std::vector<SocketHandle> handshaking_sockets_;
     std::size_t active_client_handlers_{0};
     bool client_registration_closed_{false};
     std::condition_variable client_handlers_cv_;
@@ -228,6 +230,7 @@ private:
     StartupAttempt startWildcard(uint16_t port);
     bool finishStart(uint32_t keep_alive_secs);
     void closeFailedListener() noexcept;
+    void markListenerStopped();
     static bool ipv6Unavailable(const StartupAttempt &attempt) noexcept;
 
     std::condition_variable keep_alive_cv_; ///< Conditional to break from loop
@@ -237,7 +240,7 @@ private:
     // std::mutex client_mutex_;       ///< Mutex to guard access to client socket.
 
     // Helper for per‐client work:
-    void clientLoop(int client_fd, ClientAuthorizationContext authorization);
+    void clientLoop(SocketHandle client_fd, ClientAuthorizationContext authorization);
 
     /**
      * @brief Main server loop that accepts and manages the client connection.
@@ -262,7 +265,7 @@ private:
      * @return true if handshake succeeded, false otherwise.
      */
     bool performHandshake(
-        int client,
+        SocketHandle client,
         const std::string &peer_address,
         std::string &upgrade_request,
         std::shared_ptr<WebSocketBackendSession> &backend_session);

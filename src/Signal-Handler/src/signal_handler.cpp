@@ -15,11 +15,13 @@
 #include <utility>
 
 // System Libraries
+#ifndef _WIN32
 #include <pthread.h>
 #include <sched.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <unistd.h>
+#endif
 
 #ifdef DEBUG_SIGNAL_HANDLER
 #include <cstring>  // For strerror()
@@ -27,7 +29,8 @@
 
 namespace
 {
-bool build_handled_signal_set(sigset_t &set)
+#ifndef _WIN32
+bool build_handled_signal_set(SignalWaitSet &set)
 {
     if (sigemptyset(&set) != 0)
     {
@@ -50,7 +53,7 @@ bool build_handled_signal_set(sigset_t &set)
     return true;
 }
 
-bool apply_handled_signal_mask(const sigset_t &set)
+bool apply_handled_signal_mask(const SignalWaitSet &set)
 {
     if (pthread_sigmask(SIG_BLOCK, &set, nullptr) != 0)
     {
@@ -62,6 +65,7 @@ bool apply_handled_signal_mask(const sigset_t &set)
 
     return true;
 }
+#endif
 } // namespace
 
 /**
@@ -71,6 +75,12 @@ bool apply_handled_signal_mask(const sigset_t &set)
  * separate shutdown primitive.
  */
 const std::unordered_map<int, std::pair<std::string_view, bool>> SignalHandler::signal_map = {
+#ifdef _WIN32
+    // Native console events map to these portable callback numbers. CRT fault
+    // signals and Windows service control are separate platform contracts.
+    {SIGINT, {"SIGINT", false}},
+    {SIGTERM, {"SIGTERM", false}}};
+#else
     {SIGUSR1, {"SIGUSR1", false}},
     {SIGINT, {"SIGINT", false}},
     {SIGTERM, {"SIGTERM", false}},
@@ -81,6 +91,7 @@ const std::unordered_map<int, std::pair<std::string_view, bool>> SignalHandler::
     {SIGFPE, {"SIGFPE", true}},
     {SIGILL, {"SIGILL", true}},
     {SIGABRT, {"SIGABRT", true}}};
+#endif
 
 /**
  * @brief Block all signals registered in SignalHandler::signal_map.
@@ -93,6 +104,7 @@ const std::unordered_map<int, std::pair<std::string_view, bool>> SignalHandler::
  */
 void block_signals()
 {
+#ifndef _WIN32
     sigset_t blockset;
 
     if (!build_handled_signal_set(blockset))
@@ -101,6 +113,7 @@ void block_signals()
     }
 
     (void)apply_handled_signal_mask(blockset);
+#endif
 }
 
 /**
@@ -116,7 +129,9 @@ SignalHandler::SignalHandler()
 
 SignalHandler::SignalHandler(SignalWaitFunction wait_function_value)
     : state(SignalHandlerState::STOPPED),
+#ifndef _WIN32
       termios_saved(false),
+#endif
       wait_function(std::move(wait_function_value))
 {
 }
@@ -138,6 +153,11 @@ void SignalHandler::start()
 
     state.store(SignalHandlerState::RUNNING);
 
+#ifdef _WIN32
+    if(!start_native_signal_wait(signal_set)) {
+        state.store(SignalHandlerState::FAILED);return;
+    }
+#else
     if (tcgetattr(STDIN_FILENO, &original_termios) == 0)
     {
         termios_saved = true;
@@ -160,8 +180,14 @@ void SignalHandler::start()
         state.store(SignalHandlerState::FAILED);
         return;
     }
+#endif
 
+#ifdef _WIN32
+    try {worker_thread = std::thread(&SignalHandler::run, this);}
+    catch(...) {stop_native_signal_wait(signal_set);state.store(SignalHandlerState::FAILED);throw;}
+#else
     worker_thread = std::thread(&SignalHandler::run, this);
+#endif
 }
 
 /**
@@ -246,6 +272,9 @@ bool SignalHandler::stop()
     {
         if (worker_needs_wake)
         {
+#ifdef _WIN32
+            wake_native_signal_wait(signal_set);
+#else
             const int retval = pthread_kill(worker_thread.native_handle(), SIGUSR1);
             if (retval != 0)
             {
@@ -257,6 +286,7 @@ bool SignalHandler::stop()
                        "leave object lifetime unsafe."
                     << std::endl;
             }
+#endif
         }
 
         worker_thread.join();
@@ -264,6 +294,9 @@ bool SignalHandler::stop()
 
     state.store(SignalHandlerState::STOPPED);
 
+#ifdef _WIN32
+    return stop_native_signal_wait(signal_set);
+#else
     if (termios_saved)
     {
         if (tcsetattr(STDIN_FILENO, TCSANOW, &original_termios) != 0)
@@ -276,6 +309,7 @@ bool SignalHandler::stop()
     }
 
     return true;
+#endif
 }
 
 /**
@@ -290,6 +324,9 @@ bool SignalHandler::stop()
  */
 bool SignalHandler::setPriority(int schedPolicy, int priority)
 {
+#ifdef _WIN32
+    (void)schedPolicy;(void)priority;return false;
+#else
     if (state.load() != SignalHandlerState::RUNNING || !worker_thread.joinable())
     {
         return false;
@@ -301,6 +338,7 @@ bool SignalHandler::setPriority(int schedPolicy, int priority)
     int ret = pthread_setschedparam(worker_thread.native_handle(), schedPolicy, &sch_params);
 
     return (ret == 0);
+#endif
 }
 
 /**
@@ -321,7 +359,10 @@ void SignalHandler::run()
 
     SignalHandler *local_this = this;
 
-    sigset_t local_set;
+#ifdef _WIN32
+    auto local_set=signal_set;
+#else
+    SignalWaitSet local_set;
     if (!build_handled_signal_set(local_set))
     {
         local_this->state.store(SignalHandlerState::FAILED);
@@ -336,6 +377,7 @@ void SignalHandler::run()
         local_this->state.store(SignalHandlerState::FAILED);
         return;
     }
+#endif
 
     while (true)
     {
@@ -373,12 +415,19 @@ void SignalHandler::run()
             (void)local_this->state.compare_exchange_strong(
                 expected,
                 SignalHandlerState::FAILED);
+#ifdef _WIN32
+            (void)stop_native_signal_wait(local_set);
+#endif
             break;
         }
 
         const int sig = wait_result.signal_number;
 
+#ifdef _WIN32
+        if (sig == 0)
+#else
         if (sig == SIGUSR1)
+#endif
         {
             continue;
         }

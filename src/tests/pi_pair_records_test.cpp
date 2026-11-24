@@ -103,7 +103,7 @@ int main(int argc,char **argv){try{
     // Private pointer publication is conditional on the exact prior observed
     // inode, not merely equal bytes. Reads never initialize missing history.
     char pattern[]="/tmp/pi-pair-records-XXXXXX";const auto tmp=mkdtemp(pattern);check(tmp);
-    const std::string root=tmp,path=root+"/selection.json";
+    const std::string root=std::filesystem::canonical(tmp).string(),path=root+"/selection.json";
     struct Remove{std::string path;~Remove(){std::filesystem::remove_all(path);}} cleanup{root};
     testing::set_wtp_pi_private_state_path(root+"/device");
     // This dedicated fixture process never starts the endpoint. Its path seam

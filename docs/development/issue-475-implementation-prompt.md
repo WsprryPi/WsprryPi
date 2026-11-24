@@ -15,12 +15,7 @@ step; do not interpret this prompt as unrestricted implementation authority.
 An explicit authorization for multiple slices permits only those slices, in order,
 with each predecessor gate satisfied before its dependent work starts.
 
-The intended outcome is one controller runtime, without a local transmitter,
-with native installation, unprivileged services, private state, truthful UI, and
-qualified Linux/macOS/Windows host support. Build only the adapters and host
-plumbing required to operate accepted #473 functions. Do not add radio modes,
-management resources/carriers, recurrence evaluators, pairing methods, firmware
-updaters, login systems, public hosting, or a Setup redesign.
+The intended outcome is one controller runtime, without a local transmitter, with native installation, unprivileged services, private state, truthful UI, and qualified Linux/macOS/Windows host support. Windows qualification covers x64 on the user-selected Windows 11 build 26300/MSVC 19.51 baseline; native Windows ARM64 is outside the selected scope. Linux ARM64 and both macOS architectures remain selected, with macOS 15 checks permitted through CI. Build only the adapters and host plumbing required to operate accepted #473 functions. Do not add radio modes, management resources/carriers, recurrence evaluators, pairing methods, firmware updaters, login systems, public hosting, or a Setup redesign.
 
 This execution does not authorize staging, commits, pushes, PRs, issue comments,
 publication, signing-credential access, or deployment unless the invoking request

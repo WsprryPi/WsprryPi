@@ -11,14 +11,22 @@
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
+#ifndef _WIN32
 #include <sys/socket.h>
+#endif
 
 namespace
 {
 std::uint16_t reserve_available_port()
 {
-    const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    const auto fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+#ifdef _WIN32
+    const auto close_discovery=[](SOCKET socket){::closesocket(socket);};
+    if(fd==INVALID_SOCKET)
+#else
+    const auto close_discovery=[](int socket){::close(socket);};
     if (fd < 0)
+#endif
     {
         throw std::runtime_error("unable to create loopback discovery socket");
     }
@@ -29,19 +37,23 @@ std::uint16_t reserve_available_port()
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (::bind(fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0)
     {
-        ::close(fd);
+        close_discovery(fd);
         throw std::runtime_error("unable to reserve an available loopback port");
     }
 
+#ifdef _WIN32
+    int length = sizeof(address);
+#else
     socklen_t length = sizeof(address);
+#endif
     if (::getsockname(fd, reinterpret_cast<sockaddr *>(&address), &length) != 0)
     {
-        ::close(fd);
+        close_discovery(fd);
         throw std::runtime_error("unable to inspect the reserved loopback port");
     }
 
     const std::uint16_t port = ntohs(address.sin_port);
-    ::close(fd);
+    close_discovery(fd);
     return port;
 }
 }
@@ -50,6 +62,12 @@ int main()
 {
     try
     {
+#ifdef _WIN32
+        struct Winsock {
+            Winsock(){WSADATA data{};if(::WSAStartup(MAKEWORD(2,2),&data)!=0)throw std::runtime_error("Winsock unavailable");}
+            ~Winsock(){::WSACleanup();}
+        } winsock;
+#endif
         const std::uint16_t port = reserve_available_port();
         {
             SingletonProcess first(port);

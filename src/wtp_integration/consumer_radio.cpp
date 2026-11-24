@@ -7,6 +7,7 @@
 #include <charconv>
 #include <chrono>
 #include <memory>
+#include <limits>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
@@ -51,11 +52,12 @@ Bytes unhex(const std::string &value, std::size_t size) {
   for (std::size_t i = 0; i < size; ++i) {
     auto a = digits.find(value[i * 2]), b = digits.find(value[i * 2 + 1]);
     require(a < 16 && b < 16);
-    result[i] = a * 16 + b;
+    result[i] = static_cast<unsigned char>(a * 16 + b);
   }
   return result;
 }
 std::string b64(std::span<const unsigned char> data) {
+  require(data.size()<=static_cast<std::size_t>(std::numeric_limits<int>::max()/4)*3-2);
   std::string value((data.size() + 2) / 3 * 4, '\0');
   EVP_EncodeBlock(reinterpret_cast<unsigned char *>(value.data()), data.data(),
                   static_cast<int>(data.size()));
@@ -114,16 +116,17 @@ void derive(std::span<const unsigned char> secret,
             std::span<unsigned char> output) {
   std::unique_ptr<EVP_PKEY_CTX, decltype(&EVP_PKEY_CTX_free)> ctx(
       EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, nullptr), EVP_PKEY_CTX_free);
+  require(secret.size()<=static_cast<std::size_t>(std::numeric_limits<int>::max())&&salt.size()<=static_cast<std::size_t>(std::numeric_limits<int>::max())&&info.size()<=static_cast<std::size_t>(std::numeric_limits<int>::max()));
   std::size_t size = output.size();
   require(ctx && EVP_PKEY_derive_init(ctx.get()) == 1 &&
           EVP_PKEY_CTX_set_hkdf_md(ctx.get(), EVP_sha256()) == 1 &&
-          EVP_PKEY_CTX_set1_hkdf_salt(ctx.get(), salt.data(), salt.size()) ==
+          EVP_PKEY_CTX_set1_hkdf_salt(ctx.get(), salt.data(), static_cast<int>(salt.size())) ==
               1 &&
-          EVP_PKEY_CTX_set1_hkdf_key(ctx.get(), secret.data(), secret.size()) ==
+          EVP_PKEY_CTX_set1_hkdf_key(ctx.get(), secret.data(), static_cast<int>(secret.size())) ==
               1 &&
           EVP_PKEY_CTX_add1_hkdf_info(
               ctx.get(), reinterpret_cast<const unsigned char *>(info.data()),
-              info.size()) == 1 &&
+              static_cast<int>(info.size())) == 1 &&
           EVP_PKEY_derive(ctx.get(), output.data(), &size) == 1 &&
           size == output.size());
 }
@@ -132,7 +135,7 @@ std::array<unsigned char, 28> header(std::span<const unsigned char, 16> session,
   std::array<unsigned char, 28> result{'C', 'R', '0', '1'};
   std::copy(session.begin(), session.end(), result.begin() + 4);
   for (unsigned i = 0; i < 8; ++i)
-    result[20 + i] = seq >> (56 - i * 8);
+    result[20 + i] = static_cast<unsigned char>(seq >> (56 - i * 8));
   return result;
 }
 // Local secrets have a lexical lifetime even if parsing/allocation/crypto
@@ -277,11 +280,11 @@ std::string ConsumerRadioClient::seal(std::string_view plain,
           EVP_EncryptInit_ex(ctx.get(), EVP_chacha20_poly1305(), nullptr,
                              key.data(), nonce.data()) == 1 &&
           EVP_EncryptUpdate(ctx.get(), nullptr, &count, aad.data(),
-                            aad.size()) == 1 &&
+                            static_cast<int>(aad.size())) == 1 &&
           EVP_EncryptUpdate(
               ctx.get(), reinterpret_cast<unsigned char *>(packet.data() + 28),
               &count, reinterpret_cast<const unsigned char *>(plain.data()),
-              plain.size()) == 1 &&
+              static_cast<int>(plain.size())) == 1 &&
           static_cast<std::size_t>(count) == plain.size() &&
           EVP_EncryptFinal_ex(
               ctx.get(),
@@ -311,12 +314,12 @@ std::optional<std::string> ConsumerRadioClient::open(std::string_view packet,
   if (!(ctx &&
         EVP_DecryptInit_ex(ctx.get(), EVP_chacha20_poly1305(), nullptr,
                            response_key_.data(), nonce.data()) == 1 &&
-        EVP_DecryptUpdate(ctx.get(), nullptr, &count, aad.data(), aad.size()) ==
+        EVP_DecryptUpdate(ctx.get(), nullptr, &count, aad.data(), static_cast<int>(aad.size())) ==
             1 &&
         EVP_DecryptUpdate(
             ctx.get(), reinterpret_cast<unsigned char *>(plain.data()), &count,
             reinterpret_cast<const unsigned char *>(packet.data() + 28),
-            plain.size()) == 1 &&
+            static_cast<int>(plain.size())) == 1 &&
         static_cast<std::size_t>(count) == plain.size() &&
         EVP_CIPHER_CTX_ctrl(
             ctx.get(), EVP_CTRL_AEAD_SET_TAG, 16,
@@ -374,7 +377,7 @@ PicoHttpResponse ConsumerRadioClient::handshake(const std::string &device,
     require(EVP_PKEY_get_raw_public_key(key.get(), pub.data(), &size) == 1 &&
             size == 32);
     std::array<unsigned char, 16> nonce{};
-    require(RAND_bytes(nonce.data(), nonce.size()) == 1);
+    require(RAND_bytes(nonce.data(), static_cast<int>(nonce.size())) == 1);
     Json start = {{"version", 1},           {"device_id", device_},
                   {"boot_id", boot_},       {"generation", generation_},
                   {"public_key", b64(pub)}, {"nonce", hex(nonce)}};
@@ -419,7 +422,7 @@ PicoHttpResponse ConsumerRadioClient::handshake(const std::string &device,
     for (const auto &part : {unhex(device_, 16), unhex(boot_, 16), sid})
       transcript.insert(transcript.end(), part.begin(), part.end());
     for (unsigned i = 0; i < 8; ++i)
-      transcript.push_back(gen >> (56 - i * 8));
+      transcript.push_back(static_cast<unsigned char>(gen >> (56 - i * 8)));
     for (const auto &part : {Bytes(pub.begin(), pub.end()), peer, challenge,
                              Bytes(nonce.begin(), nonce.end())})
       transcript.insert(transcript.end(), part.begin(), part.end());

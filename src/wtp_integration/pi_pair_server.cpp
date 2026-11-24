@@ -1,14 +1,10 @@
+#include "hardware_access_policy.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_pair_server.hpp"
 #include "management_resolver.hpp"
 #include "pi_pair_contract.hpp"
 #include "control_contract.hpp"
 #include "controller_contract.hpp"
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <poll.h>
 #include <array>
 #include <atomic>
 #include <cerrno>
@@ -20,14 +16,11 @@
 namespace wsprrypi {
 namespace {
 using Clock=std::chrono::steady_clock;
+namespace ns=native_socket;
 void require(bool value){if(!value)throw std::runtime_error("pairing_listener_unavailable");}
-struct Socket {int fd{-1};~Socket(){if(fd>=0)::close(fd);}};
+struct Socket {ns::Handle fd{ns::invalid};~Socket(){ns::close(fd);}};
 thread_local const void *active_server{};
 struct ActiveServer {const void *previous;explicit ActiveServer(const void *value):previous(active_server){active_server=value;}~ActiveServer(){active_server=previous;}};
-void nonblocking(int fd){
-    const auto flags=fcntl(fd,F_GETFL),descriptor=fcntl(fd,F_GETFD);require(flags>=0&&descriptor>=0&&
-        !fcntl(fd,F_SETFL,flags|O_NONBLOCK)&&!fcntl(fd,F_SETFD,descriptor|FD_CLOEXEC));
-}
 std::string peer_address(const sockaddr_storage &peer){
     std::array<char,INET6_ADDRSTRLEN> text{};
     if(peer.ss_family==AF_INET){const auto &address=reinterpret_cast<const sockaddr_in &>(peer);
@@ -70,17 +63,17 @@ struct PiPairServer::State:std::enable_shared_from_this<State> {
     Access access;
     std::mutex lifecycle;
     std::thread accepting;
-    std::vector<int> listeners;
+    std::vector<ns::Handle> listeners;
     std::array<std::unique_ptr<Worker>,4> workers;
     std::atomic_bool stopping{true},running{false};
     std::atomic_uint bound_port{0};
     State(PiPairAdmission &budget,PiPairTlsChannel::Lookup keys,Finished admit,Handler dispatch,Access mode)
         :admission(budget),lookup(std::move(keys)),finished(std::move(admit)),handler(std::move(dispatch)),access(mode){require(bool(lookup)&&bool(finished)&&bool(handler));}
-    void serve(int fd,PiPairAdmission::Connection connection,const std::string &peer){
+    void serve(ns::Handle fd,PiPairAdmission::Connection connection,const std::string &peer){
         ActiveServer active(this);
         struct Cancel {PiPairAdmission::Connection &connection;~Cancel(){connection.cancel();}} cancel{connection};
         try{
-            const auto owned=fd;fd=-1;PiPairTlsChannel channel(owned,lookup);
+            const auto owned=fd;fd=ns::invalid;PiPairTlsChannel channel(owned,lookup);
             const auto started=Clock::now(),deadline=started+std::chrono::seconds(24);
             const auto own_cancel=connection.cancellation();const auto self=shared_from_this();
             const auto cancelled=[self,own_cancel,deadline]{return self->stopping.load()||own_cancel()||Clock::now()>=deadline;};
@@ -108,21 +101,21 @@ struct PiPairServer::State:std::enable_shared_from_this<State> {
                 else if(wrote.state!=wtp::IoState::WouldBlock)return;
                 else std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
-        }catch(...){if(fd>=0)::close(fd);}
+        }catch(...){ns::close(fd);}
     }
     void reap(){for(auto &worker:workers)if(worker&&worker->done.load()){worker->thread.join();worker.reset();}}
     void accept_loop() noexcept{
         ActiveServer active(this);
         try{
         while(!stopping.load()){
-            reap();std::vector<pollfd> fds;for(const auto fd:listeners)fds.push_back({fd,POLLIN,0});
-            const auto count=poll(fds.data(),fds.size(),50);if(count<0){if(errno==EINTR)continue;break;}
+            reap();std::vector<ns::PollItem> fds;for(const auto fd:listeners)fds.push_back({fd,ns::readable,0});
+            const auto count=ns::poll(fds.data(),fds.size(),50);if(count<0){if(ns::interrupted(ns::error()))continue;break;}
             for(const auto &source:fds){
-                if(!(source.revents&POLLIN)||stopping.load())continue;
-                sockaddr_storage peer{};socklen_t size=sizeof(peer);Socket accepted{accept(source.fd,reinterpret_cast<sockaddr *>(&peer),&size)};
-                if(accepted.fd<0)continue;
+                if(!(source.revents&ns::readable)||stopping.load())continue;
+                sockaddr_storage peer{};ns::Length size=sizeof(peer);Socket accepted{accept(source.fd,reinterpret_cast<sockaddr *>(&peer),&size)};
+                if(accepted.fd==ns::invalid)continue;
                 try{
-                    nonblocking(accepted.fd);const auto address=peer_address(peer);
+                    require(ns::configure_stream(accepted.fd));const auto address=peer_address(peer);
                     if(access==Access::LoopbackTest?!loopback(address):!private_management_address(address,{}))continue;
                     if(!admission.allow_request(address))continue;
                     auto connection=admission.try_incoming();if(!connection)continue;
@@ -130,13 +123,13 @@ struct PiPairServer::State:std::enable_shared_from_this<State> {
                     auto worker=std::make_unique<Worker>();auto *completed=worker.get();const auto fd=accepted.fd;const auto self=shared_from_this();
                     worker->thread=std::thread([self,completed,fd,address,connection=std::move(*connection)]() mutable {
                         self->serve(fd,std::move(connection),address);completed->done.store(true);
-                    });accepted.fd=-1;*free=std::move(worker);
+                    });accepted.fd=ns::invalid;*free=std::move(worker);
                 }catch(...){}
             }
         }
         }catch(...){}
         stopping.store(true);running.store(false);bound_port.store(0);
-        for(const auto fd:listeners)::close(fd);
+        for(const auto fd:listeners)ns::close(fd);
         listeners.clear();
     }
 };
@@ -147,29 +140,29 @@ bool PiPairServer::ready() const noexcept{return state_->running.load();}
 unsigned PiPairServer::port() const noexcept{return state_->bound_port.load();}
 bool PiPairServer::start(){
     auto &state=*state_;std::lock_guard lock(state.lifecycle);if(state.accepting.joinable())return false;
-    if(const auto disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");state.access==Access::PrivateLan&&disabled&&std::string_view(disabled)=="1")return false;
+    if(state.access==Access::PrivateLan&&hardware_access_disabled())return false;
     try{
         unsigned port=state.access==Access::LoopbackTest?0:31418;
         for(const auto family:{AF_INET,AF_INET6}){
             if(family==AF_INET6&&state.access==Access::LoopbackTest)continue;
-            Socket listener{socket(family,SOCK_STREAM,IPPROTO_TCP)};
-            if(listener.fd<0&&family==AF_INET6&&(errno==EAFNOSUPPORT||errno==EPROTONOSUPPORT))continue;
-            require(listener.fd>=0);nonblocking(listener.fd);const int yes=1;require(!setsockopt(listener.fd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes)));
+            Socket listener{ns::open_stream(family)};
+            if(listener.fd==ns::invalid&&family==AF_INET6&&ns::unsupported_family(ns::error()))continue;
+            require(listener.fd!=ns::invalid&&ns::exclusive_listener(listener.fd));const int yes=1;
             if(family==AF_INET){
                 sockaddr_in address{};address.sin_family=AF_INET;address.sin_port=htons(port);
                 address.sin_addr.s_addr=htonl(state.access==Access::LoopbackTest?INADDR_LOOPBACK:INADDR_ANY);
                 require(!bind(listener.fd,reinterpret_cast<const sockaddr *>(&address),sizeof(address))&&!listen(listener.fd,4));
-                socklen_t size=sizeof(address);require(!getsockname(listener.fd,reinterpret_cast<sockaddr *>(&address),&size));port=ntohs(address.sin_port);
+                ns::Length size=sizeof(address);require(!getsockname(listener.fd,reinterpret_cast<sockaddr *>(&address),&size));port=ntohs(address.sin_port);
             }else {
-                require(!setsockopt(listener.fd,IPPROTO_IPV6,IPV6_V6ONLY,&yes,sizeof(yes)));
+                require(!ns::option(listener.fd,IPPROTO_IPV6,IPV6_V6ONLY,&yes,sizeof(yes)));
                 sockaddr_in6 address{};address.sin6_family=AF_INET6;address.sin6_port=htons(port);
                 require(!bind(listener.fd,reinterpret_cast<const sockaddr *>(&address),sizeof(address))&&!listen(listener.fd,4));
             }
-            state.listeners.push_back(listener.fd);listener.fd=-1;
+            state.listeners.push_back(listener.fd);listener.fd=ns::invalid;
         }
         require(!state.listeners.empty()&&port);state.stopping.store(false);state.bound_port.store(port);state.running.store(true);
         state.accepting=std::thread([self=state_]{self->accept_loop();});return true;
-    }catch(...){for(const auto fd:state.listeners)::close(fd);state.listeners.clear();state.running.store(false);state.bound_port.store(0);return false;}
+    }catch(...){for(const auto fd:state.listeners)ns::close(fd);state.listeners.clear();state.running.store(false);state.bound_port.store(0);return false;}
 }
 void PiPairServer::stop() noexcept{
     auto &state=*state_;state.stopping.store(true);if(active_server==state_.get())return;

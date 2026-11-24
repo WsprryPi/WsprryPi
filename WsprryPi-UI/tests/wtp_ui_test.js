@@ -15,6 +15,18 @@ for (const value of ["PiCo.LoCaL.", "pico.local", "localhost", "127.0.0.1", "::1
 for (const value of ["", "pico.local..", "pico.local\n", "127.0.0.1\n", "pico.local\u2028", "pico..local", "-pico.local", "pico-.local", "pico_local", "pico.local:443", "*.local", "pico.local/", "127.1", "0127.0.0.1", "0x7f000001", "0x7f000001.", "256.0.0.1", "127.0.0.1.", "[::1]", "::g", "1:::2", "a".repeat(64) + ".local"]) assert(!validNetworkIdentity(value), value);
 const named = { ...settings, Transport: "network", Hostname: "PiCo.LoCaL.", "TLS Server Identity": "PICO.LOCAL.", "TCP Port": 18443, "TLS CA File": "/ca.crt", "TLS Client Certificate": "/client.crt", "TLS Client Key": "/client.key" };
 assert.deepEqual(errors(named, true), {});
+const windows = {...named, "TLS CA File": String.raw`C:\ProgramData\WsprryPi\ca.crt`,
+    "TLS Client Certificate": "D:/private/Ω/client.crt", "TLS Client Key": String.raw`C:\private\client.key`};
+assert.deepEqual(errors(windows,true),{});
+assert.deepEqual(errors({...settings,Endpoint:String.raw`\\?\usb#opaque-interface`},true),{});
+for(const value of [String.raw`C:relative.key`,String.raw`C:\a\..\client.key`,String.raw`C:\a\key:stream`,
+    String.raw`\\server\share\client.key`,String.raw`\\?\C:\client.key`,String.raw`C:\a\NUL`,String.raw`C:\a\CON .key`,
+    String.raw`C:\a\COM1.key`,"C:/a/client.key ","C:/a/client.key."])
+    assert(errors({...windows,"TLS Client Key":value},true)["TLS Client Key"],value);
+for(const value of [undefined,17,"COM1",String.raw`\\.\COM1`,String.raw`\\?\C:\private.key`,String.raw`\\?\GLOBALROOT\Device\other`])
+    assert(errors({...settings,Endpoint:value},true).Endpoint,String(value));
+assert(errors({...windows,"TLS Client Key":"C:/"+"Ω".repeat(255)},true)["TLS Client Key"],"UTF-8 byte bound matches the server");
+assert(errors({...windows,"TLS Client Key":"C:/private/\ud800.key"},true)["TLS Client Key"],"Invalid Unicode is rejected without changing the draft");
 const plain = { ...settings, Transport: "network_plain", Hostname: "pico.local", "TCP Port": 31417, "Device ID": "" };
 assert(errors(plain,true)["Device ID"]);
 assert.deepEqual(errors({...plain,"Device ID":"a".repeat(32),"TLS Server Identity":"stale:invalid"},true),{});

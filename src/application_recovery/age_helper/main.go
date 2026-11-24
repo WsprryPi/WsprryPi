@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Application-private age v1 adapter. Secrets enter only through descriptor 3;
+// Application-private age v1 adapter. Secrets enter only through a private pipe;
 // archive bytes use stdin/stdout. The caller owns private staging/publication.
 package main
 
@@ -122,12 +122,12 @@ func transform(action, passphrase string, input io.Reader, output io.Writer) err
 }
 
 func run(args []string) error {
-	if len(args) != 1 || (args[0] != "encrypt" && args[0] != "decrypt") {
+	if len(args) == 0 || (args[0] != "encrypt" && args[0] != "decrypt") {
 		return errors.New("unsupported invocation")
 	}
-	descriptor := os.NewFile(3, "passphrase-pipe")
-	if descriptor == nil {
-		return errors.New("missing secret descriptor")
+	descriptor, err := secretChannel(args)
+	if err != nil {
+		return err
 	}
 	defer descriptor.Close()
 	passphrase, err := secret(descriptor)

@@ -10,7 +10,21 @@
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef NOGDI
+#define NOGDI
+#endif
+#include <windows.h>
+#include <psapi.h>
+#else
 #include <sys/resource.h>
+#endif
 #include "profile_vector.hpp"
 #ifdef PROVIDER_WITH_OPENSSL
 #include <openssl/crypto.h>
@@ -90,11 +104,17 @@ int main(){
 #endif
   const auto elapsed=std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-start).count();
   require(elapsed<30000);
+#ifdef _WIN32
+  PROCESS_MEMORY_COUNTERS usage{};usage.cb=sizeof usage;
+  require(GetProcessMemoryInfo(GetCurrentProcess(),&usage,sizeof usage)!=0);
+  const auto rss=usage.PeakWorkingSetSize;
+#else
   rusage usage{};require(getrusage(RUSAGE_SELF,&usage)==0);
 #ifdef __APPLE__
   const auto rss=usage.ru_maxrss;
 #else
   const auto rss=usage.ru_maxrss*1024ULL;
+#endif
 #endif
   std::cout<<"{\"passed\":true,\"checks\":"<<checks<<",\"elapsed_ms\":"<<elapsed<<",\"scrypt_memory_bytes\":"<<kdf->total_memory_usage()<<",\"peak_rss_bytes\":"<<rss<<"}\n";
  }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

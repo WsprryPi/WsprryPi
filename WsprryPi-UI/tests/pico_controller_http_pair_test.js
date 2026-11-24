@@ -20,7 +20,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const httpPort=await port(39300),socketPort=await port(httpPort+1),origin=`http://127.0.0.1:${httpPort}`;
   const ini=path.join(temporary,'controller.ini'),original=`[Operation]\nWeb Port = ${httpPort}\nSocket Port = ${socketPort}\n[Security]\nPrivileged Network Safety = enforced\n`;
   fs.writeFileSync(ini,original,{mode:0o600});
-  controller=spawn(binary,[temporary,'--controller-only','-i',ini],{stdio:['ignore','ignore','inherit']});
+  controller=spawn(binary,[temporary,'--controller-only','-i',ini],{stdio:[process.platform==='win32'?'pipe':'ignore','ignore','inherit']});
   const deadline=Date.now()+10000;while(true){try{const response=await fetch(origin+'/status');if(response.ok&&(await response.json()).controller_ready)break;}catch(_){}assert(Date.now()<deadline,'Controller ready deadline');await pause(50);}
   let cookie='',csrf='';
   async function call(resource,method='GET',body,headers={}){
@@ -37,6 +37,16 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    const catalog=await call('/api/control/v1/host/devices');
    const settings={'Endpoint':'','USB Serial':'','USB Vendor ID':0,'USB Product ID':0,'TLS Server Identity':'','Transport':'network','Hostname':'wsprrypico-'+id.repeat(32)+'.local','Device ID':id.repeat(32),'TCP Port':tcp,
     'TLS CA File':path.join(temporary,id,'client-ca.crt'),'TLS Client Certificate':path.join(temporary,id,'client.crt'),'TLS Client Key':path.join(temporary,id,'client.key')};
+   if(id==='a'){
+    const foreignFile=process.platform==='win32'?'/foreign/client.key':String.raw`C:\foreign\client.key`;
+    const foreignUsb=process.platform==='win32'?'/dev/foreign-interface':String.raw`\\?\usb#foreign-interface`;
+    for(const rejectedSettings of [{...settings,'TLS Client Key':foreignFile},
+     {...settings,Transport:'usb',Endpoint:foreignUsb,'USB Serial':'SOURCE-HOST','USB Vendor ID':51966,'USB Product ID':16402}]){
+     const denied=await call('/api/control/v1/host/devices','POST',{operation:'add',name:'Foreign host reference',method:'manual',discovery_id:'',settings:rejectedSettings,consent_plain:false},{'If-Match':catalog.etag});
+     assert.equal(denied.status,409);assert.equal(denied.body.error.code,'catalog_request_rejected');
+     const unchanged=await call('/api/control/v1/host/devices');assert.equal(unchanged.etag,catalog.etag);assert.deepEqual(unchanged.body,catalog.body);
+    }
+   }
    const saved=await call('/api/control/v1/host/devices','POST',{operation:'add',name:'Pico '+id,method:'manual',discovery_id:'',settings,consent_plain:false},{'If-Match':catalog.etag});assert.equal(saved.status,200,JSON.stringify(saved.body));profiles[id]=saved.body.profiles.at(-1).id;
   }
   const target=id=>'/api/control/v1/targets/'+id.repeat(32)+'/pico/';const headers={};
@@ -174,8 +184,8 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
    const timer=setTimeout(()=>{child.kill('SIGTERM');reject(Error('Controller recovery startup/shutdown deadline'));},10000);
    child.once('exit',code=>{clearTimeout(timer);resolve(code);});
   });
-  const stopController=async()=>{const exit=exited(controller);controller.kill('SIGTERM');assert.equal(await exit,0);};
-  const startController=()=>spawn(binary,[temporary,'--controller-only','-i',ini],{stdio:['ignore','ignore','inherit']});
+  const stopController=async()=>{const exit=exited(controller);if(process.platform==='win32')controller.stdin.end('STOP\n');else controller.kill('SIGTERM');assert.equal(await exit,0);};
+  const startController=()=>spawn(binary,[temporary,'--controller-only','-i',ini],{stdio:[process.platform==='win32'?'pipe':'ignore','ignore','inherit']});
   const history=ini+'.management',record=path.join(history,'a'.repeat(32)+'.json'),backup=fs.readFileSync(record);
   await stopController();fs.unlinkSync(record);
   controller=startController();assert.equal(await exited(controller),1,'Missing recorded history must inhibit a fresh controller before listeners');assert.equal(fs.existsSync(record),false);

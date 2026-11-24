@@ -99,6 +99,8 @@ class RecoveryArchiveTest(unittest.TestCase):
     def test_manifest_types_duplicates_unknown_names_and_resource_bounds(self):
         for change in [lambda v: v.update(extra=True), lambda v: v.update(schema='wsprrypi-recovery/2'),
                        lambda v: v['source'].update(identity='b' * 31), lambda v: v['files'][0].update(size=True),
+                       lambda v: v['source'].update(platform='unknown'),
+                       lambda v: v['source'].update(platform='windows', role='pi'),
                        lambda v: v['files'].append(v['files'][0]), lambda v: v['files'][0].update(size=archive.MAX_ARCHIVE),
                        lambda v: v['files'][0].update(name='../../etc/passwd'),
                        lambda v: v['files'][0].update(name='application/source-configuration')]:
@@ -110,6 +112,18 @@ class RecoveryArchiveTest(unittest.TestCase):
             archive.strict_json(b'{"schema":1,"schema":2}')
         with self.assertRaises(archive.RecoveryError):
             archive.strict_json(b'[' * 30 + b'0' + b']' * 30)
+
+    def test_controller_source_platforms_use_the_same_archive(self):
+        for platform in ('linux', 'darwin', 'windows'):
+            with self.subTest(platform=platform):
+                manifest = json.loads(json.dumps(self.manifest))
+                manifest['source'].update(platform=platform, role='controller')
+                archive.validate_manifest(manifest)
+                output = io.BytesIO()
+                archive.write_container(output, self.snapshot, manifest)
+                destination = self.root / ('decoded-' + platform)
+                destination.mkdir(mode=0o700)
+                self.assertEqual(archive.read_container(io.BytesIO(output.getvalue()), destination), manifest)
 
     def test_strict_container_rejects_trailing_bytes_header_metadata_and_digest(self):
         output = io.BytesIO()

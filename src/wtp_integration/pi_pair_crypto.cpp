@@ -12,6 +12,7 @@
 #include <botan/pwdhash.h>
 #include <botan/spake2p.h>
 #include <algorithm>
+#include <limits>
 #include <mutex>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -28,12 +29,14 @@ std::function<void()> derivation_checkpoint;
 void require(bool value,PiPairCryptoFailure code=PiPairCryptoFailure::InvalidShape){if(!value)fail(code);}
 std::span<const unsigned char> bytes(std::string_view text){return {reinterpret_cast<const unsigned char *>(text.data()),text.size()};}
 std::string encode(std::span<const unsigned char> input){
+    require(input.size()<=static_cast<std::size_t>(std::numeric_limits<int>::max()/4)*3-2);
     std::string out((input.size()+2)/3*4,'\0');
-    EVP_EncodeBlock(reinterpret_cast<unsigned char *>(out.data()),input.data(),input.size());
+    EVP_EncodeBlock(reinterpret_cast<unsigned char *>(out.data()),input.data(),static_cast<int>(input.size()));
     while(out.ends_with('='))out.pop_back();
     std::replace(out.begin(),out.end(),'+','-');std::replace(out.begin(),out.end(),'/','_');return out;
 }
 Secure decode(std::string_view input,std::size_t expected){
+    require(expected<=static_cast<std::size_t>(std::numeric_limits<int>::max()/4)*3-2);
     require(input.size()==(expected*8+5)/6&&input.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")==std::string_view::npos);
     constexpr std::string_view digits="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     const auto tail=(expected*8)%6;
@@ -42,7 +45,7 @@ Secure decode(std::string_view input,std::size_t expected){
     struct Wipe{std::string &value;~Wipe(){OPENSSL_cleanse(value.data(),value.size());}} wipe{encoded};
     while(encoded.size()%4)encoded+='=';
     Secure result(encoded.size()/4*3);
-    require(EVP_DecodeBlock(result.data(),reinterpret_cast<const unsigned char *>(encoded.data()),encoded.size())==static_cast<int>(result.size()));
+    require(EVP_DecodeBlock(result.data(),reinterpret_cast<const unsigned char *>(encoded.data()),static_cast<int>(encoded.size()))==static_cast<int>(result.size()));
     result.resize(expected);return result;
 }
 Secure hash(std::string_view input){return Botan::HashFunction::create_or_throw("SHA-256")->process(bytes(input));}
@@ -64,7 +67,7 @@ PiPairCode &PiPairCode::operator=(PiPairCode &&other) noexcept{if(this!=&other){
 PiPairCode PiPairCode::generate(){
     std::array<unsigned char,8> raw{};
     struct Wipe{std::array<unsigned char,8> &value;~Wipe(){OPENSSL_cleanse(value.data(),value.size());}} wipe{raw};
-    require(RAND_bytes(raw.data(),raw.size())==1,PiPairCryptoFailure::Unavailable);
+    require(RAND_bytes(raw.data(),static_cast<int>(raw.size()))==1,PiPairCryptoFailure::Unavailable);
     for(auto &c:raw)c=alphabet[c&31];
     return PiPairCode(raw);
 }
@@ -97,7 +100,7 @@ struct PiPairExchange::Impl {
         context=canonical_pi_management_json(transcript);digest=PiManagementJournal::digest(context);salt=hash(context);
         const auto a="Wsprry-Pair/1/controller/"+context,b="Wsprry-Pair/1/target/"+context;
         Secure framed;
-        const auto append=[&](std::span<const unsigned char> data){for(unsigned i=0;i<8;++i)framed.push_back(static_cast<std::uint64_t>(data.size())>>(8*i));framed.insert(framed.end(),data.begin(),data.end());};
+        const auto append=[&](std::span<const unsigned char> data){for(unsigned i=0;i<8;++i)framed.push_back(static_cast<unsigned char>(static_cast<std::uint64_t>(data.size())>>(8*i)));framed.insert(framed.end(),data.begin(),data.end());};
         append(code.bytes());append(bytes(a));append(bytes(b));
         Secure derived(96);
         {

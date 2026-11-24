@@ -22,25 +22,63 @@
 #include <cerrno>
 #include <set>
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_directory_owner.hpp"
+#else
 #include <fcntl.h>
-#include <stdexcept>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <stdexcept>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw std::runtime_error("pairing_storage_unavailable");}
 bool id(const Json &value){return value.is_string()&&value.get_ref<const std::string &>().size()==32&&
     value.get_ref<const std::string &>().find_first_not_of("0123456789abcdef")==std::string::npos;}
+std::filesystem::path disk_path(const std::string &path){
+#ifdef _WIN32
+    return windows_file::path_from_utf8(path);
+#else
+    return path;
+#endif
+}
+std::string text(const std::filesystem::path &path){
+#ifdef _WIN32
+    const auto bytes=path.u8string();return {bytes.begin(),bytes.end()};
+#else
+    return path.string();
+#endif
+}
+bool present(const std::string &path){
+#ifdef _WIN32
+    const auto named=disk_path(path);windows_file::ParentChain parents(named,windows_file::current_sid());
+    if(::GetFileAttributesW(windows_file::api_path(named).c_str())!=INVALID_FILE_ATTRIBUTES)return true;
+    const auto error=::GetLastError();require(error==ERROR_FILE_NOT_FOUND||error==ERROR_PATH_NOT_FOUND);return false;
+#else
+    struct stat info{};if(!::lstat(path.c_str(),&info))return true;require(errno==ENOENT);return false;
+#endif
+}
 std::string normalized(const std::string &requested){
+#ifdef _WIN32
+    namespace wf=windows_file;const auto path=disk_path(requested),name=path.filename();require(!name.empty()&&name!=L"."&&name!=L"..");
+    wf::ParentChain parents(path,wf::current_sid());
+    wf::Handle directory(::CreateFileW(wf::api_path(path.parent_path()).c_str(),FILE_LIST_DIRECTORY|READ_CONTROL|FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr));
+    require(directory.get()!=INVALID_HANDLE_VALUE);(void)wf::inspect(directory.get(),true);
+    wf::verify_exact_owner(directory.get(),wf::current_sid());wf::verify_security(directory.get(),wf::current_sid(),false,true);
+    return text(wf::normalized_path(directory.get())/name);
+#else
     const auto path=std::filesystem::path(requested),name=path.filename();require(!name.empty()&&name!="."&&name!="..");
     const auto parent=std::filesystem::canonical(path.has_parent_path()?path.parent_path():".");
     struct stat info{};require(!lstat(parent.c_str(),&info)&&S_ISDIR(info.st_mode)&&info.st_uid==geteuid()&&!(info.st_mode&0022));
     return (parent/name).string();
+#endif
 }
+
 std::string fresh(){
-    std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),bytes.size())==1);
+    std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))==1);
     std::string result;for(const auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;
 }
 Json selection(const std::string &bytes,const std::string &self){
@@ -50,16 +88,29 @@ std::string namespace_path(const std::string &directory,const Json &record){retu
 Json empty_catalog(const std::string &self){return {{"schema","pi-management-pairs/1"},{"self_id",self},
     {"authorization_generation","0"},{"active",nullptr},{"retired",Json::array()}};}
 void namespace_capacity(const std::string &directory){
-    const auto path=std::filesystem::path(directory);const auto prefix=path.filename().string()+".ns-";unsigned count=0;
+    const auto path=disk_path(directory);const auto prefix=text(path.filename())+".ns-";unsigned count=0;
     for(const auto &entry:std::filesystem::directory_iterator(path.parent_path())){
-        const auto name=entry.path().filename().string();if(!name.starts_with(prefix))continue;
+        const auto name=text(entry.path().filename());if(!name.starts_with(prefix))continue;
         require(++count<32);
     }
 }
 }
 struct PiPairHistory::Lock {
+#ifdef _WIN32
+    std::unique_ptr<WindowsDirectoryOwner> owner;
+    bool held()const noexcept{return bool(owner);}
+    void open(const std::string &path){require(!owner);owner=std::make_unique<WindowsDirectoryOwner>(disk_path(path));}
+    void check(const std::string &path)const{(void)path;require(bool(owner));owner->check();}
+#else
     int fd{-1};
     ~Lock(){if(fd>=0)::close(fd);}
+    bool held()const noexcept{return fd>=0;}
+    void open(const std::string &path){require(fd<0);fd=::open(path.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(fd>=0&&!flock(fd,LOCK_EX|LOCK_NB));check(path);}
+    void check(const std::string &path)const{
+        struct stat opened{},named{};require(fd>=0&&!fstat(fd,&opened)&&!lstat(path.c_str(),&named)&&S_ISDIR(named.st_mode)&&
+            named.st_uid==geteuid()&&!(named.st_mode&0077)&&opened.st_dev==named.st_dev&&opened.st_ino==named.st_ino);
+    }
+#endif
 };
 bool PiPairHistory::reopen_service_history() noexcept{
     std::lock_guard guard(mutex_);
@@ -74,18 +125,13 @@ PiPairHistory::PiPairHistory(std::string directory,std::string self,std::functio
     require(id(self));directory=normalized(directory);
     directory_=directory;self_=self;
     usage_=std::make_unique<PiPairUsage>(self_);
-    struct stat existing{};
-    if(lstat(directory_.c_str(),&existing)){require(errno==ENOENT);return;}
+    if(!present(directory_))return;
     open_directory();load_selection(std::move(checkpoint));
 }
 void PiPairHistory::open_directory(){
-    require(lock_->fd<0);
-    auto candidate=std::make_unique<Lock>();candidate->fd=open(directory_.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    require(candidate->fd>=0&&!flock(candidate->fd,LOCK_EX|LOCK_NB));struct stat opened{},named{};
-    require(!fstat(candidate->fd,&opened)&&!lstat(directory_.c_str(),&named)&&S_ISDIR(named.st_mode)&&
-        named.st_uid==geteuid()&&!(named.st_mode&0077)&&opened.st_dev==named.st_dev&&opened.st_ino==named.st_ino);
-    lock_=std::move(candidate);
+    require(!lock_->held());auto candidate=std::make_unique<Lock>();candidate->open(directory_);lock_=std::move(candidate);
 }
+
 void PiPairHistory::load_selection(std::function<void(PiPairCatalogWritePoint)> checkpoint){
     // Invalid or lost selected state holds access. It is never replaced by an
     // empty catalog or an alternate sibling merely because opening failed.
@@ -132,9 +178,8 @@ std::unique_ptr<PiPairHistory> PiPairHistory::initialize(std::string directory,P
     return std::make_unique<PiPairHistory>(directory,self);
 }
 void PiPairHistory::verify_selection() const {
-    require(bool(store_)&&selected_.has_value());struct stat descriptor{},named{};
-    require(!fstat(lock_->fd,&descriptor)&&!lstat(directory_.c_str(),&named)&&S_ISDIR(named.st_mode)&&
-        named.st_uid==geteuid()&&!(named.st_mode&0077)&&descriptor.st_dev==named.st_dev&&descriptor.st_ino==named.st_ino);
+    require(bool(store_)&&selected_.has_value());
+    lock_->check(directory_);
     const auto current=PiManagementJournal::read_private_record(directory_+"/authority.json");
     require(current&&current->bytes==selected_->bytes&&current->signature==selected_->signature);
     const auto record=selection(current->bytes,self_);const auto &initial=record["initialization"];
@@ -149,10 +194,8 @@ bool PiPairHistory::available() noexcept {
 std::optional<std::string> PiPairHistory::recovery_generation() noexcept {
     std::lock_guard guard(mutex_);
     try{
-        struct stat named{},descriptor{};
-        if(lock_->fd<0){require(lstat(directory_.c_str(),&named)&&errno==ENOENT);return "0";}
-        require(!fstat(lock_->fd,&descriptor)&&!lstat(directory_.c_str(),&named)&&S_ISDIR(named.st_mode)&&
-            named.st_uid==geteuid()&&!(named.st_mode&0077)&&descriptor.st_dev==named.st_dev&&descriptor.st_ino==named.st_ino);
+        if(!lock_->held()){require(!present(directory_));return "0";}
+        lock_->check(directory_);
         const auto observed=PiManagementJournal::read_private_record(directory_+"/authority.json");
         if(!observed)return "0";
         try{return selection(observed->bytes,self_)["authorization_generation"].get<std::string>();}
@@ -168,7 +211,7 @@ void PiPairHistory::with_backup_files(const std::function<void(const std::map<st
     if(!guard.owns_lock())throw std::system_error(std::make_error_code(std::errc::device_or_resource_busy));
     require(bool(capture));
     if(!store_){
-        struct stat info{};require(::lstat(directory_.c_str(),&info)&&errno==ENOENT);
+        require(!present(directory_));
         capture({});return;
     }
     verify_selection();const auto before=store_->snapshot();
@@ -217,14 +260,12 @@ void PiPairHistory::recover_access(const BrowserRequest &request,const LocalBrow
     // owner. A missing root is represented as a hold until this explicit action.
     std::optional<PiManagementJournal::Observation> before;
     std::optional<Json> old;
-    if(lock_->fd>=0){
-        struct stat descriptor{},named{};
-        require(!fstat(lock_->fd,&descriptor)&&!lstat(directory_.c_str(),&named)&&S_ISDIR(named.st_mode)&&
-            named.st_uid==geteuid()&&!(named.st_mode&0077)&&descriptor.st_dev==named.st_dev&&descriptor.st_ino==named.st_ino);
+    if(lock_->held()){
+        lock_->check(directory_);
         before=PiManagementJournal::read_private_record(directory_+"/authority.json");
         if(before)try{old=selection(before->bytes,self_);}catch(...){/* Explicit recovery retains these bytes, never follows them. */}
     }else {
-        struct stat named{};require(lstat(directory_.c_str(),&named)&&errno==ENOENT);
+        require(!present(directory_));
     }
     if(old&&(*old)["initialization"]["kind"]=="access-recovery"){
         const auto &initial=(*old)["initialization"];
@@ -265,7 +306,7 @@ void PiPairHistory::recover_access(const BrowserRequest &request,const LocalBrow
     if(checkpoint)checkpoint(PiPairCatalogWritePoint::Prepared);
     require(principal.matches(request));
     try{
-        if(lock_->fd>=0){
+        if(lock_->held()){
             selected_=PiManagementJournal::publish_private_record(directory_+"/authority.json",before,record.dump());
         }else {
             const auto root=prepare_owned_state_directory(directory_,[&]{return record.dump();},[&](const auto &bytes){require(bytes==record.dump());});
@@ -450,7 +491,7 @@ std::optional<Json> PiPairHistory::rotate(const PiPairPrincipal &principal,const
             const auto &text=request["expected_epoch"].get_ref<const std::string &>();std::uint64_t epoch{};
             const auto parsed=std::from_chars(text.data(),text.data()+text.size(),epoch);
             require(parsed.ec==std::errc{}&&parsed.ptr==text.data()+text.size()&&epoch&&epoch<UINT64_MAX);
-            auto key=PiPairRotationKey::generate();std::array<unsigned char,32> nonce{};require(RAND_bytes(nonce.data(),nonce.size())==1);
+            auto key=PiPairRotationKey::generate();std::array<unsigned char,32> nonce{};require(RAND_bytes(nonce.data(),static_cast<int>(nonce.size()))==1);
             response={{"contract","Wsprry-Pair/1"},{"schema","rotate-prepared"},{"operation_id",request["operation_id"]},
                 {"next_epoch",std::to_string(epoch+1)},{"pB",key.public_point()},{"nonce",PiPairSecret(nonce).storage_encoding()}};
             auto next=key.derive_next(PiPairSecret::from_storage(active["current"]["tls_psk"].get_ref<const std::string &>()),epoch,request,response,PiPairRotationKey::Role::Target);

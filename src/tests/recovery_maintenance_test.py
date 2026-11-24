@@ -22,14 +22,18 @@ from application_recovery import archive, evidence
 
 
 def run(fixture, helper, fault_phase=None):
-    controller = fault_phase in ('--controller', '--controller-browser')
+    controller_crash = bool(fault_phase and fault_phase.startswith('--controller-crash='))
+    controller = controller_crash or fault_phase in ('--controller', '--controller-browser', '--controller-move')
     browser_mode = fault_phase in ('--browser', '--controller-browser')
-    moving = fault_phase == '--move'
+    moving = fault_phase in ('--move', '--controller-move')
     overridden = fault_phase == '--listener-override'
     history = fault_phase == '--history'
     roundtrip = fault_phase in ('--roundtrip', '--history')
     purpose = 'move' if moving else 'recover'
-    if controller or moving or overridden or roundtrip:
+    if controller_crash:
+        fault_phase = fault_phase.split('=', 1)[1]
+        assert fault_phase in ('stopping_backend', 'retaining_evidence', 'publishing_generation', 'starting_backend', 'verifying_backend', 'complete')
+    elif controller or moving or overridden or roundtrip:
         fault_phase = '--browser' if browser_mode else None
     role = 'controller' if controller else 'pi'
     environment = dict(os.environ, WSPRRYPI_DISABLE_HARDWARE_ACCESS='1')
@@ -78,7 +82,16 @@ def run(fixture, helper, fault_phase=None):
         assert 'select at least one hold' in help_result.stdout
         assert not state.exists() and not Path(str(ledger) + '.maintenance').exists()
         reserved = []
-        for port in range(42200, 42300):
+        # Restored listeners bind only after browser/proxy traffic has begun.
+        # Keep them outside Linux's ephemeral client range so active or
+        # TIME_WAIT client sockets cannot occupy a future listener port.
+        ephemeral = range(0)
+        if sys.platform == 'linux':
+            first, last = map(int, Path('/proc/sys/net/ipv4/ip_local_port_range').read_text().split())
+            ephemeral = range(first, last + 1)
+        for port in range(22000, 32000):
+            if port in ephemeral:
+                continue
             descriptor = socket.socket()
             try:
                 descriptor.bind(('127.0.0.1', port))
@@ -88,7 +101,7 @@ def run(fixture, helper, fault_phase=None):
             reserved.append(descriptor)
             if len(reserved) == 4:
                 break
-        assert len(reserved) == 4
+        assert len(reserved) == 4, 'Four non-ephemeral recovery fixture listener ports are required'
         ports = [item.getsockname()[1] for item in reserved]
         maintenance_arguments = ['--fixture-listener-override', str(ports[0]), str(ports[1])] if overridden else []
         for item in reserved:
@@ -215,12 +228,12 @@ def run(fixture, helper, fault_phase=None):
                 text = re.sub(r'(?m)^Power Level = .*$', 'Power Level = 3', text)
                 destination_ini.write_text(text.replace('Call Sign = AA0NT', 'Call Sign = K1ABC').replace('Fade In Ms = 17', 'Fade In Ms = 9'))
                 destination_ini.chmod(0o600)
-                admitted = subprocess.run(prefix + ['--migrate-state', '--state-directory', str(state), '--ini-source', str(destination_ini)],
+                admitted = subprocess.run(prefix + ['--migrate-state', '--state-directory', str(state), '--ini-source', str(destination_ini)] + (['--controller-only'] if controller else []),
                                           env=environment, capture_output=True, timeout=20)
                 assert admitted.returncode == 0, admitted.stderr.decode()
                 assert json.loads((state / 'authority.json').read_text())['identity'] != source_identity
                 backend = start('destination-backend', ['--state-directory', str(state), '--runtime-directory', str(runtime), '--backend', 'simulated',
-                                                       '--socket-loopback-only', '--web-port', str(ports[0]), '--socket-port', str(ports[1]), '--socket-loopback-family', 'ipv4'])
+                                                       '--socket-loopback-only', '--web-port', str(ports[0]), '--socket-port', str(ports[1]), '--socket-loopback-family', 'ipv4'] + (['--controller-only'] if controller else []))
                 maintenance = start('destination-maintenance', ['--maintenance-worker', '--role', role])
                 web = start('destination-web', ['--web-service', '--runtime-directory', str(runtime), '--listener-cache', str(listener_cache)])
                 cookie, csrf, recovery_cookie, recovery_csrf = '', '', '', ''
@@ -264,11 +277,12 @@ def run(fixture, helper, fault_phase=None):
             assert request('POST', path + '/validate', {'purpose': purpose, 'passphrase': 'wrong phrase'})[0] == 200
             assert wait_state(('failed',))['error'] == 'archive_invalid'
             time.sleep(.05)
-            def explicit_validation(action):
+            def explicit_validation(action, job_id=None):
                 # The owning backend can temporarily hold its configuration
                 # gate. Only a durable, definite busy refusal permits another
                 # explicit validation; never replay an unknown outcome.
-                proof_path = Path(str(ledger) + '.maintenance/jobs/' + restore['job_id']) / 'validation-result.json'
+                selected_id = restore['job_id'] if job_id is None else job_id
+                proof_path = Path(str(ledger) + '.maintenance/jobs/' + selected_id) / 'validation-result.json'
                 for attempt in range(5):
                     action()
                     observed = wait_state(('preview', 'failed'))
@@ -276,7 +290,7 @@ def run(fixture, helper, fault_phase=None):
                         return observed
                     proof = json.loads(proof_path.read_text()) if proof_path.exists() else None
                     assert observed['error'] == 'validation_failed' and proof is not None, (observed, proof)
-                    assert proof['schema'] == 'recovery-validation-result/1' and proof['job_id'] == restore['job_id'] \
+                    assert proof['schema'] == 'recovery-validation-result/1' and proof['job_id'] == selected_id \
                         and proof['state'] == 'failed' and proof['error'] == 'busy', (observed, proof)
                     assert attempt < 4, (observed, proof)
                     time.sleep(.05)
@@ -372,8 +386,12 @@ def run(fixture, helper, fault_phase=None):
             assert review['hold']['local_output_held'] and review['hold']['remote_authority_held']
             if moving:
                 assert review['identity'] != preview['source']['identity']
-                assert review['settings']['Calibration']['PPM'] == 1.25 and review['settings']['GPIO']['Power Level'] == 3
-                assert review['settings']['CW']['Fade In Ms'] == 17 and review['settings']['CW']['Fade Shape'] == 'linear'
+                if not controller:
+                    assert review['settings']['Calibration']['PPM'] == 1.25 and review['settings']['GPIO']['Power Level'] == 3
+                if controller:
+                    assert review['settings']['Operation']['Web Port'] == preview['listeners']['restored_web_port']
+                else:
+                    assert review['settings']['CW']['Fade In Ms'] == 17 and review['settings']['CW']['Fade Shape'] == 'linear'
             assert review_request('POST', {'action': 'release', 'digest': '0' * 64,
                                                           'release_local': True, 'release_remote': False})[0] != 200
             assert review_request('GET')[2] == data
@@ -386,7 +404,10 @@ def run(fixture, helper, fault_phase=None):
             assert review_request('POST', {'action': 'release', 'digest': review['digest'],
                                                           'release_local': True, 'release_remote': True})[0] != 200
             if moving:
-                print('PASS actual separate-installation move: distinct destination identity, retained GPIO/calibration/authority, portable custom CW settings, source evidence, no remote adoption, exact review and stopped local output')
+                if controller:
+                    print('PASS actual separate-controller move: distinct destination identity and backend-owner roots, destination authority retained, source evidence, no remote adoption, and exact held review')
+                else:
+                    print('PASS actual separate-installation move: distinct destination identity, retained GPIO/calibration/authority, portable custom CW settings, source evidence, no remote adoption, exact review and stopped local output')
                 return
             if roundtrip:
                 # A restored installation, including inactive source evidence,
@@ -409,10 +430,10 @@ def run(fixture, helper, fault_phase=None):
                 again = json.loads(uploaded.stdout)
                 path = '/api/recovery/jobs/' + again['job_id']
                 assert wait_state(('uploaded', 'failed'))['state'] == 'uploaded'
-                checked = cli(['validate', '--job-id', again['job_id'], '--purpose', 'recover'], [('--passphrase-fd', phrase)])
-                assert checked.returncode == 0, checked.stderr
-                validated = wait_state(('preview', 'failed'))
-                assert validated['state'] == 'preview', validated
+                def validate_again_cli():
+                    checked = cli(['validate', '--job-id', again['job_id'], '--purpose', 'recover'], [('--passphrase-fd', phrase)])
+                    assert checked.returncode == 0, checked.stderr
+                validated = explicit_validation(validate_again_cli, again['job_id'])
                 staged = Path(str(ledger) + '.maintenance/jobs/' + again['job_id'])
                 manifest_again = json.loads((staged / 'archive-manifest.json').read_text())
                 assert any(item['name'].startswith('application/evidence/') for item in manifest_again['files'])
@@ -425,10 +446,7 @@ def run(fixture, helper, fault_phase=None):
                             again = json.loads(uploaded.stdout)
                             path = '/api/recovery/jobs/' + again['job_id']
                             assert wait_state(('uploaded', 'failed'))['state'] == 'uploaded'
-                            checked = cli(['validate', '--job-id', again['job_id'], '--purpose', 'recover'], [('--passphrase-fd', phrase)])
-                            assert checked.returncode == 0, checked.stderr
-                            validated = wait_state(('preview', 'failed'))
-                            assert validated['state'] == 'preview', validated
+                            validated = explicit_validation(validate_again_cli, again['job_id'])
                         confirmed = cli(['confirm', '--job-id', again['job_id'], '--preview-digest', validated['preview']['digest']])
                         assert confirmed.returncode == 0, confirmed.stderr
                         finished = wait_state(('completed', 'failed'))

@@ -1,12 +1,15 @@
+#include "hardware_access_policy.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_pair_discovery.hpp"
 #include "management_resolver.hpp"
 #include "controller_contract.hpp"
 #include "control_contract.hpp"
-#include <arpa/inet.h>
+#include "native_socket.hpp"
+#ifndef _WIN32
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <poll.h>
+#endif
 #include <array>
 #include <atomic>
 #include <cstdlib>
@@ -14,7 +17,9 @@
 #include <set>
 #include <thread>
 #include <stdexcept>
-#if defined(__APPLE__)
+#if defined(_WIN32)
+#include "pi_pair_discovery_windows.hpp"
+#elif defined(__APPLE__)
 #include <dns_sd.h>
 #elif defined(__linux__) && defined(WSPRRYPI_HAVE_AVAHI)
 #include <avahi-client/client.h>
@@ -28,6 +33,12 @@ using Clock=std::chrono::steady_clock;
 void require(bool value){if(!value)throw std::runtime_error("pair_publication_unavailable");}
 struct Address {unsigned interface;int family;std::string text;auto operator<=>(const Address &) const = default;};
 std::vector<Address> addresses(){
+#ifdef _WIN32
+    const auto native=windows_discovery_addresses();require(native.has_value());std::vector<Address> result;std::set<std::pair<unsigned,int>> seen;
+    for(const auto &address:*native)if(private_management_address(address.address,{})&&seen.emplace(address.interface_index,address.family).second)
+        result.push_back({address.interface_index,address.family,address.address});
+    return result;
+#else
     ifaddrs *list{};require(!getifaddrs(&list));struct Release {ifaddrs *value;~Release(){freeifaddrs(value);}} release{list};
     std::set<Address> all;
     for(auto *entry=list;entry;entry=entry->ifa_next){
@@ -44,6 +55,7 @@ std::vector<Address> addresses(){
     std::vector<Address> result;std::set<std::pair<unsigned,int>> seen;
     for(const auto &address:all)if(seen.emplace(address.interface,address.family).second)result.push_back(address);
     return result;
+#endif
 }
 }
 struct PiPairDiscoveryPublisher::State {
@@ -68,7 +80,18 @@ struct PiPairDiscoveryPublisher::State {
         auto result=addresses();if(!announcement.bootstrap_ipv6)std::erase_if(result,[](const auto &address){return address.family==AF_INET6;});
         return result;
     }
-#if defined(__APPLE__)
+#if defined(_WIN32)
+    void native(){
+        std::vector<WindowsLanAddress> addresses;for(const auto &address:current)addresses.push_back({address.interface,address.family,address.text});
+        windows_dnssd::Publisher publisher(announcement.name,host,fields,addresses);auto checked=Clock::now();
+        while(live()){
+            require(!publisher.failed());published=publisher.published();
+            if(Clock::now()-checked>=std::chrono::seconds(5)){if(advertised()!=current)break;checked=Clock::now();}
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+    void cleanup(){published=false;}
+#elif defined(__APPLE__)
     struct Service {
         DNSServiceRef ref{};State *owner{};bool confirmed{};
         ~Service(){if(ref)DNSServiceRefDeallocate(ref);}
@@ -164,7 +187,7 @@ PiPairDiscoveryPublisher::PiPairDiscoveryPublisher(PiPairAnnouncement announceme
 PiPairDiscoveryPublisher::~PiPairDiscoveryPublisher(){stop();}
 bool PiPairDiscoveryPublisher::start(){
     std::lock_guard guard(state_->lifecycle);if(state_->worker.joinable())return false;
-    if(const auto disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");disabled&&std::string_view(disabled)=="1")return false;
+    if(hardware_access_disabled())return false;
     state_->stopping=false;try{state_->worker=std::thread([state=state_.get()]{state->run();});return true;}catch(...){state_->stopping=true;return false;}
 }
 void PiPairDiscoveryPublisher::stop() noexcept{state_->stopping=true;std::lock_guard guard(state_->lifecycle);state_->stopping=true;if(state_->worker.joinable())state_->worker.join();}

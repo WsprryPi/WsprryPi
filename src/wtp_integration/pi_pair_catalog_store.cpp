@@ -8,11 +8,15 @@
 #include <cstdint>
 #include <filesystem>
 #include <set>
+#ifdef _WIN32
+#include "native_windows_directory_owner.hpp"
+#else
 #include <fcntl.h>
-#include <stdexcept>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <stdexcept>
 namespace wsprrypi {
 namespace {
 void require(bool value){if(!value)throw std::runtime_error("pairing_storage_unavailable");}
@@ -84,12 +88,20 @@ void coherent(const nlohmann::json &catalog,const nlohmann::json &operations,con
 }
 }
 struct PiPairCatalogStore::Lock {
+#ifdef _WIN32
+    std::unique_ptr<WindowsDirectoryOwner> owner;
+#else
     int fd{-1};
     ~Lock(){if(fd>=0)::close(fd);}
+#endif
 };
 PiPairCatalogStore::PiPairCatalogStore(std::string directory,std::string self,
     std::function<void(PiPairCatalogWritePoint)> checkpoint,std::optional<Authority> authority)
     :lock_(std::make_unique<Lock>()),self_(std::move(self)),checkpoint_(std::move(checkpoint)),authority_(std::move(authority)){
+#ifdef _WIN32
+    lock_->owner=std::make_unique<WindowsDirectoryOwner>(windows_file::path_from_utf8(directory));
+    const auto normalized=lock_->owner->path().u8string();directory_.assign(normalized.begin(),normalized.end());verify_directory();
+#else
     const auto requested=std::filesystem::path(directory),name=requested.filename();
     require(!name.empty()&&name!="."&&name!="..");
     const auto parent=std::filesystem::canonical(requested.has_parent_path()?requested.parent_path():".");
@@ -97,6 +109,7 @@ PiPairCatalogStore::PiPairCatalogStore(std::string directory,std::string self,
     directory_=(parent/name).string();
     lock_->fd=open(directory_.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     require(lock_->fd>=0&&!flock(lock_->fd,LOCK_EX|LOCK_NB));verify_directory();
+#endif
     std::map<std::string,std::string> destinations{{"pair",directory_+"/authority.json"},{"operations",directory_+"/operations.json"}};
     if(authority_){require(!authority_->path.empty());destinations["authority"]=authority_->path;destinations["peers"]=directory_+"/peers.json";}
     journal_=std::make_unique<PiManagementJournal>(directory_+"/transactions",self_,std::move(destinations));
@@ -104,9 +117,13 @@ PiPairCatalogStore::PiPairCatalogStore(std::string directory,std::string self,
 }
 PiPairCatalogStore::~PiPairCatalogStore()=default;
 void PiPairCatalogStore::verify_directory() const {
+#ifdef _WIN32
+    require(bool(lock_->owner));lock_->owner->check();
+#else
     struct stat descriptor{},named{};
     require(!fstat(lock_->fd,&descriptor)&&!lstat(directory_.c_str(),&named)&&S_ISDIR(named.st_mode)&&
         named.st_uid==geteuid()&&!(named.st_mode&0077)&&descriptor.st_dev==named.st_dev&&descriptor.st_ino==named.st_ino);
+#endif
 }
 void PiPairCatalogStore::validate_decision(){
     const auto decision=journal_->decision();if(!decision)return;

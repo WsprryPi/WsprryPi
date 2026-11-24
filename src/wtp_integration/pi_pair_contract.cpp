@@ -16,13 +16,14 @@ namespace {
 using Json=nlohmann::json;
 const Json &contract(){static const auto value=Json::parse(pi_pair_contract_data());return value;}
 bool canonical_binary(const std::string &input,std::size_t size){
+    if(size!=32&&size!=65)return false;
     if(input.size()!=(size*8+5)/6||input.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")!=std::string::npos)return false;
     auto encoded=input;std::replace(encoded.begin(),encoded.end(),'-','+');std::replace(encoded.begin(),encoded.end(),'_','/');
     while(encoded.size()%4)encoded+='=';
     std::vector<unsigned char> bytes(encoded.size()/4*3);
-    if(EVP_DecodeBlock(bytes.data(),reinterpret_cast<const unsigned char *>(encoded.data()),encoded.size())!=static_cast<int>(bytes.size()))return false;
+    if(EVP_DecodeBlock(bytes.data(),reinterpret_cast<const unsigned char *>(encoded.data()),static_cast<int>(encoded.size()))!=static_cast<int>(bytes.size()))return false;
     std::string normalized((size+2)/3*4,'\0');
-    EVP_EncodeBlock(reinterpret_cast<unsigned char *>(normalized.data()),bytes.data(),size);
+    EVP_EncodeBlock(reinterpret_cast<unsigned char *>(normalized.data()),bytes.data(),static_cast<int>(size));
     while(normalized.ends_with('='))normalized.pop_back();
     std::replace(normalized.begin(),normalized.end(),'+','-');std::replace(normalized.begin(),normalized.end(),'/','_');
     return normalized==input&&(size!=65||bytes.front()==4);
@@ -78,6 +79,6 @@ bool pi_pair_route(PiPairRoutePurpose purpose,std::string_view method,std::strin
     const auto &routes=contract()["routes"][role];
     if(!routes.contains(std::string(method)))return false;
     const auto &names=routes[std::string(method)];
-    return std::find(names.begin(),names.end(),resource)!=names.end();
+    return std::find(names.begin(),names.end(),std::string(resource))!=names.end();
 }
 } // namespace wsprrypi

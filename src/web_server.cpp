@@ -47,6 +47,7 @@
 #include "support_bundle_http.hpp"
 #include "support_bundle_intake_production.hpp"
 #include "support_bundle_runtime.hpp"
+#include "backend_capabilities.hpp"
 
 /**
  * @brief Global instance of the WebServer class.
@@ -155,10 +156,12 @@ void WebServer::start(int port)
         if(wsprrypi::pi_managed_host_selected()){
             svr->set_read_timeout(5,0);svr->set_write_timeout(5,0);
         }
+#if !WSPRRYPI_CONTROLLER_ONLY
         if (!supportBundleJobManager_)
         {
             supportBundleJobManager_ = wsprrypi::backend_support_jobs();
         }
+#endif
         if (!privilegedNetworkAdmin_)
         {
             privilegedNetworkAdmin_ = std::make_unique<PrivilegedNetworkAdmin>(
@@ -178,11 +181,13 @@ void WebServer::start(int port)
 
     if (!supportBundleRoutesRegistered_)
     {
+#if !WSPRRYPI_CONTROLLER_ONLY
         register_support_bundle_http_routes(
             *svr,
             *supportBundleJobManager_,
             [this] { return network_snapshot_provider_(); },
             resolve_support_bundle_intake_production);
+#endif
         supportBundleRoutesRegistered_ = true;
     }
 
@@ -271,6 +276,9 @@ void WebServer::stop()
  */
 bool WebServer::setThreadPriority(int schedPolicy, int priority)
 {
+#ifdef _WIN32
+    (void)schedPolicy;(void)priority;return false;
+#else
     bool success = true;
     sched_param sch_params;
     sch_params.sched_priority = priority;
@@ -291,4 +299,5 @@ bool WebServer::setThreadPriority(int schedPolicy, int priority)
         success = false;
     }
     return success;
+#endif
 }

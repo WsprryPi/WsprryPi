@@ -1018,6 +1018,9 @@ namespace httplib
         virtual void get_remote_ip_and_port(std::string &ip, int &port) const = 0;
         virtual void get_local_ip_and_port(std::string &ip, int &port) const = 0;
         virtual socket_t socket() const = 0;
+        // Owning callback also supports authenticated local transports which
+        // are not sockets and may outlive an in-process parsing stream.
+        virtual std::function<bool()> connection_closed_handler() const;
 
         virtual time_t duration() const = 0;
 

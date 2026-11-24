@@ -7,9 +7,11 @@ source = Path(__file__).with_name("signal_wait.cpp").read_text(encoding="utf-8")
 
 linux_start = source.index("#if defined(__linux__)")
 mac_start = source.index("#elif defined(__APPLE__)")
-unsupported_start = source.index("#else", mac_start)
+windows_start = source.index("#elif defined(_WIN32)")
+unsupported_start = source.index("#else", windows_start)
 linux_branch = source[linux_start:mac_start]
-mac_branch = source[mac_start:unsupported_start]
+mac_branch = source[mac_start:windows_start]
+windows_branch = source[windows_start:unsupported_start]
 
 assert "sigwaitinfo(&set, &signal_info)" in linux_branch
 assert "normalize_sigwaitinfo_result(returned_signal, errno)" in linux_branch
@@ -20,7 +22,9 @@ assert "normalize_sigwait_result(returned_error, received_signal)" in mac_branch
 assert "sigwaitinfo" not in mac_branch
 assert "errno" not in mac_branch
 
-assert '#error "Signal-Handler synchronous waiting is supported only on Linux and macOS"' in source
+assert "wait_for_windows_signal(set)" in windows_branch
+assert "sigwait" not in windows_branch
+assert '#error "Signal-Handler synchronous waiting is supported only on Linux, macOS, and Windows"' in source
 assert "getenv(" not in source
 
 print("Signal wait compile-time platform selection: PASS")

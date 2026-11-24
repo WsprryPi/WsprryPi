@@ -77,26 +77,68 @@ jobs:
         id: pico-output
         run: python3 -B scripts/ci/selected_source.py record src/build/selected-pico
 
+  native-controller-components:
+    name: Native controller components (${{ matrix.runner }})
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build and exercise native signal lifecycle
+        run: |
+          cmake -S src/Signal-Handler -B "${{ runner.temp }}/wsprrypi-signal" -DCMAKE_BUILD_TYPE=Debug
+          cmake --build "${{ runner.temp }}/wsprrypi-signal" --config Debug --parallel 2
+          ctest --test-dir "${{ runner.temp }}/wsprrypi-signal" -C Debug --output-on-failure
+      - name: Build and exercise native installation ownership
+        run: |
+          cmake -S src/Singleton -B "${{ runner.temp }}/wsprrypi-singleton" -DCMAKE_BUILD_TYPE=Debug
+          cmake --build "${{ runner.temp }}/wsprrypi-singleton" --config Debug --parallel 2
+          ctest --test-dir "${{ runner.temp }}/wsprrypi-singleton" -C Debug --output-on-failure
+      - name: Build and exercise native log timestamps
+        run: |
+          cmake -S src/LCBLog -B "${{ runner.temp }}/wsprrypi-lcblog" -DCMAKE_BUILD_TYPE=Debug
+          cmake --build "${{ runner.temp }}/wsprrypi-lcblog" --config Debug --parallel 2
+          ctest --test-dir "${{ runner.temp }}/wsprrypi-lcblog" -C Debug --output-on-failure
+      - name: Check native Windows protected files
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S src/tests/native_windows -B "${{ runner.temp }}/wsprrypi-native-windows"
+          cmake --build "${{ runner.temp }}/wsprrypi-native-windows" --config Debug --parallel 2
+          ctest --test-dir "${{ runner.temp }}/wsprrypi-native-windows" -C Debug --output-on-failure
+
   macos-simulated-profile:
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
+      MACOSX_DEPLOYMENT_TARGET: "15.0"
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
-    runs-on: macos-15
-    # Cold native builds plus durable journal/history and actual-main checks
-    # need room to finish the complete retained suite, including TLS regressions.
-    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    # Cold controller, native recovery, and both actual software carriers run
+    # on each architecture; retain their source checks and final runtime cases.
+    timeout-minutes: 90
     steps:
       - name: Check out source
         uses: actions/checkout@v7
 
       - name: Select OpenSSL 4 development and fixture tools
         run: |
-          brew install openssl@4 sqlite
+          brew install openssl@4 sqlite python@3.15
           macos_openssl_prefix=$(brew --prefix openssl@4)
           macos_sqlite_prefix=$(brew --prefix sqlite)
           echo "${macos_openssl_prefix}/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix python@3.15)/libexec/bin" >> "$GITHUB_PATH"
           echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig:${macos_sqlite_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
           "${macos_openssl_prefix}/bin/openssl" version
 
@@ -109,9 +151,16 @@ jobs:
         run: |
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
-          make controller-only-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make controller-only-test application-monitor-boundary-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-target-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-journal-test pico-management-history-test pico-target-controller-test controller-contract-test pico-usb-settings-test pi-config-persistence-coordinator-test pi-management-anchor-test pi-management-journal-test pi-managed-records-test pi-managed-store-test pi-management-service-test pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test pi-private-network-persistence-test pi-managed-wtp-main-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Build and audit the isolated controller profile
+        run: |
+          python3 scripts/tests/controller_build_profile_test.py
+          python3 scripts/tests/controller_profile_entry_test.py
+          env -u SI5351_TRANSPORT make -C src -j2 debug controller-transmitter-boundary-test application-monitor-boundary-test native-controller-identity-runtime-test BUILD_PROFILE=controller SUDO=
+          python3 scripts/tests/controller_binary_audit.py src/build/bin/profiles/controller/wsprrypi_debug
 
       - name: Run bounded recovery role, relocation, and restart matrix
         working-directory: src
@@ -137,6 +186,63 @@ jobs:
         run: |
           python3 scripts/tests/container_build_test.py
           python3 scripts/tests/container_avahi_contract_test.py
+
+      - name: Record the native minimum-OS software profile
+        run: |
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
+          sw_vers
+          uname -m
+          clang++ --version
+          xcrun --show-sdk-version
+          python3 --version
+          python3 -c "import sys; assert sys.version_info[:2] == (3, 15)"
+          node --version
+          pkg-config --modversion openssl sqlite3
+      - name: Require immutable Pico selection for native Mac carriers
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py require "$PICO_SHA"
+      - uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/WsprryPico
+          ref: ${{ needs.change_scope.outputs.pico_sha }}
+          path: src/build/controller-native-reference/pico
+          persist-credentials: false
+      - name: Verify immutable Pico source for native Mac carriers
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/controller-native-reference/pico
+      - name: Verify the selected shared contract
+        run: python3 scripts/generate_control_contract.py --source src/build/controller-native-reference/pico --check
+      - uses: actions/checkout@v7
+        with:
+          repository: Mbed-TLS/mbedtls
+          ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
+          path: src/build/controller-native-reference/mbedtls
+          submodules: recursive
+          persist-credentials: false
+      - name: Exercise actual native Mac controller and Pico network peers
+        working-directory: src
+        run: |
+          make -j2 wtp-network-tools-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-network-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
+          make wtp-config-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
+      - name: Build the actual software Pico USB endpoint on native Mac
+        run: |
+          cmake -S src/build/controller-native-reference/pico -B src/build/controller-native-reference/pico-usb -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build src/build/controller-native-reference/pico-usb --target usb_management_driver -j2
+          make -C src wtp-usb-pair-client-build wtp-usb-management-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+      - name: Exercise native Mac clients through production Pico USB handlers
+        env:
+          WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
+        run: |
+          WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/controller-native-reference/pico-usb/usb_management_driver
+          node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/controller-native-reference/pico-usb/usb_management_driver
+          node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/controller-native-reference/pico-usb/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
+      - name: Exercise native controller recovery owners and restart
+        working-directory: src
+        run: make -j1 recovery-native-owner-controller-test recovery-maintenance-controller-test recovery-maintenance-roundtrip-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
   macos-si5351-profile:
     needs: change_scope
@@ -385,6 +491,13 @@ jobs:
           su -s /bin/sh nobody -c \
             '../scripts/tests/strict_i2c_file_access_audit.sh ./build/bin/wsprrypi'
           ../scripts/tests/strict_i2c_install_path_test.sh
+
+      - name: Build and audit the zero-backend controller without libgpiod
+        run: |
+          python3 scripts/tests/controller_build_profile_test.py
+          python3 scripts/tests/controller_profile_entry_test.py
+          make -C src -j2 debug controller-transmitter-boundary-test application-monitor-boundary-test BUILD_PROFILE=controller SUDO=
+          python3 scripts/tests/controller_binary_audit.py src/build/bin/profiles/controller/wsprrypi_debug
 
   ubuntu-gcc13-release:
     needs: change_scope

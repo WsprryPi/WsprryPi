@@ -34,9 +34,10 @@ TEST_DEP    = $(TEST_OBJ:.o=.d)
 RM ?= rm -f
 
 # Build the test executable (Only compiles main.cpp)
-test: $(TEST_NAME)
+test: $(TEST_NAME) installation_lock_test
 	@echo "Running $(TEST_NAME) with an available loopback UDP port."
 	./$(TEST_NAME)
+	./installation_lock_test
 
 demo: $(DEMO_NAME)
 	@test "$(SINGLETON_DEMO)" = "YES" || { \
@@ -49,6 +50,9 @@ demo: $(DEMO_NAME)
 $(TEST_NAME): $(TEST_OBJ)
 	$(CXX) $(CXXFLAGS) $(TEST_OBJ) -o $(TEST_NAME)
 
+installation_lock_test: installation_lock_test.cpp installation_lock.hpp
+	$(CXX) $(CXXFLAGS) $< -o $@
+
 # Object file compilation
 test.o: test.cpp singleton.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -58,7 +62,7 @@ $(DEMO_NAME): $(DEMO_SRC) singleton.hpp
 
 # Clean up build artifacts
 clean:
-	-$(RM) $(TEST_OBJ) $(TEST_DEP) $(TEST_NAME) $(DEMO_NAME) $(DEMO_DEP)
+	-$(RM) $(TEST_OBJ) $(TEST_DEP) $(TEST_NAME) $(DEMO_NAME) $(DEMO_DEP) installation_lock_test installation_lock_test.d
 	-rm -rf $(TEST_NAME).dSYM $(DEMO_NAME).dSYM
 
 # Include dependency files

@@ -3,7 +3,7 @@
 #include "wtp_integration/control_contract.hpp"
 
 #include <algorithm>
-#include <arpa/inet.h>
+#include "wtp_integration/native_socket.hpp"
 #include <array>
 #include <cctype>
 

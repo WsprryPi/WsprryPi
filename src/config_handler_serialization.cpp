@@ -13,7 +13,9 @@
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 #include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
 #endif
+#ifndef _WIN32
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -235,13 +237,24 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
     }
 
     nlohmann::json public_json = saved_configuration_from_internal_json(source);
+#ifdef _WIN32
+    const i2c_bus_inventory::Inventory i2c_inventory{{},"Local I2C adapters are unavailable on this host"};
+#else
     const auto i2c_inventory = i2c_bus_inventory::discover();
+#endif
     auto i2c_buses = nlohmann::json::array();
+#ifdef _WIN32
+    const std::string adapter_error;
+#else
     const auto adapter_inventory = linux_i2c_identity::discover();
+    const auto adapter_error=adapter_inventory.error;
+#endif
     for (const auto &bus : i2c_inventory.buses) {
         std::string identity;
+#ifndef _WIN32
         for (const auto& adapter : adapter_inventory.adapters)
             if (adapter.bus == bus.number) identity = adapter.identity;
+#endif
         i2c_buses.push_back({{"Number", bus.number}, {"Name", bus.name}, {"Identity", identity}});
     }
     auto native_adapters = nlohmann::json::array();
@@ -271,7 +284,7 @@ nlohmann::json public_config_from_internal_json(const nlohmann::json &source)
         {"Si5351 Adapters", native_adapters},
         {"Si5351 Adapter Discovery Error", native_error},
         {"I2C Buses", i2c_buses},
-        {"I2C Bus Discovery Error", i2c_inventory.error.empty() ? adapter_inventory.error : i2c_inventory.error},
+        {"I2C Bus Discovery Error", i2c_inventory.error.empty() ? adapter_error : i2c_inventory.error},
         {"Si5351 Address Bus", si5351_address_inventory.i2c_bus},
         {"Si5351 Inventory Checked", si5351_address_inventory.checked},
         {"Si5351 Addresses", si5351_addresses},

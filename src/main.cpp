@@ -29,8 +29,15 @@
 
 // Primary header for this source file
 #include "main.hpp"
+#ifdef _WIN32
+#include "native_windows_arguments.hpp"
+#include "application_recovery/windows_service_entry.hpp"
+#endif
 #include "si5351_inventory_process.hpp"
 #include "controller_runtime.hpp"
+#include "controller_instance_lock.hpp"
+#include "application_storage/controller_identity.hpp"
+#include "controller_profile_entry.hpp"
 #include "pi_managed_host_runtime.hpp"
 #include "application_storage/state_entry.hpp"
 #include "application_storage/application_state.hpp"
@@ -67,7 +74,6 @@
 #include "logging.hpp"
 #include "machine_power_control.hpp"
 #include "singleton.hpp"
-#include "wspr_transmit.hpp"
 
 // Standard headers
 #include <atomic>
@@ -79,9 +85,11 @@
 #include <thread>
 
 // System headers
+#ifndef _WIN32
 #include <fcntl.h>  // fcntl()
 #include <poll.h>
 #include <unistd.h> // pipe(), read(), write()
+#endif
 
 /**
  * @brief TCP port used for singleton instance checking.
@@ -100,8 +108,9 @@ SignalHandler signalHandler;
 
 namespace
 {
-std::atomic<int> g_async_shutdown_signal{0};
 std::atomic<int> g_shutdown_exit_signal{0};
+#ifndef _WIN32
+std::atomic<int> g_async_shutdown_signal{0};
 int g_async_shutdown_pipe[2] = {-1, -1};
 
 void notify_async_shutdown_signal(int signum) noexcept
@@ -193,6 +202,7 @@ void drain_async_shutdown_pipe() noexcept
     }
 }
 
+#endif
 std::string shutdown_reason_for_signal(int signum)
 {
     if (signum == 0)
@@ -220,13 +230,25 @@ void callback_signal_handler(int signum, bool is_critical)
 {
     if (!is_critical)
     {
+#ifdef _WIN32
+        // The native SignalHandler invokes this on its dedicated worker, not
+        // an asynchronous CRT signal handler. No POSIX self-pipe is needed.
+        if(signum){int expected=0;(void)g_shutdown_exit_signal.compare_exchange_strong(expected,signum);}
+        request_wspr_shutdown(shutdown_reason_for_signal(signum));
+#else
         notify_async_shutdown_signal(signum);
+#endif
     }
     else
     {
         std::string_view signal_name = SignalHandler::signalToString(signum);
         std::cerr << "[FATAL] Critical signal received: " << signal_name << ". Performing immediate shutdown." << std::endl;
+#ifdef _WIN32
+        ::TerminateProcess(::GetCurrentProcess(),static_cast<UINT>(signum));
+        std::abort();
+#else
         std::quick_exit(signum);
+#endif
     }
 }
 
@@ -247,8 +269,9 @@ void callback_signal_handler(int signum, bool is_critical)
  *       The log level is set to INFO by default, but can be changed
  *       via a macro or configuration option.
  */
-int main(int argc, char *argv[])
+static int application_main(int argc, char *argv[])
 {
+    if(const auto result=controller_profile_entry(argc,argv))return *result;
     if(const auto result=wsprrypi::recovery_helper_image_main(argc,argv))return *result;
     if(const auto result=wsprrypi::maintenance_service_main(argc,argv))return *result;
     if(const auto result=wsprrypi::web_service_main(argc,argv))return *result;
@@ -294,6 +317,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
+#ifndef _WIN32
     if (!install_async_shutdown_handlers())
     {
         std::perror("sigaction/pipe");
@@ -342,11 +366,19 @@ int main(int argc, char *argv[])
             }
         });
 
+#endif
+
     // Register signal handlers for safe shutdown and terminal management.
     block_signals();
     signalHandler.setCallback(callback_signal_handler);
     signalHandler.start();
-    signalHandler.setPriority(SCHED_RR, 40);
+#ifdef _WIN32
+    if(!signalHandler.running()){
+        std::cerr<<"Native shutdown handling could not start.\n";return EXIT_FAILURE;
+    }
+#else
+    if (!controller_only) signalHandler.setPriority(SCHED_RR, 40);
+#endif
 
     bool simulated_backend = false;
     for (int i = 1; i < argc; ++i)
@@ -377,16 +409,21 @@ int main(int argc, char *argv[])
     // Preserve the pre-parse privilege boundary for every executable capable
     // of physical GPIO. Explicit simulation and the no-output controller role
     // bypass this legacy gate; neither can be selected after a startup failure.
+#ifndef _WIN32
     if (getuid() != 0 && !simulated_backend && !controller_only &&
         build_has_physical_gpio_capability())
     {
         print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
     }
 
+#endif
     // Enforce Singleton
     SingletonProcess singleton(SINGLETON_PORT);
-    if (!singleton())
-    {
+    std::unique_ptr<InstallationLock> controller_instance;
+    if (controller_only) {
+        try {controller_instance=wsprrypi::acquire_controller_installation_lock();wsprrypi::configure_native_controller_identity();}
+        catch(const std::exception &error){llog.logE(FATAL,error.what());std::exit(EXIT_FAILURE);}
+    } else if (!singleton()) {
         llog.logE(FATAL, "Another instance is running on port: ", SINGLETON_PORT);
         std::exit(EXIT_FAILURE);
     }
@@ -460,17 +497,22 @@ int main(int argc, char *argv[])
     {
         // Handle any exceptions thrown during command-line parsing.
         std::string error_message = "Exception caught processing arguments: " + std::string(e.what());
+        if (controller_only) {
+            std::cerr << "Controller startup refused: " << e.what() << '\n';
+            std::exit(EXIT_FAILURE);
+        }
         print_usage(error_message, EXIT_FAILURE);
     }
 
     // GPIO-capable executables retain the legacy privilege boundary. A
     // GPIO-free Si5351 executable relies on the selected I2C device's ordinary
     // kernel permissions, and simulation requires no hardware privilege.
+#ifndef _WIN32
     if (getuid() != 0 && !controller_only && transmit_backend_requires_root(config.transmit_backend))
     {
         print_usage("This program must be run as root or with sudo.", EXIT_FAILURE);
     }
-
+#endif
     initialize_logger(
         config.use_journald,
         config.date_time_log,
@@ -508,7 +550,11 @@ int main(int argc, char *argv[])
         (sizeof(void *) == 8 ? " 64-bit" : " 32-bit"),
         ".");
 
+#ifdef _WIN32
+    llog.logS(DEBUG, "Process PID:", ::GetCurrentProcessId());
+#else
     llog.logS(DEBUG, "Process PID:", getpid());
+#endif
 
     // Re-assert the handled signal mask on the main runtime thread before
     // entering the long-lived scheduling loop.
@@ -554,12 +600,14 @@ int main(int argc, char *argv[])
     // Stop the SignalHandler.
     signalHandler.stop();
 
+#ifndef _WIN32
     notify_async_shutdown_signal(SIGUSR1);
     if (async_shutdown_monitor.joinable())
     {
         async_shutdown_monitor.join();
     }
     close_async_shutdown_pipe();
+#endif
 
     if (reboot_flag.load(std::memory_order_acquire))
     {
@@ -581,4 +629,23 @@ int main(int argc, char *argv[])
     }
 
     return retval;
+}
+
+int main(int argc,char *argv[]){
+#ifdef _WIN32
+    std::vector<std::string> native_arguments;std::vector<char *> native_argv;
+    try{
+        native_arguments=wsprrypi::native_windows_arguments();native_argv.reserve(native_arguments.size()+1);
+        for(auto &argument:native_arguments)native_argv.push_back(argument.data());
+        native_argv.push_back(nullptr);
+        argc=static_cast<int>(native_arguments.size());argv=native_argv.data();
+    }catch(...){std::cerr<<"Native command line could not be read.\n";return EXIT_FAILURE;}
+#endif
+#ifdef _WIN32
+    if(const auto result=wsprrypi::windows_controller_service_entry(argc,argv,[](const std::vector<std::string> &arguments){
+        auto values=arguments;std::vector<char *> pointers;for(auto &value:values)pointers.push_back(value.data());pointers.push_back(nullptr);
+        return application_main(static_cast<int>(values.size()),pointers.data());
+    },[]{request_wspr_shutdown("Windows service requested shutdown");}))return *result;
+#endif
+    return application_main(argc,argv);
 }

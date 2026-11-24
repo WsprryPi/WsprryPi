@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "WTP-Client/include/wtp/transport.hpp"
+#include "native_socket.hpp"
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -18,14 +19,14 @@ public:
     ~PiPairSocket() override;
     PiPairSocket(const PiPairSocket &)=delete;
     const std::string &address() const noexcept{return address_;}
-    int release_fd() noexcept;
+    native_socket::Handle release_fd() noexcept;
     wtp::IoResult read(std::span<std::uint8_t>) override;
     wtp::IoResult write(std::span<const std::uint8_t>) override;
     void close() noexcept override;
 private:
-    PiPairSocket(int,std::string,Time,std::function<bool()>);
+    PiPairSocket(native_socket::Handle,std::string,Time,std::function<bool()>);
     bool live() const;
-    int fd_;
+    native_socket::Handle fd_;
     std::string address_;
     Time deadline_;
     std::function<bool()> cancelled_;

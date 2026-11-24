@@ -1,14 +1,9 @@
+#include "hardware_access_policy.hpp"
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "plain_tcp.hpp"
 #include "identity.hpp"
-#include <cerrno>
 #include <cstdlib>
-#include <fcntl.h>
-#include <poll.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 
 namespace wsprrypi {
 PlainTcpStream::PlainTcpStream(Clock clock, Access access, std::unique_ptr<TlsResolver> resolver)
@@ -23,8 +18,8 @@ void PlainTcpStream::state(std::string value, std::string diagnostic) {
 void PlainTcpStream::close() noexcept {
   resolver_->cancel();
   std::lock_guard lock(mutex_);
-  if (fd_ >= 0) ::close(fd_);
-  fd_ = -1;
+  if (fd_ != native_socket::invalid) native_socket::close(fd_);
+  fd_ = native_socket::invalid;
   addresses_.clear();
   next_address_ = 0;
   if (status_.state != "failed") status_.state = "closed";
@@ -37,8 +32,7 @@ bool PlainTcpStream::begin_open(const std::string &host, unsigned port) {
   close();
   { std::lock_guard lock(mutex_); status_ = {}; }
   if (access_ == Access::Production) {
-    const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-    if (disabled && std::string(disabled) == "1") {
+    if (hardware_access_disabled()) {
       fail("Hardware access disabled; network transmitter access is prohibited");
       return false;
     }
@@ -52,12 +46,13 @@ bool PlainTcpStream::begin_open(const std::string &host, unsigned port) {
   return true;
 }
 void PlainTcpStream::connect_next() {
-  if (fd_ >= 0) { ::close(fd_); fd_ = -1; }
+  if (!native_socket::initialize()) { fail("Native socket runtime unavailable"); return; }
+  if (fd_ != native_socket::invalid) { native_socket::close(fd_); fd_ = native_socket::invalid; }
   if (clock_() >= deadline_) { fail("TCP connection deadline exceeded"); return; }
   while (next_address_ < addresses_.size()) {
     const auto address = addresses_[next_address_++];
     sockaddr_storage storage{};
-    socklen_t length{};
+    native_socket::Length length{};
     bool loopback = false;
     auto &v4 = reinterpret_cast<sockaddr_in &>(storage);
     auto &v6 = reinterpret_cast<sockaddr_in6 &>(storage);
@@ -71,19 +66,12 @@ void PlainTcpStream::connect_next() {
     if (access_ == Access::LoopbackTest && !loopback) {
       fail("Test TCP transport requires loopback addresses"); return;
     }
-    fd_ = socket(storage.ss_family, SOCK_STREAM, IPPROTO_TCP);
-    if (fd_ < 0) continue;
-    if (fcntl(fd_, F_SETFL, O_NONBLOCK) || fcntl(fd_, F_SETFD, FD_CLOEXEC)) {
-      ::close(fd_); fd_ = -1; continue;
-    }
-#ifdef SO_NOSIGPIPE
-    int yes = 1;
-    (void)setsockopt(fd_, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
-#endif
+    fd_ = native_socket::open_stream(storage.ss_family);
+    if (fd_ == native_socket::invalid) continue;
     { std::lock_guard lock(mutex_); status_.address = address; }
     const auto result = ::connect(fd_, reinterpret_cast<sockaddr *>(&storage), length);
-    if (result == 0 || errno == EINPROGRESS) { state("connecting"); return; }
-    ::close(fd_); fd_ = -1;
+    if (result == 0 || native_socket::pending(native_socket::error())) { state("connecting"); return; }
+    native_socket::close(fd_); fd_ = native_socket::invalid;
   }
   fail("TCP endpoint connection failed");
 }
@@ -100,12 +88,9 @@ void PlainTcpStream::poll_open() {
     connect_next();
     return;
   }
-  pollfd descriptor{fd_, POLLOUT, 0};
-  const auto result = ::poll(&descriptor, 1, 0);
-  if (!result || (result < 0 && errno == EINTR)) return;
-  int error = 0;
-  socklen_t size = sizeof(error);
-  if (result < 0 || getsockopt(fd_, SOL_SOCKET, SO_ERROR, &error, &size) || error) {
+  const auto result = native_socket::poll_write(fd_);
+  if (!result || (result < 0 && native_socket::interrupted(native_socket::error()))) return;
+  if (result < 0 || !native_socket::connected(fd_)) {
     connect_next(); return;
   }
   state("ready");
@@ -121,26 +106,21 @@ TlsObservation PlainTcpStream::observation() const {
 }
 wtp::IoResult PlainTcpStream::read(std::span<std::uint8_t> bytes) {
   std::lock_guard lock(mutex_);
-  if (status_.state != "ready" || fd_ < 0) return {wtp::IoState::Failed};
+  if (status_.state != "ready" || fd_ == native_socket::invalid) return {wtp::IoState::Failed};
   if (bytes.empty()) return {wtp::IoState::WouldBlock};
-  const auto count = recv(fd_, bytes.data(), bytes.size(), 0);
+  const auto count = native_socket::receive(fd_, bytes.data(), bytes.size());
   if (count > 0) return {wtp::IoState::Progress, static_cast<std::size_t>(count)};
   if (!count) return {wtp::IoState::Closed};
-  if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) return {wtp::IoState::WouldBlock};
+  if (native_socket::retry(native_socket::error())) return {wtp::IoState::WouldBlock};
   return {wtp::IoState::Failed};
 }
 wtp::IoResult PlainTcpStream::write(std::span<const std::uint8_t> bytes) {
   std::lock_guard lock(mutex_);
-  if (status_.state != "ready" || fd_ < 0) return {wtp::IoState::Failed};
+  if (status_.state != "ready" || fd_ == native_socket::invalid) return {wtp::IoState::Failed};
   if (bytes.empty()) return {wtp::IoState::WouldBlock};
-#ifdef MSG_NOSIGNAL
-  constexpr int flags = MSG_NOSIGNAL;
-#else
-  constexpr int flags = 0;
-#endif
-  const auto count = send(fd_, bytes.data(), bytes.size(), flags);
+  const auto count = native_socket::send(fd_, bytes.data(), bytes.size());
   if (count > 0) return {wtp::IoState::Progress, static_cast<std::size_t>(count)};
-  if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
+  if (count < 0 && (native_socket::retry(native_socket::error())))
     return {wtp::IoState::WouldBlock};
   return {wtp::IoState::Failed};
 }

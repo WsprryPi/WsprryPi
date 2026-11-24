@@ -28,8 +28,8 @@ bool bounded_rows(const Json &value){return value.is_array()&&value.size()<=32;}
 bool registration(const Json &value,std::string_view self,bool wire=true){
     if(!fields(value,{"contract","schema","operation_id","pair_id","authorization_generation","target_id","controller_id",
         "controller_incarnation","controller_generation","assignments","endpoint"})||value["contract"]!="Wsprry-Pair/1"||value["schema"]!="authority-register"||
-        !hex(value["operation_id"],32)||!hex(value["pair_id"],32)||!generation(value["authorization_generation"])||value["target_id"]!=self||
-        !hex(value["controller_id"],32)||value["controller_id"]==self||!hex(value["controller_incarnation"],32)||!generation(value["controller_generation"])||
+        !hex(value["operation_id"],32)||!hex(value["pair_id"],32)||!generation(value["authorization_generation"])||value["target_id"]!=std::string(self)||
+        !hex(value["controller_id"],32)||value["controller_id"]==std::string(self)||!hex(value["controller_incarnation"],32)||!generation(value["controller_generation"])||
         !bounded_rows(value["assignments"])||!fields(value["endpoint"],{"host","port"})||value["endpoint"]["port"]!=31418||
         value["endpoint"]["host"]!="wsprry-management-"+value["controller_id"].get<std::string>()+".local."||(wire&&value.dump().size()>4096))return false;
     std::set<std::string> ids;
@@ -63,7 +63,7 @@ bool management(const Json &stored,std::string_view self){
         }
     }
     for(const auto &row:value["operations"]){
-        if(!fields(row,{"controller_id","receipt"})||!hex(row["controller_id"],32)||row["controller_id"]==self||!pair_operation(row["receipt"])||
+        if(!fields(row,{"controller_id","receipt"})||!hex(row["controller_id"],32)||row["controller_id"]==std::string(self)||!pair_operation(row["receipt"])||
             !operations.insert(row["receipt"]["operation_id"].get<std::string>()).second)return false;
         bool found=false;for(const auto &authority:value["authorities"]){const auto &r=authority["registration"];
             if(r["controller_id"]==row["controller_id"]&&r["pair_id"]==row["receipt"]["pair_id"]&&r["authorization_generation"]==row["receipt"]["authorization_generation"])found=true;
@@ -81,7 +81,7 @@ bool valid_recurrence_authority_record(const Json &value,std::string_view self) 
     try{
         auto core=value;core.erase("management");
         if(!hex(std::string(self),32)||!fields(core,{"schema","device_id","generation","state","transition_id","controllers","retirements","jobs","staged_revision","clean_proof"})||
-            value.at("schema")!="pi-recurrence-authority/1"||value.at("device_id")!=self||!generation(value.at("generation")))return false;
+            value.at("schema")!="pi-recurrence-authority/1"||value.at("device_id")!=std::string(self)||!generation(value.at("generation")))return false;
         const std::array states{"unclassified","legacy","retiring","reconciling","staged","native","rollback","held"};
         bool known=false;for(const auto *state:states)if(value.at("state")==state)known=true;
         if(!known||(!value.at("transition_id").is_null()&&!hex(value.at("transition_id"),32))||
@@ -202,8 +202,8 @@ bool recurrence_retirement_scope_closed(const Json &record,std::string_view pair
     const auto closes_resume=[&](const Json &resumed){
         if(resumed.is_null())return true;
         const auto &grant=resumed["grant"];
-        const bool original=grant["pair_id"]==pair&&grant["authorization_generation"]==generation;
-        const bool transport=!resumed["transport"].is_null()&&resumed["transport"]["pair_id"]==pair&&resumed["transport"]["authorization_generation"]==generation;
+        const bool original=grant["pair_id"]==std::string(pair)&&grant["authorization_generation"]==std::string(generation);
+        const bool transport=!resumed["transport"].is_null()&&resumed["transport"]["pair_id"]==std::string(pair)&&resumed["transport"]["authorization_generation"]==std::string(generation);
         if(!original&&!transport)return true;
         if(resumed["state"]!="resumed"||!managed.contains("handover"))return false;
         for(const auto &row:managed["handover"]["requests"])if(row["state"]=="confirmed"&&
@@ -215,13 +215,13 @@ bool recurrence_retirement_scope_closed(const Json &record,std::string_view pair
     if(managed.contains("handover")&&!closes_resume(managed["handover"]["resume_basis"]))return false;
     bool known=false;
     for(const auto &authority:managed["authorities"]){const auto &registered=authority["registration"];
-        if(registered["pair_id"]!=pair||registered["authorization_generation"]!=generation)continue;
+        if(registered["pair_id"]!=std::string(pair)||registered["authorization_generation"]!=std::string(generation))continue;
         known=true;
         for(const auto &assignment:authority["assignments"]){
             bool confirmed=false;
             if(managed.contains("handover"))for(const auto &row:managed["handover"]["requests"]){
                 if(row["state"]!="confirmed"||row["request"]["controller_id"]!=registered["controller_id"]||row["request"]["assignment_id"]!=assignment["assignment_id"])continue;
-                for(const auto &covered:row["covered"])if(covered["pair_id"]==pair&&covered["authorization_generation"]==generation&&
+                for(const auto &covered:row["covered"])if(covered["pair_id"]==std::string(pair)&&covered["authorization_generation"]==std::string(generation)&&
                     covered["assignment_revision"]==assignment["assignment_revision"])confirmed=true;
             }
             if(!confirmed)return false;
@@ -266,7 +266,7 @@ Json recurrence_retirement_plan(const Json &record,std::string_view transition){
     std::map<std::string,std::size_t> order;std::size_t sequence=0;
     for(const auto &operation:record["management"]["operations"])order[operation["receipt"]["operation_id"].get<std::string>()]=++sequence;
 
-    for(const auto &controller:record["controllers"])if(controller["controller_id"]==self)controllers.push_back(controller);
+    for(const auto &controller:record["controllers"])if(controller["controller_id"]==std::string(self))controllers.push_back(controller);
     require(controllers.size()<=1);
     for(const auto &authority:record["management"]["authorities"]){const auto &registration=authority["registration"];
         for(const auto &assignment:authority["assignments"]){
@@ -300,7 +300,7 @@ Json recurrence_retirement_plan(const Json &record,std::string_view transition){
         for(const auto &row:found->second["covered"])if(row["pair_id"]==scope["pair_id"]&&row["authorization_generation"]==scope["authorization_generation"])covered=true;
         require(covered);found->second["pair_id"]=scope["pair_id"];found->second["authorization_generation"]=scope["authorization_generation"];
     }
-    for(const auto &controller:record["controllers"])if(controller["controller_id"]!=self)
+    for(const auto &controller:record["controllers"])if(controller["controller_id"]!=std::string(self))
         require(groups.contains({controller["controller_id"].get<std::string>(),controller["assignment_id"].get<std::string>()}));
     require(controllers.size()+groups.size()<=32);Json requests=Json::array();
     for(const auto &[identity,group]:groups){
@@ -318,7 +318,7 @@ bool opaque_proof(const Json &value){return value.is_string()&&value.get_ref<con
 bool retired_document(const Json &value,std::string_view self,bool response){
     auto body=value;if(response)body.erase("receipt_digest");
     return fields(body,{"contract","schema","target_id","controller_id","assignment_id","transition_id","assignment_revision","retirement_generation","pair_id","authorization_generation","proof"})&&
-        body["contract"]=="Wsprry-Pair/1"&&body["schema"]==(response?"retired":"retirement")&&body["target_id"]==self&&hex(body["controller_id"],32)&&body["controller_id"]!=self&&
+        body["contract"]=="Wsprry-Pair/1"&&body["schema"]==(response?"retired":"retirement")&&body["target_id"]==std::string(self)&&hex(body["controller_id"],32)&&body["controller_id"]!=std::string(self)&&
         hex(body["assignment_id"],32)&&hex(body["transition_id"],32)&&hex(body["assignment_revision"],64)&&generation(body["retirement_generation"])&&
         hex(body["pair_id"],32)&&generation(body["authorization_generation"])&&opaque_proof(body["proof"])&&(!response||hex(value["receipt_digest"],64));
 }
@@ -331,7 +331,7 @@ bool resume(const Json &record,std::string_view self){
         const auto &grant=value["grant"],&disabled=value["disabled_snapshot"],&proof=value["retirement"];
         if(!fields(grant,{"contract","schema","operation_id","pair_id","authorization_generation","target_id","target_boot_id","controller_id","controller_incarnation", "assignment_id",
             "assignment_revision","transition_id","retirement_receipt_digest","authority_generation","disabled_revision","disable_receipt_digest","candidate_digest","grant_digest","wtp_binding"})||
-            grant["contract"]!="Wsprry-Pair/1"||grant["schema"]!="resume-grant"||grant["target_id"]!=self||grant["controller_id"]==self)return false;
+            grant["contract"]!="Wsprry-Pair/1"||grant["schema"]!="resume-grant"||grant["target_id"]!=std::string(self)||grant["controller_id"]==std::string(self))return false;
         for(const auto *name:{"operation_id","pair_id","target_boot_id","controller_id","controller_incarnation","assignment_id","transition_id"})if(!hex(grant[name],32))return false;
         for(const auto *name:{"assignment_revision","retirement_receipt_digest","disabled_revision","disable_receipt_digest","candidate_digest","grant_digest"})if(!hex(grant[name],64))return false;
         if(!generation(grant["authorization_generation"])||!generation(grant["authority_generation"])||number(grant["authority_generation"])>number(record["generation"]))return false;
@@ -343,7 +343,7 @@ bool resume(const Json &record,std::string_view self){
         if(!fields(receipt,{"contract","schema","binding","operation_id","request_digest","state","revision","error"})||receipt["contract"]!="Wsprry-Control/1"||
             receipt["schema"]!="target-operation"||receipt["state"]!="committed"||!receipt["error"].is_null()||receipt["revision"]!=grant["disabled_revision"]||
             !hex(receipt["operation_id"],32)||!hex(receipt["request_digest"],64)||!fields(receipt["binding"],{"device_id","boot_id","profile_generation","connection_generation"})||
-            receipt["binding"]["device_id"]!=self||!hex(receipt["binding"]["boot_id"],32)||!generation(receipt["binding"]["profile_generation"])||!generation(receipt["binding"]["connection_generation"]))return false;
+            receipt["binding"]["device_id"]!=std::string(self)||!hex(receipt["binding"]["boot_id"],32)||!generation(receipt["binding"]["profile_generation"])||!generation(receipt["binding"]["connection_generation"]))return false;
         if(!fields(proof,{"request","response"})||!retired_document(proof["request"],self,false)||!retired_document(proof["response"],self,true))return false;
         auto expected=proof["request"];expected.erase("proof");expected["schema"]="retired";auto response=proof["response"];response.erase("proof");response.erase("receipt_digest");
         if(expected!=response||proof["response"]["receipt_digest"]!=grant["retirement_receipt_digest"]||number(proof["request"]["retirement_generation"])>=number(grant["authority_generation"]))return false;
@@ -377,7 +377,7 @@ bool resume(const Json &record,std::string_view self){
 }
 bool handover(const Json &record,std::string_view self){
     try{
-        if(record["device_id"]!=self)return false;
+        if(record["device_id"]!=std::string(self))return false;
         const auto &saved=record["management"]["handover"];
         if(!fields(saved,{"schema","generation","transition_id","candidate_digest","inventory","operations","resume_basis","controllers","requests"})||
             saved["schema"]!="pi-remote-handover/1"||!generation(saved["generation"])||number(saved["generation"])<=1||

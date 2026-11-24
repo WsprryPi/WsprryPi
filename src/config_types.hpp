@@ -258,7 +258,7 @@ wspr_planner_preference_to_plan_preference(
  * Holds all command-line and runtime configuration data not managed directly
  * by the INI file system. Initialized globally and used throughout the application.
  *
- * @see ArgParserConfig, ini, iniMonitor
+ * @see ArgParserConfig
  */
 struct ArgParserConfig
 {

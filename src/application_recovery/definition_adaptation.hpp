@@ -5,7 +5,20 @@
 #include <charconv>
 #include <cstdint>
 #include <set>
+#include <stdexcept>
 namespace wsprrypi {
+// A moved USB definition requires explicit destination selection. Keep its
+// unavailable reference in the destination namespace; never discover a device
+// by serial alone or retain a source host's endpoint as an active connection.
+inline std::string recovery_unresolved_usb_endpoint(const std::string &profile){
+    if(profile.size()!=32||profile.find_first_not_of("0123456789abcdef")!=std::string::npos)
+        throw std::invalid_argument("Invalid unresolved recovery profile");
+#ifdef _WIN32
+    return "\\\\?\\wsprrypi-unresolved-"+profile;
+#else
+    return "/dev/wsprrypi-unresolved-"+profile;
+#endif
+}
 // Inputs have already passed the actual catalog validator. Matching never
 // substitutes a different device or carrier to make a saved definition work.
 inline const nlohmann::json *recovery_definition_match(const nlohmann::json &source,const nlohmann::json &destination){

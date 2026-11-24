@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "pi_pair_crypto.hpp"
+#include "native_socket.hpp"
 #include "WTP-Client/include/wtp/transport.hpp"
 #include <functional>
 #include <memory>
@@ -51,7 +52,7 @@ public:
     enum class Handshake {Pending,Ready,Failed};
     enum class Failure {None,Transport,Deadline,Authentication,KeyExchange,EarlyData,Cipher,Purpose,Authorization};
     // On constructor failure the supplied descriptor is still closed.
-    PiPairTlsChannel(int connected_fd,Lookup,std::optional<PiPairTlsIdentity> client = {});
+    PiPairTlsChannel(native_socket::Handle connected_fd,Lookup,std::optional<PiPairTlsIdentity> client = {});
     ~PiPairTlsChannel() override;
     PiPairTlsChannel(const PiPairTlsChannel &)=delete;
     Handshake handshake();

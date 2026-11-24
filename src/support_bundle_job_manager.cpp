@@ -1,3 +1,4 @@
+#include "native_calendar_time.hpp"
 #include "support_bundle_job_manager.hpp"
 
 #include <ctime>
@@ -333,7 +334,7 @@ namespace {
 std::string receipt_timestamp() {
     const std::time_t now = std::time(nullptr);
     std::tm utc{};
-    if (gmtime_r(&now, &utc) == nullptr) return {};
+    if (wsprrypi::native_calendar::utc(&now, &utc) == nullptr) return {};
     char value[21]{};
     return std::strftime(value, sizeof(value), "%Y-%m-%dT%H:%M:%SZ", &utc) == 20
         ? std::string(value) : std::string{};

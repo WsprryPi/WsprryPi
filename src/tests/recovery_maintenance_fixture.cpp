@@ -7,6 +7,8 @@
 #include "web_server.hpp"
 #include "scheduling.hpp"
 #include <filesystem>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <string_view>
 int pi_managed_production_main(int,char **);
 int main(int argc,char *argv[]){
@@ -48,9 +50,25 @@ int main(int argc,char *argv[]){
         }else forwarded.push_back(argv[index]);
     }
     forwarded.push_back(nullptr);
+#ifdef WSPRRYPI_NATIVE_RECOVERY_OWNER_FIXTURE
+    const auto home=std::filesystem::path(argv[1]).parent_path()/(std::filesystem::path(argv[1]).filename().string()+"-backend-home");
+    if(!std::filesystem::exists(home)){
+        if(::mkdir(home.c_str(),0700))return 2;
+    }
+    paths.backend_owner=wsprrypi::RecoveryBackendOwner{::geteuid(),::getegid(),home.string(),
+        (home/".wsprrypi-recovery").string(),(executable.parent_path().parent_path().parent_path()/"tests/recovery_native_owner_worker.py").string()};
+    bool maintenance=false;
+    for(int index=6;index<argc;++index){const std::string_view option=argv[index];
+        if(option=="--maintenance"||option=="--maintenance-worker"||option=="--web-service")maintenance=true;
+    }
+    if(!maintenance)paths.root=paths.backend_owner->root;
+#endif
     wsprrypi::testing::set_recovery_paths(std::move(paths));
     wsprrypi::testing::SoftwareControlRuntime runtime(argv[1],argc,argv);
     wsprrypi::testing::set_wtp_pi_private_state_path(argv[1]);
+#ifdef WSPRRYPI_NATIVE_RECOVERY_OWNER_FIXTURE
+    wsprrypi::testing::set_controller_installation_owner_home(home.string());
+#endif
     bool early=false,simulated=false;
     for(int index=6;index<argc;++index){
         const std::string_view option=argv[index];

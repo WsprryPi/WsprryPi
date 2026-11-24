@@ -67,7 +67,8 @@ public:
 // The caller selects a trusted existing owner-only directory and validates the
 // complete typed after-image before commit. This class never initializes output,
 // parses INI, performs remote work, or turns records into runnable commands.
-// POSIX implementation; native Windows ownership requires its platform adapter.
+// POSIX descriptors or native Windows handles enforce the same private-owner
+// admission around the shared SQLite engine.
 class SqliteStateStore {
 public:
     static constexpr std::size_t maximum_record_bytes = 1048576;

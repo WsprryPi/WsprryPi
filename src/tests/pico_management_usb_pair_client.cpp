@@ -2,6 +2,9 @@
 // Independent and paired-Pi TLS management -> real context/journal, USB
 // framing/ACK and the explicitly selected software Pico driver. Fault controls
 // exist only on this fixture's stdin; no physical-carrier command exists.
+#ifdef _WIN32
+#include "tests/native_windows_peer_stream.hpp"
+#endif
 #include "wtp_integration/pico_management_context.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_integration/pi_pair_owner.hpp"
@@ -23,11 +26,13 @@
 #include <chrono>
 #include <csignal>
 #include <filesystem>
+#ifndef _WIN32
 #include <fcntl.h>
-#include <iostream>
 #include <sys/wait.h>
-#include <thread>
 #include <unistd.h>
+#endif
+#include <iostream>
+#include <thread>
 using namespace wsprrypi;
 namespace {
 std::string identity(char value){return std::string(32,value);}
@@ -55,7 +60,11 @@ std::shared_ptr<PiPairHistory> paired_history(const std::string &directory,bool 
 }
 std::uint64_t now(){return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
 class Driver final:public wtp::ByteStream {
+#ifdef _WIN32
+ std::unique_ptr<testing::NativeUsbPeerStream> peer_;
+#else
  int input{-1},output{-1};pid_t child{-1};
+#endif
  bool resume_fault_{};std::string program_;
  public:
  std::atomic_uint64_t writes{0};
@@ -64,16 +73,26 @@ class Driver final:public wtp::ByteStream {
  void wait(unsigned ms){if(resume_fault_){resume_fault_=false;if(before_resume)before_resume();}std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
  explicit Driver(const char *program):program_(program){launch();}
  void launch(){
+#ifdef _WIN32
+  peer_=std::make_unique<testing::NativeUsbPeerStream>(program_);
+#else
   const auto program=program_.c_str();
   int to[2],from[2];if(pipe(to))throw std::runtime_error("driver_pipe");
   if(pipe(from)){::close(to[0]);::close(to[1]);throw std::runtime_error("driver_pipe");}
   child=fork();if(child<0){for(int fd:{to[0],to[1],from[0],from[1]})::close(fd);throw std::runtime_error("driver_fork");}
   if(!child){dup2(to[0],STDIN_FILENO);dup2(from[1],STDOUT_FILENO);for(int fd:{to[0],to[1],from[0],from[1]})::close(fd);execl(program,program,nullptr);_exit(127);}
   ::close(to[0]);::close(from[1]);input=from[0];output=to[1];fcntl(input,F_SETFL,O_NONBLOCK);fcntl(output,F_SETFL,O_NONBLOCK);
+#endif
  }
+#ifdef _WIN32
+ void restart(){peer_.reset();launch();}
+ ~Driver()=default;
+ wtp::IoResult read(std::span<std::uint8_t> bytes)override{return peer_->read(bytes);}
+#else
  void restart(){close();if(child>0){kill(child,SIGTERM);while(waitpid(child,nullptr,0)<0&&errno==EINTR){}}child=-1;launch();}
  ~Driver(){close();if(child>0){kill(child,SIGTERM);while(waitpid(child,nullptr,0)<0&&errno==EINTR){}}}
  wtp::IoResult read(std::span<std::uint8_t> bytes)override{const auto n=::read(input,bytes.data(),std::min<std::size_t>(bytes.size(),17));if(n>0)return {wtp::IoState::Progress,std::size_t(n)};return {n<0&&(errno==EAGAIN||errno==EINTR)?wtp::IoState::WouldBlock:wtp::IoState::Closed,0};}
+#endif
  wtp::IoResult write(std::span<const std::uint8_t> bytes)override{
   ++writes;
   if(block_mutation_once&&bytes.size()>=8&&std::string_view(reinterpret_cast<const char *>(bytes.data()),4)=="UMP1"){
@@ -82,16 +101,38 @@ class Driver final:public wtp::ByteStream {
     block_mutation_once=false;resume_fault_=true;return {wtp::IoState::WouldBlock,0};
    }
   }
-  const auto n=::write(output,bytes.data(),std::min<std::size_t>(bytes.size(),23));if(n>0)return {wtp::IoState::Progress,std::size_t(n)};return {n<0&&(errno==EAGAIN||errno==EINTR)?wtp::IoState::WouldBlock:wtp::IoState::Failed,0};}
- void close()noexcept override{if(input>=0)::close(input);if(output>=0)::close(output);input=output=-1;}
+#ifdef _WIN32
+  return peer_->write(bytes);
+#else
+  const auto n=::write(output,bytes.data(),std::min<std::size_t>(bytes.size(),23));if(n>0)return {wtp::IoState::Progress,std::size_t(n)};return {n<0&&(errno==EAGAIN||errno==EINTR)?wtp::IoState::WouldBlock:wtp::IoState::Failed,0};
+#endif
+ }
+ void close()noexcept override{
+#ifdef _WIN32
+  if(peer_)peer_->close();
+#else
+  if(input>=0)::close(input);
+  if(output>=0)::close(output);
+  input=output=-1;
+#endif
+ }
 };
 }
 int main(int argc,char **argv){
  if(argc!=2&&!(argc==3&&std::string_view(argv[2])=="--paired-pi"))return 2;
  try{
   const bool paired=argc==3;
+#ifdef _WIN32
+  Driver driver(argv[1]);
+  const auto root=std::filesystem::temp_directory_path()/std::filesystem::path(L"pico-independent-usb-"+std::to_wstring(::GetCurrentProcessId())+L"-"+std::to_wstring(::GetTickCount64()));
+  windows_file::ParentChain parents(root,windows_file::current_sid());
+  windows_file::PrivateSecurity security(windows_file::current_sid());
+  windows_file::require(::CreateDirectoryW(windows_file::api_path(root).c_str(),security.attributes())!=0);
+  const auto directory=windows_argument_utf8(root.native());
+#else
   signal(SIGPIPE,SIG_IGN);Driver driver(argv[1]);
   char pattern[]="/tmp/pico-independent-usb-XXXXXX";const auto directory=mkdtemp(pattern);if(!directory)throw std::runtime_error("private_directory");
+#endif
   struct Remove{std::string path;~Remove(){std::filesystem::remove_all(path);}} remove{directory};
   WtpSettings settings;settings.transport="usb";settings.path="/dev/fixture-wtp";settings.usb_serial="fixture-independent";settings.vendor_id=0xcafe;settings.product_id=0x4012;settings.device_id=std::string(32,'a');
   std::atomic_bool utc_qualified{false};

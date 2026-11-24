@@ -77,6 +77,20 @@ def main() -> int:
         )
         assert "invalid choice" in failed.stderr
 
+        run("--profile", "controller", "--backends", "", "--ancillary-gpio", "0", "--output", str(output))
+        controller = output.read_text()
+        assert '#define WSPRRYPI_COMPILED_BACKENDS ""' in controller
+        assert '#define WSPRRYPI_CONTROLLER_ONLY 1' in controller
+        assert all(f"#define {macro} 0" in controller for macro in (
+            "WSPRRYPI_BACKEND_RPI_GPIO", "WSPRRYPI_BACKEND_RP1_GPCLK",
+            "WSPRRYPI_BACKEND_SI5351", "WSPRRYPI_BACKEND_SIMULATED",
+        ))
+        for backends, gpio in (("simulated", "0"), ("", "1")):
+            failed = run("--profile", "controller", "--backends", backends,
+                         "--ancillary-gpio", gpio, "--output", str(output), expect=1)
+            assert "controller profile requires" in failed.stderr
+            assert output.read_text() == controller, 'Invalid selection must not replace an admitted header'
+
     print("backend capability regression tests passed")
     return 0
 

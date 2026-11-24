@@ -1,3 +1,6 @@
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 /**
  * @file version.cpp
  * @brief Provides software and hardware version information.
@@ -45,7 +48,6 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
-#include <unistd.h>
 
 #ifdef DEBUG_WSPR
 constexpr bool kDebugWspr = true;
@@ -567,8 +569,13 @@ bool platform_supports_gpio_clock_transmission(
     {
         const bool rp1_provider_available =
             g_rp1_gpclk_provider_available_override.value_or(
+                #ifndef _WIN32
                 !g_pi_generation_override.has_value() &&
-                ::access("/dev/rp1-gpclk", R_OK | W_OK) == 0);
+                ::access("/dev/rp1-gpclk", R_OK | W_OK) == 0
+#else
+                false
+#endif
+            );
         if (generation == 5 && rp1_provider_available)
         {
             return true;

@@ -47,6 +47,18 @@ class RecoveryEvidenceTest(unittest.TestCase):
     def retain(self, archive_hash='b' * 64):
         return evidence.retain_source(self.candidate, self.source, self.records, self.manifest, archive_hash)
 
+    def test_windows_controller_provenance_is_retained_and_revalidated(self):
+        self.manifest['source']['platform'] = 'windows'
+        self.retain()
+        group, index = evidence.inspect(self.candidate / 'evidence')[0]
+        self.assertEqual(index['source']['platform'], 'windows')
+        self.cpp(self.candidate)
+        for platform, role in (('unknown', 'controller'), ('windows', 'pi')):
+            changed = dict(index, source=dict(index['source'], platform=platform, role=role))
+            changed['content_digest'] = evidence.content_digest(changed)
+            with self.assertRaises(archive.RecoveryError):
+                evidence.validate_index(changed, changed['content_digest'][:32])
+
     def cpp(self, path, valid=True):
         result = subprocess.run([CPP, str(path)], capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
@@ -72,6 +84,21 @@ class RecoveryEvidenceTest(unittest.TestCase):
         evidence.copy_groups(self.candidate / 'evidence', other / 'evidence')
         self.assertEqual(evidence.inspect(other / 'evidence')[0][1], index)
         self.cpp(other)
+
+    def test_copy_refuses_collision_and_removes_only_its_own_failed_output(self):
+        source = self.records / 'state-configuration.json'
+        data = source.read_bytes()
+        item = {'name': source.name, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+        existing = self.candidate / 'existing.json'
+        existing.write_bytes(b'preserve existing evidence');existing.chmod(0o600)
+        with self.assertRaises(FileExistsError):
+            evidence.copy_file(source, existing, item)
+        self.assertEqual(existing.read_bytes(), b'preserve existing evidence')
+        failed = self.candidate / 'failed.json'
+        with self.assertRaises(archive.RecoveryError):
+            evidence.copy_file(source, failed, dict(item, sha256='0' * 64))
+        self.assertFalse(failed.exists())
+        self.assertEqual(source.read_bytes(), data)
 
     def test_unknown_extra_members_corruption_and_symlinks_refuse(self):
         self.retain()

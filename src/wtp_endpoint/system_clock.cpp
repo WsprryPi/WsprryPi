@@ -1,4 +1,5 @@
 #include "wtp_endpoint/system_clock.hpp"
+#include "native_clock.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -10,29 +11,14 @@
 #endif
 
 namespace wsprrypi {
-namespace {
-std::uint64_t ns(const timespec& value) {
-    if (value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1'000'000'000)
-        return 0;
-    const auto seconds = static_cast<std::uint64_t>(value.tv_sec);
-    if (seconds > (std::numeric_limits<std::uint64_t>::max() -
-                   static_cast<std::uint64_t>(value.tv_nsec)) / 1'000'000'000ULL)
-        return 0;
-    return seconds * 1'000'000'000ULL +
-           static_cast<std::uint64_t>(value.tv_nsec);
-}
-} // namespace
-
 wsprrypico::wtp::ClockSnapshot WtpPiSystemClock::snapshot() const {
     using namespace wsprrypico::wtp;
     ClockSnapshot result;
-    timespec before{}, utc{}, after{};
-    if (clock_gettime(CLOCK_MONOTONIC, &before) != 0 ||
-        clock_gettime(CLOCK_REALTIME, &utc) != 0 ||
-        clock_gettime(CLOCK_MONOTONIC, &after) != 0)
+    const auto before=read_native_clock(NativeClock::Monotonic),utc=read_native_clock(NativeClock::Utc),after=read_native_clock(NativeClock::Monotonic);
+    if (!before||!utc||!after)
         return result;
-    const auto first = ns(before), last = ns(after);
-    result.utc_now_ns = ns(utc);
+    const auto first = *before, last = *after;
+    result.utc_now_ns = *utc;
     result.monotonic_now_ns = first + (last >= first ? (last - first) / 2 : 0);
     if (!first || !last || last < first || !result.utc_now_ns)
         return result;

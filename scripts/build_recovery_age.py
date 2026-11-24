@@ -130,7 +130,7 @@ def build(args, root):
     destination = root / f'{system}-{arch}'
     destination.mkdir(exist_ok=True)
     output = destination / 'recovery-age'
-    inputs = {path.name: digest(path) for path in sorted(SOURCE.iterdir()) if path.name in ('go.mod', 'go.sum', 'main.go')}
+    inputs = {path.name: digest(path) for path in sorted(SOURCE.iterdir()) if path.name in ('go.mod', 'go.sum') or (path.suffix == '.go' and not path.name.endswith('_test.go'))}
     identity = {'provider': provider, 'inputs': inputs, 'target': [system, arch, '6' if arch == 'arm' else '']}
     record = destination / 'build.json'
     valid = False

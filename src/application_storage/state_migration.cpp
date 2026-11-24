@@ -7,12 +7,17 @@
 #include "wtp_integration/browser_api.hpp"
 #include <cerrno>
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#include "windows_generation_admission.hpp"
+#else
 #include <fcntl.h>
-#include <set>
-#include <openssl/rand.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <set>
+#include <openssl/rand.h>
 #ifdef __linux__
 #include <sys/syscall.h>
 #include <linux/fs.h>
@@ -38,6 +43,15 @@ const char *name(StateRecord kind){
     }
     throw StateStorageError(StateStorageError::Code::InvalidInput);
 }
+#ifdef _WIN32
+#include "state_migration_windows.hpp"
+#else
+std::filesystem::path disk_path(const std::string &text){return std::filesystem::path(text);}
+std::string path_text(const std::filesystem::path &path){return path.string();}
+bool absolute_path(const std::string &text){return std::filesystem::path(text).is_absolute()&&text.find('\0')==std::string::npos;}
+bool present(const std::string &text){struct stat info{};if(!::lstat(text.c_str(),&info))return true;require(errno==ENOENT);return false;}
+std::string normalized_root(const std::string &text){const auto path=disk_path(text);return path_text(std::filesystem::canonical(path.parent_path())/path.filename());}
+void make_directory(const std::string &path){require(!::mkdir(path.c_str(),0700));}
 struct Admission {
     int fd{-1};std::string path;
     explicit Admission(const std::string &input){
@@ -68,9 +82,9 @@ bool move_no_replace(const std::string &from,const std::string &to){
     (void)from;(void)to;return false;
 #endif
 }
+#endif
 Json capture_description(const StateMigrationCapture &capture,StateRole role){
-    require(hash(capture.source_revision)&&std::filesystem::path(capture.source_namespace).is_absolute()&&
-        capture.source_namespace.find('\0')==std::string::npos&&capture.original_records.contains(StateRecord::Configuration));
+    require(hash(capture.source_revision)&&absolute_path(capture.source_namespace)&&capture.original_records.contains(StateRecord::Configuration));
     Json records=Json::object(),originals=Json::object();
     for(const auto &record:capture.records) {
         require(record.kind!=StateRecord::Initialization&&record.bytes&&record.bytes->size()<=SqliteStateStore::maximum_record_bytes&&
@@ -139,15 +153,19 @@ void verify_candidate(const std::shared_ptr<SqliteStateStore> &database,const St
     for(const auto &file:image.companions)verify_companion_file(database->directory()+"/"+companion_relative_path(file),file);
 }
 void clear_unpublished_candidate(const std::string &path,const std::vector<CompanionFile> &companions={}){
-    struct stat info{};
-    if(::lstat(path.c_str(),&info)){require(errno==ENOENT);return;}
+    if(!present(path))return;
+#ifndef _WIN32
     auto admission=std::make_shared<Admission>(path);
+#endif
     std::set<std::string> files{"state.sqlite3","state.sqlite3-wal","state.sqlite3-shm","state.sqlite3-journal","configuration.recurrence-progress.json"};
     std::set<std::string> directories;
     for(const auto &file:companions){
         const auto relative=companion_relative_path(file);files.insert(relative);files.insert(relative+".writing");
         if(file.kind==CompanionKind::TargetManagement)directories.insert("configuration.management");
     }
+#ifdef _WIN32
+    remove_candidate(path,files,directories);
+#else
     std::vector<std::filesystem::path> remove_files,remove_directories;
     // Validate the complete inventory before removing any candidate file.
     for(const auto &entry:std::filesystem::recursive_directory_iterator(path)) {
@@ -164,18 +182,14 @@ void clear_unpublished_candidate(const std::string &path,const std::vector<Compa
     for(const auto &file:remove_files)require(!::unlink(file.c_str()));
     for(auto directory=remove_directories.rbegin();directory!=remove_directories.rend();++directory)require(!::rmdir(directory->c_str()));
     admission->sync();require(!::rmdir(path.c_str()));sync_parent(path);
+#endif
 }
 void retire_source(const StateMigrationCapture &capture){
     const auto &original=capture.original_records.at(StateRecord::Configuration);
     const auto backup_path=capture.source_namespace+".sqlite-migrated";
-    struct stat retired_info{};
-    const bool exists=!::lstat(backup_path.c_str(),&retired_info);
-    if(!exists)require(errno==ENOENT);
+    const bool exists=present(backup_path);
     const auto retired=exists?std::optional<Journal::Observation>(Journal::read_ini_input(backup_path)):std::nullopt;
-    struct stat info{};
-    if(::lstat(capture.source_namespace.c_str(),&info)) {
-        require(errno==ENOENT&&retired&&retired->bytes==original);return;
-    }
+    if(!present(capture.source_namespace)){require(retired&&retired->bytes==original);return;}
     require(!retired&&Journal::read_ini_input(capture.source_namespace).bytes==original);
     require(move_no_replace(capture.source_namespace,backup_path));sync_parent(backup_path);
     require(Journal::read_ini_input(backup_path).bytes==original);
@@ -215,14 +229,13 @@ std::shared_ptr<SqliteStateStore> migrate_application_state(const std::string &r
     const std::function<void(StateMigrationPoint)> &checkpoint){
     require(bool(capture)&&bool(validate));
     require(identity.size()==32&&identity.find_first_not_of("0123456789abcdef")==std::string::npos&&
-        std::filesystem::path(root).is_absolute()&&root.find('\0')==std::string::npos);
+        absolute_path(root));
     // The trusted invoker supplies the source namespace separately. A marker
     // read from disk never chooses a path on which to perform retirement.
-    require(std::filesystem::path(source_namespace).is_absolute()&&source_namespace.find('\0')==std::string::npos);
+    require(absolute_path(source_namespace));
     std::optional<StateMigrationCapture> captured;
-    struct stat root_info{};
-    if(::lstat(root.c_str(),&root_info)) {
-        require(errno==ENOENT);captured=capture();
+    if(!present(root)) {
+        captured=capture();
         require(captured->source_namespace==source_namespace);
         const auto description=capture_description(*captured,role);
         const Json initial{{"schema","application-state/1"},{"identity",identity},{"role",role_name(role)},
@@ -270,9 +283,8 @@ std::shared_ptr<SqliteStateStore> migrate_application_state(const std::string &r
             copy_companion_file(companion_source_path(source_namespace,file),admission->path+"/source-companions/"+companion_backup_name(file),file,true);
         notify(StateMigrationPoint::SourceBackedUp);
         const auto staging=admission->path+"/generation-1.prepare",final=admission->path+"/generation-1";
-        struct stat final_info{};
-        if(::lstat(final.c_str(),&final_info)) {
-            require(errno==ENOENT);clear_unpublished_candidate(staging,image.companions);require(!::mkdir(staging.c_str(),0700));
+        if(!present(final)) {
+            clear_unpublished_candidate(staging,image.companions);make_directory(staging);
             {
                 auto database=std::make_shared<SqliteStateStore>(staging,identity,role,StateOpen::CreateNew);
                 auto records=image.records;records.push_back({StateRecord::Initialization,initialization(selection).dump()});
@@ -312,9 +324,8 @@ std::shared_ptr<SqliteStateStore> initialize_application_state(const std::string
     const std::function<void(std::shared_ptr<SqliteStateStore>)> &validate,
     const std::function<void(StateMigrationPoint)> &checkpoint){
     require(bool(seed)&&bool(validate)&&identity.size()==32&&identity.find_first_not_of("0123456789abcdef")==std::string::npos&&
-        std::filesystem::path(root).is_absolute()&&root.find('\0')==std::string::npos);
-    const auto requested=std::filesystem::path(root);
-    const auto directory=(std::filesystem::canonical(requested.parent_path())/requested.filename()).string();
+        absolute_path(root));
+    const auto directory=normalized_root(root);
     const auto make_image=[&](const std::string &nonce){
         require(hash(nonce));StateMigrationCapture image;
         image.source_namespace=directory+"/generation-1/configuration";
@@ -332,9 +343,7 @@ std::shared_ptr<SqliteStateStore> initialize_application_state(const std::string
         require(role==StateRole::Pi?kinds.contains(StateRecord::RecurrenceAuthority):!kinds.contains(StateRecord::RecurrenceAuthority));
         return std::pair{image,Json{{"records",digests},{"originals",Json::object()},{"progress",nullptr},{"companions",Json::array()}}};
     };
-    struct stat info{};
-    if(::lstat(directory.c_str(),&info)) {
-        require(errno==ENOENT);
+    if(!present(directory)) {
         unsigned char random[32];require(RAND_bytes(random,sizeof(random))==1);
         std::string nonce;for(auto byte:random){nonce+="0123456789abcdef"[byte>>4];nonce+="0123456789abcdef"[byte&15];}
         const auto [image,images]=make_image(nonce);(void)image;
@@ -357,8 +366,8 @@ std::shared_ptr<SqliteStateStore> initialize_application_state(const std::string
     const auto [image,images]=make_image(selection["source_revision"].get<std::string>());
     require(selection["images"]==images);
     const auto staging=directory+"/generation-1.prepare",final=directory+"/generation-1";
-    if(::lstat(final.c_str(),&info)) {
-        require(errno==ENOENT);clear_unpublished_candidate(staging);require(!::mkdir(staging.c_str(),0700));
+    if(!present(final)) {
+        clear_unpublished_candidate(staging);make_directory(staging);
         {
             auto database=std::make_shared<SqliteStateStore>(staging,identity,role,StateOpen::CreateNew);
             auto records=image.records;records.push_back({StateRecord::Initialization,initialization(selection).dump()});

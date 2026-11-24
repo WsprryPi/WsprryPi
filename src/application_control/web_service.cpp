@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "web_service.hpp"
+#include "backend_capabilities.hpp"
+#include "native_controller_paths.hpp"
 #include "web_bootstrap.hpp"
 #include "runtime_options.hpp"
 #include "http_contract.hpp"
@@ -8,6 +10,10 @@
 #include "web_socket.hpp"
 #include "version.hpp"
 #include "httplib.hpp"
+#ifdef _WIN32
+#include "signal_handler.hpp"
+#include "native_windows_owners.hpp"
+#endif
 #include <atomic>
 #include <algorithm>
 #include <cctype>
@@ -21,8 +27,12 @@
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
+#ifdef _WIN32
+std::atomic_bool stopped{false};
+#else
 volatile std::sig_atomic_t stopped=0;
 void stop_signal(int){stopped=1;}
+#endif
 void require(bool value){if(!value)throw LocalControlError(LocalControlError::Code::Protocol);}
 bool fields(const Json &value,std::initializer_list<const char *> names){
     if(!value.is_object()||value.size()!=names.size())return false;
@@ -126,6 +136,11 @@ public:
     bool same_listeners(const Json &candidate)const{
         for(const auto *key:{"web_port","socket_port","http_enabled","websocket_enabled","http_loopback_only","socket_loopback_only","socket_loopback_family"})
             if(bootstrap_.at(key)!=candidate.at(key))return false;
+        return true;
+    }
+    bool listeners_healthy()const{
+        if(bootstrap_["http_enabled"]==true&&(!server_||!server_->is_running()))return false;
+        if(bootstrap_["websocket_enabled"]==true&&(!websocket_||websocket_->listening_port()!=bootstrap_["socket_port"].get<unsigned short>()))return false;
         return true;
     }
     void context(const Json &bootstrap){std::lock_guard lock(context_mutex_);bootstrap_=bootstrap;}
@@ -234,24 +249,44 @@ private:
     std::unique_ptr<httplib::Server> server_;std::unique_ptr<WebSocketServer> websocket_;std::thread http_thread_;
 };
 struct Signals {
+#ifdef _WIN32
+    SignalHandler handler;
+    Signals(){stopped=false;handler.setCallback([](int,bool){stopped=true;});handler.start();require(handler.running());}
+    ~Signals(){if(!handler.stop())std::terminate();}
+#else
     struct sigaction previous_term{},previous_int{},previous_pipe{};
     Signals(){stopped=0;struct sigaction action{};action.sa_handler=stop_signal;sigemptyset(&action.sa_mask);
         require(!sigaction(SIGTERM,&action,&previous_term)&&!sigaction(SIGINT,&action,&previous_int));
         action.sa_handler=SIG_IGN;require(!sigaction(SIGPIPE,&action,&previous_pipe));}
     ~Signals(){sigaction(SIGTERM,&previous_term,nullptr);sigaction(SIGINT,&previous_int,nullptr);sigaction(SIGPIPE,&previous_pipe,nullptr);}
+#endif
 };
 }
 std::optional<int> web_service_main(int argc,char *argv[]){
     bool selected=false;for(int index=1;index<argc;++index)if(std::string_view(argv[index]).starts_with("--web-service"))selected=true;
     if(!selected)return {};
     try{
-        std::optional<std::string> runtime;std::string cache="/var/lib/wsprrypi-web/listeners.json";bool role=false,help=false,cache_selected=false;
+        std::optional<std::string> runtime;std::string cache=
+#ifdef _WIN32
+            []{const auto path=(windows_controller_root()/L"Web"/L"listeners.json").u8string();return std::string(path.begin(),path.end());}();
+#elif WSPRRYPI_CONTROLLER_ONLY
+            posix_controller_paths().web_cache;
+#else
+            "/var/lib/wsprrypi-web/listeners.json";
+#endif
+        bool role=false,help=false,cache_selected=false;
         for(int index=1;index<argc;++index){
             const std::string option=argv[index];
             if(option=="--web-service"&&!role)role=true;
             else if((option=="--help"||option=="-h")&&!help)help=true;
             else if((option=="--runtime-directory"&&!runtime)||(option=="--listener-cache"&&!cache_selected)){
-                require(index+1<argc);const std::string path=argv[++index];require(std::filesystem::path(path).is_absolute());
+                require(index+1<argc);const std::string path=argv[++index];require(
+#ifdef _WIN32
+                    windows_file::path_from_utf8(path).is_absolute()
+#else
+                    std::filesystem::path(path).is_absolute()
+#endif
+                );
                 if(option=="--runtime-directory")runtime=path;else{cache=path;cache_selected=true;}
             }else throw LocalControlError(LocalControlError::Code::Protocol);
         }
@@ -284,6 +319,7 @@ std::optional<int> web_service_main(int argc,char *argv[]){
             const auto now=std::chrono::steady_clock::now();
             if(now>=heartbeat){
                 heartbeat=now+std::chrono::seconds(1);
+                if(!service->listeners_healthy()){presence.reset();listeners_ready=false;}
                 try{
                     if(!presence){
                         LocalControlConnection control(options);auto current=value(control.request({LocalOperation::WebBootstrap,Json::object()}));

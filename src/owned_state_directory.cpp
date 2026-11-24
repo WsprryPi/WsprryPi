@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "owned_state_directory.hpp"
+#ifndef _WIN32
+#include "native_private_acl.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
 #include <cerrno>
 #include <cstdio>
@@ -46,11 +48,13 @@ OwnedStateDirectory prepare_owned_state_directory(const std::string &requested,
     require(!name.empty()&&name!="."&&name!="..");
     const auto parent=std::filesystem::canonical(path.has_parent_path()?path.parent_path():".");
     struct stat info{};require(!::lstat(parent.c_str(),&info)&&S_ISDIR(info.st_mode)&&info.st_uid==geteuid()&&!(info.st_mode&0022));
+    require(wsprrypi::native_private_acl_path(parent.c_str(),info.st_uid));
     const auto directory=(parent/name).string();bool existed=true;
     if(::lstat(directory.c_str(),&info)){
         require(errno==ENOENT);const auto staged=directory+".prepare";
         require(!::mkdir(staged.c_str(),0700)||errno==EEXIST);
         require(!::lstat(staged.c_str(),&info)&&private_directory(info));
+        require(wsprrypi::native_private_acl_path(staged.c_str(),info.st_uid));
         FileDescriptor preparation{::open(staged.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)};
         require(preparation.value>=0&&!::flock(preparation.value,LOCK_EX|LOCK_NB));
         struct stat locked{};require(!::fstat(preparation.value,&locked)&&locked.st_dev==info.st_dev&&locked.st_ino==info.st_ino);
@@ -58,11 +62,12 @@ OwnedStateDirectory prepare_owned_state_directory(const std::string &requested,
             require(entry.path().filename()=="authority.json"||entry.path().filename()=="writing");
         if(checkpoint)checkpoint(OwnedStatePublicationPoint::PreparedDirectory);
         const auto writing=staged+"/writing",ready=staged+"/authority.json";
-        if(!::lstat(writing.c_str(),&info))require(private_file(info)&&!::unlink(writing.c_str()));
+        if(!::lstat(writing.c_str(),&info))require(private_file(info)&&native_private_acl_path(writing.c_str(),info.st_uid)&&!::unlink(writing.c_str()));
         else require(errno==ENOENT);
         if(::lstat(ready.c_str(),&info)){
             require(errno==ENOENT);const auto bytes=initial();require(!bytes.empty()&&bytes.size()<=1048576);validate(bytes);
             FileDescriptor output{::open(writing.c_str(),O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};require(output.value>=0);
+            require(wsprrypi::native_private_acl(output.value,::geteuid()));
             bool good=true;std::size_t offset=0;
             while(offset<bytes.size()){
                 const auto count=::write(output.value,bytes.data()+offset,bytes.size()-offset);
@@ -74,7 +79,7 @@ OwnedStateDirectory prepare_owned_state_directory(const std::string &requested,
             if(::fsync(output.value))good=false;
             if(output.close())good=false;
             require(good&&move_no_replace(writing,ready));
-        }else {require(private_file(info));validate(PiManagementJournal::read_ini_input(ready).bytes);}
+        }else {require(private_file(info)&&native_private_acl_path(ready.c_str(),info.st_uid));validate(PiManagementJournal::read_ini_input(ready).bytes);}
         if(checkpoint)checkpoint(OwnedStatePublicationPoint::StagedImage);
         sync_directory(staged);require(move_no_replace(staged,directory));
         if(checkpoint)checkpoint(OwnedStatePublicationPoint::PublishedDirectory);
@@ -82,6 +87,7 @@ OwnedStateDirectory prepare_owned_state_directory(const std::string &requested,
         require(!::lstat(directory.c_str(),&info));
         if(checkpoint)checkpoint(OwnedStatePublicationPoint::SyncedDirectory);
     }
-    require(private_directory(info));return {directory+"/authority.json",existed};
+    require(private_directory(info)&&wsprrypi::native_private_acl_path(directory.c_str(),info.st_uid));return {directory+"/authority.json",existed};
 }
 }
+#endif

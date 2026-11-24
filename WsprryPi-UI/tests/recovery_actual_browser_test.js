@@ -113,7 +113,13 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await waitFor(() => run("document.getElementById('recoveryStatus').textContent.includes('Restore verified')"), 'Restore completes after lost confirmation reply', 60000);
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1, 'Lost confirmation is not replayed');
-        await client.send('Page.reload');
+        let reloaded = false;
+        const onLoad = event => { if (event.method === 'Page.loadEventFired') reloaded = true; };
+        client.on('event', onLoad);
+        try {
+            await client.send('Page.reload');
+            await waitFor(() => reloaded, 'Reload replaces the previous document', 20000);
+        } finally { client.off('event', onLoad); }
         await waitFor(() => run("document.getElementById('recoveryStatus')?.textContent.includes('Restore verified')"), 'Reload reads durable result', 20000);
         await waitFor(() => run("!document.getElementById('destinationRead').disabled"), 'Independent destination review remains reachable', 15000);
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1);

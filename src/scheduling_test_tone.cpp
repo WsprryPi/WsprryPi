@@ -436,9 +436,9 @@ static TestToneStartResult start_test_tone_locked(const TestToneRequest &tone_re
     llog.logS(
         DEBUG,
         "Resolved WSPR dial frequency ",
-        lookup.freq_display_string(dial_freq),
+        lookup.freq_display_string(static_cast<std::int64_t>(dial_freq)),
         " to actual RF ",
-        lookup.freq_display_string(actual_rf_freq),
+        lookup.freq_display_string(static_cast<std::int64_t>(actual_rf_freq)),
         " using audio offset ",
         explicit_frequency_plan.has_value()
             ? static_cast<double>(explicit_frequency_plan->audio_offset_hz.value_or(0))
@@ -449,7 +449,7 @@ static TestToneStartResult start_test_tone_locked(const TestToneRequest &tone_re
         llog.logS(
             INFO,
             "Using web UI test tone RF frequency override: ",
-            lookup.freq_display_string(actual_rf_freq));
+            lookup.freq_display_string(static_cast<std::int64_t>(actual_rf_freq)));
     }
     double committed_ppm = config.ppm;
     if (transmit_backend_uses_gpio_output(config.transmit_backend))
@@ -538,7 +538,7 @@ static TestToneStartResult start_test_tone_locked(const TestToneRequest &tone_re
 
     llog.logS(INFO,
               "WSPR-band test tone using dial frequency: ",
-              lookup.freq_display_string(dial_freq));
+              lookup.freq_display_string(static_cast<std::int64_t>(dial_freq)));
     result.started = true;
     result.message = "Test Tone accepted; waiting for runtime confirmation.";
     local_tone_reservation.transfer_to_running_tone();

@@ -1,4 +1,7 @@
 #pragma once
+#ifndef _WIN32
+#include <sys/types.h>
+#endif
 
 #include "config_types.hpp"
 #include "owned_state_directory.hpp"
@@ -25,6 +28,16 @@ struct PiRecurrenceStorage {
 // of INI filename, HTTP parameters, HOME overrides, or selected output backend.
 enum class PrivateDeviceDomain {Recurrence,ControllerRetirements,Pairing};
 std::string private_device_state_directory(PrivateDeviceDomain,const std::string &device_id);
+// OS account home; typed actual-main fixtures retain their private owner root.
+struct ControllerInstallationOwner {
+    std::string home;
+#ifdef _WIN32
+    std::wstring sid;
+#else
+    uid_t uid;
+#endif
+};
+ControllerInstallationOwner controller_installation_owner();
 PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device_id,const std::string &ini,
     const std::function<void(OwnedStatePublicationPoint)> &checkpoint = {});
 
@@ -50,6 +63,7 @@ namespace testing {
 // Isolated native-main fixtures only. No CLI, INI, environment, or HTTP setting
 // exposes this path; production continues to use the invoking user's ledger.
 void set_wtp_pi_private_state_path(const std::string &);
+void set_controller_installation_owner_home(const std::string &);
 
 }
 

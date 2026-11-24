@@ -13,7 +13,7 @@ namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw std::runtime_error("pairing_renewal_unavailable");}
 bool id(const std::string &value){return value.size()==32&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
-std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),bytes.size())==1);std::string value;
+std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))==1);std::string value;
     for(const auto byte:bytes){value+="0123456789abcdef"[byte>>4];value+="0123456789abcdef"[byte&15];}return value;}
 }
 PiPairRenewal::PiPairRenewal(PiPairHistory &history,ManagementBrowserSessions &sessions,PiPairAdmission &budget,std::string self)

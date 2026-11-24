@@ -1,3 +1,4 @@
+#include "native_calendar_time.hpp"
 /**
  * @file scheduling.cpp
  * @brief Orchestration layer for planning and committing transmissions.
@@ -59,7 +60,7 @@
 #include "gpio_band_policy.hpp"
 #include "gpio_output.hpp"
 #include "logging.hpp"
-#include "ppm_manager.hpp"
+#include "local_frequency_provider.hpp"
 #include "system_clock_frequency_estimate.hpp"
 #include "execution_plan_compiler.hpp"
 #include "wspr_reference_adapter.hpp"
@@ -141,7 +142,7 @@ namespace
             return {};
         const std::time_t raw = std::chrono::system_clock::to_time_t(value);
         std::tm utc{};
-        gmtime_r(&raw, &utc);
+        wsprrypi::native_calendar::utc(&raw, &utc);
         std::ostringstream out;
         out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
         return out.str();
@@ -171,7 +172,7 @@ namespace
     GpioFrequencyCorrection select_and_publish_gpio_correction(
         const ArgParserConfig &cfg)
     {
-        const auto provider = ppmManager.getProviderSnapshot();
+        const auto provider = wsprrypi::local_frequency_provider_snapshot();
         std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
         // Every future request, including inbound WTP preparation, must check
         // the cached report's current age. Committed requests remain frozen.
@@ -277,7 +278,7 @@ namespace
 
     void refresh_frequency_estimate()
     {
-        const PPMProviderSnapshot provider = ppmManager.getProviderSnapshot();
+        const PPMProviderSnapshot provider = wsprrypi::local_frequency_provider_snapshot();
         std::lock_guard<std::mutex> lock(frequency_estimate_mutex);
         current_chrony_frequency_estimate = qualify_provider_snapshot(provider);
     }
@@ -1684,7 +1685,7 @@ std::chrono::system_clock::time_point next_non_wspr_schedule_time_for_test(
 {
     std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm local_tm{};
-    localtime_r(&now_time_t, &local_tm);
+    wsprrypi::native_calendar::local(&now_time_t, &local_tm);
     local_tm.tm_min = cfg.schedule_start_minute;
     local_tm.tm_sec = cfg.schedule_start_second;
     std::time_t candidate_time_t = std::mktime(&local_tm);
@@ -1713,7 +1714,7 @@ static std::string format_local_schedule_time(
 {
     std::time_t time_t_value = std::chrono::system_clock::to_time_t(tp);
     std::tm local_tm{};
-    localtime_r(&time_t_value, &local_tm);
+    wsprrypi::native_calendar::local(&time_t_value, &local_tm);
     std::ostringstream oss;
     oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
     return oss.str();
@@ -1724,7 +1725,7 @@ static std::string format_utc_schedule_time(
 {
     std::time_t time_t_value = std::chrono::system_clock::to_time_t(tp);
     std::tm utc_tm{};
-    gmtime_r(&time_t_value, &utc_tm);
+    wsprrypi::native_calendar::utc(&time_t_value, &utc_tm);
 
     std::ostringstream oss;
     oss << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S") << " UTC";
@@ -2326,7 +2327,7 @@ BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
         llog.logS(
             WARN,
             "Unable to map source frequency ",
-            lookup.freq_display_string(source_frequency_hz),
+            lookup.freq_display_string(static_cast<std::int64_t>(source_frequency_hz)),
             " to a ham band for band-selector GPIO preparation.");
         active_band_gpio_prepare_status.store(
             BandGPIOPrepareStatus::Failed,
@@ -2416,7 +2417,7 @@ BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
         "Unified scheduler selector derived band ",
         ham_band_to_string(*band),
         " from source frequency ",
-        lookup.freq_display_string(source_frequency_hz),
+        lookup.freq_display_string(static_cast<std::int64_t>(source_frequency_hz)),
         "; selected GPIO ",
         resolution.config.gpio,
         " (",
@@ -3276,8 +3277,8 @@ bool configure_current_wspr_transmission(
         }
 
         llog.logS(DEBUG, "Resolved WSPR dial frequency ",
-                  lookup.freq_display_string(dial_frequency_hz),
-                  " to nominal RF center ", lookup.freq_display_string(placement->rf_center_hz),
+                  lookup.freq_display_string(static_cast<std::int64_t>(dial_frequency_hz)),
+                  " to nominal RF center ", lookup.freq_display_string(static_cast<std::int64_t>(placement->rf_center_hz)),
                   " with random placement ", placement->applied_offset_hz, " Hz.");
         llog.logS(DEBUG, "Selected WSPR plan.");
 

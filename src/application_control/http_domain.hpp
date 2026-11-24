@@ -2,13 +2,15 @@
 #pragma once
 #include "httplib.hpp"
 #include "json.hpp"
+#include "local_transport.hpp"
 #include <memory>
 namespace wsprrypi {
 struct BrowserHttpInput {
     std::string operation,method,path,target,peer;
     httplib::Headers headers;
     std::string body;
-    int transport_descriptor{-1}; // Verified local transport, never JSON.
+    LocalTransportDescriptor transport_descriptor{-1}; // Verified local transport, never JSON.
+    std::function<bool()> transport_alive{};
 };
 class BrowserHttpResource {
 public:

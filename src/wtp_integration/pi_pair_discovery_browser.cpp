@@ -1,3 +1,4 @@
+#include "hardware_access_policy.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_pair_discovery.hpp"
 #include "pi_pair_discovery_avahi.hpp"
@@ -7,9 +8,13 @@
 #include <mutex>
 #include <stdexcept>
 #include <cstdlib>
-#include <arpa/inet.h>
+#include "native_socket.hpp"
+#ifndef _WIN32
 #include <poll.h>
-#if defined(__APPLE__)
+#endif
+#if defined(_WIN32)
+#include "pi_pair_discovery_windows.hpp"
+#elif defined(__APPLE__)
 #include <dns_sd.h>
 #elif defined(__linux__) && defined(WSPRRYPI_HAVE_AVAHI)
 #include <avahi-client/client.h>
@@ -56,7 +61,21 @@ struct PiPairDiscoveryBrowser::State {
         auto service=std::make_unique<Service>();service->key=std::move(key);service->domain=std::move(domain);service->owner=this;
         const auto identity=service->key;services.emplace(identity,std::move(service));
     }
-#if defined(__APPLE__)
+#if defined(_WIN32)
+    void native(){
+        windows_dnssd::Browser browser;cache.available(true);
+        while(!stopping.load()){
+            for(const auto &row:browser.poll()){
+                if(row.removed)cache.removed(row.key);
+                else if(!cache.resolved(row.key,"local.",row.host,row.port,row.fields))cache.removed(row.key);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+    void cleanup(){services.clear();}
+    void release(Service &){}
+    void resolve(Service &){}
+#elif defined(__APPLE__)
     DNSServiceRef browser{};
     static void browse(DNSServiceRef,DNSServiceFlags flags,std::uint32_t interface,DNSServiceErrorType error,
         const char *name,const char *type,const char *domain,void *context) noexcept{
@@ -174,7 +193,7 @@ PiPairDiscoveryBrowser::PiPairDiscoveryBrowser(PiPairDiscovery &cache):state_(st
 PiPairDiscoveryBrowser::~PiPairDiscoveryBrowser(){stop();}
 bool PiPairDiscoveryBrowser::start(){
     std::lock_guard guard(state_->lifecycle);if(state_->worker.joinable())return false;
-    if(const auto disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");disabled&&std::string_view(disabled)=="1"){
+    if(hardware_access_disabled()){
         state_->cache.available(false);return false;
     }
     state_->stopping=false;try{state_->worker=std::thread([state=state_.get()]{state->run();});return true;}catch(...){state_->stopping=true;return false;}

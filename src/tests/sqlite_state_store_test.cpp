@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "application_storage/sqlite_state_store.hpp"
 #include "software_child_process.hpp"
+#include "software_private_acl.hpp"
 #include <sqlite3.h>
 #include <cassert>
 #include <cerrno>
@@ -197,6 +198,31 @@ void unsafe_sidecars_and_live_permissions() {
     assert(std::filesystem::is_empty(child));
     assert(!chmod(parent.root().c_str(), 0700));
 }
+void extended_acl_refusals(){
+#ifdef __APPLE__
+    Temporary unsafe;
+    set_software_other_read_acl(unsafe.root().c_str(),true);
+    refuses(Code::Unavailable,[&]{SqliteStateStore create(unsafe.root(),identity,StateRole::Pi,StateOpen::CreateNew);});
+    assert(std::filesystem::is_empty(unsafe.path));
+    set_software_other_read_acl(unsafe.root().c_str(),false);
+    Temporary temporary;
+    {SqliteStateStore create(temporary.root(),identity,StateRole::Pi,StateOpen::CreateNew);}
+    for(const auto &path:{temporary.root(),temporary.database()}){
+        set_software_other_read_acl(path.c_str(),true);
+        refuses(Code::Unavailable,[&]{SqliteStateStore store(temporary.root(),identity,StateRole::Pi,StateOpen::Existing);});
+        set_software_other_read_acl(path.c_str(),false);
+    }
+    {
+        SqliteStateStore store(temporary.root(),identity,StateRole::Pi,StateOpen::Existing);
+        set_software_other_read_acl(temporary.database().c_str(),true);
+        refuses(Code::Unavailable,[&]{(void)store.snapshot();});assert(store.held());
+        set_software_other_read_acl(temporary.database().c_str(),false);
+        refuses(Code::Unavailable,[&]{(void)store.snapshot();});
+    }
+    SqliteStateStore recovered(temporary.root(),identity,StateRole::Pi,StateOpen::Existing);
+    assert(recovered.snapshot().revision=="0");
+#endif
+}
 void sqlite_commit_refusal() {
     underlying_vfs = sqlite3_vfs_find(nullptr);
     assert(underlying_vfs);
@@ -357,6 +383,7 @@ int main(int argc,char **argv) {
     ordinary_transactions();
     role_and_path_refusals();
     unsafe_sidecars_and_live_permissions();
+    extended_acl_refusals();
     sqlite_commit_refusal();
     execution_reads();
     failed_and_uncertain_commit();

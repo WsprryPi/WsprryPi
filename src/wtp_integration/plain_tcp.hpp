@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #pragma once
+#include "native_socket.hpp"
 #include "tls.hpp"
 #include <atomic>
 #include <mutex>
@@ -32,7 +33,7 @@ private:
   std::unique_ptr<TlsResolver> resolver_;
   mutable std::mutex mutex_;
   TlsObservation status_;
-  int fd_{-1};
+  native_socket::Handle fd_{native_socket::invalid};
   unsigned port_{};
   std::uint64_t deadline_{};
   std::vector<std::string> addresses_;

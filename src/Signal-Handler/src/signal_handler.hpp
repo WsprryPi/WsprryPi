@@ -20,7 +20,9 @@
 #include <unordered_map>
 
 // System libraries
+#ifndef _WIN32
 #include <termios.h>
+#endif
 
 /**
  * @brief Lifecycle state of the signal handler worker thread.
@@ -150,6 +152,8 @@ public:
      *          needs to finish any in-flight callback.
      */
     bool stop();
+    /** True only while the worker has valid startup admission. */
+    bool running() const noexcept { return state.load()==SignalHandlerState::RUNNING; }
 
     /**
      * @brief Sets thread scheduling policy and priority for the signal thread.
@@ -197,17 +201,19 @@ private:
      *
      * Stored so control-character echo settings can be restored on shutdown.
      */
+#ifndef _WIN32
     termios original_termios;
 
     /**
      * @brief Whether original_termios contains a valid saved state.
      */
     bool termios_saved;
+#endif
 
     /**
      * @brief Cached set of handled signals built from signal_map.
      */
-    sigset_t signal_set;
+    SignalWaitSet signal_set;
 
     /** @brief Platform-normalized synchronous signal wait operation. */
     SignalWaitFunction wait_function;

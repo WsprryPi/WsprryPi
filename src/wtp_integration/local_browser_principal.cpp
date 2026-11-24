@@ -10,7 +10,7 @@ namespace {
 PiPairSecret fresh_key(){
     std::array<unsigned char,32> bytes{};
     struct Wipe{std::array<unsigned char,32> &value;~Wipe(){OPENSSL_cleanse(value.data(),value.size());}} wipe{bytes};
-    if(RAND_bytes(bytes.data(),bytes.size())!=1)throw std::runtime_error("local_authorization_unavailable");
+    if(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))!=1)throw std::runtime_error("local_authorization_unavailable");
     return PiPairSecret(bytes);
 }
 std::array<unsigned char,32> seal(const PiPairSecret &key,std::string_view body){

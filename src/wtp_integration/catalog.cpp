@@ -3,9 +3,14 @@
 #include "catalog.hpp"
 #include "wtp_settings_json.hpp"
 #include <openssl/sha.h>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#include "pi_management_journal.hpp"
+#else
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
@@ -28,14 +33,23 @@ bool identity(const std::string &id) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
   });
 }
+bool catalog_path_present(const std::string &path){
+#ifdef _WIN32
+  const auto native=windows_file::path_from_utf8(path);
+  if(::GetFileAttributesW(windows_file::api_path(native).c_str())!=INVALID_FILE_ATTRIBUTES)return true;
+  const auto error=::GetLastError();if(error==ERROR_FILE_NOT_FOUND||error==ERROR_PATH_NOT_FOUND)return false;
+#else
+  struct stat information{};if(!::lstat(path.c_str(),&information))return true;
+  if(errno==ENOENT)return false;
+#endif
+  throw std::runtime_error("Management authority state is unreadable");
+}
 void guard_missing_management_catalog(const std::string &path) {
   const std::string suffix=".wtp-devices.json";
   if(!path.ends_with(suffix))return;
   const auto ini=path.substr(0,path.size()-suffix.size());
   for(const auto &state:{ini+".management",ini+".pi-management.json"}){
-    struct stat information{};
-    if(!::lstat(state.c_str(),&information))throw std::runtime_error("Management catalog is missing beside existing authority state");
-    if(errno!=ENOENT)throw std::runtime_error("Management authority state is unreadable");
+    if(catalog_path_present(state))throw std::runtime_error("Management catalog is missing beside existing authority state");
   }
 }
 std::string local_id() {
@@ -100,6 +114,7 @@ WtpCatalogProfile parse(const nlohmann::json &value,bool private_profile=true) {
   // All TLS material is referenced by absolute host paths, never embedded.
   return p;
 }
+#ifndef _WIN32
 void write_all(int fd, const std::string &bytes) {
   std::size_t offset = 0;
   while (offset < bytes.size()) {
@@ -109,6 +124,7 @@ void write_all(int fd, const std::string &bytes) {
     offset += static_cast<std::size_t>(n);
   }
 }
+#endif
 nlohmann::json public_catalog(const nlohmann::json &value){
   nlohmann::json rows=nlohmann::json::array();for(const auto &row:value.at("profiles"))rows.push_back(serialize(parse(row),false));
   return {{"version",1},{"profiles",rows}};
@@ -161,6 +177,11 @@ void WtpCatalog::save(nlohmann::json &value) {
     observed_storage_=bytes;
     return;
   }
+#ifdef _WIN32
+  const auto before=PiManagementJournal::read_private_record(path_);
+  if(bool(before)!=bool(observed_storage_)||(before&&before->bytes!=*observed_storage_))throw std::runtime_error("Catalog owner observation changed");
+  (void)PiManagementJournal::publish_private_record(path_,before,bytes);observed_storage_=bytes;
+#else
   const auto temp = path_ + ".tmp." + local_id();
   const int fd = ::open(temp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0) throw std::runtime_error("Could not create WTP catalog");
@@ -182,6 +203,7 @@ void WtpCatalog::save(nlohmann::json &value) {
     if (open) ::close(fd);
     ::unlink(temp.c_str()); throw;
   }
+#endif
 }
 nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::string *source_bytes,bool initialize_missing) {
   std::string bytes;
@@ -192,9 +214,18 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     if(saved->size()>262144)throw std::runtime_error("Catalog exceeds size limit");
     bytes=*saved;
   }else{
+#ifdef _WIN32
+   const auto native=PiManagementJournal::read_private_record(path_);
+   const bool missing=!native;
+#else
    const int fd=::open(path_.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
-   if(fd<0) {
-    if(errno!=ENOENT)throw std::runtime_error("WTP catalog is unreadable");
+   const bool missing=fd<0;
+   if(missing&&errno!=ENOENT)throw std::runtime_error("WTP catalog is unreadable");
+#endif
+   if(missing) {
+#ifdef _WIN32
+    observed_storage_.reset();
+#endif
     if(!initialize_missing)throw std::runtime_error("Import catalog is missing");
     guard_missing_management_catalog(path_);
     nlohmann::json fresh=empty_catalog();
@@ -204,6 +235,10 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     }
     save(fresh);if(source_bytes)*source_bytes=catalog_storage_bytes(fresh);return fresh;
   }
+#ifdef _WIN32
+  if(native->bytes.size()>262144)throw std::runtime_error("WTP catalog exceeds size limit");
+  bytes=native->bytes;observed_storage_=bytes;
+#else
   struct Close {int fd;~Close(){::close(fd);}} close{fd};
   struct stat information{};
   if(::fstat(fd,&information)||!S_ISREG(information.st_mode)||information.st_nlink!=1||
@@ -214,6 +249,7 @@ nlohmann::json WtpCatalog::load(const std::optional<WtpSettings> &active,std::st
     if(n<0)throw std::runtime_error("WTP catalog is unreadable");
     if(!n)break;
     bytes.append(block,static_cast<std::size_t>(n));if(bytes.size()>262144)throw std::runtime_error("WTP catalog exceeds size limit");}
+#endif
   }
   auto value=parse_storage_image(bytes,bool(storage_));
   if(source_bytes)*source_bytes=bytes;
@@ -378,11 +414,8 @@ PicoManagementHistoryAuthority WtpCatalog::management_history_authority(
     const std::optional<WtpSettings> &active) {
   PicoManagementHistoryAuthority authority;
   authority.read=[this,active]{
-    std::lock_guard lock(mutex_);PicoManagementHistoryView view;struct stat information{};
-    if(!storage_&&::lstat(path_.c_str(),&information)){
-      if(errno==ENOENT)return view;
-      throw std::runtime_error("Management catalog is unreadable");
-    }
+    std::lock_guard lock(mutex_);PicoManagementHistoryView view;
+    if(!storage_&&!catalog_path_present(path_))return view;
     const auto value=load(active);
     for(const auto &[device,epoch]:value["management_history"].items())view.epochs.emplace(device,epoch.get<std::string>());
     for(const auto &[device,epoch]:value["management_retired"].items())view.retired_epochs.emplace(device,epoch.get<std::string>());
@@ -462,11 +495,7 @@ PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
       if(!storage_->read())return std::optional<std::string>{};
       return epoch(load(active));
     }
-    struct stat information{};
-    if(::lstat(path_.c_str(),&information)){
-      if(errno==ENOENT)return std::optional<std::string>{};
-      throw std::runtime_error("Pi management catalog is unreadable");
-    }
+    if(!catalog_path_present(path_))return std::optional<std::string>{};
     return epoch(load(active));
   };
   authority.coordinate=[this,active,self,epoch](const std::string &history,const PiManagementAnchor::Commit &commit){
@@ -485,8 +514,7 @@ PiManagementAnchor WtpCatalog::pi_management_anchor(const std::string &self,
     const std::string after=changed?catalog_storage_bytes(value):before;
     commit(before,after);
     if(!storage_){
-      struct stat published{};
-      if(::lstat(path_.c_str(),&published))throw std::runtime_error("Pi management catalog disappeared during commit");
+      if(!catalog_path_present(path_))throw std::runtime_error("Pi management catalog disappeared during commit");
     }
     std::string committed;const auto observed=load(active,&committed);
     if(epoch(observed)!=std::optional<std::string>(history)||committed!=after)

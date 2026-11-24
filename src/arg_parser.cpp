@@ -29,6 +29,7 @@
 
 // Primary header for this source file
 #include "arg_parser.hpp"
+#include "backend_capabilities.hpp"
 #include "pi_managed_host_runtime.hpp"
 #include "test_tone_frequency_plan.hpp"
 #include "arg_parser_internal.hpp"
@@ -36,7 +37,10 @@
 // Project headers
 #include "config_handler.hpp"
 #include "application_storage/application_state.hpp"
+#include "WSPR-Transmitter/src/usb_adapter_identity.hpp"
+#ifndef _WIN32
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
+#endif
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 #include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
 #endif
@@ -65,25 +69,9 @@
 #include <vector>
 
 // System headers
+#if !WSPRRYPI_CONTROLLER_ONLY
 #include <getopt.h>
-#include <sched.h>
-
-/**
- * @brief Global instance of the MonitorFile for INI file change detection.
- *
- * The `iniMonitor` object continuously monitors the specified INI file for changes.
- * It provides real-time notifications when the file is modified, enabling the application
- * to reload configuration settings dynamically without requiring a restart.
- *
- * This instance is typically used alongside the `ini` object to automatically re-validate
- * and apply updated configuration settings.
- *
- * The `iniMonitor` object works by checking the file's last modified timestamp and comparing
- * it with the previous known state. If a change is detected, it returns `true` on `changed()`.
- *
- * @see https://github.com/WsprryPi/MonitorFile for detailed documentation and examples.
- */
-MonitorFile iniMonitor;
+#endif
 
 /**
  * @brief Instance of BandLookup.
@@ -99,21 +87,10 @@ MonitorFile iniMonitor;
 BandLookup lookup;
 
 /**
- * @brief Semaphore indicating a pending INI file reload.
+ * @brief Deferred saved-configuration reload notification.
  *
- * The `ini_reload_pending` atomic flag acts as a semaphore to signal when an
- * INI file change has been detected and a configuration reload is required.
- * This ensures that the reload process does not conflict with an ongoing
- * transmission.
- *
- * - `true` indicates that an INI reload is pending.
- * - `false` indicates that no reload is currently required.
- *
- * This flag is typically set when the `iniMonitor` detects a file change and
- * is checked periodically by the INI monitoring thread. If a transmission is
- * in progress, the reload is deferred until the transmission completes.
- *
- * @note The atomic nature ensures thread-safe access across multiple threads.
+ * Verified persistence advances the generation and signals the scheduler.
+ * Runtime application waits until transmitter ownership permits it.
  */
 std::atomic<bool> ini_reload_pending(false);
 std::atomic<std::uint64_t> ini_reload_generation(0);
@@ -198,6 +175,7 @@ namespace
         cfg.wspr.planner_preference = cfg.wspr_planner_preference;
     }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
     void sync_cw_mode_config(ArgParserConfig &cfg)
     {
         cfg.qrss.dot_seconds = cfg.modulation_dot_seconds;
@@ -208,6 +186,7 @@ namespace
         cfg.dfcw.dash_frequency_hz =
             cfg.dfcw.dot_frequency_hz + cfg.modulation_fsk_offset_hz;
     }
+#endif
 
     bool persisted_qrss_config_available(const ArgParserConfig &cfg) noexcept
     {
@@ -295,11 +274,13 @@ void defer_startup_diagnostic(LogLevel level, std::string message)
         DeferredStartupDiagnostic{level, std::move(message)});
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 static void clear_deferred_startup_diagnostics()
 {
     std::lock_guard<std::mutex> lock(deferred_startup_diagnostics_mtx);
     deferred_startup_diagnostics.clear();
 }
+#endif
 
 void emit_deferred_startup_diagnostics()
 {
@@ -320,20 +301,12 @@ void set_startup_diagnostic_deferral(bool enabled) noexcept
     startup_diagnostic_deferral_enabled.store(enabled, std::memory_order_release);
 }
 
-/**
- * @brief Callback for INI file change detection
- *
- * This function runs as a background thread, periodically checking
- * if the monitored INI file has been modified. When a change is detected:
- *
- * - It sets a deferred reload flag (`ini_reload_pending`) to apply the
- *   changes after the transmission completes.
- */
-void callback_ini_changed()
+// Called after saved-setting persistence, never by filesystem polling.
+void notify_saved_configuration_changed()
 {
     if (exiting_wspr.load(std::memory_order_acquire))
     {
-        llog.logS(DEBUG, "Ignoring INI reload while shutdown is in progress.");
+        llog.logS(DEBUG, "Ignoring saved settings reload while shutdown is in progress.");
         return;
     }
 
@@ -344,14 +317,14 @@ void callback_ini_changed()
     const bool should_defer = transmitter_reload_should_defer();
     llog.logS(
         DEBUG,
-        "INI reload defer predicate snapshot: ",
+        "Saved settings reload defer predicate snapshot: ",
         transmitter_reload_defer_debug_snapshot());
 
     if (should_defer)
     {
         llog.logS(
             INFO,
-            wsprrypi::application_database_selected()?"Saved settings changed during transmission.":"INI file changed during transmission.");
+            "Saved settings changed during transmission.");
         llog.logS(
             INFO,
             "Deferring managed reload until the current TX completes (generation ",
@@ -360,22 +333,8 @@ void callback_ini_changed()
         return;
     }
 
-    llog.logS(INFO, wsprrypi::application_database_selected()?"Saved settings changed, reloading.":"INI file changed, reloading.");
+    llog.logS(INFO, "Saved settings changed, reloading.");
     (void)set_config(true);
-}
-
-void start_runtime_config_monitor(const std::string &filename)
-{
-    if(wsprrypi::application_database_selected()){
-        validate_config_ini_input(filename);return;
-    }
-    iniMonitor.filemon(filename, callback_ini_changed);
-    iniMonitor.setPriority(SCHED_RR, 10);
-}
-
-void stop_runtime_config_monitor() noexcept
-{
-    iniMonitor.stop();
 }
 
 static void normalize_wspr_callsign(std::string &callsign)
@@ -705,6 +664,7 @@ static TransmitBackendKind parse_transmit_backend_option(
         "Invalid backend. Expected 'gpio', 'rp1-gpclk', 'si5351', or 'simulated'.");
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 static int parse_integer_option(
     const char *raw_value,
     const std::string &option_name,
@@ -721,6 +681,8 @@ static int parse_integer_option(
     return parsed;
 }
 
+#endif
+
 static double parse_double_option(
     const char *raw_value,
     const std::string &option_name)
@@ -736,6 +698,7 @@ static double parse_double_option(
     return parsed;
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 static double parse_frequency_hz_option(
     const char *raw_value,
     const std::string &option_name)
@@ -825,6 +788,8 @@ static double parse_frequency_hz_option(
     return rounded;
 }
 
+#endif
+
 static bool validate_cli_frequency_hz(
     double frequency_hz,
     bool allow_zero,
@@ -872,6 +837,7 @@ static bool validate_cli_frequency_hz(
     return true;
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 static ModeType parse_mode_option(const char *raw_value)
 {
     std::string value = trim_copy_string(raw_value == nullptr ? "" : raw_value);
@@ -975,6 +941,8 @@ static std::string parse_cw_fade_shape_option(const char *raw_value)
     throw std::invalid_argument(
         "Invalid CW fade shape. Expected none, linear, or raised_cosine.");
 }
+
+#endif
 
 static bool parse_gpio_number_strict(
     std::string_view raw_value,
@@ -1159,7 +1127,7 @@ bool set_direct_tone_startup_request(
                 preferences);
             if (!planned)
                 throw std::invalid_argument(planned.error);
-            actual_rf_frequency_hz = planned.plan->actual_rf_frequency_hz;
+            actual_rf_frequency_hz = static_cast<double>(planned.plan->actual_rf_frequency_hz);
         }
         else
         {
@@ -1517,7 +1485,7 @@ bool validate_config_candidate(
     }
 
     try {
-        validate_wtp_settings(candidate.wtp, candidate.transmit_backend == TransmitBackendKind::WTP);
+        validate_native_wtp_settings(candidate.wtp, candidate.transmit_backend == TransmitBackendKind::WTP);
         if (candidate.transmit_backend == TransmitBackendKind::WTP &&
             (candidate.use_led || candidate.use_amp || candidate.use_shutdown || candidate.frequencies.find('@') != std::string::npos ||
              std::any_of(candidate.band_gpio.begin(), candidate.band_gpio.end(),
@@ -1765,7 +1733,7 @@ bool validate_config_candidate(
     }
     else if (candidate.transmit_backend == TransmitBackendKind::SI5351)
     {
-        if (!linux_i2c_identity::valid(candidate.si5351_adapter_identity)) {
+        if (!usb_adapter_identity::valid(candidate.si5351_adapter_identity)) {
             if (error_message) *error_message = "Invalid stable Si5351 adapter identity.";
             return false;
         }
@@ -2535,7 +2503,7 @@ bool handle_early_cli_options(int argc, char *argv[])
             std::cout << nlohmann::json{{"Transport", "mcp2221a-hid"},
                 {"I2C Adapters", adapters}, {"Discovery Error", inventory.error}}.dump(2) << std::endl;
             std::exit(inventory.error.empty() ? EXIT_SUCCESS : EXIT_FAILURE);
-#else
+#elif !defined(_WIN32)
             const auto inventory = linux_i2c_identity::discover();
             auto adapters = nlohmann::json::array();
             for (const auto& adapter : inventory.adapters)
@@ -2545,6 +2513,8 @@ bool handle_early_cli_options(int argc, char *argv[])
             std::cout << nlohmann::json{{"Transport", "linux-i2c"},
                 {"I2C Adapters", adapters}, {"Discovery Error", inventory.error}}.dump(2) << std::endl;
             std::exit(inventory.error.empty() ? EXIT_SUCCESS : EXIT_FAILURE);
+#else
+            throw std::runtime_error("Local I2C adapters are unavailable on this host");
 #endif
         }
 
@@ -2577,6 +2547,10 @@ bool handle_early_cli_options(int argc, char *argv[])
 
 bool parse_command_line(int argc, char *argv[])
 {
+#if WSPRRYPI_CONTROLLER_ONLY
+    (void)argc;(void)argv;
+    throw std::logic_error("Local transmitter command parsing is unavailable in the controller build");
+#else
     startup_config_handoff_ready.store(false, std::memory_order_release);
     clear_deferred_startup_diagnostics();
     clear_direct_tone_startup_request();
@@ -4120,6 +4094,7 @@ bool parse_command_line(int argc, char *argv[])
     config_to_json();
 
     return true;
+#endif
 }
 
 bool consume_startup_config_handoff() noexcept

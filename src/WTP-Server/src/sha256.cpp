@@ -99,7 +99,7 @@ void Sha256::update(std::span<const std::uint8_t> bytes) {
 PayloadDigest Sha256::finish() const {
     auto state = *this;
     state.tail_[state.pending_++] = 0x80;
-    std::fill(state.tail_.begin() + state.pending_, state.tail_.end(), 0);
+    std::fill(state.tail_.begin() + state.pending_, state.tail_.end(), std::uint8_t{0});
     if (state.pending_ > 56) {
         state.compress(state.tail_.data());
         state.tail_.fill(0);

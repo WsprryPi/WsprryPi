@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: MIT
 #include "udp_logging/host.hpp"
 #include "logging.hpp"
+#include "udp_logging/contract.hpp"
+#ifndef _WIN32
 #include "udp_logging/io.hpp"
 #include "udp_logging/network_policy.hpp"
 #include "udp_logging/resource_limits.hpp"
+#endif
 #include "wtp_endpoint/identity.hpp"
 #include "wtp_integration/usb_logging.hpp"
 #include <chrono>
 #include <ctime>
-#include <grp.h>
 #include <mutex>
+#ifndef _WIN32
+#include <grp.h>
 #include <net/if.h>
 #include <pwd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#endif
 #include <thread>
 namespace wsprrypi {
 namespace {
 std::mutex policy_mutex;
 std::string policy_ini;
+#ifndef _WIN32
 bool apply_service(const std::string &ini) {
   const auto pid = ::fork();
   if (pid < 0)
@@ -47,6 +53,7 @@ bool apply_service(const std::string &ini) {
   }
   return false;
 }
+#endif
 } // namespace
 void start_udp_logging_policy(const std::string &ini) {
   std::lock_guard lock(policy_mutex);
@@ -56,12 +63,14 @@ PicoHttpResponse udp_logging_installation() {
   const auto self = wtp_pi_device_id();
   const auto current = udp_logging_api("GET", {}, {}, false, false);
   std::string policy = "unavailable", service = "inactive", worker = "missing";
+#ifndef _WIN32
   struct stat info{};
   if (::lstat("/usr/local/bin/wsprrypi-log", &info) == 0)
     worker = S_ISREG(info.st_mode) && info.st_uid == 0 &&
                      !(info.st_mode & 0022) && (info.st_mode & 0100)
                  ? "installed"
                  : "unsafe";
+#endif
   if (current.status == 200) {
     policy = "valid";
     try {
@@ -137,6 +146,13 @@ PicoHttpResponse udp_logging_api(const std::string &method,
                 .dump(),
             {}};
   }
+#ifdef _WIN32
+  // The accepted UDP worker requires Linux/systemd resource controllers and
+  // journald. Keep its inspection contract, but never save a policy that this
+  // host cannot apply or probe Linux paths relative to a Windows drive.
+  (void)body;(void)revision;
+  return error(503,"udp_policy_unavailable");
+#else
   try {
     const auto path = policy_ini + ".udp-logs.json";
     const auto bytes = udp::read_file(path, 16384, ::getuid(), true);
@@ -353,5 +369,6 @@ PicoHttpResponse udp_logging_api(const std::string &method,
   } catch (const std::exception &e) {
     return error(400, e.what());
   }
+#endif
 }
 } // namespace wsprrypi

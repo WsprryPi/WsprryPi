@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/pi_pair_crypto.hpp"
 #include "wtp_integration/pi_pair_contract.hpp"
+namespace pairing_vector {
 #include "pairing_provider/profile_vector.hpp"
+}
 #include <botan/auto_rng.h>
 #include <botan/hex.h>
 #include <botan/kdf.h>
@@ -22,16 +24,16 @@ void check(bool v){++checks;if(!v)throw std::runtime_error("pair_crypto_test_fai
 template<class F>void refuses(F action){bool rejected=false;try{action();}catch(const wsprrypi::PiPairCryptoError &e){rejected=true;check(std::string_view(e.what())=="pairing_crypto_failed");}check(rejected);}
 std::span<const unsigned char> as_bytes(std::string_view value){return {reinterpret_cast<const unsigned char *>(value.data()),value.size()};}
 std::string encode(std::span<const unsigned char> value){
-    std::string result((value.size()+2)/3*4,'\0');EVP_EncodeBlock(reinterpret_cast<unsigned char *>(result.data()),value.data(),value.size());
+    std::string result((value.size()+2)/3*4,'\0');EVP_EncodeBlock(reinterpret_cast<unsigned char *>(result.data()),value.data(),static_cast<int>(value.size()));
     while(result.ends_with('='))result.pop_back();
     std::replace(result.begin(),result.end(),'+','-');std::replace(result.begin(),result.end(),'/','_');return result;
 }
 Bytes decode(std::string value,std::size_t n){
     std::replace(value.begin(),value.end(),'-','+');std::replace(value.begin(),value.end(),'_','/');while(value.size()%4)value+='=';
-    Bytes result(value.size()/4*3);check(EVP_DecodeBlock(result.data(),reinterpret_cast<const unsigned char *>(value.data()),value.size())==static_cast<int>(result.size()));result.resize(n);return result;
+    Bytes result(value.size()/4*3);check(EVP_DecodeBlock(result.data(),reinterpret_cast<const unsigned char *>(value.data()),static_cast<int>(value.size()))==static_cast<int>(result.size()));result.resize(n);return result;
 }
 void keys_match(const wsprrypi::PiPairKeys &actual,std::span<const unsigned char> secret){
-    const auto salt=Botan::hex_decode(salt_hex);
+    const auto salt=Botan::hex_decode(pairing_vector::salt_hex);
     const auto derived=[&](const char *label){return Botan::KDF::create_or_throw("HKDF(SHA-256)")->derive_key(32,secret,salt,as_bytes(label));};
     for(const auto &[key,label]:{std::pair{&actual.tls,"Wsprry-Pair/1/spake2plus/tls-psk"},
         std::pair{&actual.commit,"Wsprry-Pair/1/spake2plus/commit"},std::pair{&actual.retirement,"Wsprry-Pair/1/spake2plus/retirement"}}){
@@ -49,18 +51,18 @@ int main(){
         for(const auto input:{"2345ABCI","2345ABCL","2345ABCO","2345ABCU","2345ABC","2345ABCDE","2345\tABCD","2345ABCé"})
             refuses([&]{(void)PiPairCode::normalize(input);});
         const auto generated=PiPairCode::generate();check(generated.display().size()==9);check(PiPairCode::normalize(generated.display()).display()==generated.display());
-        auto hello=Json::parse(context);const auto target_nonce=hello.at("target_nonce");hello.erase("target_nonce");
+        auto hello=Json::parse(pairing_vector::context);const auto target_nonce=hello.at("target_nonce");hello.erase("target_nonce");
         const Json challenge{{"contract","Wsprry-Pair/1"},{"schema","challenge"},{"suite",hello["suite"]},{"pair_id",hello["pair_id"]},{"target_nonce",target_nonce}};
         const auto params=Botan::SPAKE2p::SystemParameters::rfc9383_p256_sha256();
-        const auto scalar_bytes=Botan::hex_decode(scalars_hex);
+        const auto scalar_bytes=Botan::hex_decode(pairing_vector::scalars_hex);
         const auto secret=Botan::SPAKE2p::ProverSecret::deserialize(params,scalar_bytes);
         Botan::AutoSeeded_RNG rng;
         // Independent fixture scalars, not another copy of the application's
         // password mapping, drive the peer in each direction.
         PiPairExchange controller(PiPairExchange::Role::Controller,code,hello,challenge);
-        check(controller.request_digest()==salt_hex);refuses([&]{(void)controller.keys();});
+        check(controller.request_digest()==pairing_vector::salt_hex);refuses([&]{(void)controller.keys();});
         refuses([&]{(void)controller.confirmed_controller_hello();});
-        Botan::SPAKE2p::VerifierContext peer(params,secret.registration_record(rng),as_bytes(prover_id),as_bytes(verifier_id),as_bytes(context));
+        Botan::SPAKE2p::VerifierContext peer(params,secret.registration_record(rng),as_bytes(pairing_vector::prover_id),as_bytes(pairing_vector::verifier_id),as_bytes(pairing_vector::context));
         const auto initial=controller.start_controller();check(valid_pi_pair_document(initial,"exchange-request"));
         check(PiPairExchange::valid_peer_point(initial["pA"].get<std::string>()));
         const auto reply=peer.process_message(decode(initial["pA"],65),rng);
@@ -80,7 +82,7 @@ int main(){
         check(CRYPTO_memcmp(restored.bytes().data(),controller_keys.tls.bytes().data(),32)==0);
         refuses([&]{(void)PiPairSecret::from_storage(std::string(42,'A')+"B");});
         PiPairExchange target(PiPairExchange::Role::Target,code,hello,challenge);
-        Botan::SPAKE2p::ProverContext other(params,secret,as_bytes(prover_id),as_bytes(verifier_id),as_bytes(context));
+        Botan::SPAKE2p::ProverContext other(params,secret,as_bytes(pairing_vector::prover_id),as_bytes(pairing_vector::verifier_id),as_bytes(pairing_vector::context));
         const auto share=other.generate_message(rng);
         auto request=initial;request["pA"]=encode(share);const auto target_reply=target.target_exchange(request);
         auto combined=decode(target_reply["pB"],65);const auto cb=decode(target_reply["cB"],32);combined.insert(combined.end(),cb.begin(),cb.end());

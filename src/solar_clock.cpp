@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "solar_clock.hpp"
+#include "native_clock.hpp"
 #include <limits>
 #include <stdexcept>
-#include <time.h>
 #ifdef __linux__
 #include <sys/timex.h>
 #endif
@@ -10,12 +10,6 @@ namespace wsprrypi {
 namespace {
 constexpr std::uint64_t second=1'000'000'000ULL,limit=250'000'000ULL;
 std::uint64_t difference(std::uint64_t a,std::uint64_t b){return a>b?a-b:b-a;}
-std::optional<std::uint64_t> read_clock(clockid_t id) noexcept {
-    timespec value{};
-    if(clock_gettime(id,&value)||value.tv_sec<0||value.tv_nsec<0||value.tv_nsec>=static_cast<long>(second)||
-        static_cast<std::uint64_t>(value.tv_sec)>(UINT64_MAX-static_cast<std::uint64_t>(value.tv_nsec))/second)return {};
-    return static_cast<std::uint64_t>(value.tv_sec)*second+static_cast<std::uint64_t>(value.tv_nsec);
-}
 }
 SolarClockObservation SolarClockTracker::observe(const SolarClockSample &sample){
     bool discontinuity=false;
@@ -58,10 +52,10 @@ SolarClockObservation SolarClockTracker::observe(const SolarClockSample &sample)
 }
 SolarClockSample read_solar_clock_sample() noexcept {
     SolarClockSample sample;
-    const auto before=read_clock(CLOCK_MONOTONIC);
-    const auto utc=read_clock(CLOCK_REALTIME),monotonic=read_clock(CLOCK_MONOTONIC);
+    const auto before=read_native_clock(NativeClock::Monotonic);
+    const auto utc=read_native_clock(NativeClock::Utc),monotonic=read_native_clock(NativeClock::Monotonic);
+    const auto elapsed=read_native_clock(NativeClock::Elapsed);
 #ifdef __linux__
-    const auto elapsed=read_clock(CLOCK_BOOTTIME);
     timex status{};const int state=adjtimex(&status); // modes=0: read only
     if(state>=0&&status.maxerror>=0&&static_cast<std::uint64_t>(status.maxerror)<=UINT64_MAX/1000ULL){
         sample.provider_available=true;
@@ -77,9 +71,8 @@ SolarClockSample read_solar_clock_sample() noexcept {
 #else
     // No approved native OS health provider on this platform. Ordinary solar-off
     // recurrence remains unaffected; solar admission reports unavailable.
-    const auto elapsed=monotonic;
 #endif
-    const auto after=read_clock(CLOCK_MONOTONIC);
+    const auto after=read_native_clock(NativeClock::Monotonic);
     if(!before||!after||!utc||!monotonic||!elapsed||*after<*before||*after-*before>100'000'000ULL){sample.provider_available=false;return sample;}
     // Account conservatively for acquisition skew as well as kernel error.
     if(sample.maximum_error_ns){
@@ -91,7 +84,7 @@ SolarClockSample read_solar_clock_sample() noexcept {
 }
 SolarClockObservation SolarClockProvider::observe(bool commitment){
     std::lock_guard lock(mutex_);
-    const auto monotonic=read_clock(CLOCK_MONOTONIC);
+    const auto monotonic=read_native_clock(NativeClock::Monotonic);
     if(!commitment&&last_&&monotonic&&*monotonic>=last_->monotonic_ns&&*monotonic-last_->monotonic_ns<second)return observation_;
     auto sample=read_solar_clock_sample();observation_=tracker_.observe(sample);last_=sample;return observation_;
 }

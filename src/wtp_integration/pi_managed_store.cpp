@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#endif
 #include "wtp_retirement.hpp"
 // SPDX-License-Identifier: MIT
 #include "pi_managed_store.hpp"
@@ -426,9 +429,16 @@ void PiManagedStore::prepare_installation(bool prior_output_history,
         if(!fresh)clean=false;
     }
     for(const auto *suffix:{".wtp-assignments.json",".wtp-fleet-contexts.json",".management",".pi-management.json",".legacy-recurrence.json"}){
-        const auto path=ini_+suffix;struct stat info{};
+        const auto path=ini_+suffix;
+#ifdef _WIN32
+        const auto native=windows_file::path_from_utf8(path);windows_file::ParentChain parents(native,windows_file::current_sid());
+        if(::GetFileAttributesW(windows_file::api_path(native).c_str())!=INVALID_FILE_ATTRIBUTES){clean=false;continue;}
+        const auto error=::GetLastError();require(error==ERROR_FILE_NOT_FOUND||error==ERROR_PATH_NOT_FOUND);
+#else
+        struct stat info{};
         if(!::lstat(path.c_str(),&info)){clean=false;continue;}
         require(errno==ENOENT);
+#endif
     }
     WtpPiBootIdentity random;
     auto authority=unclassified_recurrence_authority(self_);

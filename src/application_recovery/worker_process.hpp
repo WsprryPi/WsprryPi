@@ -12,6 +12,9 @@ public:
     ~RecoveryWorkerProcess();
     RecoveryWorkerProcess(const RecoveryWorkerProcess &)=delete;
     nlohmann::json request(const nlohmann::json &);
+    // Poll even when no browser request is pending; worker loss tears down all
+    // owned descendants before admitting another recovery operation.
+    bool alive();
 private:
     struct Impl;std::unique_ptr<Impl> impl_;
 };

@@ -28,6 +28,22 @@ On its selected branches, the non-hardware workflow starts with a lightweight ch
 
 Concurrency groups include the commit SHA so a documentation-only successor cannot cancel or replace an earlier code-validation run. Different commits can therefore validate concurrently; duplicate runs of the same commit retain cancellation. When documentation becomes a build or regression input, add it to the classifier's checked-input policy before relying on it in tests.
 
+## Hardware-free controller build
+
+The explicit controller build reuses the controller role and remote-management runtime with no physical or simulated local output. Build from `src`:
+
+```sh
+make -j2 debug BUILD_PROFILE=controller SUDO=
+./build/bin/profiles/controller/wsprrypi_debug --version
+make controller-build-profile-test controller-profile-entry-test controller-transmitter-boundary-test BUILD_PROFILE=controller SUDO=
+```
+
+The profile requires empty `BACKENDS`, `ANCILLARY_GPIO=0`, and no explicit `SI5351_TRANSPORT`. Unset a transport selected in the shell before building this profile. Ordinary transmitter builds retain their backend validation and default role. The controller executable requires `--controller-only` for normal startup; safe `--help`, `--version`, and `--list-backends` do not construct a transmitter. An empty backend listing is intentional. Legacy transmitter run, debugger, install, and uninstall targets refuse this profile before building or operating an ordinary transmitter alias.
+
+Controller objects, generated headers, link maps, license notices, and executables use isolated `controller` paths. Its artifact does not replace the ordinary `build/bin/wsprrypi` or `build/bin/wsprrypi_debug` aliases. The explicit `scripts/controller_sources.mk` manifest admits sources. Parent no-output adapters refuse local transmitter, PPS capture, and RP1 route operations; the controller excludes the local WTP execution runtime while retaining shared identity and private-state validation.
+
+A build is not a qualified installation. The [platform matrix](issue-475-platform-matrix.md) records current #475 evidence and outstanding native gates. The finite `src/tests/controller_profile_production_test.py` gate and reviewed `scripts/tests/controller_native_namespace.sh` isolation launcher require an explicitly authorized isolated native Linux amd64 environment, private OS home, hidden host service sockets, and ordinary unprivileged execution. It uses the actual binary and host identity without fixture identity or hardware-suppression environment, checks empty enrollment and restart, refuses local operations, and audits syscall traces. Do not run it against an interactive account's unisolated home or live transmitters. Native path/transport adapters, browser acceptance, and installed services belong to later authorized slices.
+
 ## Production application and browser regressions
 
 The Linux application regression builds the current source with the explicit simulated backend and ancillary GPIO disabled. It starts the explicit simulated backend in a private network namespace, verifies one-time migration and refusal of invalid source configuration through the actual application, and runs finite browser-read profiles with synthetic schedule time. A separate frontend serves reads, which must preserve the SQLite/WAL image, retired source backup, and exposed configuration. It opens no transmitter device and supplies no RF qualification.

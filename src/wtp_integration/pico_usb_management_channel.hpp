@@ -17,7 +17,7 @@ struct PicoUsbManagementChannel {
     explicit PicoUsbManagementChannel(WtpSettings binding) : binding_(std::move(binding)) {}
     ~PicoUsbManagementChannel();
     std::recursive_mutex mutex;
-    PosixCdcSystem system;
+    NativeCdcSystem system;
     UsbCdcStream stream{system};
     std::unique_ptr<UsbManagementClient> client;
     std::function<std::unique_ptr<UsbManagementClient>()> factory_for_test;

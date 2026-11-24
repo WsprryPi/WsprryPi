@@ -4,7 +4,12 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#ifdef _WIN32
+#include "native_windows_fixture.hpp"
+#include "wtp_integration/pi_management_journal.hpp"
+#else
 #include <unistd.h>
+#endif
 
 using namespace wsprrypi;
 namespace {
@@ -14,10 +19,14 @@ template<class Function> void refuses(Function action) {
 }
 }
 int main() {
+#ifdef _WIN32
+    NativeWindowsFixture fixture;const auto root=NativeWindowsFixture::utf8(fixture.root);
+#else
     char pattern[]="/tmp/wsprrypi-sqlite-catalog-XXXXXX";
     const auto created=mkdtemp(pattern);assert(created);
     const auto root=std::filesystem::canonical(created).string();
     struct Cleanup{std::string root;~Cleanup(){std::filesystem::remove_all(root);}} cleanup{root};
+#endif
     const std::string self(32,'a'),history(32,'b');
     auto store=std::make_shared<SqliteStateStore>(root,self,StateRole::Pi,StateOpen::CreateNew);
     WtpCatalog catalog(sqlite_catalog_storage(store));
@@ -68,5 +77,24 @@ int main() {
     const auto reopened=same_owner.snapshot({});
     assert(reopened.first.at("profiles")==changed.first.at("profiles") && reopened.second==changed.second &&
         same_owner.pi_management_anchor(self,{}).read()==anchor.read());
+#ifdef _WIN32
+    // Explicit legacy-source owner, never a fallback for missing SQL records.
+    NativeWindowsFixture legacy;
+    const auto legacy_path=NativeWindowsFixture::utf8(legacy.root/L"source-\u03a9.wtp-devices.json");
+    WtpCatalog legacy_owner(legacy_path);const auto empty=legacy_owner.snapshot({});
+    assert(empty.first.at("profiles").empty());
+    const auto inserted=legacy_owner.mutate(add,empty.second,{});assert(inserted.first.at("profiles").size()==1);
+    const auto legacy_before=PiManagementJournal::read_private_record(legacy_path);assert(legacy_before);
+    WtpCatalog legacy_reopened(legacy_path);const auto legacy_snapshot=legacy_reopened.snapshot({});
+    assert(legacy_snapshot.first.at("profiles")==inserted.first.at("profiles")&&legacy_snapshot.second==inserted.second);
+    assert(PiManagementJournal::read_private_record(legacy_path)->bytes==legacy_before->bytes);
+    PiManagementJournal::publish_private_record(legacy_path,legacy_before,"{\"version\":999}");
+    refuses([&]{legacy_reopened.snapshot({});});
+    const auto missing=NativeWindowsFixture::utf8(legacy.root/L"lost");
+    windows_file::PrivateSecurity directory_security(windows_file::current_sid());
+    assert(::CreateDirectoryW(windows_file::api_path(windows_file::path_from_utf8(missing+".management")).c_str(),directory_security.attributes()));
+    WtpCatalog lost(missing+".wtp-devices.json");refuses([&]{lost.snapshot({});});
+    assert(!std::filesystem::exists(legacy.root/L"lost.wtp-devices.json"));
+#endif
     std::cout<<"SQLite catalog: no read initialization, current validation, shared atomic anchor/receipt publication and revision refusal passed\n";
 }

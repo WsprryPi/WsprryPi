@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "backend_entry.hpp"
+#include "backend_capabilities.hpp"
+#include "application_storage/controller_identity.hpp"
 #include "candidate_builder.hpp"
 #include "private_json.hpp"
 #include "application_control/local_transport.hpp"
@@ -22,6 +24,9 @@ std::optional<int> recovery_backend_entry(int argc,char *argv[]){
             else throw LocalCommandRefused(LocalRefusal::InvalidRequest);
         }
         if((action=="build-candidate"||action=="seal-candidate")&&id.size()==32&&id.find_first_not_of("0123456789abcdef")==std::string::npos){
+#if WSPRRYPI_CONTROLLER_ONLY
+            configure_native_controller_identity();
+#endif
             std::cout<<(action=="build-candidate"?RecoveryCandidateBuilder::build(id):RecoveryCandidateBuilder::seal(id)).dump()<<'\n';return 0;
         }
         LocalRequest request{LocalOperation::RecoveryObserve,nlohmann::json::object()};

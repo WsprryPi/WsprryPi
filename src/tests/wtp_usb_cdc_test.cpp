@@ -667,7 +667,7 @@ void metadata() {
   auto s = selection();
   s.path = p.slave;
   CHECK(!stream.begin_open(s, 0));
-  CHECK(stream.diagnostic().find("only on Linux") != std::string::npos);
+  CHECK(stream.state()==CdcState::Failed&&!stream.identity()&&!stream.diagnostic().empty());
 #endif
 }
 

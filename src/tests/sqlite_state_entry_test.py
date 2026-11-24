@@ -100,6 +100,14 @@ def main():
                 view = settings(ledger)
                 assert view["role"] == "controller" and len(view["settings"]) == 3
                 assert view["settings"]["Meta.debug_logging"] == {"saved": True, "active": False, "valid": True, "activation": "startup_override"}
+                # A recreated import input is inert after conversion. Only the
+                # SQL persistence owner below may change the running settings.
+                source.write_text("[Operation]\nWeb Port=32109\nSocket Port=32110\n[Meta]\ndebug_logging=false\n")
+                source.chmod(0o600)
+                unchanged = settings(ledger)
+                assert unchanged["revision"] == view["revision"] and unchanged["settings"] == view["settings"]
+                assert configuration(state) == saved
+                source.unlink()
                 edited = json.loads(run(ledger, "--settings", "write", "--expected-revision", view["revision"],
                                         "--set", "Meta.debug_logging=false", "--set", "Operation.Web Port=32102",
                                         "--set", "Operation.Socket Port=32101"))

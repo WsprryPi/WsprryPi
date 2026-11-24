@@ -2,6 +2,7 @@
 #include "solar_configuration.hpp"
 #include "version.hpp"
 #include "backend_capabilities.hpp"
+#if !WSPRRYPI_CONTROLLER_ONLY
 #include "wtp_runtime_bridge.hpp"
 #include "WSPR-Transmitter/src/gpio_band_policy.hpp"
 #include "WSPR-Transmitter/src/legacy_gpio_clock_model.hpp"
@@ -12,8 +13,14 @@
 #include <algorithm>
 #include <charconv>
 #include <stdexcept>
+#endif
 namespace wsprrypi {
 bool solar_backend_frequencies(const ArgParserConfig &cfg,ModeType mode,std::span<const std::uint64_t> tones){
+#if WSPRRYPI_CONTROLLER_ONLY
+    // Target-owned recurrence is validated by the target contract. A controller
+    // has no local frequency authority or reason to load a hardware planner.
+    (void)cfg;(void)mode;(void)tones;return false;
+#else
     try{
         if((mode!=ModeType::WSPR&&mode!=ModeType::QRSS&&mode!=ModeType::FSKCW&&mode!=ModeType::DFCW)||tones.empty()||!transmit_backend_is_compiled(cfg.transmit_backend))return false;
         const auto expected=mode==ModeType::WSPR?4U:mode==ModeType::QRSS?1U:2U;
@@ -72,5 +79,6 @@ bool solar_backend_frequencies(const ArgParserConfig &cfg,ModeType mode,std::spa
 #endif
         return true;
     }catch(...){return false;}
+#endif
 }
 }

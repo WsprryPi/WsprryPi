@@ -40,6 +40,7 @@ Json LocalHttpSessions::request(const LocalRequest &request){
         auto session=std::make_shared<Session>();auto &input=session->input;
         input.operation=text(value["operation"],64);input.method=text(value["method"],8);input.path=text(value["path"],4096);
         input.target=text(value["target"],4096);input.peer=text(value["peer"],64);input.transport_descriptor=request.transport_descriptor;
+        input.transport_alive=request.transport_alive;
         session->expected=wire_offset(text(value["body_size"],20));
         const auto operation=browser_http_operation(input.method,input.path);
         require(operation&&operation->name==input.operation&&session->expected<=operation->maximum_body);

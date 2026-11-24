@@ -14,7 +14,6 @@
 #include <thread>
 namespace wsprrypi {
 PiRecoveryRuntime::~PiRecoveryRuntime(){
-    if(monitor_)iniMonitor.stop();
     if(websocket_)socketServer.stop();
     if(http_)webServer.stop();
 }
@@ -37,16 +36,9 @@ bool PiRecoveryRuntime::await_configuration(){
             if(!webServer.isListening())throw std::runtime_error("recovery_http_unavailable");
         }
         if(websocket_server_start_enabled(config)&&!application_database_selected()){
-            if(!socketServer.start(config.socket_port,SOCKET_KEEPALIVE,config.socket_loopback_only,config.socket_loopback_family))
+            if(config.socket_port<1||config.socket_port>65535||!socketServer.start(static_cast<std::uint16_t>(config.socket_port),SOCKET_KEEPALIVE,config.socket_loopback_only,config.socket_loopback_family))
                 throw std::runtime_error("recovery_websocket_unavailable");
             websocket_=true;
-        }
-        if(host&&!application_database_selected()){
-            // MonitorFile inspects filesystem metadata only. Its callback never
-            // opens/parses input, publishes defaults, or reaches runtime reload.
-            const std::weak_ptr<PiManagedHost> weak=host;
-            iniMonitor.filemon(config.ini_filename,[weak]{if(const auto owner=weak.lock())owner->signal_saved_configuration();});
-            monitor_=true;
         }
         llog.logS(WARN,"Transmitter startup is held. Review the protected configuration recovery page.");
         std::unique_lock lock(exitwspr_mtx);
@@ -56,7 +48,6 @@ bool PiRecoveryRuntime::await_configuration(){
             lock.lock();
             if(ready){
                 lock.unlock();
-                if(monitor_){iniMonitor.stop();monitor_=false;}
                 return true;
             }
             exitwspr_cv.wait_for(lock,std::chrono::milliseconds(100));

@@ -8,7 +8,11 @@
 #include "wtp_integration/pi_management_journal.hpp"
 #include "application_recovery/restore_hold.hpp"
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
 #include <unistd.h>
+#endif
 #include "advanced_settings.hpp"
 #include "event_feed.hpp"
 #include "browser_sessions.hpp"
@@ -117,6 +121,9 @@ Json backend_local_request(std::shared_ptr<SqliteStateStore> database,LocalPeer 
     }
     require(peer==LocalPeer::Administrator);
     if(request.operation==LocalOperation::DiagnosticRead)return diagnostic_settings_chunk(database,boot,request.arguments);
+    if(controller_only_mode()&&(request.operation==LocalOperation::RecoveryReview||request.operation==LocalOperation::RecoveryPrepare||
+        request.operation==LocalOperation::RecoveryValidate||request.operation==LocalOperation::RecoveryCapture))
+        require(controller_only_ready(),LocalRefusal::StorageUnavailable);
     if(request.operation==LocalOperation::RecoveryReview)return recovery_destination_review(request.arguments,boot);
     if(request.operation==LocalOperation::RecoveryPrepare)return recovery_prepare_request(request.arguments,boot);
     if(request.operation==LocalOperation::RecoveryValidate)return recovery_validation_request(request.arguments,boot);
@@ -129,7 +136,13 @@ Json backend_local_request(std::shared_ptr<SqliteStateStore> database,LocalPeer 
         require(name.starts_with("generation-"),LocalRefusal::StorageUnavailable);
         const auto configuration=database->record(StateRecord::Configuration);require(configuration.bytes.has_value(),LocalRefusal::StorageUnavailable);
         return {{"schema","recovery-backend-observation/1"},{"identity",database->identity()},{"role",database->role()==StateRole::Pi?"pi":"controller"},
-            {"boot",boot},{"pid",::getpid()},{"generation",name.substr(11)},{"restore_hold",application_restore_hold_view()},
+            {"boot",boot},{"pid",
+#ifdef _WIN32
+                ::GetCurrentProcessId()
+#else
+                ::getpid()
+#endif
+            },{"generation",name.substr(11)},{"restore_hold",application_restore_hold_view()},
             {"ready",database->role()==StateRole::Controller?controller_only_ready():pi_managed_host_selected()&&!pi_managed_host_held()},
             {"listeners",{{"web_port",bootstrap.at("web_port")},{"socket_port",bootstrap.at("socket_port")},
                 {"http_enabled",bootstrap.at("http_enabled")},{"websocket_enabled",bootstrap.at("websocket_enabled")},

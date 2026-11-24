@@ -5,16 +5,20 @@
 #include <cerrno>
 #include <cctype>
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include <fstream>
 #include <iterator>
 #include <string_view>
 #include <stdexcept>
 #include <utility>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 namespace {
 std::string trim(std::string_view value) {
@@ -71,10 +75,15 @@ std::string mode_value(PrivilegedNetworkMode mode) {
 }
 
 std::optional<std::string> read_text_file(const std::string &path) {
+#ifdef _WIN32
+    try{const auto bytes=wsprrypi::windows_file::read_protected(path,false,1048576);return std::string(bytes.begin(),bytes.end());}
+    catch(const std::exception &){return std::nullopt;}
+#else
     std::ifstream input(path, std::ios::binary);
     if (!input.is_open()) return std::nullopt;
     return std::string(std::istreambuf_iterator<char>(input),
                        std::istreambuf_iterator<char>());
+#endif
 }
 
 std::optional<std::string> read_privileged_network_ini_value(
@@ -147,6 +156,10 @@ std::optional<std::string> render_privileged_network_ini(
 
 bool write_text_file_atomically(const std::string &path,
                                 const std::string &contents) {
+#ifdef _WIN32
+    (void)path;(void)contents;
+    return false;
+#else
     const std::filesystem::path destination(path);
     const auto parent = destination.parent_path();
     if (parent.empty()) return false;
@@ -191,9 +204,14 @@ bool write_text_file_atomically(const std::string &path,
         (void)::close(directory);
     }
     return ok;
+#endif
 }
 
 bool run_privileged_network_command(const std::vector<std::string> &arguments) {
+#ifdef _WIN32
+    (void)arguments;
+    return false;
+#else
     if (arguments.empty() || arguments.front().empty()) return false;
     std::vector<char *> argv;
     argv.reserve(arguments.size() + 1);
@@ -211,6 +229,7 @@ bool run_privileged_network_command(const std::vector<std::string> &arguments) {
         if (errno != EINTR) return false;
     }
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+#endif
 }
 
 PrivilegedNetworkAdmin::PrivilegedNetworkAdmin(
@@ -257,6 +276,10 @@ PrivilegedNetworkTransactionSnapshot PrivilegedNetworkAdmin::status() {
 
 bool PrivilegedNetworkAdmin::validate_apache_candidate(
     const std::string &policy) const {
+#ifdef _WIN32
+    (void)policy;
+    return false;
+#else
     const std::string candidate = paths_.apache_policy_file + ".candidate." +
         std::to_string(static_cast<long long>(::getpid()));
     if (!write_text_file_atomically(candidate, policy)) return false;
@@ -264,6 +287,7 @@ bool PrivilegedNetworkAdmin::validate_apache_candidate(
                                 "Include \"" + candidate + "\""});
     (void)::unlink(candidate.c_str());
     return valid;
+#endif
 }
 
 PrivilegedNetworkTransactionResult PrivilegedNetworkAdmin::apply(

@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
 """One admitted local recovery job; called only through the root worker pipe."""
 import base64
-import fcntl
 import hashlib
 import json
 import os
+import sys
+if sys.platform != 'win32':
+    import fcntl
 from pathlib import Path
 import secrets
 import selectors
@@ -15,6 +17,7 @@ import time
 
 from . import archive, evidence, proxy
 from .lifecycle import BackendLifecycle
+from .state_owner import StateOwner, OwnerBusy, OwnerUnavailable, make_private_directory
 from .publication import GenerationPublisher, recover_hold_preparation, decimal
 from .durable import canonical, directory_lock, RecoveryLockBusy, publish_record, read_record, sync_directory
 
@@ -33,7 +36,10 @@ class BackendRefused(archive.RecoveryError):
         self.code = code
 
 
-def backend_command(config, action, job_id=None, payload=None):
+def backend_command(config, action, job_id=None, payload=None, *, cancelled=None):
+    if sys.platform == 'win32':
+        from .windows_backend import backend_command as native_command
+        return native_command(config, action, job_id, payload, cancelled=cancelled)
     command = [*config['backend_command'], '--recovery-backend', action]
     if job_id is not None:
         command += ['--job-id', job_id]
@@ -54,6 +60,8 @@ def backend_command(config, action, job_id=None, payload=None):
             # on the destination card. It is not a small live control query.
             deadline = time.monotonic() + (1800 if action in ('build-candidate', 'seal-candidate') else 12)
             while True:
+                if cancelled is not None and cancelled():
+                    raise BackendUnavailable('Backend owner connection lost')
                 if time.monotonic() >= deadline:
                     raise BackendUnavailable('Backend response unavailable')
                 for key, _ in selection.select(0.1):
@@ -86,6 +94,9 @@ def backend_command(config, action, job_id=None, payload=None):
 
 
 def process_alive(pid):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.process_alive(pid)
     if type(pid) is not int or pid <= 0:
         return True
     try:
@@ -97,7 +108,7 @@ def process_alive(pid):
         return True
 
 
-def private_job_cleanup(directory):
+def private_job_cleanup(directory, artifact_lease=None):
     archive.private_directory(directory)
     count = 0
     for path in directory.rglob('*'):
@@ -105,28 +116,37 @@ def private_job_cleanup(directory):
         archive.require(count <= 8192 and not path.is_symlink())
         if path.is_dir():
             archive.private_directory(path)
+        elif artifact_lease is not None and path == artifact_lease.path:
+            artifact_lease.check(path)
         else:
             with archive.private_input(path, archive.MAX_ARCHIVE):
                 pass
+    if artifact_lease is not None:
+        artifact_lease.remove()
     shutil.rmtree(directory)
     sync_directory(directory.parent)
 
 
 class RecoveryJobs:
-    def __init__(self, config):
-        archive.closed(config, ('root', 'application_root', 'backend_command', 'backend_runtime', 'age', 'identity', 'role', 'lifecycle'))
+    def __init__(self, config, *, owner_failure=None):
+        archive.closed(config, ('root', 'application_root', 'backend_command', 'backend_runtime', 'age', 'identity', 'role', 'lifecycle', 'backend_owner'))
         archive.require(type(config['identity']) is str and archive.ID.fullmatch(config['identity']) and config['role'] in ('pi', 'controller'))
         archive.require(type(config['backend_command']) is list and 0 < len(config['backend_command']) <= 8
                         and all(type(item) is str and '\0' not in item and len(item) <= 4096 for item in config['backend_command'])
                         and Path(config['backend_command'][0]).is_absolute())
         self.config = config
-        self.lifecycle = BackendLifecycle(config)
+        self.state_owner = StateOwner(config, process_failure=owner_failure) if config['backend_owner'] is not None else None
+        self.lifecycle = BackendLifecycle(config, available=self.state_owner.root_available if self.state_owner else None,
+            native_service=self.state_owner.native.service if sys.platform == 'win32' and self.state_owner else None)
         self.root = archive.private_directory(config['root'])
         self.directory = self.root / 'jobs'
-        self.directory.mkdir(mode=0o700, exist_ok=True)
+        make_private_directory(self.directory, exist_ok=True)
         archive.private_directory(self.directory)
         self.lock = threading.RLock()
         self.thread = None
+        self.pruning = False
+        self.pruning_failed = False
+        self.validation_reset = None
         self.uploads = {}
         self.registry_path = self.root / 'jobs.json'
         registry, _ = read_record(self.registry_path)
@@ -154,6 +174,56 @@ class RecoveryJobs:
         if pending:
             self.spawn(self.recover_restore, pending[0])
 
+    def backend(self, action, job_id=None, payload=None):
+        if self.state_owner is None or job_id is None:
+            return backend_command(self.config, action, job_id, payload)
+        try:
+            self.state_owner.synchronize(job_id, action)
+            if action in ('build-candidate', 'seal-candidate'):
+                return self.state_owner.call(action, job_id)
+            return backend_command(self.config, action, job_id, payload)
+        except OwnerBusy as error:
+            raise RecoveryBusy('Recovery owner is busy') from error
+
+    def collect(self, job_id):
+        if self.state_owner is not None:
+            try:
+                self.state_owner.collect(job_id)
+            except OwnerBusy as error:
+                raise RecoveryBusy('Recovery owner is busy') from error
+
+    def application_record(self, name):
+        if self.state_owner is not None:
+            return self.state_owner.application_record(name)
+        return read_record(Path(self.config['application_root']) / name)[0]
+
+    def collect(self, job_id):
+        if self.state_owner is None:
+            return
+        try:
+            return self.state_owner.collect(job_id)
+        except OwnerBusy as error:
+            raise RecoveryBusy('Native recovery job is busy') from error
+        except OwnerUnavailable as error:
+            raise BackendUnavailable('Recovery owner export is unavailable') from error
+
+    def publisher(self, job_id):
+        if self.state_owner is not None:
+            return self.state_owner.publication(job_id)
+        return GenerationPublisher(self.config['application_root'], self.directory / job_id)
+
+    def root_available(self):
+        if self.state_owner is not None:
+            return self.state_owner.root_available()
+        from .lifecycle import root_available
+        return root_available(self.config['application_root'])
+
+    def recover_hold(self, job_id):
+        if self.state_owner is not None:
+            self.state_owner.synchronize(job_id)
+            return self.state_owner.call('recover-hold', job_id)
+        return recover_hold_preparation(self.config['application_root'], self.directory / job_id)
+
     def recover_pruning(self):
         intent, _ = read_record(self.root / 'pruning.json')
         if intent is None:
@@ -163,9 +233,12 @@ class RecoveryJobs:
                         and intent['role'] == self.config['role'] and type(intent['job_id']) is str
                         and archive.ID.fullmatch(intent['job_id']) and intent['job_id'] != self.registry['active'])
         job_id = intent['job_id']
-        if job_id in self.registry['jobs']:
-            self.registry['jobs'].remove(job_id)
-            self.save_registry()
+        if self.state_owner is not None:
+            self.state_owner.call('prune-job', job_id)
+        with self.lock:
+            if job_id in self.registry['jobs']:
+                self.registry['jobs'].remove(job_id)
+                self.save_registry()
         path = self.directory / job_id
         if path.exists():
             # No worker/download child survives broker process-group teardown.
@@ -245,6 +318,12 @@ class RecoveryJobs:
         value['archive'] = None if job['archive'] is None else {key: job['archive'][key] for key in ('size', 'sha256')}
         value['result'] = read_record(self.directory / job['job_id'] / 'result.json')[0]
         value['confirmed'] = job['confirmation_sha256'] is not None
+        if (self.validation_reset is not None and self.validation_reset[0] == job['job_id']
+                and job['state'] == 'failed' and job['error'] == 'interrupted'
+                and job['backend'] is None and job['confirmation_sha256'] is None):
+            # Cleanup is live validation work, but the durable failed record
+            # fences the old preview until that cleanup completes.
+            value.update(state='validating', error=None, purpose=self.validation_reset[1], preview=None)
         return value
 
     def recovery_pinned(self, job):
@@ -253,8 +332,8 @@ class RecoveryJobs:
         # A failed admitted restore still owns its recovery proof. Only a
         # complete destination review (or a newer admitted hold) can retire it.
         try:
-            pending, _ = read_record(Path(self.config['application_root']) / 'restore-preparation.json')
-            held, _ = read_record(Path(self.config['application_root']) / 'restore-hold.json')
+            pending = self.application_record('restore-preparation.json')
+            held = self.application_record('restore-hold.json')
             if pending is not None or type(held) is not dict:
                 return True
             archive.closed(held, ('schema', 'identity', 'role', 'generation', 'job_id', 'local_output', 'remote_authority', 'revision', 'stage'))
@@ -280,24 +359,36 @@ class RecoveryJobs:
             proof, _ = read_record(path / ('capture-result.json' if job['kind'] == 'backup' else 'validation-result.json'))
             archive.require(job['backend'] is None or (proof is not None and proof.get('job_id') == job_id
                             and proof.get('backend_boot') == job['backend'].get('boot')) or not process_alive(job['backend'].get('pid')))
-            descriptor = None
+            descriptor, artifact_lease = None, None
             try:
                 artifact = path / ('backup.age' if job['kind'] == 'backup' else 'upload.age')
                 if artifact.exists():
-                    descriptor = os.open(artifact, os.O_RDONLY | os.O_NOFOLLOW)
-                    try:
-                        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    except BlockingIOError as error:
-                        raise RecoveryBusy('A completed archive is still being downloaded') from error
+                    if sys.platform == 'win32':
+                        from . import native_files
+                        try:
+                            artifact_lease = native_files.PruneLease(artifact)
+                        except native_files.NativeLockBusy as error:
+                            raise RecoveryBusy('A completed archive is still being downloaded') from error
+                    else:
+                        descriptor = os.open(artifact, os.O_RDONLY | os.O_NOFOLLOW)
+                        try:
+                            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        except BlockingIOError as error:
+                            raise RecoveryBusy('A completed archive is still being downloaded') from error
                 intent = {'schema': 'recovery-pruning/1', 'job_id': job_id,
                           'identity': self.config['identity'], 'role': self.config['role']}
                 publish_record(self.root / 'pruning.json', intent, None)
-                self.registry['jobs'].remove(job_id)
-                self.save_registry()
-                private_job_cleanup(path)
+                if self.state_owner is not None:
+                    self.state_owner.call('prune-job', job_id)
+                with self.lock:
+                    self.registry['jobs'].remove(job_id)
+                    self.save_registry()
+                private_job_cleanup(path, artifact_lease)
                 (self.root / 'pruning.json').unlink()
                 sync_directory(self.root)
             finally:
+                if artifact_lease is not None:
+                    artifact_lease.close()
                 if descriptor is not None:
                     os.close(descriptor)
 
@@ -305,14 +396,36 @@ class RecoveryJobs:
         if self.registry['active'] is not None or (self.thread is not None and self.thread.is_alive()):
             raise RecoveryBusy('A recovery job is already active')
 
+    def prune_before_admission(self):
+        try:
+            # Intent recovery belongs to startup, after broker teardown has
+            # closed every download child. Never retire its lease and then
+            # resume that intent while this broker can still own downloads.
+            archive.require(not (self.root / 'pruning.json').exists())
+            self.prune()
+        except (RecoveryBusy, OwnerBusy):
+            self.pruning_failed = (self.root / 'pruning.json').exists()
+        except BaseException:
+            # No new job was admitted. Keep any intent for recovery rather
+            # than deleting evidence or concealing an uncertain owner result.
+            self.pruning_failed = True
+        finally:
+            with self.lock:
+                self.pruning = False
+
     def new_job(self, request_id, kind, backend=None, total=None):
         archive.require(type(request_id) is str and archive.ID.fullmatch(request_id))
         self.ensure_idle()
         archive.require(not any(self.read(item)['request_id'] == request_id for item in self.registry['jobs']))
-        self.prune()
+        if self.pruning_failed or (self.root / 'pruning.json').exists():
+            raise OSError('Recovery retention failed; inspect saved state before restarting maintenance')
+        if len(self.registry['jobs']) >= 4:
+            self.pruning = True
+            self.spawn(self.prune_before_admission)
+            raise RecoveryBusy('Recovery archive retention is being processed; no job was admitted')
         job_id = secrets.token_hex(16)
         directory = self.directory / job_id
-        directory.mkdir(mode=0o700)
+        make_private_directory(directory)
         sync_directory(self.directory)
         job = {'schema': 'recovery-job/1', 'job_id': job_id, 'request_id': request_id, 'identity': self.config['identity'],
                'role': self.config['role'], 'kind': kind, 'state': 'created', 'created_utc': int(time.time()), 'error': None,
@@ -338,12 +451,16 @@ class RecoveryJobs:
         self.thread.start()
 
     def observe(self):
-        value = backend_command(self.config, 'observe')
+        value = self.backend('observe')
+        # Native maintenance cannot traverse the backend's private root merely
+        # to calculate its binding. Fixed native paths are already physical;
+        # the actual backend supplies the independently checked scope digest.
+        scope_path = str(Path(self.config['application_root'])) if self.state_owner else str(Path(self.config['application_root']).resolve())
         archive.closed(value, ('schema', 'identity', 'role', 'boot', 'pid', 'generation', 'restore_hold', 'storage_scope', 'configuration_digest', 'ready', 'listeners'))
         archive.require(value['schema'] == 'recovery-backend-observation/1' and value['identity'] == self.config['identity']
                         and value['role'] == self.config['role'] and type(value['boot']) is str and archive.ID.fullmatch(value['boot'])
                         and type(value['pid']) is int and value['pid'] > 0
-                        and value['storage_scope'] == hashlib.sha256(str(Path(self.config['application_root']).resolve()).encode()).hexdigest()
+                        and value['storage_scope'] == hashlib.sha256(scope_path.encode()).hexdigest()
                         and type(value['configuration_digest']) is str and archive.HASH.fullmatch(value['configuration_digest']) and type(value['ready']) is bool)
         listeners = value['listeners']
         archive.closed(listeners, ('web_port', 'socket_port', 'http_enabled', 'websocket_enabled', 'http_bound', 'websocket_bound'))
@@ -355,6 +472,13 @@ class RecoveryJobs:
     def capture_proof(self, job):
         path = self.directory / job['job_id'] / 'capture-result.json'
         while True:
+            try:
+                self.collect(job['job_id'])
+            except RecoveryBusy:
+                if not process_alive(job['backend']['pid']):
+                    raise BackendUnavailable('Capture owner stopped before publication')
+                time.sleep(.1)
+                continue
             proof, _ = read_record(path)
             if proof is not None:
                 archive.closed(proof, ('schema', 'job_id', 'backend_boot', 'state', 'inventory', 'error'))
@@ -374,7 +498,7 @@ class RecoveryJobs:
             publish_record(directory / 'capture-admission.json', {'schema': 'recovery-capture-admission/1', 'job_id': job_id,
                            'backend_boot': job['backend']['boot'], 'identity': job['identity']}, None)
             try:
-                backend_command(self.config, 'capture', job_id)
+                self.backend('capture', job_id)
             except BackendUnavailable:
                 # A missing reply is not permission to send the capture again.
                 pass
@@ -399,7 +523,7 @@ class RecoveryJobs:
                 self.save_registry()
         except RecoveryBusy:
             self.fail(job_id, 'capture_busy')
-        except BackendUnavailable:
+        except (BackendUnavailable, OwnerUnavailable):
             self.fail(job_id, 'backend_unavailable')
         except BaseException:
             self.fail(job_id, 'storage_unavailable')
@@ -419,6 +543,13 @@ class RecoveryJobs:
     def validation_proof(self, job):
         path = self.directory / job['job_id'] / 'validation-result.json'
         while True:
+            try:
+                self.collect(job['job_id'])
+            except RecoveryBusy:
+                if not process_alive(job['backend']['pid']):
+                    raise BackendUnavailable('Validation owner stopped before publication')
+                time.sleep(.1)
+                continue
             proof, _ = read_record(path)
             if proof is not None:
                 archive.closed(proof, ('schema', 'job_id', 'backend_boot', 'state', 'preview_digest', 'error'))
@@ -429,11 +560,16 @@ class RecoveryJobs:
                 raise BackendUnavailable('Validation owner stopped before publication')
             time.sleep(0.1)
 
-    def validate(self, job_id, phrase, purpose):
+    def validate(self, job_id, phrase, purpose, reset_backend=None):
         try:
+            if reset_backend is not None:
+                self.cleanup_validation(job_id, reset_backend)
+                self.save(dict(self.read(job_id), state='validating', error=None, purpose=purpose))
+                with self.lock:
+                    self.validation_reset = None
             directory = self.directory / job_id
             decoded = directory / 'decoded'
-            decoded.mkdir(mode=0o700)
+            make_private_directory(decoded)
             job = self.read(job_id)
             manifest = archive.validate_archive(self.config['age'], directory / 'upload.age', decoded, phrase, job['archive']['stamp'])
             evidence.inspect(decoded / 'application/evidence')
@@ -446,7 +582,7 @@ class RecoveryJobs:
                            'purpose': purpose, 'archive_sha256': job['archive']['sha256'],
                            'manifest_sha256': hashlib.sha256(canonical(manifest)).hexdigest()}, None)
             try:
-                backend_command(self.config, 'validate', job_id)
+                self.backend('validate', job_id)
             except BackendUnavailable:
                 # A lost reply does not cause a second owner validation.
                 pass
@@ -463,12 +599,15 @@ class RecoveryJobs:
                 self.save(dict(self.read(job_id), state='preview', backend=backend, purpose=purpose, preview=preview))
         except (RecoveryBusy, BackendRefused):
             self.fail(job_id, 'validation_failed')
-        except BackendUnavailable:
+        except (BackendUnavailable, OwnerUnavailable):
             self.fail(job_id, 'backend_unavailable')
         except BaseException:
             self.fail(job_id, 'archive_invalid')
         finally:
             phrase = b''
+            with self.lock:
+                if self.validation_reset is not None and self.validation_reset[0] == job_id:
+                    self.validation_reset = None
 
     def reset_validation(self, job):
         # Explicit operator refresh only. Serialize with the actual validator,
@@ -481,7 +620,29 @@ class RecoveryJobs:
             # Commit the pre-validation state before deleting old staging. A
             # crash during cleanup remains explicitly retryable without a lost
             # owner proof, and a queued old validation cannot use this state.
-            job = self.save(dict(job, state='failed', error='interrupted', backend=None, preview=None, purpose=None))
+            return self.save(dict(job, state='failed', error='interrupted', backend=None, preview=None, purpose=None))
+
+    def cleanup_validation(self, job_id, had_backend):
+        # Owner exchange and bounded tree removal run on the existing job
+        # thread, outside the five-second command and status-request budget.
+        directory = self.directory / job_id
+        with directory_lock(directory):
+            job = self.read(job_id)
+            archive.require(job['state'] == 'failed' and job['error'] == 'interrupted'
+                            and job['backend'] is None and job['confirmation_sha256'] is None)
+            if self.state_owner is not None and had_backend:
+                deadline = time.monotonic() + 30
+                while True:
+                    try:
+                        self.state_owner.synchronize(job_id)
+                        break
+                    except OwnerBusy as error:
+                        # Import refused its directory lock before changing
+                        # records. The old preview is already durably fenced;
+                        # wait only on that definite refusal, never an unknown.
+                        if time.monotonic() >= deadline:
+                            raise RecoveryBusy('Recovery owner is busy') from error
+                        time.sleep(.1)
             for name in ('decoded', 'validated', 'source-records'):
                 path = directory / name
                 if path.exists():
@@ -492,10 +653,16 @@ class RecoveryJobs:
                     read_record(path)  # Refuse unexpected file type/ownership.
                     path.unlink()
             sync_directory(directory)
-            return job
 
     def stop_proof(self, job):
         while True:
+            try:
+                self.collect(job['job_id'])
+            except RecoveryBusy:
+                if not process_alive(job['backend']['pid']):
+                    raise BackendUnavailable('Preparation owner stopped before publication')
+                time.sleep(.1)
+                continue
             proof, _ = read_record(self.directory / job['job_id'] / 'stop-result.json')
             if proof is not None:
                 archive.closed(proof, ('schema', 'job_id', 'backend_boot', 'state', 'generation', 'error'))
@@ -536,17 +703,20 @@ class RecoveryJobs:
         job = self.read(job_id)
         directory = self.directory / job_id
         self.save(dict(self.read(job_id), phase='building_candidate'))
-        backend_command(self.config, 'build-candidate', job_id)
+        self.backend('build-candidate', job_id)
         manifest, _ = read_record(directory / 'archive-manifest.json')
         self.save(dict(self.read(job_id), phase='retaining_evidence'))
-        evidence.copy_groups(Path(self.config['application_root']) / ('generation-' + previous_generation) / 'evidence', directory / 'candidate/evidence')
+        if self.state_owner is not None:
+            self.state_owner.call('copy-evidence', job_id, {'generation': previous_generation})
+        else:
+            evidence.copy_groups(Path(self.config['application_root']) / ('generation-' + previous_generation) / 'evidence', directory / 'candidate/evidence')
         evidence.retain_source(directory / 'candidate', directory / 'validated', directory / 'source-records', manifest, job['archive']['sha256'])
         self.save(dict(self.read(job_id), phase='validating_candidate'))
-        backend_command(self.config, 'seal-candidate', job_id)
+        self.backend('seal-candidate', job_id)
         prepared, _ = read_record(directory / 'prepared.json')
         archive.require(prepared is not None and prepared['job_id'] == job_id and prepared['archive_sha256'] == job['archive']['sha256'])
         self.save(dict(self.read(job_id), phase='publishing_generation'))
-        outcome = GenerationPublisher(self.config['application_root'], directory).publish(prepared)
+        outcome = self.publisher(job_id).publish(prepared)
         archive.require(outcome == {'state': 'restored_generation_held', 'generation': prepared['generation']})
         self.save(dict(self.read(job_id), state='awaiting_backend', phase='starting_backend'))
         self.finish_published(job_id, prepared)
@@ -561,8 +731,7 @@ class RecoveryJobs:
             except BackendUnavailable:
                 current = None
             if current is None:
-                from .lifecycle import root_available
-                if root_available(self.config['application_root']):
+                if self.root_available():
                     self.lifecycle.start()
             self.save(dict(self.read(job_id), state='awaiting_backend', phase='verifying_backend'))
             observed = self.verify_started(job_id, prepared)
@@ -594,20 +763,29 @@ class RecoveryJobs:
                             and held.get('maintenance_active') is True and held.get('job_id') in (None, job_id))
             self.lifecycle.stop(current['pid'])
         else:
-            from .lifecycle import root_available
-            archive.require(root_available(self.config['application_root']))
+            archive.require(self.root_available())
 
     def recover_restore(self, job_id):
         try:
             job = self.read(job_id)
             directory = self.directory / job_id
+            if self.state_owner is not None:
+                while True:
+                    try:
+                        self.state_owner.synchronize(job_id)
+                        self.collect(job_id)
+                        break
+                    except (OwnerBusy, RecoveryBusy):
+                        # Serialize with an admitted request still finishing
+                        # under the backend job lock; never replay that request.
+                        time.sleep(.1)
             publication, _ = read_record(directory / 'publication.json')
             if publication is not None:
-                publisher = GenerationPublisher(self.config['application_root'], directory)
+                publisher = self.publisher(job_id)
                 prepared = publisher.admit(publication['prepared'])
                 if publication['phase'] == 'published':
-                    selected, _ = read_record(Path(self.config['application_root']) / 'authority.json')
-                    held, _ = read_record(Path(self.config['application_root']) / 'restore-hold.json')
+                    selected = self.application_record('authority.json')
+                    held = self.application_record('restore-hold.json')
                     archive.require(selected == prepared['selection'] and held == prepared['hold'])
                     if publisher.history_required(prepared):
                         # A reboot may have started the selected held backend.
@@ -639,38 +817,45 @@ class RecoveryJobs:
                         proof, _ = read_record(directory / 'stop-result.json')
                         if proof is None or proof.get('state') != 'held':
                             self.fail(job_id, 'interrupted')
+                            if self.state_owner is not None:
+                                self.state_owner.synchronize(job_id)
                         break
                 except RecoveryLockBusy:
                     time.sleep(.1)
             if proof is None or proof.get('state') != 'held':
                 # No positive drain proof: retain the verified prior generation
                 # and both holds, rather than inventing output reconciliation.
-                pending, _ = read_record(Path(self.config['application_root']) / 'restore-preparation.json')
+                pending = self.application_record('restore-preparation.json')
                 admitted, _ = read_record(directory / 'hold-prepared.json')
                 if pending is not None or admitted is not None:
                     self.stop_for_recovery(job_id)
-                    recover_hold_preparation(self.config['application_root'], directory)
-                    with directory_lock(self.config['application_root']):
-                        path = Path(self.config['application_root']) / 'restore-hold.json'
-                        held, observation = read_record(path)
-                        archive.require(type(held) is dict and held.get('job_id') == job_id and held.get('stage') == 'maintenance'
-                                        and held.get('local_output') is True and held.get('remote_authority') is True)
-                        publish_record(path, dict(held, stage='review', revision=str(int(held['revision']) + 1)), observation)
+                    self.recover_hold(job_id)
+                    if self.state_owner is not None:
+                        self.state_owner.call('review-failed-hold', job_id)
+                    else:
+                        with directory_lock(self.config['application_root'], generation=True):
+                            path = Path(self.config['application_root']) / 'restore-hold.json'
+                            held, observation = read_record(path)
+                            archive.require(type(held) is dict and held.get('job_id') == job_id and held.get('stage') == 'maintenance'
+                                            and held.get('local_output') is True and held.get('remote_authority') is True)
+                            publish_record(path, dict(held, stage='review', revision=str(int(held['revision']) + 1)), observation)
                     self.lifecycle.start()
                 return
             archive.require(proof.get('schema') == 'recovery-stop-result/1' and proof.get('job_id') == job_id
                             and proof.get('backend_boot') == job['backend']['boot'] and proof.get('error') is None)
             self.stop_for_recovery(job_id)
-            recover_hold_preparation(self.config['application_root'], directory)
+            self.recover_hold(job_id)
             prepared, _ = read_record(directory / 'prepared.json')
             if prepared is not None:
-                outcome = GenerationPublisher(self.config['application_root'], directory).publish(prepared)
+                outcome = self.publisher(job_id).publish(prepared)
                 archive.require(outcome == {'state': 'restored_generation_held', 'generation': prepared['generation']})
                 self.finish_published(job_id, prepared)
                 return
             # All private query children were killed/reaped with the old worker.
             # Unpublished staging is regenerated from the held destination and
             # already validated source, never replayed into active owners.
+            if self.state_owner is not None:
+                self.state_owner.call('clear-candidate', job_id)
             for name in ('candidate', 'candidate-working'):
                 path = directory / name
                 if path.exists():
@@ -685,15 +870,34 @@ class RecoveryJobs:
         except BaseException:
             self.fail(job_id, 'restore_failed')
 
+    def prepare_backend(self, job):
+        archive.require(job['state'] == 'applying' and job['confirmation_sha256'] is not None)
+        deadline = time.monotonic() + 30
+        for attempt in range(8):
+            try:
+                self.backend('prepare', job['job_id'])
+                return
+            except BackendUnavailable:
+                # An accepted request may have lost its reply. Read its one
+                # existing proof; never send preparation again on uncertainty.
+                return
+            except RecoveryBusy:
+                # The production preparation/context gates return busy before
+                # writing a hold. Retry only that definite refusal, while the
+                # same live boot/generation still has no maintenance hold.
+                if attempt == 7 or time.monotonic() >= deadline:
+                    raise
+                current = self.observe()
+                archive.require(all(current[key] == job['backend'][key] for key in ('boot', 'pid', 'generation'))
+                                and current['restore_hold'].get('maintenance_active') is False)
+                time.sleep(.1)
+
     def apply(self, job_id):
         try:
             job = self.read(job_id)
             directory = self.directory / job_id
             self.save(dict(self.read(job_id), phase='holding_output'))
-            try:
-                backend_command(self.config, 'prepare', job_id)
-            except BackendUnavailable:
-                pass  # Read the exact owner proof; never replay preparation.
+            self.prepare_backend(job)
             proof = self.stop_proof(job)
             archive.require(proof['state'] == 'held' and proof['error'] is None)
             # Re-observe immediately before a fixture signal. A cached PID is
@@ -704,7 +908,7 @@ class RecoveryJobs:
                             and current['generation'] == proof['generation'])
             self.save(dict(self.read(job_id), phase='stopping_backend'))
             self.lifecycle.stop(current['pid'])
-            archive.require(recover_hold_preparation(self.config['application_root'], directory) is not None)
+            archive.require(self.recover_hold(job_id) is not None)
             self.complete_candidate(job_id, proof['generation'])
         except BackendRefused as error:
             self.fail(job_id, 'destination_changed' if error.code == 'revision_conflict' else 'restore_failed')
@@ -720,6 +924,8 @@ class RecoveryJobs:
                 self.lifecycle.child.poll()  # Reap an owned software service; no mutation/replay.
             archive.require(type(value) is dict and type(value.get('action')) is str)
             action = value['action']
+            if self.pruning and action not in ('list', 'list.summary', 'status'):
+                raise RecoveryBusy('Recovery archive retention is being processed; no command was admitted')
             if 'job_id' in value:
                 archive.require(type(value['job_id']) is str and value['job_id'] in self.registry['jobs'])
             if action in ('list', 'list.summary'):
@@ -757,7 +963,7 @@ class RecoveryJobs:
                 total = int(value['size'])
                 archive.require(shutil.disk_usage(self.root).free >= total)
                 job = self.new_job(value['request_id'], 'restore', total=total)
-                descriptor = os.open(self.directory / job['job_id'] / 'upload.age', os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                descriptor = archive.CiphertextUpload(self.directory / job['job_id'] / 'upload.age', int(job['archive']['size']))
                 self.uploads[job['job_id']] = descriptor
                 return self.public(self.save(dict(job, state='uploading')))
             if action == 'restore.upload.chunk':
@@ -770,26 +976,15 @@ class RecoveryJobs:
                 data = base64.b64decode(value['bytes'], validate=True)
                 archive.require(0 < len(data) <= 65536 and base64.b64encode(data).decode() == value['bytes'])
                 descriptor, offset = self.uploads[value['job_id']], int(value['offset'])
-                position = os.lseek(descriptor, 0, os.SEEK_END)
-                archive.require(offset <= position and offset + len(data) <= int(job['archive']['size']))
-                if offset < position:
-                    archive.require(offset + len(data) <= position and os.pread(descriptor, len(data), offset) == data)
-                else:
-                    remaining = memoryview(data)
-                    while remaining:
-                        count = os.write(descriptor, remaining)
-                        archive.require(count > 0)
-                        remaining = remaining[count:]
-                    position += len(data)
+                position = descriptor.append(offset, data)
                 return {'offset': str(position)}
             if action == 'restore.upload.finish':
                 archive.closed(value, ('action', 'job_id'))
                 job = self.read(value['job_id'])
                 archive.require(job['state'] == 'uploading' and value['job_id'] in self.uploads)
                 descriptor = self.uploads[value['job_id']]
-                archive.require(os.fstat(descriptor).st_size == int(job['archive']['size']))
-                os.fsync(descriptor)
-                os.close(descriptor)
+                descriptor.complete()
+                descriptor.close()
                 del self.uploads[value['job_id']]
                 job = self.save(dict(job, state='upload_checking'))
                 self.spawn(self.check_upload, value['job_id'])
@@ -798,10 +993,11 @@ class RecoveryJobs:
                 archive.closed(value, ('action', 'job_id'))
                 job = self.read(value['job_id'])
                 archive.require(job['kind'] == 'restore' and job['confirmation_sha256'] is None
-                                and job['state'] in ('created', 'uploading', 'uploaded', 'preview', 'failed'))
+                                and job['state'] in ('created', 'uploading', 'uploaded', 'preview', 'failed')
+                                and not (self.validation_reset is not None and self.validation_reset[0] == job['job_id']))
                 descriptor = self.uploads.pop(value['job_id'], None)
                 if descriptor is not None:
-                    os.close(descriptor)
+                    descriptor.close()
                 self.fail(value['job_id'], 'cancelled')
                 return self.public(self.read(value['job_id']))
             if action == 'restore.resume':
@@ -847,9 +1043,17 @@ class RecoveryJobs:
                 archive.require(self.thread is None or not self.thread.is_alive())
                 archive.require(self.registry['active'] in (None, job['job_id']))
                 if job['state'] in ('failed', 'preview'):
+                    had_backend = job['backend'] is not None
                     job = self.reset_validation(job)
                     self.registry['active'] = job['job_id']
                     self.save_registry()
+                    self.validation_reset = (job['job_id'], value['purpose'])
+                    try:
+                        self.spawn(self.validate, value['job_id'], phrase, value['purpose'], had_backend)
+                    except BaseException:
+                        self.validation_reset = None
+                        raise
+                    return self.public(job)
                 job = self.save(dict(job, state='validating', error=None, purpose=value['purpose']))
                 self.spawn(self.validate, value['job_id'], phrase, value['purpose'])
                 return self.public(job)

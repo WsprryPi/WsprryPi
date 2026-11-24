@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: MIT
 #include "sqlite_state_store.hpp"
+#ifdef _WIN32
+#include "windows_sqlite_files.hpp"
+#else
+#include "native_private_acl.hpp"
+#endif
 
 #include <sqlite3.h>
 #if SQLITE_VERSION_NUMBER < 3031000
@@ -10,15 +15,17 @@
 #include <charconv>
 #include <cerrno>
 #include <cstdint>
-#include <fcntl.h>
 #include <filesystem>
 #include <limits>
 #include <mutex>
 #include <set>
 #include <string_view>
+#ifndef _WIN32
+#include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 namespace wsprrypi {
 namespace {
@@ -76,6 +83,7 @@ bool allowed(StateRole role, StateRecord kind) {
     return role == StateRole::Pi || (kind != StateRecord::ManagedSettings &&
         kind != StateRecord::RecurrenceAuthority && kind != StateRecord::RecurrenceInitialization&&kind!=StateRecord::RecurrenceRecovery);
 }
+#ifndef _WIN32
 bool same_file(const struct stat &a, const struct stat &b) {
     return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
 }
@@ -94,11 +102,13 @@ void check_ancestors(const std::string &directory) {
         require(!lstat(ancestor.c_str(), &info) && S_ISDIR(info.st_mode) &&
             (info.st_uid == 0 || info.st_uid == geteuid()) &&
             (!(info.st_mode & 0022) || (info.st_mode & S_ISVTX)));
+        require(native_private_acl_path(ancestor.c_str(),info.st_uid));
         const auto parent = ancestor.parent_path();
         if (parent == ancestor) break;
         ancestor = parent;
     }
 }
+#endif
 struct Statement {
     sqlite3_stmt *value{};
     Statement(sqlite3 *db, std::string_view sql) {
@@ -137,7 +147,11 @@ SqliteExecutionReadScope::~SqliteExecutionReadScope(){--execution_read_depth;}
 
 struct SqliteStateStore::Impl {
     sqlite3 *db{};
+#ifdef _WIN32
+    std::unique_ptr<WindowsSqliteFiles> native_files;
+#else
     int directory_fd{-1}, file_fd{-1};
+#endif
     std::string directory, path, identity, role;
     StateRole selected_role;
     Checkpoint checkpoint;
@@ -176,6 +190,10 @@ struct SqliteStateStore::Impl {
         require(sqlite3_libversion_number() >= 3031000, Code::Unsupported);
         require(input.find('\0') == std::string::npos && std::filesystem::path(input).is_absolute(), Code::InvalidInput);
         try {
+#ifdef _WIN32
+            native_files=std::make_unique<WindowsSqliteFiles>(input,mode==StateOpen::CreateNew);
+            directory=native_files->directory();path=native_files->path();
+#else
             struct stat root{};
             require(!lstat(input.c_str(), &root) && S_ISDIR(root.st_mode) &&
                 root.st_uid == geteuid() && (root.st_mode & 0777) == 0700);
@@ -184,6 +202,8 @@ struct SqliteStateStore::Impl {
             directory_fd = open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
             struct stat opened{};
             require(directory_fd >= 0 && !fstat(directory_fd, &opened) && same_file(root, opened));
+            require(native_private_acl(directory_fd,opened.st_uid));
+            require(native_private_acl(directory_fd,root.st_uid));
             require(!flock(directory_fd, LOCK_EX | LOCK_NB));
             path = directory + "/state.sqlite3";
             if (mode == StateOpen::Existing) {
@@ -193,6 +213,7 @@ struct SqliteStateStore::Impl {
             file_fd = open(path.c_str(), O_RDWR | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK |
                 (mode == StateOpen::CreateNew ? O_CREAT | O_EXCL : 0), 0600);
             require(file_fd >= 0);
+#endif
             check_files();
             require(sqlite3_open_v2(path.c_str(), &db,
                 SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_NOFOLLOW, nullptr) == SQLITE_OK);
@@ -230,9 +251,13 @@ struct SqliteStateStore::Impl {
     void close() noexcept {
         if (db) sqlite3_close_v2(db);
         db = nullptr;
+#ifdef _WIN32
+        native_files.reset();
+#else
         if (file_fd >= 0) ::close(file_fd);
         if (directory_fd >= 0) ::close(directory_fd);
         file_fd = directory_fd = -1;
+#endif
     }
     void exec(std::string_view sql) {
         const std::string terminated(sql);
@@ -253,6 +278,9 @@ struct SqliteStateStore::Impl {
         return value;
     }
     void check_files() {
+#ifdef _WIN32
+        try{require(native_files!=nullptr);native_files->check();}catch(...){fail();}
+#else
         check_ancestors(directory);
         struct stat root{}, named{}, opened{};
         require(!lstat(directory.c_str(), &root) && S_ISDIR(root.st_mode) &&
@@ -260,11 +288,20 @@ struct SqliteStateStore::Impl {
             !fstat(directory_fd, &opened) && same_file(root, opened));
         require(!lstat(path.c_str(), &named) && private_file(named, 32 * 1048576) &&
             !fstat(file_fd, &opened) && same_file(named, opened));
+        require(native_private_acl(directory_fd,root.st_uid)&&native_private_acl(file_fd,named.st_uid));
         for (const auto *suffix : {"-wal", "-shm", "-journal"}) {
             struct stat info{};
-            if (!lstat((path + suffix).c_str(), &info)) require(private_file(info, 64 * 1048576));
+            if (!lstat((path + suffix).c_str(), &info)) require(private_file(info, 64 * 1048576)&&native_private_acl_path((path+suffix).c_str(),info.st_uid));
             else require(errno == ENOENT);
         }
+#endif
+    }
+    void flush_files() {
+#ifdef _WIN32
+        try{require(native_files!=nullptr);native_files->flush();}catch(...){fail();}
+#else
+        require(!fsync(file_fd) && !fsync(directory_fd));
+#endif
     }
     void check_live() {
         require(!is_held);
@@ -284,7 +321,7 @@ struct SqliteStateStore::Impl {
         exec("PRAGMA application_id=1465077842");
         exec("PRAGMA user_version=1");
         exec("COMMIT");
-        require(!fsync(file_fd) && !fsync(directory_fd));
+        flush_files();
     }
     std::string read_revision() {
         std::map<std::string, std::string> metadata;
@@ -495,7 +532,7 @@ void SqliteStateStore::snapshot_to(const std::string &directory) {
         int wal_pages = -1, checkpointed_pages = -1;
         require(sqlite3_wal_checkpoint_v2(staging.impl_->db, "main", SQLITE_CHECKPOINT_TRUNCATE,
             &wal_pages, &checkpointed_pages) == SQLITE_OK && wal_pages == 0 && checkpointed_pages == 0);
-        require(!fsync(staging.impl_->file_fd) && !fsync(staging.impl_->directory_fd));
+        staging.impl_->flush_files();
     } catch (...) {
         // Destination failure is not permission to revoke source admission;
         // only independently observed source failure holds the live owner.

@@ -12,7 +12,7 @@ std::string signature(const std::string &kind,const std::string &bytes,const std
     return PiManagementJournal::digest("sqlite-record/1:"+kind+":"+revision+":"+PiManagementJournal::digest(bytes));
 }
 std::string fresh(){
-    std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),bytes.size())==1);
+    std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))==1);
     std::string result;for(const auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;
 }
 }

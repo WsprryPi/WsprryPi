@@ -23,7 +23,7 @@ BIN_DIR		 	= build/bin
 
 # Keep the reusable implementation, demonstration, and bounded test separate.
 C_SOURCES :=
-LIB_SOURCES := signal_handler.cpp signal_wait.cpp
+LIB_SOURCES := signal_handler.cpp signal_wait.cpp signal_wait_windows.cpp
 DEMO_SOURCES := main.cpp
 TEST_SOURCES := test.cpp
 CPP_SOURCES := $(LIB_SOURCES) $(DEMO_SOURCES) $(TEST_SOURCES)

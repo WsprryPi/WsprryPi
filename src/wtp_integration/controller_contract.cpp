@@ -108,7 +108,7 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
         static const auto adapter=Json::parse(controller_adapter_contract());
         static const auto definitions=Json::parse(controller_document_definitions());
         const auto &documents=adapter["documents"];
-        if(std::find(documents.begin(),documents.end(),name)==documents.end()||!definitions.contains(std::string(name))||
+        if(std::find(documents.begin(),documents.end(),std::string(name))==documents.end()||!definitions.contains(std::string(name))||
             !match(value,definitions[std::string(name)],definitions,0))return false;
         if(name=="target-migration"||name=="target-migration-read"||name=="target-migration-rollback"){
             for(const auto *key:{"controllers","retirements","jobs"})if(value.contains(key)){
@@ -135,7 +135,7 @@ bool valid_controller_document(const nlohmann::json &value,std::string_view name
             for(const auto &entry:value["discoveries"]){
                 if(!handles.insert(entry["discovery_id"].get<std::string>()).second||!devices.insert(entry["device_id"].get<std::string>()).second||
                     entry["host"]!="wsprry-management-"+entry["device_id"].get<std::string>()+".local."||
-                    entry["control_schema_digest"]!=control_schema_sha256)return false;
+                    entry["control_schema_digest"].get_ref<const std::string &>()!=control_schema_sha256)return false;
             }
         }
         if(name=="target-context") {

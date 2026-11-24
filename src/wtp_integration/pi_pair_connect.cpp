@@ -11,7 +11,7 @@ namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw std::runtime_error("pairing_connect_unavailable");}
 bool id(const std::string &value){return value.size()==32&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
-std::string nonce(){std::array<unsigned char,32> value{};require(RAND_bytes(value.data(),value.size())==1);return PiPairSecret(value).storage_encoding();}
+std::string nonce(){std::array<unsigned char,32> value{};require(RAND_bytes(value.data(),static_cast<int>(value.size()))==1);return PiPairSecret(value).storage_encoding();}
 PicoHttpResponse receipt(const Json &value){require(valid_controller_document(value,"target-operation"));return {value["state"]=="committed"?200U:202U,value.dump(),{}};}
 }
 PiPairConnect::PiPairConnect(PiPairHistory &history,ManagementBrowserSessions &sessions,PiPairDiscovery &discovery,PiPairAdmission &admission,

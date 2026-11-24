@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "application_storage/companion_files.hpp"
+#include "software_private_acl.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -21,6 +22,15 @@ int main(){
         const auto path=prefix+".management/"+target+".json";
         const auto payload=std::string(2*1048576+37,'x');put(path,payload);
         auto captured=inspect_companion_file(prefix,CompanionKind::TargetManagement,target);check(captured.has_value(),"Capture existing journal");
+#ifdef __APPLE__
+        set_software_other_read_acl(path.c_str(),true);
+        refuses([&]{inspect_companion_file(prefix,CompanionKind::TargetManagement,target);});
+        set_software_other_read_acl(path.c_str(),false);
+        set_software_other_read_acl((prefix+".management").c_str(),true);
+        refuses([&]{inspect_companion_file(prefix,CompanionKind::TargetManagement,target);});
+        set_software_other_read_acl((prefix+".management").c_str(),false);
+        captured=inspect_companion_file(prefix,CompanionKind::TargetManagement,target);check(captured.has_value(),"Private journal restored after ACL repair");
+#endif
         check(captured->size==payload.size(),"Journal larger than a settings record is supported");
         const auto manifest=companion_manifest({*captured});check(parse_companion_manifest(manifest)==std::vector{*captured},"Closed bounded manifest round trip");
         const auto destination=root+"/copied";

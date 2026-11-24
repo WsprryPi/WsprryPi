@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "pico_usb_policy.hpp"
 #include <cerrno>
 #include <cstdio>
 #include "json.hpp"
@@ -21,13 +22,6 @@ inline bool pico_usb_any_update_blocked(const std::filesystem::path& root="/var/
   if(!exists) return false;
   const bool empty=std::filesystem::is_empty(root,error);
   return error || !empty;
-}
-inline bool pico_usb_http_mutation(std::string_view method,std::string_view path) {
-  return method!="GET" && method!="HEAD" && method!="OPTIONS" &&
-      !(method=="POST" && path=="/api/control/v1/member/firmware");
-}
-inline bool pico_usb_command_mutation(std::string_view command) {
-  return command!="get_tx_state" && command!="wspr_band_catalog" && command!="echo";
 }
 inline bool pico_usb_entry_protected(const std::filesystem::path& path) {
   auto current=path;
@@ -78,9 +72,6 @@ inline nlohmann::json pico_usb_read_hold(const std::filesystem::path& path) {
 inline void pico_usb_remove_hold(const std::filesystem::path& path) {
   if(unlink(path.c_str())) throw std::runtime_error("pico_maintenance_record_remove_failed");
   pico_usb_sync_directory(path.parent_path());
-}
-inline bool pico_usb_serial(const std::string& serial) {
-  return serial.size()==16 && serial.find_first_not_of("0123456789ABCDEF")==std::string::npos;
 }
 inline std::filesystem::path pico_usb_hold_path(const std::string& serial) {
   if (!pico_usb_serial(serial)) throw std::runtime_error("unsupported_pico_usb_serial");

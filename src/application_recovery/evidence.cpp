@@ -5,17 +5,29 @@
 #include <array>
 #include <cerrno>
 #include <filesystem>
+#ifdef _WIN32
+#include "windows_file_io.hpp"
+#else
 #include <fcntl.h>
-#include <openssl/evp.h>
-#include <set>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <openssl/evp.h>
+#include <set>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw LocalCommandRefused(LocalRefusal::StorageUnavailable);}
 bool hex(std::string_view value,std::size_t length){return value.size()==length&&value.find_first_not_of("0123456789abcdef")==std::string_view::npos;}
 void fields(const Json &value,std::initializer_list<const char *> names){require(value.is_object()&&value.size()==names.size());for(const auto *name:names)require(value.contains(name));}
+#ifdef _WIN32
+std::filesystem::path disk_path(const std::string &path){return windows_file::path_from_utf8(path);}
+std::string text(const std::filesystem::path &path){return recovery_windows::text(path);}
+void directory(const std::filesystem::path &path){(void)recovery_windows::private_directory(path);}
+std::string digest_file(const std::filesystem::path &path,std::uint64_t expected){recovery_windows::Input input(path,expected);return recovery_windows::digest(input,expected);}
+#else
+std::filesystem::path disk_path(const std::string &path){return path;}
+std::string text(const std::filesystem::path &path){return path.string();}
 void directory(const std::filesystem::path &path){struct stat info{};require(!::lstat(path.c_str(),&info)&&S_ISDIR(info.st_mode)&&info.st_uid==::geteuid()&&(info.st_mode&0777)==0700&&std::filesystem::canonical(path)==path);}
 std::string digest_file(const std::filesystem::path &path,std::uint64_t expected){
     const int fd=::open(path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);require(fd>=0);struct Close{int fd;~Close(){::close(fd);}}close{fd};
@@ -33,6 +45,7 @@ std::string digest_file(const std::filesystem::path &path,std::uint64_t expected
     std::array<unsigned char,32> digest{};unsigned size{};require(EVP_DigestFinal_ex(hash.get(),digest.data(),&size)==1&&size==32);std::string result;
     for(const auto byte:digest){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;
 }
+#endif
 }
 std::optional<std::uint64_t> recovery_evidence_member_maximum(std::string_view name){
     constexpr std::string_view prefix="application/evidence/";if(!name.starts_with(prefix))return {};name.remove_prefix(prefix.size());
@@ -48,16 +61,22 @@ std::optional<std::uint64_t> recovery_evidence_member_maximum(std::string_view n
     return {};
 }
 std::map<std::string,std::string> capture_recovery_evidence(const std::string &generation){
-    const auto root=std::filesystem::path(generation)/"evidence";struct stat info{};
+    const auto root=disk_path(generation)/"evidence";
+#ifdef _WIN32
+    windows_file::ParentChain parents(root,windows_file::current_sid());
+    if(::GetFileAttributesW(windows_file::api_path(root).c_str())==INVALID_FILE_ATTRIBUTES){const auto error=::GetLastError();require(error==ERROR_FILE_NOT_FOUND||error==ERROR_PATH_NOT_FOUND);return {};}
+#else
+    struct stat info{};
     if(::lstat(root.c_str(),&info)){require(errno==ENOENT);return {};}
+#endif
     directory(root);std::map<std::string,std::string> files;std::uint64_t total{};
     for(const auto &entry:std::filesystem::directory_iterator(root)){
         const auto id=entry.path().filename().string();require(hex(id,32));directory(entry.path());
-        const auto record=PiManagementJournal::read_private_record((entry.path()/"index.json").string());require(bool(record));const auto index=parse_recovery_json(record->bytes,1048576);
+        const auto record=PiManagementJournal::read_private_record(text(entry.path()/"index.json"));require(bool(record));const auto index=parse_recovery_json(record->bytes,1048576);
         fields(index,{"schema","source","created_utc","archive_sha256","content_digest","files"});require(index["schema"]=="recovery-evidence/1"&&index["created_utc"].is_number_unsigned()&&index["created_utc"]>0&&index["created_utc"].get<std::uint64_t>()<(1ULL<<63));
         const auto &source=index["source"];fields(source,{"identity","role","application_version","storage","platform"});
         require(source["identity"].is_string()&&hex(source["identity"].get<std::string>(),32)&&(source["role"]=="pi"||source["role"]=="controller")&&
-            source["storage"]=="application-state/1"&&(source["platform"]=="linux"||source["platform"]=="darwin")&&source["application_version"].is_string()&&
+            source["storage"]=="application-state/1"&&(source["platform"]=="linux"||source["platform"]=="darwin"||(source["platform"]=="windows"&&source["role"]=="controller"))&&source["application_version"].is_string()&&
             !source["application_version"].get_ref<const std::string &>().empty()&&source["application_version"].get_ref<const std::string &>().size()<=128&&
             index["archive_sha256"].is_string()&&hex(index["archive_sha256"].get<std::string>(),64)&&index["content_digest"].is_string()&&hex(index["content_digest"].get<std::string>(),64)&&
             index["files"].is_array()&&!index["files"].empty()&&index["files"].size()<1024);
@@ -68,10 +87,10 @@ std::map<std::string,std::string> capture_recovery_evidence(const std::string &g
             const auto name=file["name"].get<std::string>(),logical="application/evidence/"+id+"/"+name;const auto maximum=recovery_evidence_member_maximum(logical);
             require(name!="index.json"&&name>previous&&maximum&&file["size"].get<std::uint64_t>()<=*maximum&&names.insert(name).second);previous=name;
             total+=file["size"].get<std::uint64_t>();require(total<=2ULL*1024*1024*1024-2*1024*1024&&files.size()<1023);
-            require(digest_file(entry.path()/name,file["size"].get<std::uint64_t>())==file["sha256"].get<std::string>());files[logical]=(entry.path()/name).string();
+            require(digest_file(entry.path()/name,file["size"].get<std::uint64_t>())==file["sha256"].get<std::string>());files[logical]=text(entry.path()/name);
         }
         std::set<std::string> actual;for(const auto &file:std::filesystem::directory_iterator(entry.path()))actual.insert(file.path().filename().string());require(actual==names&&files.size()<1024);
-        files["application/evidence/"+id+"/index.json"]=(entry.path()/"index.json").string();
+        files["application/evidence/"+id+"/index.json"]=text(entry.path()/"index.json");
     }return files;
 }
 }

@@ -1,6 +1,8 @@
+#include "hardware_access_policy.hpp"
 // SPDX-License-Identifier: MIT
 #include "pico_usb_management_channel.hpp"
-#include "../pico_usb_installer_state.hpp"
+#include "usb_cdc_native.hpp"
+#include "../pico_usb_runtime_ownership.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <map>
@@ -48,8 +50,7 @@ bool PicoUsbManagementChannel::ensure(const std::string &expected, bool verified
     if (now() >= operation_deadline || (cancellation && cancellation->load())||(operation_cancelled&&operation_cancelled())) return false;
     if (binding_.transport != "usb" || (pico_usb_update_blocked(binding_.usb_serial) && !verified_update_reconnect)) return false;
     if (!factory_for_test) {
-        if (const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-            disabled && std::string_view(disabled) == "1") return false;
+        if (hardware_access_disabled()) return false;
     }
     if (client && client->connected()) return expected.empty() || client->device() == expected;
     try {
@@ -57,7 +58,7 @@ bool PicoUsbManagementChannel::ensure(const std::string &expected, bool verified
         else {
             updater_lease = pico_usb_runtime_lease(binding_.usb_serial);
             stream.close();
-            const auto paired = management_linux_cdc({binding_.path, binding_.usb_serial,
+            const auto paired = management_native_cdc({binding_.path, binding_.usb_serial,
                 static_cast<std::uint16_t>(binding_.vendor_id), static_cast<std::uint16_t>(binding_.product_id),
                 PicoCdcRole::Management});
             auto current = now();

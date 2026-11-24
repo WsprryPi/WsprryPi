@@ -1,3 +1,4 @@
+#include "native_calendar_time.hpp"
 /**
  * @file web_socket_commands.cpp
  * @brief Dispatches JSON commands received by the WebSocket transport.
@@ -29,7 +30,7 @@
 #include "web_socket.hpp"
 #include "application_recovery/restore_hold.hpp"
 #include "wtp_runtime_bridge.hpp"
-#include "pico_usb_installer_state.hpp"
+#include "pico_usb_runtime_ownership.hpp"
 #include "backend_capabilities.hpp"
 #include "machine_power_control.hpp"
 #if WSPRRYPI_BACKEND_RP1_GPCLK
@@ -45,7 +46,6 @@
 #include "test_tone_request.hpp"
 #include "test_tone_response.hpp"
 #include "wspr_band_catalog_response.hpp"
-#include "wspr_transmit.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -400,7 +400,7 @@ void WebSocketServer::handleMessage(const std::string &raw_message)
             auto now = std::chrono::system_clock::now();
             auto now_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm_utc{};
-            gmtime_r(&now_t, &tm_utc);
+            wsprrypi::native_calendar::utc(&now_t, &tm_utc);
             std::ostringstream oss;
             oss << std::put_time(&tm_utc, "%Y-%m-%dT%H:%M:%SZ");
             reply["timestamp"] = oss.str();

@@ -1,5 +1,6 @@
 # Repo-specific ignores
 singleton_test
+installation_lock_test
 src/[^/]*[^.][^/]*$
 !src/
 !src/**/

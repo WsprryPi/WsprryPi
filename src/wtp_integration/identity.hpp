@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Lee Bussy
 #pragma once
 #include <algorithm>
-#include <arpa/inet.h>
+#include "native_socket.hpp"
 #include <optional>
 #include <string>
 

@@ -12,7 +12,7 @@ import stat
 import subprocess
 import tempfile
 
-MODULES = ('__init__.py', 'archive.py', 'durable.py', 'evidence.py', 'jobs.py', 'lifecycle.py', 'publication.py', 'proxy.py', 'worker.py')
+MODULES = ('__init__.py', 'archive.py', 'durable.py', 'evidence.py', 'jobs.py', 'lifecycle.py', 'publication.py', 'proxy.py', 'private_acl.py', 'state_owner.py', 'state_owner_worker.py', 'worker.py')
 
 
 def directory(path):

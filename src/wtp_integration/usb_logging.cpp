@@ -1,7 +1,10 @@
+#include "native_calendar_time.hpp"
 // SPDX-License-Identifier: MIT
 #include "usb_logging.hpp"
+#include "hardware_access_policy.hpp"
+#include "usb_cdc_native.hpp"
 #include "catalog.hpp"
-#include "pico_usb_installer_state.hpp"
+#include "pico_usb_runtime_ownership.hpp"
 #include "usb_cdc.hpp"
 #include "usb_discovery.hpp"
 #include <openssl/sha.h>
@@ -24,7 +27,11 @@
 #include <map>
 #include <sstream>
 #include <thread>
+#ifdef _WIN32
+#include "pi_management_journal.hpp"
+#else
 #include <unistd.h>
+#endif
 #if defined(__linux__) && LIB_JOURNALD
 #include <systemd/sd-journal.h>
 #endif
@@ -110,7 +117,7 @@ bool project_journal(const Json &event, const std::string &collector, const std:
 #endif
 }
 struct Source {
-  PosixCdcSystem system;
+  NativeCdcSystem system;
   UsbCdcStream stream{system};
   std::shared_ptr<void> lease;
   std::string input, output, boot, name, state = "disconnected", last_boot,
@@ -239,6 +246,15 @@ private:
     Json loaded = {{"contract","Wsprry-Control/1"},{"schema", "host-usb-logging/1"},
                    {"collector_id", self_},
                    {"sources", Json::array()}};
+#ifdef _WIN32
+    const auto record=PiManagementJournal::read_private_record(path_);
+    if(record){
+      if(record->bytes.size()>4096)throw std::runtime_error("logging_settings_too_large");
+      loaded=strict_json(record->bytes);
+      validate(loaded);
+      if(loaded.at("collector_id")!=self_)throw std::runtime_error("logging_collector_changed");
+    }
+#else
     const int fd = ::open(path_.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd < 0) {
       if (errno != ENOENT)
@@ -274,6 +290,7 @@ private:
       if (loaded.at("collector_id") != self_)
         throw std::runtime_error("logging_collector_changed");
     }
+#endif
     if (loaded != saved_) {
       saved_ = std::move(loaded);
       ++generation_;
@@ -281,6 +298,12 @@ private:
   }
   std::string etag() const { return wtp_catalog_revision(saved_); }
   void save(const Json &value) {
+#ifdef _WIN32
+    const auto bytes=value.dump();
+    if(bytes.size()>4096)throw std::runtime_error("logging_settings_too_large");
+    const auto before=PiManagementJournal::read_private_record(path_);
+    (void)PiManagementJournal::publish_private_record(path_,before,bytes);
+#else
     const auto temp = path_ + ".tmp." + WtpPiBootIdentity{}.new_boot_id();
     const auto bytes = value.dump();
     const int fd =
@@ -316,6 +339,7 @@ private:
     ::close(parent);
     if (sync)
       throw std::runtime_error("logging_save_unconfirmed");
+#endif
   }
   void poll(Source &source, const WtpSettings &settings, const std::string& profile, unsigned maximum,
             std::uint64_t now) {
@@ -332,7 +356,7 @@ private:
       source.close();
       source.retry = now + 5000;
       source.lease = pico_usb_runtime_lease(settings.usb_serial);
-      const auto selected = logging_linux_cdc(
+      const auto selected = logging_native_cdc(
           {settings.path, settings.usb_serial,
            static_cast<std::uint16_t>(settings.vendor_id),
            static_cast<std::uint16_t>(settings.product_id)});
@@ -663,7 +687,7 @@ Json parse_usb_log(const std::string &line, const std::string &device,
         static_cast<std::time_t>(decimal(value.at("utc_ns")) / 1000000000ULL);
     std::tm time{};
     char text[32]{};
-    if (!gmtime_r(&seconds, &time) ||
+    if (!wsprrypi::native_calendar::utc(&seconds, &time) ||
         !std::strftime(text, sizeof(text), "%Y-%m-%dT%H:%M:%SZ", &time))
       throw std::runtime_error("invalid_log_time");
     expected_stamp = text;
@@ -673,8 +697,7 @@ Json parse_usb_log(const std::string &line, const std::string &device,
   return value;
 }
 void start_usb_logging(const std::string &ini,UsbLoggingCatalogSnapshot catalog) {
-  if (const auto *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-      disabled && std::string(disabled) == "1")
+  if (hardware_access_disabled())
     return;
   auto candidate = std::make_shared<Collector>(ini,wtp_pi_device_id(),true,std::move(catalog));
   std::shared_ptr<Collector> old;

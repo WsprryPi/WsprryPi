@@ -22,8 +22,6 @@ extern std::atomic<bool> ppm_reload_pending;
 void apply_runtime_config_side_effects();
 void show_config_values(bool reload);
 bool validate_config_data();
-void start_runtime_config_monitor(const std::string &filename);
-void stop_runtime_config_monitor() noexcept;
 void set_startup_diagnostic_deferral(bool enabled) noexcept;
 void emit_deferred_startup_diagnostics();
 bool consume_startup_config_handoff() noexcept;

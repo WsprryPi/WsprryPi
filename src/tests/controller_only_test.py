@@ -186,6 +186,12 @@ def main():
                 assert state["role"] == "controller-only"
                 assert state["local_output"] is None and not state["local_transmission_available"]
                 if arguments.production_main and arguments.private_state:
+                    # A different database root still shares this installation's
+                    # identity and pairing owners. Refuse before creating it.
+                    competing = directory / "competing-state"
+                    assert rejected(launcher + ["--initialize-state", "--controller-only",
+                                                "--state-directory", str(competing)]) == 2
+                    assert not competing.exists()
                     # The production role's explicit stable identity must retain
                     # its own pairing owner; it has no native transmitter host.
                     deadline = time.monotonic() + 5

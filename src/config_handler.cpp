@@ -41,7 +41,11 @@
 #include "privileged_network_admin.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
 #include "i2c_bus_inventory.hpp"
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
 #include "WSPR-Transmitter/src/linux_i2c_identity.hpp"
+#endif
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
 #include "WSPR-Transmitter/src/mcp2221a_macos.hpp"
 #include <mach-o/dyld.h>
@@ -83,9 +87,11 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#ifndef _WIN32
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 ArgParserConfig config;
 nlohmann::json jConfig;
@@ -197,7 +203,9 @@ namespace
     std::optional<mcp2221a::Endpoint> si5351_native_binding;
     int si5351_native_address = -1;
 #endif
+#ifndef _WIN32
     std::optional<linux_i2c_identity::Adapter> si5351_inventory_binding;
+#endif
     std::optional<std::vector<std::string>> si5351_inventory_command_override;
     std::function<void()> si5351_inventory_after_spawn_for_test;
     std::string interactive_enable_file_stamp;
@@ -212,6 +220,19 @@ namespace
             const auto saved=wsprrypi::database_configuration_input();
             return path+":"+saved.record_revision;
         }
+#ifdef _WIN32
+        namespace wf=wsprrypi::windows_file;
+        try{
+            const auto name=wf::path_from_utf8(path);wf::ParentChain parents(name,wf::current_sid());
+            wf::Handle handle(::CreateFileW(wf::api_path(name).c_str(),READ_CONTROL|FILE_READ_ATTRIBUTES,FILE_SHARE_READ,
+                nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,nullptr));
+            wf::require(handle.get()!=INVALID_HANDLE_VALUE);const auto info=wf::inspect(handle.get(),false);
+            wf::verify_security(handle.get(),wf::current_sid(),false,false);
+            std::string identity;for(const auto byte:info.file_id.FileId.Identifier){identity+="0123456789abcdef"[byte>>4];identity+="0123456789abcdef"[byte&15];}
+            return path+":"+std::to_string(info.file_id.VolumeSerialNumber)+":"+identity+":"+
+                std::to_string(info.standard.EndOfFile.QuadPart)+":"+std::to_string(info.basic.LastWriteTime.QuadPart)+":"+std::to_string(info.basic.ChangeTime.QuadPart);
+        }catch(const std::exception &){return {};}
+#else
         struct stat info{};
         if (stat(path.c_str(), &info) != 0) return {};
 #if defined(__APPLE__)
@@ -225,6 +246,7 @@ namespace
             std::to_string(info.st_ino) + ":" + std::to_string(info.st_size) + ":" +
             std::to_string(modified.tv_sec) + ":" + std::to_string(modified.tv_nsec) + ":" +
             std::to_string(changed.tv_sec) + ":" + std::to_string(changed.tv_nsec);
+#endif
     }
 
     void require_persistable_gpio_manual_ppm(double ppm)
@@ -900,6 +922,11 @@ Si5351AddressInventory discover_si5351_addresses(
         si5351_native_address = selected_address;
     }
     return native_result;
+#elif defined(_WIN32)
+    Si5351AddressInventory unavailable;
+    unavailable.i2c_bus=i2c_bus;
+    unavailable.error="Local Si5351 transmission is unavailable on this host";
+    return unavailable;
 #else
     Si5351AddressInventory result;
     if (!adapter_identity.empty() && (selected_address < 0x60 || selected_address > 0x6F)) {
@@ -1002,6 +1029,11 @@ Si5351AddressInventory cached_si5351_addresses(int i2c_bus, int reference_hz, co
     }
     native_result.error = "This adapter and address have not been checked. Check the selected address before saving.";
     return native_result;
+#elif defined(_WIN32)
+    Si5351AddressInventory unavailable;
+    unavailable.i2c_bus=i2c_bus;
+    unavailable.error="Local Si5351 transmission is unavailable on this host";
+    return unavailable;
 #else
     std::optional<linux_i2c_identity::Adapter> current_binding;
     if (!adapter_identity.empty()) {
@@ -2345,6 +2377,7 @@ void json_to_ini()
 
 bool apply_enable_on_boot_startup_policy()
 {
+#ifndef _WIN32
     // A route restoration restarts the application, never its transmission.
     // This startup-only override leaves the saved boot preference unchanged.
     if (std::getenv("WSPRRYPI_ROUTE_RESTORE_IDLE") != nullptr ||
@@ -2355,6 +2388,7 @@ bool apply_enable_on_boot_startup_policy()
         json_to_ini();
         return true;
     }
+#endif
 
     switch (config.enable_on_boot)
     {
@@ -2579,6 +2613,8 @@ static std::string patch_all_from_web_revision_impl(const nlohmann::json &j, con
 #if defined(__APPLE__) && defined(WSPRRYPI_SI5351_TRANSPORT)
             mcp2221a::Endpoint endpoint;
             mcp2221a::resolve(native_si5351_inventory(), candidate_config.si5351_adapter_identity, endpoint, error_message);
+#elif defined(_WIN32)
+            error_message = "Local Si5351 transmission is unavailable on this host";
 #else
             error_message = candidate_config.si5351_adapter_identity.empty()
                 ? i2c_bus_inventory::selection_error(i2c_bus_inventory::discover(), candidate_config.si5351_i2c_bus)
@@ -2745,7 +2781,7 @@ static std::string patch_all_from_web_revision_impl(const nlohmann::json &j, con
     update_lock.unlock(); // set_config takes its own lock before reading config.
     if (!g_patch_all_from_web_runtime_apply_suppressed_for_test)
     {
-        callback_ini_changed();
+        notify_saved_configuration_changed();
     }
     return revision;
 }
@@ -2836,6 +2872,9 @@ PreparedConfigCandidate prepare_ini_after_image(const std::string &filename,cons
             throw std::runtime_error("Configuration after-image rejected: "+candidate.error_reason);
         return candidate;
     }
+#ifdef _WIN32
+    throw std::runtime_error("Active configuration requires the SQLite settings owner");
+#else
     // The component is a singleton. Use its existing parser on an exclusively
     // created private preparation file while holding the configuration lock;
     // restore the live parser before invoking the durable owner. No live file
@@ -2871,6 +2910,7 @@ PreparedConfigCandidate prepare_ini_after_image(const std::string &filename,cons
     if (candidate.normalized_json.contains("Meta"))
         candidate.normalized_json["Meta"].erase("Legacy GPIO Migration Required");
     return candidate;
+#endif
 }
 }
 
@@ -2901,6 +2941,9 @@ void persist_stock_configuration(bool preserve_compatible_values)
         config_stock_coordinator(candidate.normalized_json,bytes);
         return;
     }
+#ifdef _WIN32
+    throw std::runtime_error("Active configuration requires the SQLite settings owner");
+#else
     const auto inspect = [](const std::string &path) {
         struct stat info{};
         if (::lstat(path.c_str(), &info) || !S_ISREG(info.st_mode) ||
@@ -2919,6 +2962,7 @@ void persist_stock_configuration(bool preserve_compatible_values)
         throw std::runtime_error("Configuration changed during stock validation");
     config_stock_coordinator(candidate.normalized_json,bytes);
     iniFile.set_filename(filename);
+#endif
 }
 
 void persist_recovery_configuration(const nlohmann::json &configuration,
@@ -3092,30 +3136,19 @@ void repair_from_web(bool attempt_repair)
     if (config_stock_coordinator)
     {
         persist_stock_configuration(attempt_repair);
-        if(!wsprrypi::application_database_selected()) {
-            iniMonitor.stop();
-            iniMonitor.filemon(config.ini_filename, callback_ini_changed);
-            iniMonitor.setPriority(SCHED_RR, 10);
-        }
     }
     else if (attempt_repair)
     {
         iniFile.repair_from_stock(get_raw_version_string());
-        iniMonitor.stop();
-        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
-        iniMonitor.setPriority(SCHED_RR, 10);
     }
     else
     {
         iniFile.reset_to_stock(get_raw_version_string());
-        iniMonitor.stop();
-        iniMonitor.filemon(config.ini_filename, callback_ini_changed);
-        iniMonitor.setPriority(SCHED_RR, 10);
     }
 
     if (current_test_tone_status().owned) {
         // Keep the running tone's backend/mode/selector snapshot until End.
-        // The file monitor and scheduler will reconcile the saved repair.
+        // The saved-setting notification and scheduler reconcile the repair.
         ini_reload_pending.store(true, std::memory_order_release);
         llog.logS(INFO, "Configuration repair saved; runtime reload deferred until Test Tone ends.");
         return;

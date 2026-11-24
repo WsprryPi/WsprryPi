@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "native_socket.hpp"
 #include "httplib.hpp"
 #include "pi_pair_admission.hpp"
 namespace wsprrypi {

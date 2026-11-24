@@ -155,6 +155,8 @@ wsprrypi::PicoHttpResponse catalog_request(const httplib::Request &request) {
             auto body = wsprrypi::strict_browser_json(request.body);
             if (!body.is_object()) throw std::runtime_error("Invalid catalog request");
             const auto operation = body.value("operation", "");
+            if(operation=="add"||operation=="edit")
+                validate_native_wtp_settings(parse_management_profile_settings(body.at("settings"),true),true);
             if (operation == "add" && body.value("method", "") == "dns_sd") {
                 const auto settings = candidate_settings(body, false);
                 if (settings.transport == "network_plain" && body.value("consent_plain", false) != true)

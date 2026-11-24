@@ -2,16 +2,28 @@
 #include "web_bootstrap.hpp"
 #include <cerrno>
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#include "wtp_integration/pi_management_journal.hpp"
+#else
 #include <fcntl.h>
-#include <set>
-#include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <set>
+#include <stdexcept>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw std::runtime_error("Listener bootstrap cache is unavailable or unsafe");}
 bool identity(const Json &value){return value.is_string()&&value.get_ref<const std::string &>().size()==32&&value.get_ref<const std::string &>().find_first_not_of("0123456789abcdef")==std::string::npos;}
+#ifdef _WIN32
+std::string native_path(const std::string &path){
+    const auto file=windows_file::path_from_utf8(path);const auto name=file.filename().u8string();
+    const std::string leaf(name.begin(),name.end());require(leaf=="listeners.json"||leaf.ends_with(".web-listeners.json"));
+    return path;
+}
+#else
 struct Descriptor {int fd;~Descriptor(){if(fd>=0)::close(fd);}};
 int parent(const std::string &path){
     const std::filesystem::path file(path);require(file.is_absolute()&&file.filename()!="."&&file.filename()!=".."&&path.find('\0')==std::string::npos);
@@ -29,6 +41,7 @@ void safe_file(int directory,const std::string &name,bool missing){
     if(::fstatat(directory,name.c_str(),&info,AT_SYMLINK_NOFOLLOW)){require(missing&&errno==ENOENT);return;}
     require(S_ISREG(info.st_mode)&&info.st_uid==::geteuid()&&info.st_nlink==1&&!(info.st_mode&0077));
 }
+#endif
 }
 bool valid_web_bootstrap(const Json &value){
     if(!value.is_object()||value.size()!=11)return false;
@@ -40,11 +53,16 @@ bool valid_web_bootstrap(const Json &value){
     return value["socket_loopback_family"]=="auto"||value["socket_loopback_family"]=="ipv4"||value["socket_loopback_family"]=="ipv6";
 }
 Json read_web_bootstrap_cache(const std::string &path){
+#ifdef _WIN32
+    const auto record=PiManagementJournal::read_private_record(native_path(path));
+    require(record&&record->bytes.size()>0&&record->bytes.size()<=8192);const auto &bytes=record->bytes;
+#else
     Descriptor directory{parent(path)};const auto name=std::filesystem::path(path).filename().string();safe_file(directory.fd,name,false);
     Descriptor input{::openat(directory.fd,name.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK)};require(input.fd>=0);
     struct stat info{};require(!::fstat(input.fd,&info)&&S_ISREG(info.st_mode)&&info.st_uid==::geteuid()&&info.st_nlink==1&&!(info.st_mode&0077)&&info.st_size>0&&info.st_size<=8192);
     std::string bytes(info.st_size,'\0');std::size_t offset=0;
     while(offset<bytes.size()){const auto count=::read(input.fd,bytes.data()+offset,bytes.size()-offset);if(count<0&&errno==EINTR)continue;require(count>0);offset+=count;}
+#endif
     std::vector<std::set<std::string>> keys;
     auto value=Json::parse(bytes,[&](int depth,Json::parse_event_t event,Json &item){
         require(depth<=8);if(event==Json::parse_event_t::object_start)keys.emplace_back();
@@ -54,6 +72,12 @@ Json read_web_bootstrap_cache(const std::string &path){
     });require(valid_web_bootstrap(value));return value;
 }
 void write_web_bootstrap_cache(const std::string &path,const Json &value){
+#ifdef _WIN32
+    require(valid_web_bootstrap(value));const auto selected=native_path(path);
+    const auto before=PiManagementJournal::read_private_record(selected);
+    if(before){require(before->bytes.size()<=8192);try{if(read_web_bootstrap_cache(selected)==value)return;}catch(const std::exception &) {}}
+    (void)PiManagementJournal::publish_private_record(selected,before,value.dump());
+#else
     require(valid_web_bootstrap(value));Descriptor directory{parent(path)};
     const auto name=std::filesystem::path(path).filename().string();safe_file(directory.fd,name,true);
     // One admitted frontend writes this cache. A stale, bounded, private
@@ -78,5 +102,6 @@ void write_web_bootstrap_cache(const std::string &path,const Json &value){
         require(!::fsync(output.fd));safe_file(directory.fd,name,true);
         require(!::renameat(directory.fd,temporary.c_str(),directory.fd,name.c_str())&&!::fsync(directory.fd));
     }catch(...){::unlinkat(directory.fd,temporary.c_str(),0);throw;}
+#endif
 }
 }

@@ -3,10 +3,19 @@
 #include "json.hpp"
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <cstdint>
+#ifndef _WIN32
 #include <sys/types.h>
+#endif
 namespace wsprrypi {
+#ifdef _WIN32
+using LocalTransportDescriptor=std::intptr_t;
+#else
+using LocalTransportDescriptor=int;
+#endif
 enum class LocalPeer {Administrator,WebService};
 enum class LocalOperation {SettingsRead,SettingsWrite,DiagnosticRead,RouteRead,ListenerRead,EventsRead,BrowserOpen,BrowserMessage,HttpOpen,HttpBody,HttpDispatch,HttpRead,HttpComplete,WebBootstrap,WebAttach,WebHeartbeat,BrowserCheck,RecoveryCapture,RecoveryObserve,RecoveryValidate,RecoveryPrepare,RecoveryReview,RecoveryCommand,RecoverySessionIssue};
 enum class LocalChannel {Control,Events,Browser,Http,WebService,Recovery};
@@ -15,7 +24,8 @@ struct LocalRequest {
     nlohmann::json arguments;
     // Set only by the verified server transport; never read from JSON.
     std::string transport_connection{};
-    int transport_descriptor{-1};
+    LocalTransportDescriptor transport_descriptor{-1};
+    std::function<bool()> transport_alive{}; // Verified connection lifetime, never JSON.
 };
 enum class LocalRefusal {InvalidRequest,RevisionConflict,Busy,SetupRequired,StorageUnavailable};
 // The handler may use this only for an admission refusal before mutation.
@@ -28,10 +38,19 @@ private:LocalRefusal value_;
 // Peers are derived from the connected OS socket, never request JSON.
 struct LocalTransportOptions {
     std::string directory;
+#ifdef _WIN32
+    std::wstring backend_sid,web_sid;
+    LocalChannel channel{LocalChannel::Control};
+    std::optional<std::wstring> administrator_sid{};
+    bool allow_elevated_administrators{true};
+#else
     uid_t backend_uid;
     uid_t web_uid;
     gid_t socket_group;
     LocalChannel channel{LocalChannel::Control};
+    // Optional additional OS administrator, distinct from the backend owner.
+    std::optional<uid_t> administrator_uid{};
+#endif
 };
 class LocalControlError:public std::runtime_error {
 public:

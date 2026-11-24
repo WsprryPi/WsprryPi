@@ -30,11 +30,40 @@
         if (/^[0-9.]+$/.test(name) || name.split(".").every(label => /^(?:[0-9]+|0x[0-9a-f]+)$/i.test(label))) return false;
         return name.length <= 253 && name.split(".").every(label => /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(label));
     }
+    function windowsFileReference(value) {
+        if (typeof value !== "string" || !/^[a-zA-Z]:[/\\]/.test(value)) return false;
+        const parts = value.slice(3).split(/[/\\]/);
+        return parts.every(part => {
+            if (!part || part === "." || part === ".." || /[. ]$/.test(part) || /[\x00-\x1f\x7f:<>"|?*]/.test(part)) return false;
+            const stem = part.split(".")[0].replace(/ +$/, "").replace(/[a-z]/g, letter => String.fromCharCode(letter.charCodeAt(0) - 32));
+            return !/^(?:CON|PRN|AUX|NUL|CLOCK\$|CONIN\$|CONOUT\$|(?:COM|LPT)[0-9¹²³])$/.test(stem);
+        });
+    }
+    function absoluteFileReference(value) {
+        return typeof value === "string" && (value.startsWith("/") || windowsFileReference(value));
+    }
+    function usbInterfaceReference(value) {
+        if (typeof value !== "string") return false;
+        if (value.startsWith("/dev/")) return !value.includes("/../");
+        // SetupAPI names are opaque; discovery owns serial, VID/PID, and role.
+        return value.startsWith("\\\\?\\") && value.length > 4 && !/[\x00-\x1f\x7f-\uffff\\/:"<>|?*]/.test(value.slice(4));
+    }
+    function boundedReference(value, maximum) {
+        if (typeof value !== "string" || /[\x00-\x1f\x7f]/.test(value)) return false;
+        let bytes = 0;
+        for (const character of value) {
+            const code = character.codePointAt(0);
+            if (code >= 0xd800 && code <= 0xdfff) return false;
+            bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+            if (bytes > maximum) return false;
+        }
+        return true;
+    }
     function errors(settings, selected) {
         const result = {};
         for (const [key, max] of [["Endpoint", 512], ["USB Serial", 128], ["Device ID", 32]]) {
             const value = settings[key];
-            if (typeof value !== "string" || value.length > max || /[\x00-\x1f\x7f]/.test(value))
+            if (!boundedReference(value, max))
                 result[key] = `Enter a valid ${key.toLowerCase()}.`;
         }
         if (!["usb", "network_plain", "network"].includes(settings.Transport)) result.Transport = "Choose USB, Consumer Wi-Fi, or HTTPS.";
@@ -46,13 +75,13 @@
         }
         for (const key of ["TLS CA File", "TLS Client Certificate", "TLS Client Key"]) {
             const value = settings[key];
-            if (typeof value !== "string" || value.length > 512 || /[\x00-\x1f\x7f]/.test(value)) result[key] = "Enter a valid local file reference.";
-            else if (selected && tls && !value.startsWith("/")) result[key] = "Enter an absolute file path on the WsprryPi host.";
+            if (!boundedReference(value, 512)) result[key] = "Enter a valid local file reference.";
+            else if (selected && tls && !absoluteFileReference(value)) result[key] = "Enter an absolute file path on the WsprryPi host.";
         }
         if (selected && network && !settings.Hostname) result.Hostname = "Enter the Pico's configured hostname or literal IP address.";
         if (!Number.isInteger(settings["TCP Port"]) || settings["TCP Port"] < (selected && network ? 1 : 0) || settings["TCP Port"] > 65535) result["TCP Port"] = "Enter the configured management port (1–65535).";
         if (selected) {
-            if (!network && !String(settings.Endpoint).startsWith("/dev/") || (!network && settings.Endpoint.includes("/../"))) result.Endpoint = "Select the dedicated management device path under /dev/.";
+            if (!network && !usbInterfaceReference(settings.Endpoint)) result.Endpoint = "Select the dedicated management device interface reported by this host.";
             if (!network && !settings["USB Serial"]) result["USB Serial"] = "Enter the selected device's USB serial.";
             if (!(settings.Transport === "usb" && settings["Device ID"] === "") &&
                 !/^[0-9a-f]{32}$/.test(settings["Device ID"]))

@@ -11,7 +11,7 @@
 #include "logging.hpp"
 #include "privileged_network_runtime.hpp"
 #include "wtp_runtime_bridge.hpp"
-#include "pico_usb_installer_state.hpp"
+#include "pico_usb_runtime_ownership.hpp"
 #include "controller_runtime.hpp"
 #include "pi_managed_host_runtime.hpp"
 #include "json.hpp"

@@ -99,6 +99,7 @@ __pycache__/
 *.egg
 *.egg-info/
 *.manifest
+!/src/native_windows_controller.manifest
 *.spec
 .venv/
 venv/

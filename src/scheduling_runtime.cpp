@@ -24,6 +24,7 @@
 #include "test_tone_response.hpp"
 #include "machine_power_control.hpp"
 #include "ppm_manager.hpp"
+#include "local_frequency_provider.hpp"
 #include "privileged_network_runtime.hpp"
 #include "rp1_route_bridge.hpp"
 #include "runtime_config_operations.hpp"
@@ -47,8 +48,10 @@
 #include <thread>
 
 #include <string.h>
+#ifndef _WIN32
 #include <sys/resource.h>
 #include <unistd.h>
+#endif
 
 static std::atomic<bool> transmission_runtime_failed{false};
 
@@ -435,6 +438,7 @@ void transmitter_cb(WsprTransmissionCallbackEvent event,
  */
 void ppm_callback(double /*new_ppm*/)
 {
+#if !WSPRRYPI_CONTROLLER_ONLY
     refresh_frequency_estimate_for_config();
     // Notify other subsystems to reload/recalibrate with the fresh PPM.
     ppm_reload_pending.store(true, std::memory_order_relaxed);
@@ -445,6 +449,7 @@ void ppm_callback(double /*new_ppm*/)
         llog.logS(DEBUG, "The system-clock frequency estimate provider has updated its value.");
         config.frequency_estimate_good = true;
     }
+#endif
 }
 
 /**
@@ -459,6 +464,9 @@ void ppm_callback(double /*new_ppm*/)
  */
 bool ppm_init()
 {
+#if WSPRRYPI_CONTROLLER_ONLY
+    return false;
+#else
     bool retval = true;
 
     // Register the PPM update callback
@@ -492,6 +500,7 @@ bool ppm_init()
     }
 
     return retval;
+#endif
 }
 
 /**
@@ -605,12 +614,11 @@ void stop_runtime_components_for_process_exit() noexcept
     socketServer.stop();
     socketServer.stop_command_runtime();
     wsprrypi::stop_backend_services();
-    stop_runtime_config_monitor();
     wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
-    ppmManager.stop();
+    wsprrypi::stop_local_frequency_provider();
     transmitter_shutdown_for_process_exit();
     reset_active_wspr_plan_state();
     deassert_transmit_gpio_outputs(
@@ -629,12 +637,11 @@ void stop_runtime_components_for_test() noexcept
     socketServer.stop();
     socketServer.stop_command_runtime();
     wsprrypi::stop_backend_services();
-    stop_runtime_config_monitor();
     wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
     shutdownMonitor.stop();
-    ppmManager.stop();
+    wsprrypi::stop_local_frequency_provider();
     transmitter_stop_and_join();
     deassert_transmit_gpio_outputs(
         &config,
@@ -769,7 +776,7 @@ bool wspr_loop()
     const bool start_web = web_server_start_enabled(config)&&!wsprrypi::application_database_selected();
     const bool start_websocket = websocket_server_start_enabled(config)&&!wsprrypi::application_database_selected();
     const int startup_web_port = config.web_port;
-    const uint16_t startup_socket_port = config.socket_port;
+    const int startup_socket_port = config.socket_port;
     const bool startup_socket_loopback_only = config.socket_loopback_only;
     const auto startup_socket_loopback_family = config.socket_loopback_family;
     if (!config.enable_web)
@@ -783,7 +790,9 @@ bool wspr_loop()
         try
         {
             webServer.start(startup_web_port);
+#ifndef _WIN32
             webServer.setThreadPriority(SCHED_RR, 10);
+#endif
         }
         catch (const std::exception &error)
         {
@@ -816,8 +825,8 @@ bool wspr_loop()
 
     if (start_websocket&&!recovery.owns_websocket())
     {
-        if (!socketServer.start(
-                startup_socket_port,
+        if (startup_socket_port<1||startup_socket_port>65535||!socketServer.start(
+                static_cast<std::uint16_t>(startup_socket_port),
                 SOCKET_KEEPALIVE,
                 startup_socket_loopback_only,
                 startup_socket_loopback_family))
@@ -826,7 +835,9 @@ bool wspr_loop()
             stop_runtime_components_for_process_exit();
             return false;
         }
+#ifndef _WIN32
         socketServer.setThreadPriority(SCHED_RR, 10);
+#endif
     }
     else if (!start_websocket)
     {
@@ -858,7 +869,9 @@ bool wspr_loop()
     }
 
     // Set transmission server and set priority
+#ifndef _WIN32
     transmitter_set_thread_scheduling(SCHED_FIFO, 50);
+#endif
 
     // Set transmission event callbacks
     transmitter_set_callbacks(
@@ -869,13 +882,6 @@ bool wspr_loop()
         {
             transmitter_cb(event, level, msg, value);
         });
-
-    // Monitor INI file for changes
-    if (config.use_ini && !wsprrypi::application_database_selected())
-    {
-        // Start INI monitor
-        start_runtime_config_monitor(config.ini_filename);
-    }
 
     llog.logS(INFO, "WSPR loop running.");
     set_startup_diagnostic_deferral(false);
@@ -980,6 +986,7 @@ bool wspr_loop()
 
     // Reboot bootstrap has no current route transaction to acknowledge. The
     // separate worker restores the route and restarts us with its fresh token.
+#ifndef _WIN32
     if (const char *restoration = std::getenv("WSPRRYPI_ROUTE_RESTORE_IDLE");
         restoration && std::getenv("WSPRRYPI_RP1_REBOOT_IDLE") == nullptr)
     {
@@ -998,6 +1005,7 @@ bool wspr_loop()
         }
     }
 
+#endif
     // -------------------------------------------------------------------------
     // Loop (block wspr_loop only) until shutdown is triggered
     // -------------------------------------------------------------------------
@@ -1052,20 +1060,17 @@ bool wspr_loop()
 
     wsprrypi::stop_backend_services();
 
-    llog.logS(DEBUG, "Stopping configuration monitor.");
     ini_reload_pending.store(false, std::memory_order_relaxed);
-    stop_runtime_config_monitor(); // Stop config file monitor before transmitter teardown.
     wsprrypi::stop_usb_logging();
     wsprrypi::stop_wtp_fleet();
     wsprrypi::stop_wtp_pi_endpoint();
-    llog.logS(DEBUG, "Configuration monitor stopped.");
 
     llog.logS(DEBUG, "Stopping shutdown monitor.");
     shutdownMonitor.stop(); // Stop the GPIO monitor
     llog.logS(DEBUG, "Shutdown monitor stopped.");
 
     llog.logS(DEBUG, "Stopping PPM manager.");
-    ppmManager.stop(); // Stop PPM manager (if active)
+    wsprrypi::stop_local_frequency_provider(); // Stop PPM manager (if active)
     llog.logS(DEBUG, "PPM manager stopped.");
 
     llog.logS(DEBUG, "Stopping transmitter.");
@@ -1091,8 +1096,10 @@ bool wspr_loop()
     llog.logS(DEBUG, "Runtime components stopped.");
 
     llog.logS(INFO, get_project_name(), "exiting.");
-    // Flush all file system buffers to disk
+    // Persistent owners perform their own durable barriers before shutdown.
+#ifndef _WIN32
     sync();
+#endif
 
     return !transmission_runtime_failed.load(std::memory_order_acquire);
 }
@@ -1115,7 +1122,12 @@ void reboot_machine()
     }
     else if (result.status == MachinePowerStatus::Failed)
     {
+#ifdef _MSC_VER
+        char message[256]{};if(::strerror_s(message,sizeof message,result.error_number))(void)::strcpy_s(message,sizeof message,"Unknown error");
+        llog.logE(ERROR, "Reboot failed: ", message);
+#else
         llog.logE(ERROR, "Reboot failed: ", std::strerror(result.error_number));
+#endif
     }
 }
 
@@ -1137,6 +1149,11 @@ void shutdown_machine()
     }
     else if (result.status == MachinePowerStatus::Failed)
     {
+#ifdef _MSC_VER
+        char message[256]{};if(::strerror_s(message,sizeof message,result.error_number))(void)::strcpy_s(message,sizeof message,"Unknown error");
+        llog.logE(ERROR, "Shutdown failed: ", message);
+#else
         llog.logE(ERROR, "Shutdown failed: ", std::strerror(result.error_number));
+#endif
     }
 }

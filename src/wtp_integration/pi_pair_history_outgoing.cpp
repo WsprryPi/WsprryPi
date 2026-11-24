@@ -111,7 +111,7 @@ std::optional<Json> PiPairHistory::prepare_outgoing_rotation(const std::string &
         }
         for(const auto &entry:book["entries"])require(entry["operation_id"]!=operation);
         require(pair["pending"].is_null()&&pair["previous"].is_null());const auto number=epoch(pair["current"]["epoch"]);require(number<UINT64_MAX);
-        auto key=PiPairRotationKey::generate();std::array<unsigned char,32> nonce{};require(RAND_bytes(nonce.data(),nonce.size())==1);
+        auto key=PiPairRotationKey::generate();std::array<unsigned char,32> nonce{};require(RAND_bytes(nonce.data(),static_cast<int>(nonce.size()))==1);
         Json request{{"contract","Wsprry-Pair/1"},{"schema","rotate-prepare"},{"operation_id",operation},{"pair_id",pair["pair_id"]},
             {"expected_epoch",pair["current"]["epoch"]},{"pA",key.public_point()},{"nonce",PiPairSecret(nonce).storage_encoding()}};
         Json intent{{"kind","rotation-intent"},{"self_id",self_},{"peer_id",row["target_id"]},{"profile_id",selector},{"pair_id",pair["pair_id"]},

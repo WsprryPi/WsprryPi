@@ -40,7 +40,7 @@ def parse_backends(raw: str) -> tuple[str, ...]:
     return tuple(item for item in SUPPORTED if item in requested)
 
 
-def header(backends: tuple[str, ...], ancillary_gpio: bool) -> str:
+def header(backends: tuple[str, ...], ancillary_gpio: bool, profile: str = "transmitter") -> str:
     lines = [
         "#pragma once",
         "",
@@ -53,6 +53,7 @@ def header(backends: tuple[str, ...], ancillary_gpio: bool) -> str:
     lines.append(
         f"#define WSPRRYPI_ANCILLARY_GPIO {1 if ancillary_gpio else 0}"
     )
+    lines.append(f"#define WSPRRYPI_CONTROLLER_ONLY {1 if profile == 'controller' else 0}")
     return "\n".join(lines) + "\n"
 
 
@@ -82,6 +83,7 @@ def replace_if_changed(destination: Path, content: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backends", required=True)
+    parser.add_argument("--profile", choices=("transmitter", "controller"), default="transmitter")
     parser.add_argument("--ancillary-gpio", required=True, choices=("0", "1"))
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument(
@@ -90,7 +92,13 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        content = header(parse_backends(args.backends), args.ancillary_gpio == "1")
+        if args.profile == "controller":
+            if args.backends.strip() or args.ancillary_gpio != "0":
+                raise CapabilityError("controller profile requires no local backends and ancillary GPIO disabled")
+            backends = ()
+        else:
+            backends = parse_backends(args.backends)
+        content = header(backends, args.ancillary_gpio == "1", args.profile)
         if args.check:
             current = args.output.exists() and args.output.read_bytes() == content.encode()
             print(f"backend capabilities {'current' if current else 'stale'}: {args.output}")

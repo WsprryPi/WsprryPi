@@ -103,7 +103,7 @@ function lines(child) {
         assert.equal(fault.recovery_operation,faultRequest.operation_id);assert.equal(fault.recovery_resource,'configuration');
         assert.equal((await dump()).config.station.callsign,'W5AW','A receipt persistence failure must not be mistaken for a refused remote write');
         client.stdin.write(JSON.stringify({control:'repair_receipt_storage'})+'\n');assert.deepEqual(JSON.parse(await clientLine()),{});
-        const faultRead=await call({resource:'configuration',method:'GET'});assert.equal(faultRead.status,200);
+        const faultRead=await call({resource:'configuration',method:'GET'});assert.equal(faultRead.status,200,JSON.stringify(faultRead));
         const faultHeld=await call({...faultRequest,operation_id:crypto.randomBytes(16).toString('hex')});assert.equal(faultHeld.status,503);assert.equal(faultHeld.body.error.code,'storage_unavailable');assert.equal(faultHeld.mutations,fault.mutations);
         // Restoring file permissions does not erase the warm authority's change
         // detection. The service stays held until cold authoritative recovery.

@@ -23,7 +23,7 @@ PicoHttpResponse PiPairHistory::local_pairing_receipt(const BrowserRequest &requ
     std::lock_guard guard(mutex_);
     try{
         verify_selection();const auto state=store_->snapshot();const auto book=parse_pi_pair_operations(state.operations.bytes,self_);
-        for(const auto &entry:book["entries"])if(entry["operation_id"]==*operation&&!entry["receipt"].is_null()&&
+        for(const auto &entry:book["entries"])if(entry["operation_id"]==std::string(*operation)&&!entry["receipt"].is_null()&&
             ((entry["scope"]=="local"&&entry["target_id"]==self_)||
              (entry["scope"]=="device"&&entry["principal_id"]==self_))){
             if(!valid_controller_document(entry["receipt"],"target-operation"))return controller_target_error(503,"storage_unavailable");

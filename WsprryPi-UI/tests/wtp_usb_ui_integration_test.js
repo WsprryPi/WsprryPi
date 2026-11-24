@@ -57,7 +57,7 @@ async function main() {
                     path.endsWith('/member/logging')?{schema:'logging',target,saved:{enabled:true,maximum_severity:6},active:{enabled:true,maximum_severity:6,streaming:false,dropped:'0'}}:
                     path.endsWith('/member/wifi')?{schema:'wifi',target,wifi:null,pending_restart:false,storage_healthy:true}:
                     path.endsWith('/host/devices')?window.__catalog:
-                    path.endsWith('/host/discovery')?{available:false,candidates:[],reason:'USB workflow'}:{};
+                    path.endsWith('/host/discovery')?(window.__discovery || {available:false,candidates:[],reason:'USB workflow'}):{};
                 return {ok:true,status:200,headers:header,json:async()=>value?.schema?{contract:'Wsprry-Control/1',...value}:value};
             };
             // Explicit reusable-component fixture; production target routing is
@@ -71,6 +71,28 @@ async function main() {
             document.getElementById('wtp-management').open=true;
         })()`);
 
+        // Native metadata failures and a healthy empty inventory are distinct.
+        // These mocked replies qualify presentation, not physical USB access.
+        for(const [availability,usb,expected] of [
+            ['unavailable',{available:false,candidates:[],reason:'USB discovery is unavailable on this host.'},'USB discovery is unavailable on this host'],
+            ['empty',{available:true,candidates:[]},'No USB Pico is attached.']
+        ]) {
+            await evaluate(`window.__discovery={available:false,candidates:[],reason:'Network discovery unavailable',usb:${JSON.stringify(usb)}};window.dispatchEvent(new Event('pageshow'))`);
+            await waitFor(async()=>await evaluate(`document.getElementById('fleet-discovery-status').textContent.includes(${JSON.stringify(expected)})`),`USB discovery ${availability}`);
+            for(const [name,width,height] of [['desktop',1440,1100],['mobile',390,844]]) {
+                await client.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:name==='mobile'});
+                for(const theme of ['light','dark']) {
+                    await evaluate(`applyThemePreference('${theme}');document.getElementById('fleet-discovery-status').scrollIntoView({block:'center',behavior:'instant'})`);
+                    await client.settleRendering();
+                    await waitFor(async()=>await evaluate(`(()=>{const e=document.getElementById('fleet-discovery-status');if(!e.getClientRects().length)return false;for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)<0.999)return false;}return true})()`),`visible discovery ${availability}/${name}/${theme}`);
+                    await evaluate("document.getElementById('fleet-discovery-status').scrollIntoView({block:'center',behavior:'instant'})");
+                    await client.settleRendering();
+                    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,`${availability}/${name}/${theme} overflow`);
+                    const shot=await client.send('Page.captureScreenshot',{format:'png'});
+                    fs.writeFileSync(path.join(output,`discovery-${availability}-${name}-${theme}.png`),Buffer.from(shot.data,'base64'));
+                }
+            }
+        }
         await evaluate("document.getElementById('wtp-usb-load').click()");
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-feedback').textContent.includes('No saved Wi-Fi')"),"USB no-network state");
         // The standalone fixture owns availability; production uses its captured target handle.

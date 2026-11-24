@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "application_storage/state_migration.hpp"
+#include "application_storage/provenance_path.hpp"
+#include "application_storage/generation_selection.hpp"
 #include "application_storage/persistent_configuration.hpp"
 #include "application_storage/sqlite_catalog.hpp"
 #include "wtp_integration/catalog.hpp"
@@ -46,6 +48,17 @@ std::vector<StateChange> controller_seed(const std::string &,const std::string &
 int main(int argc,char **argv){
     try {
         const std::string self(32,'a');
+        for(const auto *source:{"/original/settings.ini","C:\\ProgramData\\WsprryPi\\source.ini","D:/private/source.ini"})
+            check(valid_provenance_namespace(source),"Accepted native source-host provenance");
+        for(const auto *source:{"","relative.ini","C:relative.ini","\\\\server\\share\\source.ini","1:/source"})
+            check(!valid_provenance_namespace(source),"Relative/device provenance refuses before publication");
+        nlohmann::json provenance{{"schema","state-initialization/1"},{"identity",self},{"role","controller"},{"origin","migration"},
+            {"source_namespace","C:\\ProgramData\\WsprryPi\\source.ini"},{"generation","1"},{"source_revision",std::string(64,'c')},{"images_digest",std::string(64,'d')}};
+        nlohmann::json restored{{"schema","application-generation/1"},{"identity",self},{"role","controller"},{"generation","2"},
+            {"initialization",provenance},{"restore_job",std::string(32,'b')}};
+        check(parse_generation_selection(restored.dump(),self,StateRole::Controller)==restored,"Actual generation parser accepts Windows source provenance on a POSIX destination");
+        restored["initialization"]["source_namespace"]="C:relative.ini";
+        refuses([&]{parse_generation_selection(restored.dump(),self,StateRole::Controller);});
         if((argc==5&&std::string(argv[1])=="--crash-migration")||
             (argc==4&&std::string(argv[1])=="--crash-initialize")) {
             const auto number=std::stoi(argv[argc-1]);

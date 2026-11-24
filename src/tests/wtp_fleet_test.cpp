@@ -116,7 +116,7 @@ void resume_assignment_projection(){
 }
 void resume_book_transactions(){
     char pattern[]="/tmp/wsprrypi-resume-book-XXXXXX";const auto directory=mkdtemp(pattern);check(directory,"Private resume fixture");
-    const std::string root(directory),self(32,'f'),incarnation(32,'e'),target(32,'a');
+    const std::string root=std::filesystem::canonical(directory).string();const std::string self(32,'f'),incarnation(32,'e'),target(32,'a');
     struct Cleanup {std::string root;~Cleanup(){std::filesystem::remove_all(root);}} cleanup{root};
     const auto prepare=[&](const std::string &source,const std::string &book_directory){
         auto row=assignment('a');row["last_start_ns"]="20";row["in_flight"]=true;
@@ -210,7 +210,7 @@ void resume_book_transactions(){
 }
 void controller_retirement_records() {
     char pattern[]="/tmp/wsprrypi-retirement-records-XXXXXX";const auto directory=mkdtemp(pattern);check(directory,"private retirement fixture");
-    const std::string root(directory),self(32,'f'),incarnation(32,'e'),device(32,'a');
+    const std::string root=std::filesystem::canonical(directory).string();const std::string self(32,'f'),incarnation(32,'e'),device(32,'a');
     struct Cleanup{std::string root;~Cleanup(){std::filesystem::remove_all(root);}}cleanup{root};
     auto rows=Json::array({assignment('a')});const auto source=root+"/existing-assignments";
     Json intent;
@@ -404,17 +404,18 @@ int main(){
         check(wtp_fleet_observation_origin([]{return 10ULL;},[]{return 20ULL;},10)==0,"zero is a valid mapped monotonic origin");
     }
     char path[]="/tmp/wsprrypi-fleet-test.XXXXXX";check(mkdtemp(path)!=nullptr,"temporary directory");
-    struct Cleanup{std::string path;~Cleanup(){std::filesystem::remove_all(path);}}cleanup{path};
-    const std::string file=std::string(path)+"/fleet.json";
+    const auto root=std::filesystem::canonical(path).string();
+    struct Cleanup{std::string path;~Cleanup(){std::filesystem::remove_all(path);}}cleanup{root};
+    const std::string file=root+"/fleet.json";
     const std::string self(32,'f');
-    concurrent_pause_publication(std::string(path)+"/publication.ini",self);
-    unbound_takeover_observation(std::string(path)+"/unbound-host.ini",self);
-    failed_manager_replacement(std::string(path)+"/replacement.ini",self);
+    concurrent_pause_publication(root+"/publication.ini",self);
+    unbound_takeover_observation(root+"/unbound-host.ini",self);
+    failed_manager_replacement(root+"/replacement.ini",self);
     WtpFleetStore store(file,self);
     auto [empty,first]=store.snapshot();check(empty.at("assignments").empty(),"zero targets valid");
     check(kMaximumFleetOutputs==32,"supported capacity is independently specified as 32");
     {
-        WtpFleetStore large(std::string(path)+"/large.json",self);
+        WtpFleetStore large(root+"/large.json",self);
         Json expected;
         for(unsigned count=1;count<=32;++count) {
             auto row=assignment('a');
@@ -431,22 +432,22 @@ int main(){
             row["last_start_ns"]="18446744073709551615";
             row["in_flight"]=true;row["enabled"]=(count%2==0);
             expected=large.update({},[&](Json& d){d["assignments"].push_back(row);}).first;
-            WtpFleetStore reload(std::string(path)+"/large.json",self);
+            WtpFleetStore reload(root+"/large.json",self);
             check(reload.snapshot().first==expected,"all 1 through 32 assignments reload without normalization");
         }
         auto full=large.update({},[](Json& d){for(unsigned i=0;i<32;++i)
             d["removals"].push_back({{"device_id",std::string(32,'b')},{"revocation_generation","18446744073709551615"}});});
-        check(std::filesystem::file_size(std::string(path)+"/large.json")>131072,"escaped maximum fields exceed former read ceiling");
-        WtpFleetStore reload(std::string(path)+"/large.json",self);
+        check(std::filesystem::file_size(root+"/large.json")>131072,"escaped maximum fields exceed former read ceiling");
+        WtpFleetStore reload(root+"/large.json",self);
         check(reload.snapshot().first==full.first,"full removal history and barriers reload");
         rejects([&]{large.update({},[&](Json& d){d["assignments"].push_back(assignment('c'));});},"33rd unique stored assignment refused");
         rejects([&]{large.update({},[](Json& d){d["assignments"][31]["device_id"]=d["assignments"][0]["device_id"];d["assignments"][31]["settings"]["Device ID"]=d["assignments"][0]["device_id"];});},"duplicate at capacity refused");
         rejects([&]{large.update({},[&](Json& d){d["assignments"][31]["device_id"]=self;d["assignments"][31]["settings"]["Device ID"]=self;});},"self at capacity refused");
         rejects([&]{large.update({},[](Json& d){d["assignments"][0]["settings"]["extension"]=std::string(kMaximumFleetFileBytes,'x');});},"oversize save refused before replacement");
         check(large.snapshot()==full,"all refused mutations preserve revision and memory");
-        WtpFleetStore still_saved(std::string(path)+"/large.json",self);
+        WtpFleetStore still_saved(root+"/large.json",self);
         check(still_saved.snapshot()==full,"all refused mutations preserve disk");
-        const auto full_ini=std::string(path)+"/full-runtime.ini";
+        const auto full_ini=root+"/full-runtime.ini";
         WtpFleetStore full_runtime(full_ini+".wtp-assignments.json",self);
         const auto preserved=full_runtime.update({},[&](Json& d){d=full.first;});
         start_wtp_fleet_private_storage_for_test(full_ini,self,full_ini+".controller-retirements");
@@ -455,7 +456,7 @@ int main(){
         stop_wtp_fleet();
         WtpFleetStore after_stop(full_ini+".wtp-assignments.json",self);
         check(after_stop.snapshot()==preserved,"32 crash-retained slots and barriers survive shutdown unchanged");
-        const auto exact_file=std::string(path)+"/exact.json";
+        const auto exact_file=root+"/exact.json";
         WtpFleetStore exact(exact_file,self);
         auto boundary=full.first;
         boundary["assignments"][0]["settings"]["extension"]="";
@@ -468,7 +469,7 @@ int main(){
         rejects([&]{exact.update({},[](Json& d){d["assignments"][0]["settings"]["extension"].get_ref<std::string&>()+='x';});},"one byte over save limit refused");
         {std::ofstream append(exact_file,std::ios::app);append<<' ';}
         rejects([&]{WtpFleetStore oversized(exact_file,self);oversized.snapshot();},"one byte over read limit refused");
-        std::cout<<"Maximum populated fixture bytes: "<<std::filesystem::file_size(std::string(path)+"/large.json")<<"\n";
+        std::cout<<"Maximum populated fixture bytes: "<<std::filesystem::file_size(root+"/large.json")<<"\n";
     }
     auto a=assignment('a'),b=assignment('b');b["schedule"]["phase_seconds"]=30;
     auto [two,revision]=store.update(first,[&](Json& d){d["assignments"]=Json::array({a,b});});
@@ -520,7 +521,7 @@ int main(){
     }
     // Frozen cleanup authority is a private, independently versioned store.
     {
-        const auto journal_path=std::string(path)+"/contexts.json";
+        const auto journal_path=root+"/contexts.json";
         WtpFleetJournal journal(journal_path,self);
         check(journal.snapshot().at("contexts").empty(),"missing journal starts empty without guessing targets");
         const auto row=assignment('a');
@@ -545,7 +546,7 @@ int main(){
     // Restart at each durable retirement boundary. No carrier factory may run
     // until explicit recovery; frozen authority survives both sides of deletion.
     for(unsigned scenario=0;scenario<4;++scenario) {
-        const auto ini=std::string(path)+"/retirement-"+std::to_string(scenario);
+        const auto ini=root+"/retirement-"+std::to_string(scenario);
         auto row=assignment('a');row["enabled"]=false;
         WtpFleetStore saved(ini+".wtp-assignments.json",self);
         const auto state=saved.update({},[&](Json& d){if(scenario!=1)d["assignments"].push_back(row);});
@@ -586,12 +587,12 @@ int main(){
     auto other=wtp_reserve_output_identity(std::string(32,'b'));(void)other;
     lease.reset();check(!wtp_output_identity_in_use(std::string(32,'a')),"identity released with context");
     other.reset();
-    const auto fifo=std::string(path)+"/fifo";
+    const auto fifo=root+"/fifo";
     check(mkfifo(fifo.c_str(),0600)==0,"create nonregular state fixture");
     rejects([&]{WtpFleetStore invalid(fifo,self);invalid.snapshot();},"nonregular state rejected without blocking");
     // Exercise the actual worker shutdown against a saved crash marker. The
     // target cannot be contacted with the test target's hardware-free guard.
-    const auto ini=std::string(path)+"/runtime.ini";
+    const auto ini=root+"/runtime.ini";
     WtpFleetStore crash(ini+".wtp-assignments.json",self);
     b["enabled"]=false;b["in_flight"]=true;
     // A bare {b} can select JSON's copy constructor on older Clang versions.

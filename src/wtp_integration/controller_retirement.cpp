@@ -13,10 +13,40 @@
 #include <filesystem>
 #include <set>
 #include <cerrno>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
 #include <sys/stat.h>
+#endif
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
+std::filesystem::path disk_path(const std::string &path){
+#ifdef _WIN32
+    return windows_file::path_from_utf8(path);
+#else
+    return path;
+#endif
+}
+std::string text(const std::filesystem::path &path){
+#ifdef _WIN32
+    const auto bytes=path.u8string();return {bytes.begin(),bytes.end()};
+#else
+    return path.string();
+#endif
+}
+bool present(const std::string &name){
+#ifdef _WIN32
+    const auto path=disk_path(name);windows_file::ParentChain parents(path,windows_file::current_sid());
+    if(::GetFileAttributesW(windows_file::api_path(path).c_str())!=INVALID_FILE_ATTRIBUTES)return true;
+    const auto error=::GetLastError();if(error!=ERROR_FILE_NOT_FOUND&&error!=ERROR_PATH_NOT_FOUND)throw std::runtime_error("controller_retirement_hold");return false;
+#else
+    struct stat info{};if(!::lstat(name.c_str(),&info))return true;
+    if(errno!=ENOENT)throw std::runtime_error("controller_retirement_hold");
+    return false;
+#endif
+}
+
 Json private_record(const std::string &bytes){
     if(bytes.size()>1048576)throw std::runtime_error("controller_retirement_hold");
     std::vector<std::set<std::string>> objects;
@@ -60,12 +90,10 @@ Json controller_resume_assignment(const Json &frozen,const Json &live,const Json
 ControllerRetirementBook::ControllerRetirementBook(const std::string &directory,const std::string &source,
     const std::string &self,const Json &assignments,std::function<void(RetirementWritePoint)> checkpoint,
     std::function<void(PiPairInitializationProof)> pairing,const std::string &retained_source_binding)
-    :self_(self),source_(retained_source_binding.empty()?PiManagementJournal::digest(std::filesystem::weakly_canonical(source).string()):retained_source_binding),checkpoint_(std::move(checkpoint)) {
+    :self_(self),source_(retained_source_binding.empty()?PiManagementJournal::digest(text(std::filesystem::weakly_canonical(disk_path(source)))):retained_source_binding),checkpoint_(std::move(checkpoint)) {
     require(hex(source_,64));
-    struct stat marker{},owner{};
-    const bool anchor_present=!::lstat((directory+".established").c_str(),&marker);
-    require(anchor_present||errno==ENOENT);
-    if(anchor_present)require(!::lstat(directory.c_str(),&owner));
+    const bool anchor_present=present(directory+".established");
+    if(anchor_present)require(present(directory));
     const auto initial=[&]{Json rows=Json::array();for(const auto &row:assignments)rows.push_back({{"target_id",row.at("device_id")},
         {"assignment_id",wtp_random_identity()},{"state","legacy"},{"frozen",nullptr},{"intent",nullptr},{"receipt",nullptr},{"observation",nullptr},{"completion",nullptr},{"request_revision",nullptr}});
         return sealed(Json{{"schema","controller-retirement-book/1"},{"controller_id",self_},{"source_binding",source_},{"generation","1"},{"installation_id",wtp_random_identity()},{"established",false},{"assignments",rows}}).dump();};
@@ -73,7 +101,7 @@ ControllerRetirementBook::ControllerRetirementBook(const std::string &directory,
     authority_path_=location.file;
     // Validate the immutable source binding before interpreting any retained WAL.
     validate(private_record(PiManagementJournal::read_ini_input(location.file).bytes));
-    journal_=std::make_unique<PiManagementJournal>(directory+"/transactions",self_,std::map<std::string,std::string>{{"recurrence",location.file},{"retirement-anchor",std::filesystem::path(location.file).parent_path().string()+".established"},{"assignments",source}});
+    journal_=std::make_unique<PiManagementJournal>(directory+"/transactions",self_,std::map<std::string,std::string>{{"recurrence",location.file},{"retirement-anchor",text(disk_path(location.file).parent_path())+".established"},{"assignments",source}});
     journal_->recover();const auto observed=journal_->inspect("recurrence");require(bool(observed));
     data_=private_record(observed->bytes);validate(data_);revision_=PiManagementJournal::digest(observed->bytes);
     anchor_bytes_=anchor_record(data_,revision_).dump();
@@ -205,7 +233,7 @@ void ControllerRetirementBook::with_backup_files(const std::function<void(const 
     require(bool(capture));
     verify();require(!journal_->decision());
     capture({{"retirement/authority.json",authority_path_},
-        {"retirement/established.json",std::filesystem::path(authority_path_).parent_path().string()+".established"}});
+        {"retirement/established.json",text(disk_path(authority_path_).parent_path())+".established"}});
     verify();require(!journal_->decision());
 }
 void ControllerRetirementBook::publish(Json candidate,const std::optional<PiManagementJournal::Image> &assignment) {

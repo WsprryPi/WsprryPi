@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "pi_pair_guarded_http.hpp"
 #include "management_resolver.hpp"
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <poll.h>
 #include <array>
 #include <atomic>
 #include <cerrno>
@@ -16,9 +11,10 @@
 namespace wsprrypi {
 namespace {
 using Time=std::chrono::steady_clock::time_point;
+namespace ns=native_socket;
 void require(bool value){if(!value)throw std::runtime_error("guarded_http_unavailable");}
-std::pair<std::string,int> endpoint(int fd,bool remote){
-    sockaddr_storage address{};socklen_t length=sizeof(address);require(!(remote?getpeername(fd,reinterpret_cast<sockaddr *>(&address),&length):getsockname(fd,reinterpret_cast<sockaddr *>(&address),&length)));
+std::pair<std::string,int> endpoint(ns::Handle fd,bool remote){
+    sockaddr_storage address{};ns::Length length=sizeof(address);require(!(remote?getpeername(fd,reinterpret_cast<sockaddr *>(&address),&length):getsockname(fd,reinterpret_cast<sockaddr *>(&address),&length)));
     std::array<char,INET6_ADDRSTRLEN> text{};
     if(address.ss_family==AF_INET){const auto &v4=reinterpret_cast<const sockaddr_in &>(address);require(inet_ntop(AF_INET,&v4.sin_addr,text.data(),text.size()));return {text.data(),ntohs(v4.sin_port)};}
     require(address.ss_family==AF_INET6);const auto &v6=reinterpret_cast<const sockaddr_in6 &>(address);require(inet_ntop(AF_INET6,&v6.sin6_addr,text.data(),text.size()));return {text.data(),ntohs(v6.sin6_port)};
@@ -40,7 +36,7 @@ std::string decoded_path(const std::string &target){
 }
 class GuardedStream final:public httplib::Stream {
 public:
-    GuardedStream(int fd,const std::atomic<socket_t> &listener,PiPairAdmission &budget,PiPairGuardedHttpServer::Clock clock,
+    GuardedStream(ns::Handle fd,const std::atomic<socket_t> &listener,PiPairAdmission &budget,PiPairGuardedHttpServer::Clock clock,
         time_t read_sec,time_t read_usec,time_t write_sec,time_t write_usec)
         :fd_(fd),listener_(listener),budget_(budget),clock_(std::move(clock)),read_wait_(std::chrono::seconds(read_sec)+std::chrono::microseconds(read_usec)),
          write_wait_(std::chrono::seconds(write_sec)+std::chrono::microseconds(write_usec)),born_(clock_()),last_(born_),remote_(endpoint(fd,true)),local_(endpoint(fd,false)){}
@@ -48,14 +44,14 @@ public:
     void next(){line_.clear();header_.clear();classified_=false;guarded_=false;headers_done_=false;writing_=false;body_=0;request_=clock_();}
     bool guarded() const noexcept{return guarded_;}
     bool is_readable() const override{return begin_<end_&&live();}
-    bool wait_readable() const override{return is_readable()||wait(POLLIN,read_wait_);}
-    bool wait_writable() const override{return wait(POLLOUT,write_wait_);}
+    bool wait_readable() const override{return is_readable()||wait(ns::readable,read_wait_);}
+    bool wait_writable() const override{return wait(ns::writable,write_wait_);}
     ssize_t read(char *output,std::size_t length) override{
         try{
             if(!length)return 0;
             if(begin_==end_){
                 if(!wait_readable())return -1;
-                const auto count=recv(fd_,buffer_.data(),buffer_.size(),0);
+                const auto count=ns::receive(fd_,buffer_.data(),buffer_.size());
                 if(count<=0)return count;
                 begin_=0;end_=static_cast<std::size_t>(count);
             }
@@ -70,12 +66,7 @@ public:
         if(!length)return 0;
         if(guarded_&&!writing_){writing_=true;deadline_=std::min(request_+std::chrono::seconds(24),clock_()+std::chrono::seconds(8));}
         if(!wait_writable())return -1;
-#ifdef MSG_NOSIGNAL
-        constexpr int flags=MSG_NOSIGNAL;
-#else
-        constexpr int flags=0;
-#endif
-        return send(fd_,input,length,flags);
+        return ns::send(fd_,input,length);
     }
     void get_remote_ip_and_port(std::string &ip,int &port) const override{ip=remote_.first;port=remote_.second;}
     void get_local_ip_and_port(std::string &ip,int &port) const override{ip=local_.first;port=local_.second;}
@@ -84,14 +75,14 @@ public:
 private:
     bool live() const{
         const auto now=clock_();if(now<last_){failed_=true;return false;}last_=now;
-        return !failed_&&listener_.load()>=0&&(!connection_||!connection_->cancelled())&&
+        return !failed_&&listener_.load()!=ns::invalid&&(!connection_||!connection_->cancelled())&&
             (classified_?(!guarded_||now<deadline_):now-request_<std::chrono::seconds(8));
     }
     bool wait(short event,std::chrono::microseconds timeout) const{
         const auto end=clock_()+timeout;
-        while(live()&&clock_()<end){pollfd source{fd_,event,0};const auto count=poll(&source,1,2);
-            if(count>0)return live()&&(source.revents&(event|POLLHUP|POLLERR));
-            if(count<0&&errno!=EINTR)return false;}
+        while(live()&&clock_()<end){ns::PollItem source{fd_,event,0};const auto count=ns::poll(&source,1,2);
+            if(count>0)return live()&&(source.revents&(event|ns::failed));
+            if(count<0&&!ns::interrupted(ns::error()))return false;}
         return false;
     }
     void observe(char byte){
@@ -134,7 +125,7 @@ private:
             headers_done_=true;header_.clear();
         }
     }
-    int fd_;
+    ns::Handle fd_;
     const std::atomic<socket_t> &listener_;
     PiPairAdmission &budget_;
     PiPairGuardedHttpServer::Clock clock_;
@@ -161,17 +152,13 @@ PiPairGuardedHttpServer::PiPairGuardedHttpServer(PiPairAdmission &budget,Clock c
     });
 }
 bool PiPairGuardedHttpServer::process_and_close_socket(socket_t fd){
-    struct Close {int fd;~Close(){shutdown(fd,SHUT_RDWR);::close(fd);}} close{fd};
+    struct Close {ns::Handle fd;~Close(){ns::shutdown(fd);ns::close(fd);}} close{fd};
     try{
-        const auto flags=fcntl(fd,F_GETFL),descriptor=fcntl(fd,F_GETFD);require(flags>=0&&descriptor>=0&&
-            !fcntl(fd,F_SETFL,flags|O_NONBLOCK)&&!fcntl(fd,F_SETFD,descriptor|FD_CLOEXEC));
-#ifdef SO_NOSIGPIPE
-        const int yes=1;require(!setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes)));
-#endif
+        require(ns::configure_stream(fd));
         GuardedStream stream(fd,svr_sock_,admission_,clock_,read_timeout_sec_,read_timeout_usec_,write_timeout_sec_,write_timeout_usec_);
         std::string remote,local;int remote_port{},local_port{};stream.get_remote_ip_and_port(remote,remote_port);stream.get_local_ip_and_port(local,local_port);
         bool result=false;
-        for(std::size_t count=0;count<keep_alive_max_count_&&svr_sock_.load()>=0;++count){
+        for(std::size_t count=0;count<keep_alive_max_count_&&svr_sock_.load()!=ns::invalid;++count){
             stream.next();bool closed=false;result=process_request(stream,remote,remote_port,local,local_port,false,closed,nullptr);
             if(!result||closed||stream.guarded())break;
         }

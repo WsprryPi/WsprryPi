@@ -9,8 +9,17 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import sys
 from . import archive
 from .durable import canonical, publish_record, read_record, sync_directory
+
+
+def _make_directory(path, *, exist_ok=False):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.make_directory(path, exist_ok=exist_ok)
+    Path(path).mkdir(mode=0o700, exist_ok=exist_ok)
+    return archive.private_directory(path)
 
 STATE_NAMES = {'state-' + name + '.json' for name in ('configuration', 'managed-settings', 'operations', 'catalog',
                'recurrence-authority', 'recurrence-initialization', 'initialization', 'recurrence-recovery', 'selector')}
@@ -38,7 +47,7 @@ def validate_index(value, group_id):
     source = value['source']
     archive.closed(source, ('identity', 'role', 'application_version', 'storage', 'platform'))
     archive.require(type(source['identity']) is str and archive.ID.fullmatch(source['identity']) and source['role'] in ('pi', 'controller')
-                    and source['storage'] == 'application-state/1' and source['platform'] in ('linux', 'darwin')
+                    and source['storage'] == 'application-state/1' and (source['platform'] in ('linux', 'darwin') or source['platform'] == 'windows' and source['role'] == 'controller')
                     and type(source['application_version']) is str and 0 < len(source['application_version']) <= 128
                     and type(value['created_utc']) is int and 0 < value['created_utc'] < 2**63
                     and type(value['archive_sha256']) is str and archive.HASH.fullmatch(value['archive_sha256'])
@@ -72,7 +81,7 @@ def inspect(directory):
         for item in index['files']:
             with archive.private_input(group / item['name'], maximum(item['name'])) as (stream, info):
                 archive.require(info.st_size == item['size'] and archive.file_digest(stream) == item['sha256']
-                                and archive.observation(os.fstat(stream.fileno())) == archive.observation(info))
+                                and archive.observation(archive.stat_descriptor(stream.fileno())) == archive.observation(info))
             total += item['size']
             archive.require(total <= archive.MAX_PLAINTEXT)
         count += len(expected)
@@ -84,11 +93,12 @@ def inspect(directory):
 def copy_file(source, destination, item):
     with archive.private_input(source, maximum(item['name'])) as (stream, info):
         archive.require(info.st_size == item['size'])
-        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         digest = hashlib.sha256()
         total = 0
+        created = False
         try:
-            with os.fdopen(descriptor, 'wb') as output:
+            with archive.private_output(destination, item['size']) as output:
+                created = True
                 for data in iter(lambda: stream.read(archive.CHUNK), b''):
                     total += len(data)
                     archive.require(total <= item['size'])
@@ -96,9 +106,10 @@ def copy_file(source, destination, item):
                     output.write(data)
                 output.flush()
                 os.fsync(output.fileno())
-            archive.require(total == item['size'] and digest.hexdigest() == item['sha256'] and archive.observation(os.fstat(stream.fileno())) == archive.observation(info))
+            archive.require(total == item['size'] and digest.hexdigest() == item['sha256'] and archive.observation(archive.stat_descriptor(stream.fileno())) == archive.observation(info))
         except BaseException:
-            Path(destination).unlink(missing_ok=True)
+            if created:
+                Path(destination).unlink(missing_ok=True)
             raise
 
 
@@ -107,7 +118,7 @@ def copy_groups(source, destination):
     destination = Path(destination)
     if not groups:
         return
-    destination.mkdir(mode=0o700, exist_ok=True)
+    _make_directory(destination, exist_ok=True)
     archive.private_directory(destination)
     for group, index in groups:
         target = destination / group.name
@@ -117,7 +128,7 @@ def copy_groups(source, destination):
             # retain the first validated copy without dropping any payload.
             archive.require(existing['content_digest'] == index['content_digest'])
             continue
-        target.mkdir(mode=0o700)
+        _make_directory(target)
         for item in index['files']:
             copy_file(group / item['name'], target / item['name'], item)
         publish_record(target / 'index.json', index, None)
@@ -168,11 +179,11 @@ def retain_source(candidate, validated, records, manifest, archive_sha256):
     validate_index(index, group_id)
     destination = candidate / 'evidence'
     copy_groups(validated / 'application/evidence', destination)
-    destination.mkdir(mode=0o700, exist_ok=True)
+    _make_directory(destination, exist_ok=True)
     archive.private_directory(destination)
     target = destination / group_id
     if not target.exists():
-        target.mkdir(mode=0o700)
+        _make_directory(target)
         for item in index['files']:
             copy_file(sources[item['name']], target / item['name'], item)
         publish_record(target / 'index.json', index, None)

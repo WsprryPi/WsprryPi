@@ -195,6 +195,13 @@ debug: build/bin/$(TEST_OUT)
 	$(Q)echo "Debug build completed successfully."
 
 # Test target
+.PHONY: timestamp-test
+build/bin/timestamp_test: ../tests/timestamp_test.cpp lcblog.cpp lcblog.hpp lcblog.tpp
+	$(Q)mkdir -p build/bin
+	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -pthread -I. $(SYSTEMD_CFLAGS) ../tests/timestamp_test.cpp lcblog.cpp -o $@ $(SYSTEMD_LIBS)
+timestamp-test: build/bin/timestamp_test
+	$(Q)./build/bin/timestamp_test
+
 .PHONY: test
 test: debug
 	$(Q)if [ "$(SUDO)" = "sudo" ]; then \

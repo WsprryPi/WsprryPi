@@ -6,7 +6,7 @@
 #include <mutex>
 #include <utility>
 #include <algorithm>
-#include <arpa/inet.h>
+#include "native_socket.hpp"
 namespace wsprrypi {
 struct PiPairAdmission::State {
     std::mutex mutex;

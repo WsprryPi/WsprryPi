@@ -20,6 +20,19 @@ from application_recovery import publication
 
 
 class PublicationTest(unittest.TestCase):
+    def test_native_source_provenance(self):
+        for source in ('/var/lib/controller/settings.ini', r'C:\ProgramData\WsprryPi\source.ini', 'D:/private/source.ini'):
+            self.assertTrue(publication.valid_provenance_namespace(source))
+        for source in ('', 'relative.ini', 'C:relative.ini', r'\\server\share\source.ini', 'C:/bad\0source', '1:/source', 7):
+            self.assertFalse(publication.valid_provenance_namespace(source))
+        for source in (r'C:\ProgramData\WsprryPi\source.ini', '/original/source.ini'):
+            selected = json.loads(json.dumps(self.previous))
+            selected['initialization'].update(origin='migration', source_namespace=source)
+            publication.selector(selected, self.identity, 'controller', '1', self.job.name)
+        selected['initialization']['source_namespace'] = 'C:relative.ini'
+        with self.assertRaises(archive.RecoveryError):
+            publication.selector(selected, self.identity, 'controller', '1', self.job.name)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='recovery-publication-')
         self.addCleanup(self.temporary.cleanup)

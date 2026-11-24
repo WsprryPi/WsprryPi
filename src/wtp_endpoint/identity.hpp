@@ -5,6 +5,7 @@
 #include <string>
 #include <array>
 #include <cstdint>
+#include <functional>
 
 namespace wsprrypi {
 
@@ -12,6 +13,11 @@ namespace wsprrypi {
 // label, never authentication. Linux retains its existing machine-ID mapping;
 // macOS uses its host UUID with a distinct domain and a bounded OS query.
 std::string wtp_pi_device_id();
+// Trusted native controller startup only. Install before first identity use;
+// the source reads the service account's independently owned persistent record.
+void select_controller_identity_source(std::function<std::string()>);
+// Existing OS mapping, retained for established installations and Pi roles.
+std::string wtp_legacy_device_id();
 // Explicit file source for existing Linux software fixtures. No CLI, INI,
 // environment, browser, or network request can select this source.
 std::string wtp_pi_device_id(const std::string& machine_id_path);
@@ -21,6 +27,7 @@ namespace testing {
 // Actual-main, separate-installation software fixtures only. Must be selected
 // before first identity use; never exposed by production arguments or input.
 void select_wtp_pi_device_identity(const std::string &identity);
+bool wtp_pi_device_identity_selected();
 }
 
 class WtpPiBootIdentity final : public wsprrypico::wtp::IdentitySource {

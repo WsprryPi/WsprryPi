@@ -34,6 +34,7 @@ int main(int argc,char **argv){
     if(argc<4)return 2;
     fixture_self=argv[2];
     if(fixture_self.size()!=32||fixture_self.find_first_not_of("0123456789abcdef")!=std::string::npos)return 2;
+    wsprrypi::testing::select_wtp_pi_device_identity(fixture_self);
     bool simulated=false,state_command=false,web=false;
     for(int i=3;i<argc;++i){
         const std::string_view option=argv[i];

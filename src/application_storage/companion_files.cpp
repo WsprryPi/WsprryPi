@@ -1,31 +1,24 @@
 // SPDX-License-Identifier: MIT
 #include "companion_files.hpp"
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
+#include "native_private_acl.hpp"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include "sqlite_state_store.hpp"
 #include <array>
 #include <cerrno>
 #include <filesystem>
-#include <fcntl.h>
 #include <memory>
 #include <openssl/evp.h>
 #include <set>
-#include <sys/stat.h>
-#include <unistd.h>
 namespace wsprrypi {
 namespace {
 void require(bool value){if(!value)throw StateStorageError(StateStorageError::Code::Unavailable);}
 bool hex(const std::string &value,std::size_t n){return value.size()==n&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
-struct Fd{int value{-1};~Fd(){if(value>=0)::close(value);}};
-std::string signature(const struct stat &info){
-#if defined(__APPLE__)
-    const auto modified=info.st_mtimespec,changed=info.st_ctimespec;
-#else
-    const auto modified=info.st_mtim,changed=info.st_ctim;
-#endif
-    return std::to_string(info.st_dev)+":"+std::to_string(info.st_ino)+":"+std::to_string(info.st_size)+":"+
-        std::to_string(info.st_mode)+":"+std::to_string(info.st_uid)+":"+std::to_string(info.st_nlink)+":"+
-        std::to_string(modified.tv_sec)+":"+std::to_string(modified.tv_nsec)+":"+
-        std::to_string(changed.tv_sec)+":"+std::to_string(changed.tv_nsec);
-}
 const char *label(CompanionKind kind){
     switch(kind){
         case CompanionKind::FleetAssignments:return "fleet-assignments";
@@ -41,6 +34,21 @@ void validate(const CompanionFile &file){
     require(file.size<=companion_maximum_bytes(file.kind)&&hex(file.digest,64)&&!file.signature.empty()&&file.signature.size()<=256);
 }
 struct ReadResult{std::uint64_t size;std::string digest,signature;};
+#ifdef _WIN32
+#include "companion_files_windows.hpp"
+#else
+struct Fd{int value{-1};~Fd(){if(value>=0)::close(value);}};
+std::string signature(const struct stat &info){
+#if defined(__APPLE__)
+    const auto modified=info.st_mtimespec,changed=info.st_ctimespec;
+#else
+    const auto modified=info.st_mtim,changed=info.st_ctim;
+#endif
+    return std::to_string(info.st_dev)+":"+std::to_string(info.st_ino)+":"+std::to_string(info.st_size)+":"+
+        std::to_string(info.st_mode)+":"+std::to_string(info.st_uid)+":"+std::to_string(info.st_nlink)+":"+
+        std::to_string(modified.tv_sec)+":"+std::to_string(modified.tv_nsec)+":"+
+        std::to_string(changed.tv_sec)+":"+std::to_string(changed.tv_nsec);
+}
 std::optional<ReadResult> stream(const std::string &path,CompanionKind kind,int output=-1,const std::string &expected={}){
     struct stat parent{};
     require(!::lstat(std::filesystem::path(path).parent_path().c_str(),&parent)&&S_ISDIR(parent.st_mode)&&
@@ -48,10 +56,12 @@ std::optional<ReadResult> stream(const std::string &path,CompanionKind kind,int 
     struct stat first{};
     if(::lstat(path.c_str(),&first)){require(errno==ENOENT);return {};}
     const auto unsafe=kind==CompanionKind::UdpLogging?0022:0077;
+    if(unsafe==0077)require(native_private_acl_path(std::filesystem::path(path).parent_path().c_str(),parent.st_uid));
     require(S_ISREG(first.st_mode)&&first.st_uid==geteuid()&&!(first.st_mode&unsafe)&&first.st_size>=0&&
         static_cast<std::uint64_t>(first.st_size)<=companion_maximum_bytes(kind));
     Fd input{::open(path.c_str(),O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC)};require(input.value>=0);
     struct stat opened{};require(!::fstat(input.value,&opened)&&signature(first)==signature(opened));
+    if(unsafe==0077)require(native_private_acl(input.value,opened.st_uid));
     const auto stamp=signature(opened);require(expected.empty()||expected==stamp);
     auto digest=std::unique_ptr<EVP_MD_CTX,decltype(&EVP_MD_CTX_free)>(EVP_MD_CTX_new(),EVP_MD_CTX_free);
     require(digest&&EVP_DigestInit_ex(digest.get(),EVP_sha256(),nullptr)==1);
@@ -80,6 +90,7 @@ void sync_parent(const std::string &path){
     Fd parent{::open(std::filesystem::path(path).parent_path().c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)};
     require(parent.value>=0&&!::fsync(parent.value));
 }
+#endif
 }
 std::uint64_t companion_maximum_bytes(CompanionKind kind){
     switch(kind){
@@ -102,7 +113,11 @@ std::string companion_relative_path(const CompanionFile &file){
     }throw StateStorageError(StateStorageError::Code::InvalidInput);
 }
 std::string companion_source_path(const std::string &prefix,const CompanionFile &file){
+#ifdef _WIN32
+    (void)disk_path(prefix);
+#else
     require(std::filesystem::path(prefix).is_absolute()&&prefix.find('\0')==std::string::npos);
+#endif
     return prefix+companion_relative_path(file).substr(std::string("configuration").size());
 }
 std::string companion_backup_name(const CompanionFile &file){
@@ -135,11 +150,19 @@ std::vector<CompanionFile> parse_companion_manifest(const nlohmann::json &value)
 }
 void verify_companion_file(const std::string &path,const CompanionFile &file){
     validate(file);const auto current=stream(path,file.kind);require(current&&current->size==file.size&&current->digest==file.digest);
+#ifdef _WIN32
+    (void)open_private(disk_path(path),0);
+#else
     struct stat info{};require(!::lstat(path.c_str(),&info)&&(info.st_mode&0777)==0600&&info.st_nlink==1);
+#endif
 }
 std::string read_logging_companion(const std::string &prefix,const CompanionFile &file){
     validate(file);require(file.kind==CompanionKind::UdpLogging||file.kind==CompanionKind::UsbLogging);
     const auto path=companion_source_path(prefix,file);
+#ifdef _WIN32
+    std::string bytes;const auto current=stream(path,file.kind,INVALID_HANDLE_VALUE,file.signature,&bytes);
+    require(current&&current->size==file.size&&current->digest==file.digest);return bytes;
+#else
     Fd input{::open(path.c_str(),O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK)};require(input.value>=0);
     struct stat info{};require(!::fstat(input.value,&info)&&signature(info)==file.signature);
     std::string bytes;std::array<char,4096> buffer{};
@@ -150,12 +173,47 @@ std::string read_logging_companion(const std::string &prefix,const CompanionFile
     require(EVP_Digest(bytes.data(),bytes.size(),digest,&size,EVP_sha256(),nullptr)==1&&size==32);
     std::string hashed;for(unsigned i=0;i<size;++i){hashed+="0123456789abcdef"[digest[i]>>4];hashed+="0123456789abcdef"[digest[i]&15];}
     require(hashed==file.digest);return bytes;
+#endif
 }
 void prepare_companion_directory(const std::string &path){
+#ifdef _WIN32
+    const auto native=disk_path(path);const auto owner=wf::current_sid();wf::ParentChain parents(native,owner);
+    if(!native_exists(native)){
+        sync_parent(path);wf::PrivateSecurity security(owner);
+        require(::CreateDirectoryW(wf::api_path(native).c_str(),security.attributes()));sync_parent(path);
+    }
+    (void)open_private(native,0,true);
+#else
     if(!::mkdir(path.c_str(),0700))sync_parent(path);else require(errno==EEXIST);
     struct stat info{};require(!::lstat(path.c_str(),&info)&&S_ISDIR(info.st_mode)&&info.st_uid==geteuid()&&(info.st_mode&0777)==0700);
+    require(native_private_acl_path(path.c_str(),info.st_uid));
+#endif
 }
 void copy_companion_file(const std::string &source,const std::string &destination,const CompanionFile &file,bool original_source){
+#ifdef _WIN32
+    validate(file);const auto native=disk_path(destination),writing=disk_path(destination+".writing");
+    const auto owner=wf::current_sid();wf::ParentChain parents(native,owner);
+    (void)open_private(native.parent_path(),0,true);sync_parent(destination);
+    if(native_exists(native)){
+        // Native no-replace rename has one name after success; an additional
+        // staging name is never interpreted as the POSIX hard-link window.
+        require(!native_exists(writing));verify_companion_file(destination,file);return;
+    }
+    if(native_exists(writing)){remove_writing(writing,file.kind);sync_parent(destination);}
+    wf::PrivateSecurity security(owner);bool created=false;
+    try{
+        {
+            wf::Handle output(::CreateFileW(wf::api_path(writing).c_str(),GENERIC_WRITE|READ_CONTROL,0,
+                security.attributes(),CREATE_NEW,FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_WRITE_THROUGH,nullptr));
+            require(output.get()!=INVALID_HANDLE_VALUE);created=true;(void)wf::inspect(output.get(),false);
+            wf::verify_exact_owner(output.get(),owner);wf::verify_security(output.get(),owner,true,false);
+            const auto copied=stream(source,file.kind,output.get(),original_source?file.signature:std::string{});
+            require(copied&&copied->size==file.size&&copied->digest==file.digest&&::FlushFileBuffers(output.get()));
+        }
+        require(::MoveFileExW(wf::api_path(writing).c_str(),wf::api_path(native).c_str(),MOVEFILE_WRITE_THROUGH));
+        created=false;sync_parent(destination);verify_companion_file(destination,file);
+    }catch(...){if(created)try{remove_writing(writing,file.kind);sync_parent(destination);}catch(...){}throw;}
+#else
     validate(file);struct stat existing{};
     if(!::lstat(destination.c_str(),&existing)){
         const auto writing=destination+".writing";struct stat staged{};
@@ -175,6 +233,7 @@ void copy_companion_file(const std::string &source,const std::string &destinatio
         require(!::unlink(writing.c_str()));
     }else require(errno==ENOENT);
     Fd output{::open(writing.c_str(),O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600)};require(output.value>=0);
+    require(native_private_acl(output.value,::geteuid()));
     try{
         const auto copied=stream(source,file.kind,output.value,original_source?file.signature:std::string{});
         require(copied&&copied->size==file.size&&copied->digest==file.digest&&!::fsync(output.value));
@@ -184,5 +243,6 @@ void copy_companion_file(const std::string &source,const std::string &destinatio
         require(!::link(writing.c_str(),destination.c_str())&&!::unlink(writing.c_str()));sync_parent(destination);
         verify_companion_file(destination,file);
     }catch(...){(void)::unlink(writing.c_str());throw;}
+#endif
 }
 } // namespace wsprrypi

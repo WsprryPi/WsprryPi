@@ -4,15 +4,18 @@
  */
 
 #include "scheduling.hpp"
+#include "backend_capabilities.hpp"
 #include "scheduling_internal.hpp"
 
 #include "arg_parser.hpp"
 #include "band_gpio_selector.hpp"
 #include "frequency_semantics.hpp"
 #include "logging.hpp"
-#include "ppm_manager.hpp"
+#include "local_frequency_provider.hpp"
 #include "runtime_config_bridge.hpp"
+#if defined(DEBUG_WSPR_TRANSMIT) && !WSPRRYPI_CONTROLLER_ONLY
 #include "wspr_transmit.hpp"
+#endif
 #include "transmitter_runtime_bridge.hpp"
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_pi_control.hpp"
@@ -155,7 +158,7 @@ bool set_config(bool force)
                     "Transmit is blocked until a valid configuration is loaded.");
 
                 if (local_configuration &&
-                    transmitter_state() != WsprTransmitter::State::TRANSMITTING)
+                    transmitter_state() != WsprTransmitState::TRANSMITTING)
                 {
                     transmitter_stop_and_join();
                     deassert_transmit_gpio_outputs(
@@ -239,13 +242,13 @@ bool set_config(bool force)
             return false;
         }
 
-        bool ppm_running = ppmManager.isRunning();
+        bool ppm_running = wsprrypi::local_frequency_provider_running();
         bool should_start_ppm = working_config.use_system_clock_frequency_estimate && !ppm_running;
         if (should_start_ppm)
         {
             ppm_init();
             ppm_reload_pending.store(true, std::memory_order_seq_cst);
-            ppm_running = ppmManager.isRunning();
+            ppm_running = wsprrypi::local_frequency_provider_running();
             should_start_ppm = false;
         }
         const bool should_stop_ppm = !working_config.use_system_clock_frequency_estimate && ppm_running;
@@ -286,7 +289,7 @@ bool set_config(bool force)
                         correction_error);
                     set_managed_reload_tx_inhibited(true, correction_error);
                     if (transmitter_state() !=
-                        WsprTransmitter::State::TRANSMITTING)
+                        WsprTransmitState::TRANSMITTING)
                     {
                         transmitter_stop_and_join();
                         deassert_transmit_gpio_outputs(
@@ -440,7 +443,7 @@ bool set_config(bool force)
             }
             else if (should_stop_ppm)
             {
-                ppmManager.stop();
+                wsprrypi::stop_local_frequency_provider();
                 llog.logS(INFO, "PPM Manager disabled.");
                 ppm_reload_pending.store(false, std::memory_order_seq_cst);
             }
@@ -704,7 +707,7 @@ bool set_config(bool force)
                 }
                 else if (should_stop_ppm)
                 {
-                    ppmManager.stop();
+                    wsprrypi::stop_local_frequency_provider();
                     llog.logS(INFO, "PPM Manager disabled.");
                     ppm_reload_pending.store(false, std::memory_order_seq_cst);
                 }
@@ -931,7 +934,7 @@ bool set_config(bool force)
             }
             else if (should_stop_ppm)
             {
-                ppmManager.stop();
+                wsprrypi::stop_local_frequency_provider();
                 llog.logS(INFO, "PPM Manager disabled.");
                 ppm_reload_pending.store(false, std::memory_order_seq_cst);
             }
@@ -1003,7 +1006,7 @@ bool set_config(bool force)
                 local_configuration.release();
             transmitter_start_async();
         }
-#ifdef DEBUG_WSPR_TRANSMIT
+#if defined(DEBUG_WSPR_TRANSMIT) && !WSPRRYPI_CONTROLLER_ONLY
         wsprTransmitter.dumpParameters();
 #endif
         if (!finalize_reload_pending())

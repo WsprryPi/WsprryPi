@@ -55,3 +55,19 @@ repository, and add an appropriate license file.
 
 While part of WsprryPi, this component is covered by the repository-root
 `LICENSE.md` (MIT).
+
+## Native Windows adapter
+
+Windows uses `SetConsoleCtrlHandler`, native events, and the same waiter-thread callback interface. `CTRL_C_EVENT` and `CTRL_BREAK_EVENT` map to `SIGINT`; console close, logoff, and shutdown events map to `SIGTERM` when delivered by Windows. A closing console callback gives the application up to five seconds to finish, subject to the operating system's own deadline. This adapter does not implement Windows Service Control Manager callbacks or CRT fault handling. Windows `block_signals()` needs no POSIX signal mask, and `setPriority()` returns `false`.
+
+Only one active Windows console registration is admitted. Registration failure leaves the handler failed; `running()` reports whether the waiter is active. `stop()` wakes and joins the waiter, releases native event handles, and unregisters the callback. Repeated stop and subsequent restart retain the existing lifecycle contract.
+
+CMake supports the standalone component on Linux, macOS, and Windows:
+
+```sh
+cmake -S src/Signal-Handler -B /tmp/wsprrypi-signal-build
+cmake --build /tmp/wsprrypi-signal-build
+ctest --test-dir /tmp/wsprrypi-signal-build --output-on-failure
+```
+
+Use native private path syntax on Windows. Its bounded test starts its own child process group and sends `CTRL_BREAK_EVENT` only to that group, checks callback delivery and stop/restart, and exercises waiter failure. Native Windows execution remains required; cross-compilation does not qualify console shutdown or service lifecycle.

@@ -23,11 +23,11 @@ std::array<unsigned char,65> point(std::string_view value){
     std::array<unsigned char,66> bytes{};std::array<char,88> encoded{};
     std::copy(value.begin(),value.end(),encoded.begin());encoded.back()='=';
     std::replace(encoded.begin(),encoded.end(),'-','+');std::replace(encoded.begin(),encoded.end(),'_','/');
-    require(EVP_DecodeBlock(bytes.data(),reinterpret_cast<const unsigned char *>(encoded.data()),encoded.size())==66&&bytes.front()==4);
+    require(EVP_DecodeBlock(bytes.data(),reinterpret_cast<const unsigned char *>(encoded.data()),static_cast<int>(encoded.size()))==66&&bytes.front()==4);
     std::array<unsigned char,65> result{};std::copy_n(bytes.begin(),result.size(),result.begin());return result;
 }
 std::string encode(const std::array<unsigned char,65> &value){
-    std::array<unsigned char,89> encoded{};require(EVP_EncodeBlock(encoded.data(),value.data(),value.size())==88);
+    std::array<unsigned char,89> encoded{};require(EVP_EncodeBlock(encoded.data(),value.data(),static_cast<int>(value.size()))==88);
     std::string result(reinterpret_cast<const char *>(encoded.data()),87);
     std::replace(result.begin(),result.end(),'+','-');std::replace(result.begin(),result.end(),'/','_');return result;
 }
@@ -68,7 +68,7 @@ PiPairRotationKey PiPairRotationKey::generate(){
 PiPairRotationKey PiPairRotationKey::restore(const PiPairSecret &private_key,std::string_view public_point){
     Errors errors;const auto bytes=point(public_point);
     std::unique_ptr<BIGNUM,decltype(&BN_clear_free)> number(BN_secure_new(),BN_clear_free);require(bool(number),PiPairCryptoFailure::Unavailable);
-    require(BN_bin2bn(private_key.bytes().data(),private_key.bytes().size(),number.get())==number.get()&&!BN_is_zero(number.get()));
+    require(BN_bin2bn(private_key.bytes().data(),static_cast<int>(private_key.bytes().size()),number.get())==number.get()&&!BN_is_zero(number.get()));
     std::unique_ptr<OSSL_PARAM_BLD,decltype(&OSSL_PARAM_BLD_free)> builder(OSSL_PARAM_BLD_new(),OSSL_PARAM_BLD_free);require(bool(builder),PiPairCryptoFailure::Unavailable);
     require(OSSL_PARAM_BLD_push_utf8_string(builder.get(),OSSL_PKEY_PARAM_GROUP_NAME,"prime256v1",0)==1&&
         OSSL_PARAM_BLD_push_octet_string(builder.get(),OSSL_PKEY_PARAM_PUB_KEY,bytes.data(),bytes.size())==1&&
@@ -93,7 +93,7 @@ PiPairSecret PiPairRotationKey::export_private() const {
     require(exported==1&&number&&!BN_is_zero(number.get())&&BN_num_bytes(number.get())<=32);
     std::array<unsigned char,32> bytes{};
     struct Wipe{std::array<unsigned char,32> &value;~Wipe(){OPENSSL_cleanse(value.data(),value.size());}} wipe{bytes};
-    require(BN_bn2binpad(number.get(),bytes.data(),bytes.size())==32);return PiPairSecret(bytes);
+    require(BN_bn2binpad(number.get(),bytes.data(),static_cast<int>(bytes.size()))==32);return PiPairSecret(bytes);
 }
 std::string PiPairRotationKey::public_point() const {
     Errors errors;require(bool(impl_));std::array<unsigned char,65> bytes{};std::size_t size{};

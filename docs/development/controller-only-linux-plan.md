@@ -8,6 +8,9 @@ Track [WsprryPi #475](https://github.com/WsprryPi/WsprryPi/issues/475).
 Use the [implementation prompt](issue-475-implementation-prompt.md) for each
 subsequently authorized slice. This plan defines scope and acceptance; the prompt
 defines execution. Neither document by itself authorizes implementation.
+
+The [slice-0 platform inventory](issue-475-platform-matrix.md) records the 2026-11-22 source selection, prerequisite fixture repair, selected qualification baselines, native adapter and service boundaries, evidence, and outstanding gates. It does not qualify controller installation or authorize a later slice.
+
 The prerequisite is [issue #473](https://github.com/WsprryPi/WsprryPi/issues/473)
 and its [authoritative plan](device-owned-solar-scheduling-plan.md), as accepted
 at execution time.
@@ -65,15 +68,7 @@ No controller-side solar evaluation or remote recurrence dispatch is introduced.
 Legacy Fleet authority follows #473's completed migration rules; never re-enable
 retired assignments or use a legacy loop to replace device-owned scheduling.
 
-“Any platform” means a portable controller architecture with individually qualified
-host profiles, not an untestable promise for every operating system or CPU.
-Deliver in order: Debian-family Linux, macOS, then Windows. Establish exact minimum
-OS/runtime/toolchain versions and CPU pairs in slice 0; Linux amd64 is the first
-required profile. Audit Linux arm64, macOS Intel/Apple silicon, and Windows x64/arm64
-separately. Do not advertise a combination before its native gates pass. An
-unavailable runner/toolchain leaves that profile outstanding, not silently omitted
-from the requested cross-platform outcome. Other Unix systems, mobile hosts, and
-embedded operating systems require separate profiles and are not claimed here.
+“Any platform” means a portable controller architecture with individually qualified host profiles, not an untestable promise for every operating system or CPU. Deliver in order: Debian-family Linux, macOS, then Windows. Establish exact minimum OS/runtime/toolchain versions and CPU pairs in slice 0; Linux amd64 is the first required profile. Audit Linux arm64, macOS Intel/Apple silicon, and Windows x64 separately. Windows ARM64 is outside the selected support scope, following the explicit user decision on November 24, 2026. Windows x64 qualification selects the available Windows 11 build 26300 and MSVC 19.51 baseline; the earlier build 26100/MSVC 19.44 proposal is superseded. Do not advertise a combination before its native gates pass. An unavailable runner/toolchain leaves that profile outstanding, not silently omitted from the requested cross-platform outcome. Other Unix systems, mobile hosts, and embedded operating systems require separate profiles and are not claimed here.
 
 ## 3. Runtime and build contract
 

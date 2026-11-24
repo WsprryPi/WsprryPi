@@ -15,11 +15,26 @@
 #include "wtp_integration/browser_api.hpp"
 #include <cerrno>
 #include <filesystem>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
 #include <sys/stat.h>
+#endif
 namespace wsprrypi {
 namespace {
 void require(bool value){if(!value)throw StateStorageError(StateStorageError::Code::Unavailable);}
+#ifdef _WIN32
+std::filesystem::path disk_path(const std::string &text){return windows_file::path_from_utf8(text);}
+std::string path_text(const std::filesystem::path &path){const auto bytes=path.u8string();return {bytes.begin(),bytes.end()};}
+bool present(const std::string &text){
+    if(::GetFileAttributesW(windows_file::api_path(disk_path(text)).c_str())!=INVALID_FILE_ATTRIBUTES)return true;
+    const auto error=::GetLastError();require(error==ERROR_FILE_NOT_FOUND||error==ERROR_PATH_NOT_FOUND);return false;
+}
+#else
+std::filesystem::path disk_path(const std::string &text){return std::filesystem::path(text);}
+std::string path_text(const std::filesystem::path &path){return path.string();}
 bool present(const std::string &path){struct stat info{};if(!::lstat(path.c_str(),&info))return true;require(errno==ENOENT);return false;}
+#endif
 }
 struct StateMigrationSource::Impl {
     std::string source,self;StateRole role;
@@ -31,8 +46,8 @@ struct StateMigrationSource::Impl {
         require(role==StateRole::Pi||role==StateRole::Controller);
         require(self.size()==32&&self.find_first_not_of("0123456789abcdef")==std::string::npos&&
             !input.empty()&&input.find('\0')==std::string::npos);
-        const auto path=std::filesystem::path(input);
-        source=(std::filesystem::canonical(path.has_parent_path()?path.parent_path():std::filesystem::path("."))/path.filename()).string();
+        const auto path=disk_path(input);
+        source=path_text(std::filesystem::canonical(path.has_parent_path()?path.parent_path():std::filesystem::path("."))/path.filename());
         (void)PiManagementJournal::read_ini_input(source);
         const auto retirement_root=private_device_state_directory(PrivateDeviceDomain::ControllerRetirements,self);
         if(present(source+".wtp-devices.json"))catalog=std::make_unique<WtpCatalog>(source+".wtp-devices.json");

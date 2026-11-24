@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: MIT
 #include "pi_management_journal.hpp"
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#else
+#include "native_private_acl.hpp"
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <array>
 #include <algorithm>
 #include <cerrno>
 #include <filesystem>
-#include <fcntl.h>
 #include <mutex>
 #include <set>
 #include <stdexcept>
-#include <sys/stat.h>
-#include <unistd.h>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
@@ -20,9 +25,23 @@ std::recursive_mutex mutex;
 void require(bool condition){if(!condition)throw std::runtime_error("pi_management_storage_hold");}
 bool hex(const Json &value,std::size_t length){return value.is_string()&&value.get_ref<const std::string&>().size()==length&&value.get_ref<const std::string&>().find_first_not_of("0123456789abcdef")==std::string::npos;}
 bool fields(const Json &value,std::initializer_list<const char *> names){if(!value.is_object()||value.size()!=names.size())return false;for(auto name:names)if(!value.contains(name))return false;return true;}
-std::string parent(const std::string &path){const auto value=std::filesystem::path(path).parent_path();return value.empty()?".":value.string();}
-std::string fresh(){std::array<unsigned char,16> data{};require(RAND_bytes(data.data(),data.size())==1);std::string result;for(auto byte:data){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;}
-struct File {std::string bytes;mode_t mode;std::string signature;};
+std::string fresh(){std::array<unsigned char,16> data{};require(RAND_bytes(data.data(),static_cast<int>(data.size()))==1);std::string result;for(auto byte:data){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;}
+#ifdef _WIN32
+#include "pi_management_files_windows.hpp"
+#else
+using FileMode=mode_t;
+std::filesystem::path disk_path(const std::string &text){return std::filesystem::path(text);}
+std::string path_text(const std::filesystem::path &path){return path.string();}
+std::string path_key(const std::filesystem::path &path){return path.string();}
+std::filesystem::path owned_parent(const std::string &text){
+    const auto directory=std::filesystem::canonical(disk_path(text).parent_path().empty()?".":disk_path(text).parent_path());
+    struct stat owner{};
+    require(!::lstat(directory.c_str(),&owner)&&S_ISDIR(owner.st_mode)&&owner.st_uid==geteuid()&&!(owner.st_mode&0022));
+    require(native_private_acl_path(directory.c_str(),owner.st_uid));return directory;
+}
+std::filesystem::path normalized_destination(const std::string &text){return owned_parent(text)/disk_path(text).filename();}
+void remove_file(const std::filesystem::path &path,bool missing=false){if(::unlink(path.c_str()))require(missing&&errno==ENOENT);}
+struct File {std::string bytes;FileMode mode;std::string signature;};
 bool same_file(const struct stat &before,const struct stat &after){
 #ifdef __APPLE__
     const auto modified_before=before.st_mtimespec,modified_after=after.st_mtimespec;
@@ -48,10 +67,12 @@ std::string signature(const struct stat &info,const std::string &bytes){
         PiManagementJournal::digest(bytes)}).dump());
 }
 std::optional<File> read_file(const std::string &path,bool private_file,bool stabilize=false){
+    if(private_file)require(native_private_acl_ancestors(path.c_str()));
     const int fd=::open(path.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
     if(fd<0){require(errno==ENOENT);return {};}
     struct Close{int fd;~Close(){::close(fd);}} close{fd};struct stat before{},after{};
     require(!::fstat(fd,&before)&&S_ISREG(before.st_mode)&&before.st_nlink==1&&before.st_uid==geteuid()&&before.st_size>=0&&static_cast<std::size_t>(before.st_size)<=maximum_bytes&&!(before.st_mode&(private_file?0077:0022)));
+    if(private_file)require(native_private_acl(fd,before.st_uid));
     File result{{},static_cast<mode_t>(before.st_mode&0777),{}};std::array<char,4096> block{};
     for(;;){const auto count=::read(fd,block.data(),block.size());if(count<0&&errno==EINTR)continue;require(count>=0);if(!count)break;result.bytes.append(block.data(),count);require(result.bytes.size()<=maximum_bytes);}
     struct stat descriptor_after{};
@@ -61,17 +82,19 @@ std::optional<File> read_file(const std::string &path,bool private_file,bool sta
     return result;
 }
 std::optional<std::string> hash(const std::optional<File> &file){return file?std::optional<std::string>(PiManagementJournal::digest(file->bytes)):std::nullopt;}
-void write_file(const std::string &path,const std::string &bytes,mode_t mode,bool exclusive){
+void write_file(const std::string &path,const std::string &bytes,FileMode mode,bool exclusive){
     require(bytes.size()<=maximum_bytes);
     const auto temporary=exclusive?path:path+".tmp."+fresh();
     int fd=::open(temporary.c_str(),O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);require(fd>=0);
     try{
-        require(!::fchmod(fd,mode));std::size_t offset=0;
+        require(!::fchmod(fd,mode));if(!(mode&0077))require(native_private_acl(fd,::geteuid()));std::size_t offset=0;
         while(offset<bytes.size()){const auto count=::write(fd,bytes.data()+offset,bytes.size()-offset);if(count<0&&errno==EINTR)continue;require(count>0);offset+=count;}
         require(!::fsync(fd));const auto closed=::close(fd);fd=-1;require(!closed);
         if(!exclusive)require(!::rename(temporary.c_str(),path.c_str()));
     }catch(...){if(fd>=0)::close(fd);::unlink(temporary.c_str());throw;}
 }
+#endif
+std::string parent(const std::string &path){const auto value=disk_path(path).parent_path();return value.empty()?".":path_text(value);}
 }
 std::string PiManagementJournal::digest(const std::string &value){std::array<unsigned char,SHA256_DIGEST_LENGTH> bytes{};SHA256(reinterpret_cast<const unsigned char *>(value.data()),value.size(),bytes.data());std::string result;for(auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;}
 PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::map<std::string,std::string> paths):directory_(std::move(dir)),self_(std::move(self)),wal_(directory_+"/transaction.json"),destinations_(std::move(paths)){
@@ -79,25 +102,20 @@ PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::m
     // decision still contains at most six images. Initialization adds progress
     // proof only to the no-INI enable transaction, never a seventh image.
     require(!directory_.empty()&&hex(self_,32)&&!destinations_.empty()&&destinations_.size()<=7);
-    const auto directory_parent=std::filesystem::canonical(parent(directory_));
-    struct stat directory_owner{};
-    require(!::lstat(directory_parent.c_str(),&directory_owner)&&S_ISDIR(directory_owner.st_mode)&&directory_owner.st_uid==geteuid()&&!(directory_owner.st_mode&0022));
-    const auto name=std::filesystem::path(directory_).filename();
+    const auto directory_parent=owned_parent(directory_);
+    const auto name=disk_path(directory_).filename();
     require(!name.empty()&&name!="."&&name!="..");
-    directory_=(directory_parent/name).string();wal_=directory_+"/transaction.json";
+    directory_=path_text(normalized_destination(path_text(directory_parent/name)));wal_=directory_+"/transaction.json";
     std::set<std::string> unique;
-    const auto storage=std::filesystem::weakly_canonical(directory_);
+    const auto storage=path_key(disk_path(directory_));
     for(auto &[kind,path]:destinations_){
         require(kind=="ini"||kind=="settings"||kind=="operations"||kind=="authority"||kind=="recurrence"||kind=="retirement-anchor"||kind=="legacy"||kind=="progress"||kind=="pair"||kind=="peers"||kind=="assignments");
         require(!path.empty());
-        const auto owner_directory=std::filesystem::canonical(parent(path));
-        struct stat owner{};
-        require(!::lstat(owner_directory.c_str(),&owner)&&S_ISDIR(owner.st_mode)&&owner.st_uid==geteuid()&&!(owner.st_mode&0022));
-        // Normalize the trusted parent, never resolve a final-file symlink.
-        const auto canonical=owner_directory/std::filesystem::path(path).filename();
-        for(auto ancestor=canonical;!ancestor.empty();ancestor=ancestor.parent_path()){require(ancestor!=storage);if(ancestor==ancestor.parent_path())break;}
-        require(unique.insert(canonical.string()).second);
-        path=canonical.string();
+        const auto canonical=normalized_destination(path);
+        // Final-file reparse points are never followed by either adapter.
+        for(auto ancestor=canonical;!ancestor.empty();ancestor=ancestor.parent_path()){require(path_key(ancestor)!=storage);if(ancestor==ancestor.parent_path())break;}
+        require(unique.insert(path_key(canonical)).second);
+        path=path_text(canonical);
     }
     // P62-05 adds this image only to the new pairing owner. It cannot be
     // substituted for settings/progress or mixed into a transmitter save.
@@ -106,16 +124,34 @@ PiManagementJournal::PiManagementJournal(std::string dir,std::string self,std::m
         parent(destinations_.at("peers"))==parent(destinations_.at("pair"))&&
         parent(destinations_.at("peers"))==parent(destinations_.at("operations")));
 }
-void PiManagementJournal::sync_directory(const std::string &path) const {
+namespace {
+void sync_owned_directory(const std::string &path){
+#ifdef _WIN32
+    wf::flush_directory(disk_path(path),wf::current_sid());
+#else
     const int fd=::open(path.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(fd>=0);const auto result=::fsync(fd);::close(fd);require(!result);
+#endif
 }
+}
+void PiManagementJournal::sync_directory(const std::string &path) const {sync_owned_directory(path);}
 void PiManagementJournal::directory(bool create){
+#ifdef _WIN32
+    const auto path=disk_path(directory_);
+    if(!exists_file(path)){
+        if(!create)return;
+        sync_directory(parent(directory_));wf::PrivateSecurity security(wf::current_sid());
+        require(::CreateDirectoryW(wf::api_path(path).c_str(),security.attributes()));sync_directory(parent(directory_));
+    }
+    (void)private_directory_handle(path);
+#else
     struct stat info{};
     if(::lstat(directory_.c_str(),&info)){
         require(errno==ENOENT);if(!create)return;
         require(!::mkdir(directory_.c_str(),0700));sync_directory(parent(directory_));require(!::lstat(directory_.c_str(),&info));
     }
     require(S_ISDIR(info.st_mode)&&info.st_uid==geteuid()&&!(info.st_mode&0077));
+    require(native_private_acl_path(directory_.c_str(),info.st_uid));
+#endif
 }
 void PiManagementJournal::validate(const Json &data) const {
     require(fields(data,{"schema","transaction_id","device_id","state","records"})&&data["schema"]=="pi-management-transaction/1"&&hex(data["transaction_id"],32)&&data["device_id"]==self_&&(data["state"]=="prepared"||data["state"]=="committed")&&data["records"].is_array()&&!data["records"].empty()&&data["records"].size()<=6);
@@ -151,17 +187,14 @@ std::optional<PiManagementJournal::Observation> PiManagementJournal::read_privat
 PiManagementJournal::Observation PiManagementJournal::publish_private_record(const std::string &path,
     const std::optional<Observation> &expected,const std::string &bytes){
     std::lock_guard lock(mutex);
-    const auto owner_directory=std::filesystem::canonical(parent(path));
-    struct stat owner{};
-    require(!::lstat(owner_directory.c_str(),&owner)&&S_ISDIR(owner.st_mode)&&owner.st_uid==geteuid()&&!(owner.st_mode&0022));
-    const auto name=std::filesystem::path(path).filename();require(!name.empty()&&name!="."&&name!="..");
-    const auto destination=(owner_directory/name).string();
+    const auto owner_directory=owned_parent(path);
+    const auto name=disk_path(path).filename();require(!name.empty()&&name!="."&&name!="..");
+    const auto destination=path_text(normalized_destination(path_text(owner_directory/name)));
     const auto before=read_file(destination,true);
     require(bool(before)==bool(expected));
     if(before)require(before->bytes==expected->bytes&&before->signature==expected->signature);
     write_file(destination,bytes,0600,false);
-    const auto descriptor=::open(owner_directory.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(descriptor>=0);
-    const auto synced=::fsync(descriptor),closed=::close(descriptor);require(!synced&&!closed);
+    sync_owned_directory(path_text(owner_directory));
     const auto after=read_file(destination,true);require(after&&after->bytes==bytes);
     return {after->bytes,after->signature};
 }
@@ -176,8 +209,8 @@ void PiManagementJournal::clean_images(const std::optional<Json> &retained){
     // Without a WAL these are exclusively uncommitted staging or cleanup after
     // a fully applied, durably retired decision. They never authorize mutation.
     unsigned count=0;
-    for(const auto &entry:std::filesystem::directory_iterator(directory_)){
-        const auto name=entry.path().filename().string();
+    for(const auto &entry:std::filesystem::directory_iterator(disk_path(directory_))){
+        const auto name=path_text(entry.path().filename());
         if(retained&&name=="transaction.json")continue;
         // Two complete six-image decisions plus an interrupted atomic WAL
         // replacement fit this bound. Retained referenced images never retire
@@ -185,8 +218,8 @@ void PiManagementJournal::clean_images(const std::optional<Json> &retained){
         require(++count<=32);
         require((name.size()==36&&(name.ends_with(".old")||name.ends_with(".new"))&&hex(name.substr(0,32),32))||
                 (name.starts_with("transaction.json.tmp.")&&name.size()==53&&hex(name.substr(21),32)));
-        require(read_file(entry.path().string(),true).has_value());
-        if(!keep.contains(name))require(!::unlink(entry.path().c_str()));
+        require(read_file(path_text(entry.path()),true).has_value());
+        if(!keep.contains(name))remove_file(entry.path());
     }
     sync_directory(directory_);
 }
@@ -287,7 +320,7 @@ void PiManagementJournal::write_committed_ini(const std::string &bytes){
     const auto &expected=prepared_observations_.at("ini");
     require(current.has_value()==expected.has_value()&&(!current||current->signature==expected->signature));
     ini_published_=true;
-    write_file(path,bytes,current?current->mode:static_cast<mode_t>(0600),false);
+    write_file(path,bytes,current?current->mode:static_cast<FileMode>(0600),false);
     sync_directory(parent(path));
     const auto published=read_file(path,false);require(published&&published->bytes==bytes);
 }
@@ -296,22 +329,22 @@ bool PiManagementJournal::recover(bool retain_prepared){
     prepared_transaction_.clear();prepared_observations_.clear();ini_published_=false;
     const bool committed=(*data)["state"]=="committed";
     require(!retain_prepared||!committed);
-    struct Plan {std::string path;std::optional<File> image;mode_t mode;};std::vector<Plan> plans;
+    struct Plan {std::string path;std::optional<File> image;FileMode mode;};std::vector<Plan> plans;
     for(const auto &row:(*data)["records"]){
         const auto kind=row["kind"].get<std::string>(),stem=directory_+"/"+row["staged_name"].get<std::string>();
         const auto old=read_file(stem+".old",true),next=read_file(stem+".new",true);
         require(hash(old)==(row["old_digest"].is_null()?std::optional<std::string>{}:std::optional<std::string>(row["old_digest"].get<std::string>()))&&next&&digest(next->bytes)==row["new_digest"].get<std::string>());
         const auto path=destinations_.at(kind);const auto current=read_file(path,kind!="ini");const auto current_hash=hash(current);
         require(current_hash==hash(old)||current_hash==hash(next));
-        plans.push_back({path,committed?next:old,current?current->mode:static_cast<mode_t>(0600)});
+        plans.push_back({path,committed?next:old,current?current->mode:static_cast<FileMode>(0600)});
     }
     for(const auto &plan:plans){
         if(plan.image)write_file(plan.path,plan.image->bytes,plan.mode,false);
-        else if(::unlink(plan.path.c_str()))require(errno==ENOENT);
+        else remove_file(disk_path(plan.path),true);
         sync_directory(parent(plan.path));
         require(hash(read_file(plan.path,false))==hash(plan.image));
     }
     if(retain_prepared){clean_images(data);return true;}
-    require(!::unlink(wal_.c_str()));sync_directory(directory_);clean_images();return true;
+    remove_file(disk_path(wal_));sync_directory(directory_);clean_images();return true;
 }
 } // namespace wsprrypi

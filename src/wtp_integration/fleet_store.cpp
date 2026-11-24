@@ -8,50 +8,68 @@
 #include <charconv>
 #include <cerrno>
 #include <filesystem>
+#ifdef _WIN32
+#include "pi_management_journal.hpp"
+#else
 #include <fcntl.h>
-#include <set>
-#include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+#include <set>
+#include <stdexcept>
 #include <optional>
 namespace wsprrypi {
 namespace {
-std::optional<nlohmann::json> load_private_json(const std::string& path,std::size_t limit) {
-    nlohmann::json data;
+std::optional<std::string> private_bytes(const std::string &path,std::size_t limit){
+#ifdef _WIN32
+    const auto record=PiManagementJournal::read_private_record(path);
+    if(!record)return {};
+    if(record->bytes.size()>limit)throw std::runtime_error("Fleet assignments exceed size limit");
+    return record->bytes;
+#else
     const int fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) {
         if (errno != ENOENT) throw std::runtime_error("Cannot read fleet assignments");
         return std::nullopt;
-    } else {
-        struct Guard { int fd; ~Guard() { close(fd); } } guard{fd};
-        struct stat info{};
-        if (fstat(fd,&info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != geteuid() ||
-            (info.st_mode & 0077) != 0 || info.st_size > static_cast<off_t>(limit))
-            throw std::runtime_error("Fleet assignments must be a private host-owned regular file within the Fleet size limit");
-        std::string bytes;
-        std::array<char,4096> buffer{};
-        for (;;) {
-            const auto n = read(fd,buffer.data(),buffer.size());
-            if (n == 0) break;
-            if (n < 0) { if (errno == EINTR) continue; throw std::runtime_error("Fleet assignment read failed"); }
-            bytes.append(buffer.data(),static_cast<std::size_t>(n));
-            if (bytes.size() > limit) throw std::runtime_error("Fleet assignments exceed size limit");
-        }
-        std::vector<std::set<std::string>> keys;
-        data = nlohmann::json::parse(bytes,[&](int, nlohmann::json::parse_event_t e,nlohmann::json& v) {
-            if (e == nlohmann::json::parse_event_t::object_start) keys.emplace_back();
-            if (e == nlohmann::json::parse_event_t::key && !keys.back().insert(v.get<std::string>()).second)
-                throw std::runtime_error("Duplicate fleet assignment key");
-            if (e == nlohmann::json::parse_event_t::object_end) keys.pop_back();
-            return true;
-        });
     }
+    struct Guard { int fd; ~Guard() { close(fd); } } guard{fd};
+    struct stat info{};
+    if (fstat(fd,&info) != 0 || !S_ISREG(info.st_mode) || info.st_uid != geteuid() ||
+        (info.st_mode & 0077) != 0 || info.st_size > static_cast<off_t>(limit))
+        throw std::runtime_error("Fleet assignments must be a private host-owned regular file within the Fleet size limit");
+    std::string bytes;
+    std::array<char,4096> buffer{};
+    for (;;) {
+        const auto n = read(fd,buffer.data(),buffer.size());
+        if (n == 0) break;
+        if (n < 0) { if (errno == EINTR) continue; throw std::runtime_error("Fleet assignment read failed"); }
+        bytes.append(buffer.data(),static_cast<std::size_t>(n));
+        if (bytes.size() > limit) throw std::runtime_error("Fleet assignments exceed size limit");
+    }
+    return bytes;
+#endif
+}
+std::optional<nlohmann::json> load_private_json(const std::string& path,std::size_t limit) {
+    const auto saved=private_bytes(path,limit);if(!saved)return {};
+    const auto &bytes=*saved;
+    std::vector<std::set<std::string>> keys;
+    auto data = nlohmann::json::parse(bytes,[&](int, nlohmann::json::parse_event_t e,nlohmann::json& v) {
+        if (e == nlohmann::json::parse_event_t::object_start) keys.emplace_back();
+        if (e == nlohmann::json::parse_event_t::key && !keys.back().insert(v.get<std::string>()).second)
+            throw std::runtime_error("Duplicate fleet assignment key");
+        if (e == nlohmann::json::parse_event_t::object_end) keys.pop_back();
+        return true;
+    });
     return data;
 }
 void save_private_json(const std::string& path,const nlohmann::json& data,std::size_t limit) {
     const auto bytes = data.dump(2) + "\n";
     if (bytes.size() > limit)
         throw std::runtime_error("Fleet assignments exceed size limit");
+#ifdef _WIN32
+    const auto before=PiManagementJournal::read_private_record(path);
+    (void)PiManagementJournal::publish_private_record(path,before,bytes);
+#else
     std::string pattern = path + ".tmp.XXXXXX";
     std::vector<char> filename(pattern.begin(),pattern.end()); filename.push_back(0);
     int fd = mkstemp(filename.data());
@@ -81,6 +99,7 @@ void save_private_json(const std::string& path,const nlohmann::json& data,std::s
         // on the next request; the failed caller must never dispatch work.
         throw;
     }
+#endif
 }
 } // namespace
 std::uint64_t wtp_fleet_decimal(const nlohmann::json& value) {

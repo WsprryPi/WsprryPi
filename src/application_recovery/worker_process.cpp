@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
+#ifndef _WIN32
 #include "worker_process.hpp"
+#include "worker_protocol.hpp"
 #include "application_control/local_transport.hpp"
 #include <array>
 #include <chrono>
@@ -51,6 +53,7 @@ void ready(int fd,short events,Deadline deadline){
         const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now()).count();
         require(remaining>0);pollfd item{fd,events,0};const auto result=::poll(&item,1,static_cast<int>(std::min<std::int64_t>(remaining,5000)));
         if(result<0&&errno==EINTR)continue;
+        if(result==0)continue;
         require(result>0&&!(item.revents&(POLLERR|POLLNVAL))&&(item.revents&(events|POLLHUP)));return;
     }
 }
@@ -78,19 +81,21 @@ void send_bytes(int fd,const std::string &bytes,Deadline deadline){
         require(size>0);offset+=static_cast<std::size_t>(size);
     }
 }
-Json parse(const std::string &bytes){
-    std::vector<std::set<std::string>> keys;
-    return Json::parse(bytes,[&](int depth,Json::parse_event_t event,Json &item){
-        require(depth<=32);if(event==Json::parse_event_t::object_start)keys.emplace_back();
-        else if(event==Json::parse_event_t::key)require(!keys.empty()&&keys.back().insert(item.get<std::string>()).second);
-        else if(event==Json::parse_event_t::object_end){require(!keys.empty());keys.pop_back();}
-        return true;
-    });
-}
+
 }
 struct RecoveryWorkerProcess::Impl {
     std::mutex mutex;int input{-1},output{-1};pid_t child{-1};bool poisoned{};
     ~Impl(){stop();}
+    Json exchange(const std::string &bytes,Deadline deadline){
+        send_bytes(input,bytes,deadline);
+        std::string response;std::array<char,8192> buffer{};
+        while(true){
+            ready(output,POLLIN,deadline);const auto count=::read(output,buffer.data(),buffer.size());
+            if(count<0&&(errno==EINTR||errno==EAGAIN))continue;
+            require(count>0&&response.size()+static_cast<std::size_t>(count)<=1024*1024);response.append(buffer.data(),count);
+            if(response.find('\n')!=std::string::npos)return recovery_worker_protocol::reply(response);
+        }
+    }
     void stop()noexcept{
         if(input>=0){::close(input);input=-1;}if(output>=0){::close(output);output=-1;}
         if(child>0){
@@ -104,8 +109,9 @@ RecoveryWorkerProcess::RecoveryWorkerProcess(const RecoveryPaths &paths,const st
     require(identity.size()==32&&identity.find_first_not_of("0123456789abcdef")==std::string::npos&&(role=="pi"||role=="controller"));
     safe_program(paths.python,true);safe_program(paths.worker,false);safe_program(paths.age,true);
     require(!paths.backend_command.empty());safe_program(paths.backend_command.front(),true);
+    if(paths.backend_owner){require(role=="controller");safe_program(paths.backend_owner->worker,false);}
     const auto python=std::filesystem::canonical(paths.python).string(),worker=std::filesystem::canonical(paths.worker).string();
-    for(const auto *module:{"__init__.py","archive.py","durable.py","jobs.py","publication.py","evidence.py","lifecycle.py","proxy.py"})
+    for(const auto *module:{"__init__.py","archive.py","durable.py","jobs.py","publication.py","evidence.py","lifecycle.py","proxy.py","private_acl.py","state_owner.py"})
         safe_program((std::filesystem::path(worker).parent_path()/module).string(),false);
     Descriptor child_input,parent_input,parent_output,child_output,child_config,parent_config;
     pipe(child_input,parent_input);pipe(parent_output,child_output);pipe(child_config,parent_config);
@@ -128,34 +134,39 @@ RecoveryWorkerProcess::RecoveryWorkerProcess(const RecoveryPaths &paths,const st
     char path[]="PATH=/usr/bin:/bin",lang[]="LANG=C";char *environment[]{path,lang,nullptr};
     const auto error=::posix_spawn(&impl_->child,python.c_str(),&actions,&attributes,argv.data(),environment);
     if(error){impl_->child=-1;throw LocalControlError(LocalControlError::Code::Unavailable);}
+    require(!::close(child_input.release())&&!::close(child_output.release())&&!::close(child_config.release()));
     impl_->input=parent_input.release();impl_->output=parent_output.release();
     require(!::fcntl(impl_->input,F_SETFL,O_NONBLOCK)&&!::fcntl(impl_->output,F_SETFL,O_NONBLOCK));
     auto lifecycle=paths.software_backend_command.empty()?Json{{"kind","systemd"}}:
         Json{{"kind","software_fixture"},{"start_command",paths.software_backend_command}};
     if(!paths.software_worker_fault_phase.empty())lifecycle["crash_after_phase"]=paths.software_worker_fault_phase;
-    const auto config=Json{{"lifecycle",lifecycle},{"root",paths.root},{"application_root",paths.application_root},{"backend_command",paths.backend_command},
-        {"backend_runtime",paths.backend_runtime},{"age",paths.age},{"identity",identity},{"role",role}}.dump();
-    require(config.size()<=32768);std::string frame(4,'\0');
-    for(unsigned index=0;index<4;++index)frame[index]=static_cast<char>((config.size()>>(24-index*8))&255);
-    frame+=config;require(!::fcntl(parent_config.value,F_SETFL,O_NONBLOCK));send_bytes(parent_config.value,frame,std::chrono::steady_clock::now()+std::chrono::seconds(5));
+    const auto owner=paths.backend_owner?Json{{"uid",paths.backend_owner->uid},{"gid",paths.backend_owner->gid},
+        {"home",paths.backend_owner->home},{"root",paths.backend_owner->root},{"worker",paths.backend_owner->worker}}:Json(nullptr);
+    const auto config=Json{{"backend_owner",owner},{"lifecycle",lifecycle},{"root",paths.root},{"application_root",paths.application_root},{"backend_command",paths.backend_command},
+        {"backend_runtime",paths.backend_runtime},{"age",paths.age},{"identity",identity},{"role",role}};
+    const auto frame=recovery_worker_protocol::configuration_frame(config);
+    try{
+        require(!::fcntl(parent_config.value,F_SETFL,O_NONBLOCK));send_bytes(parent_config.value,frame,std::chrono::steady_clock::now()+std::chrono::seconds(5));
+        require(!::close(parent_config.release()));
+        recovery_worker_protocol::startup_ready(impl_->exchange(recovery_worker_protocol::request_frame({{"action","list.summary"}}),std::chrono::steady_clock::now()+std::chrono::seconds(75)));
+    }catch(...){throw LocalControlError(LocalControlError::Code::Unavailable);}
 }
 RecoveryWorkerProcess::~RecoveryWorkerProcess()=default;
+bool RecoveryWorkerProcess::alive(){
+    std::lock_guard lock(impl_->mutex);
+    if(impl_->poisoned||impl_->child<=0)return false;
+    siginfo_t observed{};int result;
+    do{result=::waitid(P_PID,impl_->child,&observed,WEXITED|WNOHANG|WNOWAIT);}while(result<0&&errno==EINTR);
+    if(result==0&&observed.si_pid==0)return true;
+    impl_->poisoned=true;impl_->stop();return false;
+}
 Json RecoveryWorkerProcess::request(const Json &request){
     std::lock_guard lock(impl_->mutex);if(impl_->poisoned)throw LocalControlError(LocalControlError::Code::UnknownOutcome);
-    const auto bytes=request.dump()+"\n";require(bytes.size()<=144*1024);
+    const auto bytes=recovery_worker_protocol::request_frame(request);
     try{
-        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);send_bytes(impl_->input,bytes,deadline);
-        std::string response;std::array<char,8192> buffer{};
-        while(true){
-            ready(impl_->output,POLLIN,deadline);const auto count=::read(impl_->output,buffer.data(),buffer.size());
-            if(count<0&&(errno==EINTR||errno==EAGAIN))continue;
-            require(count>0&&response.size()+static_cast<std::size_t>(count)<=1024*1024);response.append(buffer.data(),count);
-            const auto newline=response.find('\n');if(newline==std::string::npos)continue;
-            require(newline==response.size()-1);auto result=parse(response);
-            require(result.is_object()&&result.size()==2&&result.contains("ok")&&result["ok"].is_boolean());
-            require((result["ok"]==true&&result.contains("value"))||(result["ok"]==false&&result.contains("error")&&result["error"].is_string()));
-            return result;
-        }
+        return impl_->exchange(bytes,std::chrono::steady_clock::now()+std::chrono::seconds(5));
     }catch(...){impl_->poisoned=true;impl_->stop();throw LocalControlError(LocalControlError::Code::UnknownOutcome);}
 }
 }
+
+#endif

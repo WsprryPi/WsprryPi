@@ -35,8 +35,8 @@
 #include "wtp_endpoint/identity.hpp"
 #include <atomic>
 #include <chrono>
-#include <unistd.h>
 #if defined(__linux__) && LIB_JOURNALD
+#include <unistd.h>
 #include <systemd/sd-journal.h>
 #include <sys/timex.h>
 #endif

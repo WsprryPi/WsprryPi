@@ -5,7 +5,6 @@ Only the owning backend supplies a coherent private snapshot. Decryption stages
 untrusted files privately and never selects or replaces active application state.
 """
 from contextlib import contextmanager
-import fcntl
 import hashlib
 import io
 import json
@@ -14,8 +13,13 @@ from pathlib import Path
 import re
 import stat
 import struct
+import sys
+if sys.platform != 'win32':
+    import fcntl
 import tarfile
+import threading
 import time
+from .private_acl import require_private_acl
 
 MAX_ARCHIVE = 2 * 1024 * 1024 * 1024
 MAX_PLAINTEXT = MAX_ARCHIVE - 2 * 1024 * 1024
@@ -102,7 +106,7 @@ def validate_manifest(value):
     closed(source, ('identity', 'role', 'application_version', 'storage', 'platform'))
     require(type(source['identity']) is str and ID.fullmatch(source['identity']))
     require(source['role'] in ('pi', 'controller') and source['storage'] == 'application-state/1')
-    require(source['platform'] in ('linux', 'darwin'))
+    require((source['platform'] in ('linux', 'darwin') or source['platform'] == 'windows' and source['role'] == 'controller'))
     require(type(source['application_version']) is str and 0 < len(source['application_version']) <= 128)
     require(type(value['created_utc']) is int and 0 < value['created_utc'] < 2**63)
     require(type(value['files']) is list and 0 < len(value['files']) <= MAX_FILES)
@@ -122,38 +126,152 @@ def validate_manifest(value):
 
 
 def safe_parent(path):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.safe_parent(path)
     path = Path(path)
     require(path.is_absolute() and '..' not in path.parts)
     for parent in (path.parent, *path.parent.parents):
         info = parent.lstat()
         require(stat.S_ISDIR(info.st_mode) and info.st_uid in (0, os.geteuid()))
         require(not info.st_mode & 0o022 or (info.st_uid == 0 and info.st_mode & stat.S_ISVTX))
+        if sys.platform == 'darwin':
+            descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                require_private_acl(descriptor, info.st_uid)
+            finally:
+                os.close(descriptor)
     return path
 
 
 def private_directory(path):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.private_directory(path)
     path = safe_parent(path)
     info = path.lstat()
     require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) == 0o700)
+    if sys.platform == 'darwin':
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            require_private_acl(descriptor, info.st_uid)
+        finally:
+            os.close(descriptor)
     return path
 
 
 @contextmanager
 def private_input(path, maximum):
+    if sys.platform == 'win32':
+        from . import native_files
+        with native_files.private_input(path, maximum) as opened:
+            yield opened
+        return
     path = safe_parent(path)
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
-        info = os.fstat(descriptor)
+        info = stat_descriptor(descriptor)
         require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_uid == os.geteuid()
                 and stat.S_IMODE(info.st_mode) == 0o600 and 0 <= info.st_size <= maximum)
+        require_private_acl(descriptor, info.st_uid)
         with os.fdopen(descriptor, 'rb', closefd=False) as stream:
             yield stream, info
     finally:
         os.close(descriptor)
 
 
+def stat_descriptor(descriptor):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.stat_descriptor(descriptor)
+    return os.fstat(descriptor)
+
+
+def path_metadata(path):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.path_info(path)
+    return Path(path).lstat()
+
+
+@contextmanager
+def private_output(path, maximum=MAX_ARCHIVE):
+    path = safe_parent(path)
+    private_directory(path.parent)
+    if sys.platform == 'win32':
+        from . import native_files
+        with native_files.private_output(path, maximum) as opened:
+            yield opened[0]
+        return
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(descriptor, 'wb', closefd=False) as stream:
+            yield stream
+    finally:
+        os.close(descriptor)
+
+
+class CiphertextUpload:
+    """One private writer; duplicate-chunk reads never share a mutable cursor."""
+    def __init__(self, path, size):
+        require(type(size) is int and 0 < size <= MAX_ARCHIVE)
+        path = safe_parent(path)
+        private_directory(path.parent)
+        self.size, self.native, self.lock = size, None, threading.Lock()
+        if sys.platform == 'win32':
+            from . import native_files
+            self.native = native_files.NativeFile(path, 2, size)
+            self.fd = self.native.fd
+        else:
+            self.fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+
+    def append(self, offset, data):
+        with self.lock:
+            require(self.fd is not None and type(offset) is int and type(data) is bytes and 0 < len(data) <= CHUNK)
+            position = os.lseek(self.fd, 0, os.SEEK_END)
+            require(0 <= offset <= position and offset + len(data) <= self.size)
+            if offset < position:
+                require(offset + len(data) <= position)
+                if sys.platform == 'win32':
+                    # Windows has no os.pread. This descriptor belongs only to
+                    # this writer, and its cursor is serialized by this lock.
+                    try:
+                        os.lseek(self.fd, offset, os.SEEK_SET)
+                        observed = os.read(self.fd, len(data))
+                    finally:
+                        os.lseek(self.fd, position, os.SEEK_SET)
+                else:
+                    observed = os.pread(self.fd, len(data), offset)
+                require(observed == data)
+            else:
+                remaining = memoryview(data)
+                while remaining:
+                    count = os.write(self.fd, remaining)
+                    require(count > 0)
+                    remaining = remaining[count:]
+                position += len(data)
+            return position
+
+    def complete(self):
+        with self.lock:
+            require(self.fd is not None and stat_descriptor(self.fd).st_size == self.size)
+            if self.native is not None:
+                self.native.sync()
+            else:
+                os.fsync(self.fd)
+
+    def close(self):
+        with self.lock:
+            descriptor, self.fd = self.fd, None
+            if self.native is not None:
+                self.native.close()
+                self.native = None
+            elif descriptor is not None:
+                os.close(descriptor)
+
+
 def observation(info):
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+    return info.st_dev, getattr(info, 'native_file_id', info.st_ino), info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
 def file_digest(stream):
@@ -170,7 +288,7 @@ def manifest_for_snapshot(directory, source, names, created_utc=None):
     for name in sorted(names):
         with private_input(directory / name, maximum_file(name)) as (stream, info):
             digest = file_digest(stream)
-            require(observation(os.fstat(stream.fileno())) == observation(info))
+            require(observation(stat_descriptor(stream.fileno())) == observation(info))
         files.append({'name': name, 'size': info.st_size, 'sha256': digest})
     return validate_manifest({'schema': 'wsprrypi-recovery/1', 'source': source,
                               'created_utc': int(time.time()) if created_utc is None else created_utc, 'files': files})
@@ -178,7 +296,12 @@ def manifest_for_snapshot(directory, source, names, created_utc=None):
 
 class CryptProcess:
     """No shell/preexec callback, secret files, argv secrets, or environment secrets."""
-    def __init__(self, helper, action, phrase, input_fd, output_fd):
+    def __init__(self, helper, action, phrase, input_fd, output_fd, working_directory=None):
+        self.native = None
+        if sys.platform == 'win32':
+            from . import native_files
+            self.native = native_files.CryptProcess(helper, action, phrase, input_fd, output_fd, working_directory)
+            return
         helper = safe_parent(helper)
         info = helper.lstat()
         require(stat.S_ISREG(info.st_mode) and info.st_uid in (0, os.geteuid()) and info.st_nlink == 1
@@ -208,12 +331,16 @@ class CryptProcess:
         self.finished = False
 
     def finish(self):
+        if self.native is not None:
+            return self.native.finish()
         require(not self.finished)
         _, status = os.waitpid(self.pid, 0)
         self.finished = True
         require(status == 0)
 
     def cancel(self):
+        if self.native is not None:
+            return self.native.cancel()
         if self.finished:
             return
         try:
@@ -255,7 +382,7 @@ def write_container(output, directory, manifest):
             require(info.st_size == item['size'])
             output.write(header(item['name'], item['size']))
             require(copy_exact(source, output, item['size']) == item['sha256'])
-            require(not source.read(1) and observation(os.fstat(source.fileno())) == observation(info))
+            require(not source.read(1) and observation(stat_descriptor(source.fileno())) == observation(info))
         output.write(b'\0' * (-item['size'] % 512))
     output.write(b'\0' * 1024)
 
@@ -293,13 +420,18 @@ def read_container(input_stream, destination):
     for item in manifest['files']:
         member(input_stream, item['name'], item['size'])
         path = destination / item['name']
-        for parent in reversed(path.parent.relative_to(destination).parents):
-            if parent != Path('.'):
-                (destination / parent).mkdir(mode=0o700, exist_ok=True)
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if sys.platform == 'win32':
+            from . import native_files
+            parent = destination
+            for component in path.parent.relative_to(destination).parts:
+                parent = native_files.make_directory(parent / component, exist_ok=True)
+        else:
+            for parent in reversed(path.parent.relative_to(destination).parents):
+                if parent != Path('.'):
+                    (destination / parent).mkdir(mode=0o700, exist_ok=True)
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         private_directory(path.parent)
-        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(descriptor, 'wb') as output:
+        with private_output(path, item['size']) as output:
             require(copy_exact(input_stream, output, item['size']) == item['sha256'])
             output.flush()
             os.fsync(output.fileno())
@@ -308,30 +440,45 @@ def read_container(input_stream, destination):
     return manifest
 
 
+def crypto_pipe():
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.pipe()
+    return os.pipe()
+
+
 def create_archive(helper, directory, destination, manifest, phrase):
     directory = private_directory(directory)
     destination = safe_parent(destination)
     private_directory(destination.parent)
-    descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    source, sink = os.pipe()
+    source, sink = crypto_pipe()
     child = None
+    created = False
     try:
-        child = CryptProcess(helper, 'encrypt', phrase, source, descriptor)
-        os.close(source)
-        source = -1
-        with os.fdopen(sink, 'wb') as stream:
-            sink = -1
-            write_container(stream, directory, manifest)
-        child.finish()
-        require(0 < os.fstat(descriptor).st_size <= MAX_ARCHIVE)
-        os.fsync(descriptor)
+        with private_output(destination, MAX_ARCHIVE) as output:
+            created = True
+            descriptor = output.fileno()
+            try:
+                child = CryptProcess(helper, 'encrypt', phrase, source, descriptor, destination.parent)
+                os.close(source)
+                source = -1
+                with os.fdopen(sink, 'wb') as stream:
+                    sink = -1
+                    write_container(stream, directory, manifest)
+                child.finish()
+                require(0 < stat_descriptor(descriptor).st_size <= MAX_ARCHIVE)
+                os.fsync(descriptor)
+            except BaseException:
+                if child:
+                    child.cancel()
+                raise
     except BaseException:
-        if child:
-            child.cancel()
-        destination.unlink(missing_ok=True)
+        # The writer and any owned crypto child are closed before retirement;
+        # Windows does not unlink a live private writer as POSIX permits.
+        if created:
+            destination.unlink(missing_ok=True)
         raise
     finally:
-        os.close(descriptor)
         if source >= 0:
             os.close(source)
         if sink >= 0:
@@ -341,19 +488,19 @@ def create_archive(helper, directory, destination, manifest, phrase):
 def validate_archive(helper, source, destination, phrase, expected_stamp=None):
     destination = private_directory(destination)
     require(not any(destination.iterdir()))
-    read_fd, write_fd = os.pipe()
+    read_fd, write_fd = crypto_pipe()
     child = None
     try:
         with private_input(source, MAX_ARCHIVE) as (archive, before):
             require(expected_stamp is None or list(observation(before)) == expected_stamp)
-            child = CryptProcess(helper, 'decrypt', phrase, archive.fileno(), write_fd)
+            child = CryptProcess(helper, 'decrypt', phrase, archive.fileno(), write_fd, destination)
             os.close(write_fd)
             write_fd = -1
             with os.fdopen(read_fd, 'rb') as decrypted:
                 read_fd = -1
                 manifest = read_container(decrypted, destination)
             child.finish()
-            require(observation(os.fstat(archive.fileno())) == observation(before))
+            require(observation(stat_descriptor(archive.fileno())) == observation(before))
         return manifest
     except BaseException:
         if child:

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "generation_selection.hpp"
+#include "provenance_path.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include <charconv>
 #include <initializer_list>
@@ -32,7 +33,7 @@ Json parse_generation_selection(const std::string &bytes,const std::string &iden
         initial["generation"]=="1"&&hex(initial["source_revision"],64)&&hex(initial["images_digest"],64)&&initial["source_namespace"].is_string());
     const auto source=initial["source_namespace"].get<std::string>();
     require((initial["origin"]=="fresh"&&source=="fresh")||
-        (initial["origin"]=="migration"&&!source.empty()&&source.front()=='/'&&source.find('\0')==std::string::npos));
+        (initial["origin"]=="migration"&&valid_provenance_namespace(source)));
     return value;
 }
 Json parse_restore_hold(const std::string &bytes,const std::string &identity,StateRole role,const std::string &generation){

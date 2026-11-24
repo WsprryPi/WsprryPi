@@ -4335,6 +4335,11 @@ namespace httplib
     }
 
     // Stream implementation
+    std::function<bool()> Stream::connection_closed_handler() const
+    {
+        return [descriptor = socket()] { return !detail::is_socket_alive(descriptor); };
+    }
+
     ssize_t Stream::write(const char *ptr)
     {
         return write(ptr, strlen(ptr));
@@ -5979,10 +5984,7 @@ namespace httplib
         }
 
         // Setup `is_connection_closed` method
-        req.is_connection_closed = [&]()
-        {
-            return !detail::is_socket_alive(strm.socket());
-        };
+        req.is_connection_closed = strm.connection_closed_handler();
 
         // Routing
         auto routed = false;

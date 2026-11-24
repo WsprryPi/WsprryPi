@@ -12,7 +12,7 @@ namespace {
 using Json=nlohmann::json;
 void require(bool value){if(!value)throw std::invalid_argument("invalid_pairing_discovery");}
 bool id(const std::string &value){return value.size()==32&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
-std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),bytes.size())==1);std::string result;
+std::string fresh(){std::array<unsigned char,16> bytes{};require(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))==1);std::string result;
     for(const auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;}
 std::string dns_name(std::string value){for(auto &c:value)if(c>='A'&&c<='Z')c=static_cast<char>(c-'A'+'a');if(!value.empty()&&value.back()!='.')value+='.';return value;}
 Json document(bool available,const Json &entries){return {{"contract","Wsprry-Control/1"},{"schema","pair-discovery"},{"available",available},{"discoveries",entries}};}

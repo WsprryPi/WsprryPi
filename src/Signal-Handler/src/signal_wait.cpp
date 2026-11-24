@@ -32,7 +32,7 @@ SignalWaitResult normalize_sigwait_result(
     return {SignalWaitStatus::Failed, 0, returned_error};
 }
 
-SignalWaitResult wait_for_blocked_signal(const sigset_t &set) noexcept
+SignalWaitResult wait_for_blocked_signal(const SignalWaitSet &set) noexcept
 {
 #if defined(__linux__)
     siginfo_t signal_info{};
@@ -42,7 +42,9 @@ SignalWaitResult wait_for_blocked_signal(const sigset_t &set) noexcept
     int received_signal = 0;
     const int returned_error = sigwait(&set, &received_signal);
     return normalize_sigwait_result(returned_error, received_signal);
+#elif defined(_WIN32)
+    return wait_for_windows_signal(set);
 #else
-#error "Signal-Handler synchronous waiting is supported only on Linux and macOS"
+#error "Signal-Handler synchronous waiting is supported only on Linux, macOS, and Windows"
 #endif
 }

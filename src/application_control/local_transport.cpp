@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: MIT
 #include "local_transport.hpp"
+namespace wsprrypi {
+LocalControlError::LocalControlError(Code code):std::runtime_error(code==Code::UnknownOutcome?
+    "Local command outcome is unknown; read saved state before deciding whether to retry":code==Code::Unauthorized?
+    "Local control peer is not authorized":code==Code::Protocol?"Local control protocol is unsupported or malformed":"Local backend is unavailable"),code_(code){}
+
+}
+#ifndef _WIN32
+#include "local_session.hpp"
+#include "native_random.hpp"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -19,36 +28,7 @@
 #include <unistd.h>
 namespace wsprrypi {
 namespace {
-using Json=nlohmann::json;
-using Code=LocalControlError::Code;
-// Browser messages retain the existing 64 KiB frame limit. JSON wrapping can
-// double quotes/escapes; keep explicit envelope headroom on that channel only.
-constexpr std::size_t maximum=144*1024;
-constexpr std::string_view protocol="wsprrypi-local/1";
-using Deadline=std::chrono::steady_clock::time_point;
-void require(bool value,Code code=Code::Protocol){if(!value)throw LocalControlError(code);}
-bool fields(const Json &v,std::initializer_list<const char *> names){
-    if(!v.is_object()||v.size()!=names.size())return false;
-    for(const auto *name:names)if(!v.contains(name))return false;
-    return true;
-}
-bool identity(const Json &v){return v.is_string()&&v.get_ref<const std::string &>().size()==32&&
-    v.get_ref<const std::string &>().find_first_not_of("0123456789abcdef")==std::string::npos;}
-std::string token(){
-    std::array<unsigned char,16> bytes{};
-    const int descriptor=::open("/dev/urandom",O_RDONLY|O_CLOEXEC);
-    require(descriptor>=0,Code::Unavailable);
-    std::size_t offset=0;
-    while(offset<bytes.size()){
-        const auto size=::read(descriptor,bytes.data()+offset,bytes.size()-offset);
-        if(size<0&&errno==EINTR)continue;
-        if(size<=0){::close(descriptor);throw LocalControlError(Code::Unavailable);}
-        offset+=static_cast<std::size_t>(size);
-    }
-    ::close(descriptor);std::string result;
-    for(const auto byte:bytes){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}
-    return result;
-}
+using namespace local_protocol;
 struct Descriptor {
     int value{-1};explicit Descriptor(int descriptor=-1):value(descriptor){}
     ~Descriptor(){if(value>=0)::close(value);}
@@ -78,27 +58,9 @@ void transfer(int fd,void *buffer,std::size_t size,bool sending,Deadline deadlin
         require(count>0,Code::Unavailable);data+=count;size-=static_cast<std::size_t>(count);
     }
 }
-void send_frame(int fd,const Json &value,Deadline deadline){
-    auto bytes=value.dump();require(bytes.size()<=maximum);
-    std::array<unsigned char,4> header{static_cast<unsigned char>(bytes.size()>>24),static_cast<unsigned char>(bytes.size()>>16),
-        static_cast<unsigned char>(bytes.size()>>8),static_cast<unsigned char>(bytes.size())};
-    transfer(fd,header.data(),header.size(),true,deadline);transfer(fd,bytes.data(),bytes.size(),true,deadline);
-}
 Json receive_frame(int fd,Deadline deadline,std::size_t bound=32768){
-    std::array<unsigned char,4> header{};transfer(fd,header.data(),header.size(),false,deadline);
-    const auto size=(std::uint32_t(header[0])<<24)|(std::uint32_t(header[1])<<16)|(std::uint32_t(header[2])<<8)|header[3];
-    require(size>0&&size<=bound);
-    std::string bytes(size,'\0');transfer(fd,bytes.data(),bytes.size(),false,deadline);
-    std::vector<std::set<std::string>> keys;
-    try{
-        return Json::parse(bytes,[&](int depth,Json::parse_event_t event,Json &parsed){
-            require(depth<=32);
-            if(event==Json::parse_event_t::object_start)keys.emplace_back();
-            else if(event==Json::parse_event_t::key)require(!keys.empty()&&keys.back().insert(parsed.get<std::string>()).second);
-            else if(event==Json::parse_event_t::object_end){require(!keys.empty());keys.pop_back();}
-            return true;
-        });
-    }catch(const LocalControlError &){throw;}catch(...){throw LocalControlError(Code::Protocol);}
+    auto io=[fd](void *data,std::size_t size,bool sending,Deadline limit){transfer(fd,data,size,sending,limit);};
+    return local_protocol::receive_frame(io,deadline,bound);
 }
 uid_t peer_uid(int fd){
 #ifdef __linux__
@@ -142,32 +104,8 @@ std::string socket_path(const LocalTransportOptions &options,bool create){
     require(path.size()<sizeof(sockaddr_un{}.sun_path),Code::Unavailable);return path;
 }
 sockaddr_un address(const std::string &path){sockaddr_un value{};value.sun_family=AF_UNIX;std::memcpy(value.sun_path,path.c_str(),path.size()+1);return value;}
-const char *name(LocalOperation operation){
-    switch(operation){case LocalOperation::DiagnosticRead:return "diagnostic.read";case LocalOperation::SettingsRead:return "settings.read";case LocalOperation::SettingsWrite:return "settings.write";case LocalOperation::RouteRead:return "maintenance.route.read";case LocalOperation::ListenerRead:return "listeners.read";case LocalOperation::EventsRead:return "events.read";case LocalOperation::BrowserOpen:return "browser.open";case LocalOperation::BrowserMessage:return "browser.message";case LocalOperation::HttpOpen:return "http.open";case LocalOperation::HttpBody:return "http.body";case LocalOperation::HttpDispatch:return "http.dispatch";case LocalOperation::HttpRead:return "http.read";case LocalOperation::HttpComplete:return "http.complete";case LocalOperation::WebBootstrap:return "web.bootstrap";case LocalOperation::WebAttach:return "web.attach";case LocalOperation::WebHeartbeat:return "web.heartbeat";case LocalOperation::BrowserCheck:return "browser.check";case LocalOperation::RecoveryCapture:return "recovery.capture";case LocalOperation::RecoveryObserve:return "recovery.observe";case LocalOperation::RecoveryValidate:return "recovery.validate";case LocalOperation::RecoveryPrepare:return "recovery.prepare";case LocalOperation::RecoveryReview:return "recovery.review";case LocalOperation::RecoveryCommand:return "recovery.command";case LocalOperation::RecoverySessionIssue:return "recovery.session.issue";}
-    throw LocalControlError(Code::Protocol);
+
 }
-LocalOperation operation(const Json &value){
-    require(value.is_string());for(const auto item:{LocalOperation::SettingsRead,LocalOperation::SettingsWrite,LocalOperation::DiagnosticRead,LocalOperation::RouteRead,LocalOperation::ListenerRead,LocalOperation::EventsRead,LocalOperation::BrowserOpen,LocalOperation::BrowserMessage,LocalOperation::HttpOpen,LocalOperation::HttpBody,LocalOperation::HttpDispatch,LocalOperation::HttpRead,LocalOperation::HttpComplete,LocalOperation::WebBootstrap,LocalOperation::WebAttach,LocalOperation::WebHeartbeat,LocalOperation::BrowserCheck,LocalOperation::RecoveryCapture,LocalOperation::RecoveryObserve,LocalOperation::RecoveryValidate,LocalOperation::RecoveryPrepare,LocalOperation::RecoveryReview,LocalOperation::RecoveryCommand,LocalOperation::RecoverySessionIssue})if(value==name(item))return item;
-    throw LocalControlError(Code::Protocol);
-}
-bool http_operation(LocalOperation value){
-    return value==LocalOperation::HttpOpen||value==LocalOperation::HttpBody||value==LocalOperation::HttpDispatch||value==LocalOperation::HttpRead||value==LocalOperation::HttpComplete;
-}
-bool mutation(LocalOperation value){return value==LocalOperation::SettingsWrite||value==LocalOperation::BrowserMessage||value==LocalOperation::HttpDispatch||value==LocalOperation::HttpComplete||value==LocalOperation::RecoveryCapture||value==LocalOperation::RecoveryValidate||value==LocalOperation::RecoveryPrepare||value==LocalOperation::RecoveryReview||value==LocalOperation::RecoveryCommand||value==LocalOperation::RecoverySessionIssue;}
-const char *refusal_name(LocalRefusal value){
-    switch(value){case LocalRefusal::InvalidRequest:return "invalid_request";case LocalRefusal::RevisionConflict:return "revision_conflict";
-        case LocalRefusal::Busy:return "busy";case LocalRefusal::SetupRequired:return "setup_required";case LocalRefusal::StorageUnavailable:return "storage_unavailable";}
-    return "command_refused";
-}
-bool refusal_value(const Json &value){
-    if(!value.is_string())return false;
-    for(const auto *name:{"command_refused","invalid_request","revision_conflict","busy","setup_required","storage_unavailable","outcome_unknown"})if(value==name)return true;
-    return false;
-}
-}
-LocalControlError::LocalControlError(Code code):std::runtime_error(code==Code::UnknownOutcome?
-    "Local command outcome is unknown; read saved state before deciding whether to retry":code==Code::Unauthorized?
-    "Local control peer is not authorized":code==Code::Protocol?"Local control protocol is unsupported or malformed":"Local backend is unavailable"),code_(code){}
 
 struct LocalControlServer::Impl {
     LocalTransportOptions options;std::string boot,path;Handler handler;Disconnected disconnected;
@@ -186,44 +124,15 @@ struct LocalControlServer::Impl {
                 const int one=1;require(!::setsockopt(client.value,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof one),Code::Unavailable);
 #endif
                 const auto uid=peer_uid(client.value);
-                require(uid==options.backend_uid||uid==options.web_uid,Code::Unauthorized);
-                const auto principal=uid==options.backend_uid?LocalPeer::Administrator:LocalPeer::WebService;
+                require(uid==options.backend_uid||uid==options.web_uid||(options.administrator_uid&&uid==*options.administrator_uid),Code::Unauthorized);
+                const auto principal=uid==options.web_uid&&uid!=options.backend_uid?LocalPeer::WebService:LocalPeer::Administrator;
                 {std::lock_guard lock(mutex);if(stopping.load())continue;clients.insert(client.value);}
                 struct Remove {Impl &owner;int fd;~Remove(){std::lock_guard lock(owner.mutex);owner.clients.erase(fd);}}remove{*this,client.value};
-                const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
-                const auto connection=token();
-                send_frame(client.value,Json{{"protocol",protocol},{"boot",boot},{"connection",connection}},deadline);
-                struct Retire {
-                    Disconnected &closed;LocalPeer peer;const std::string &connection;
-                    ~Retire(){if(closed)try{closed(peer,connection);}catch(...){}}
-                }retire{disconnected,principal,connection};
-                const bool browser=options.channel==LocalChannel::Browser;
-                const bool http=options.channel==LocalChannel::Http;
-                const bool service=options.channel==LocalChannel::WebService;
-                const bool recovery=options.channel==LocalChannel::Recovery;
-                bool opened=false;
-                for(std::uint64_t sequence=1;!stopping.load();++sequence){
-                    const auto request=receive_frame(client.value,std::chrono::steady_clock::now()+std::chrono::seconds(5),(browser||http||recovery)?maximum:32768);
-                    require(fields(request,{"protocol","boot","connection","sequence","operation","arguments"})&&request["protocol"]==protocol&&
-                        request["boot"]==boot&&request["connection"]==connection&&request["sequence"]==std::to_string(sequence)&&request["arguments"].is_object());
-                    const LocalRequest parsed{operation(request["operation"]),request["arguments"],connection,client.value};
-                    const bool browser_operation=parsed.operation==LocalOperation::BrowserOpen||parsed.operation==LocalOperation::BrowserMessage||parsed.operation==LocalOperation::BrowserCheck;
-                    const bool service_operation=parsed.operation==LocalOperation::WebAttach||parsed.operation==LocalOperation::WebHeartbeat;
-                    require((parsed.operation==LocalOperation::EventsRead)==(options.channel==LocalChannel::Events)&&browser_operation==browser&&http_operation(parsed.operation)==http&&service_operation==service&&(parsed.operation==LocalOperation::RecoveryCommand)==recovery);
-                    require(!browser||(opened?parsed.operation!=LocalOperation::BrowserOpen:parsed.operation==LocalOperation::BrowserOpen));
-                    require(!service||(opened?parsed.operation==LocalOperation::WebHeartbeat:parsed.operation==LocalOperation::WebAttach));
-                    require(!http||(opened?parsed.operation!=LocalOperation::HttpOpen:parsed.operation==LocalOperation::HttpOpen));
-                    require(principal==LocalPeer::Administrator||parsed.operation==LocalOperation::ListenerRead||parsed.operation==LocalOperation::EventsRead||browser||http||service||parsed.operation==LocalOperation::WebBootstrap,Code::Unauthorized);
-                    Json result;
-                    try{result={{"ok",true},{"value",handler(principal,parsed)}};}
-                    catch(const LocalCommandRefused &error){result={{"ok",false},{"error",refusal_name(error.reason())}};}
-                    catch(...){result={{"ok",false},{"error",mutation(parsed.operation)?"outcome_unknown":"command_refused"}};}
-                    require(result.dump().size()<=(options.channel==LocalChannel::Control?32000:options.channel==LocalChannel::Events?126000:142000));
-                    send_frame(client.value,Json{{"protocol",protocol},{"boot",boot},{"connection",connection},{"sequence",std::to_string(sequence)},{"result",result}},
-                        std::chrono::steady_clock::now()+std::chrono::seconds(5));
-                    if((!browser&&!http&&!service)||(!opened&&result["ok"]!=true)||parsed.operation==LocalOperation::HttpComplete||sequence==std::numeric_limits<std::uint64_t>::max())break;
-                    opened=true;
-                }
+                auto io=[fd=client.value](void *data,std::size_t size,bool sending,Deadline limit){transfer(fd,data,size,sending,limit);};
+                serve_session(io,options,boot,principal,client.value,[fd=client.value]{
+                    char byte{};const auto count=::recv(fd,&byte,1,MSG_PEEK);const auto error=errno;
+                    return count>0||(count<0&&(error==EAGAIN||error==EWOULDBLOCK||error==EINTR));
+                },handler,disconnected,[this]{return stopping.load();});
             }catch(...){/* A refused/disconnected client cannot affect backend owners. */}
         }
     }
@@ -292,28 +201,13 @@ LocalControlConnection::~LocalControlConnection()=default;
 const std::string &LocalControlConnection::boot() const noexcept{return impl_->greeting["boot"].get_ref<const std::string &>();}
 Json LocalControlConnection::request(const LocalRequest &request){
     auto &owner=*impl_;std::lock_guard lock(owner.mutex);require(!owner.failed&&request.arguments.is_object(),Code::Unavailable);
-    const auto &greeting=owner.greeting;const auto sequence=std::to_string(owner.sequence);
-    const Json envelope{{"protocol",protocol},{"boot",greeting["boot"]},{"connection",greeting["connection"]},
-        {"sequence",sequence},{"operation",name(request.operation)},{"arguments",request.arguments}};
-    require(envelope.dump().size()<=((owner.options.channel==LocalChannel::Browser||owner.options.channel==LocalChannel::Http||owner.options.channel==LocalChannel::Recovery)?maximum:32768));
-    try{
-        send_frame(owner.socket.value,envelope,std::chrono::steady_clock::now()+std::chrono::seconds(5));
-        const auto response=receive_frame(owner.socket.value,std::chrono::steady_clock::now()+std::chrono::seconds(5),owner.options.channel==LocalChannel::Control?32768:maximum);
-        require(fields(response,{"protocol","boot","connection","sequence","result"})&&response["protocol"]==protocol&&
-            response["boot"]==greeting["boot"]&&response["connection"]==greeting["connection"]&&response["sequence"]==sequence);
-        const auto &result=response["result"];
-        require((fields(result,{"ok","value"})&&result["ok"]==true)||(fields(result,{"ok","error"})&&result["ok"]==false&&refusal_value(result["error"])));
-        if(owner.sequence==std::numeric_limits<std::uint64_t>::max())owner.failed=true;
-        else ++owner.sequence;
-        if(result["ok"]==false&&result["error"]=="outcome_unknown")throw LocalControlError(Code::UnknownOutcome);
-        return result;
-    }catch(...){
-        owner.failed=true;::shutdown(owner.socket.value,SHUT_RDWR);
-        if(mutation(request.operation))throw LocalControlError(Code::UnknownOutcome);
-        throw;
-    }
+    auto io=[fd=owner.socket.value](void *data,std::size_t size,bool sending,Deadline limit){transfer(fd,data,size,sending,limit);};
+    return session_request(io,owner.options.channel,owner.greeting,owner.sequence,owner.failed,request,
+        [&owner]{::shutdown(owner.socket.value,SHUT_RDWR);});
 }
 Json local_control_request(const LocalTransportOptions &options,const LocalRequest &request){
     LocalControlConnection connection(options);return connection.request(request);
 }
 }
+
+#endif

@@ -17,11 +17,11 @@ bool policy_ready(){const auto state=privileged_network_runtime_state();return s
 void require(bool value){if(!value)throw std::runtime_error("pairing_window_unavailable");}
 bool hex(const std::string &value,std::size_t size){return value.size()==size&&value.find_first_not_of("0123456789abcdef")==std::string::npos;}
 std::string fresh(){
-    std::array<unsigned char,16> value{};require(RAND_bytes(value.data(),value.size())==1);std::string result;
+    std::array<unsigned char,16> value{};require(RAND_bytes(value.data(),static_cast<int>(value.size()))==1);std::string result;
     for(auto byte:value){result+="0123456789abcdef"[byte>>4];result+="0123456789abcdef"[byte&15];}return result;
 }
 std::string nonce(){
-    std::array<unsigned char,32> value{};require(RAND_bytes(value.data(),value.size())==1);return PiPairSecret(value).storage_encoding();
+    std::array<unsigned char,32> value{};require(RAND_bytes(value.data(),static_cast<int>(value.size()))==1);return PiPairSecret(value).storage_encoding();
 }
 PicoHttpResponse result(unsigned status,const Json &pair,const char *code,bool retry=false,const char *state="rejected"){
     Json body{{"contract","Wsprry-Pair/1"},{"schema","result"},{"pair_id",pair},{"state",state},{"code",code},{"retryable",retry}};

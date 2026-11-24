@@ -5,6 +5,7 @@ The backend prepares/validates the complete candidate and durably holds output
 before this owner runs. A directory lock excludes every normal backend writer.
 """
 import ctypes
+from contextlib import contextmanager
 import errno
 import hashlib
 import os
@@ -21,6 +22,14 @@ def decimal(value):
     return type(value) is str and len(value) <= 20 and value.isascii() and value.isdecimal() and not value.startswith('0') and 0 < int(value) < 2**64
 
 
+def valid_provenance_namespace(value):
+    # Source-host metadata, not a path to open on the destination. Keep POSIX
+    # provenance valid across hosts; native file admission is a separate gate.
+    return (type(value) is str and bool(value) and '\0' not in value and
+            (value.startswith('/') or (len(value) >= 4 and value[0] in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+                                      and value[1] == ':' and value[2] in '/\\')))
+
+
 def selector(value, identity, role, generation, job_id):
     archive.closed(value, ('schema', 'identity', 'role', 'generation', 'initialization', 'restore_job'))
     archive.require(value['schema'] == 'application-generation/1' and value['identity'] == identity and value['role'] == role
@@ -32,7 +41,7 @@ def selector(value, identity, role, generation, job_id):
                     and type(initial['images_digest']) is str and archive.HASH.fullmatch(initial['images_digest']))
     archive.require((initial['origin'] == 'fresh' and initial['source_namespace'] == 'fresh') or
                     (initial['origin'] == 'migration' and type(initial['source_namespace']) is str
-                     and initial['source_namespace'].startswith('/') and '\0' not in initial['source_namespace']))
+                     and valid_provenance_namespace(initial['source_namespace'])))
 
 
 def hold(value, identity, role, generation, job_id):
@@ -42,7 +51,10 @@ def hold(value, identity, role, generation, job_id):
                     and value['local_output'] is True and value['remote_authority'] is True and value['stage'] in ('maintenance', 'review'))
 
 
-def move_no_replace(source, destination):
+def move_no_replace(source, destination, owner=None):
+    if sys.platform == 'win32':
+        archive.require(owner is not None)
+        return owner.move(source, destination)
     library = ctypes.CDLL(None, use_errno=True)
     if sys.platform == 'darwin':
         operation = library.renamex_np
@@ -58,6 +70,63 @@ def move_no_replace(source, destination):
         value = ctypes.get_errno()
         raise OSError(value, 'Generation publication refused')
 
+
+
+@contextmanager
+def database_lock(directory, generation):
+    if sys.platform == 'win32':
+        from . import native_files
+        with native_files.database_lock(directory, generation) as owner:
+            yield owner
+    else:
+        with directory_lock(directory):
+            yield None
+
+
+
+@contextmanager
+def history_lock(directory, generation):
+    if sys.platform == 'win32' and not (directory / 'state.sqlite3.owner.lock').exists():
+        archive.require(not list(directory.iterdir()))
+        with directory_lock(directory):
+            archive.require(not list(directory.iterdir()))
+            yield None
+    else:
+        with database_lock(directory, generation) as owner:
+            yield owner
+
+def directory_identity(directory):
+    if sys.platform == 'win32':
+        from . import native_files
+        return native_files.path_info(directory)
+    return directory.stat()
+
+
+def physical_marker(path, directory, owner):
+    if sys.platform != 'win32' or path != directory / 'state.sqlite3.owner.lock':
+        return False
+    archive.require(owner is not None)
+    owner.verify(directory)
+    return True
+
+
+def remove_tree(directory, owner):
+    if sys.platform != 'win32':
+        shutil.rmtree(directory)
+        return
+    archive.require(owner is not None)
+    owner.verify(directory)
+    # Every member has already passed the caller's closed inventory. Preserve
+    # the physical admission marker until all logical data has been retired.
+    paths = list(directory.rglob('*'))
+    for path in paths:
+        if not path.is_dir() and not physical_marker(path, directory, owner):
+            path.unlink()
+    for path in sorted((p for p in paths if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+        path.rmdir()
+    owner.verify(directory)
+    (directory / 'state.sqlite3.owner.lock').unlink()
+    directory.rmdir()
 
 def file_limit(name):
     archive.require(type(name) is str and name != 'authority.json')
@@ -77,7 +146,7 @@ def validate_files(files):
     archive.require(names == sorted(set(names)) and 'state.sqlite3' in names and total <= archive.MAX_PLAINTEXT)
 
 
-def verify_files(directory, files):
+def verify_files(directory, files, owner=None):
     directory = archive.private_directory(directory)
     validate_files(files)
     expected = {item['name']: item for item in files}
@@ -85,6 +154,8 @@ def verify_files(directory, files):
     directories = {Path(name).parent for name in expected}
     directories |= {parent for path in tuple(directories) for parent in path.parents}
     for path in directory.rglob('*'):
+        if physical_marker(path, directory, owner):
+            continue
         relative = path.relative_to(directory)
         info = path.lstat()
         if path.is_symlink():
@@ -101,9 +172,16 @@ def verify_files(directory, files):
     archive.require(observed == set(expected))
 
 
-def sync_tree(directory):
+def sync_tree(directory, owner=None):
     for path in directory.rglob('*'):
+        if physical_marker(path, directory, owner):
+            continue
         if path.is_file():
+            if sys.platform == 'win32':
+                from . import native_files
+                with native_files.NativeFile(path, 3, file_limit(path.relative_to(directory).as_posix())) as native:
+                    native.sync()
+                continue
             descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
             try:
                 os.fsync(descriptor)
@@ -114,13 +192,15 @@ def sync_tree(directory):
     sync_directory(directory)
 
 
-def discard_partial_copy(directory, files):
+def discard_partial_copy(directory, files, owner=None):
     # Only this journal's fixed staging name may be removed. A partial copy can
     # contain a prefix of admitted files, never unknown names or linked data.
     archive.private_directory(directory)
     expected = {item['name']: item for item in files}
     parents = {parent for name in expected for parent in Path(name).parents}
     for path in directory.rglob('*'):
+        if physical_marker(path, directory, owner):
+            continue
         relative = path.relative_to(directory)
         archive.require(not path.is_symlink())
         if path.is_dir():
@@ -130,7 +210,7 @@ def discard_partial_copy(directory, files):
             archive.require(relative.as_posix() in expected)
             with archive.private_input(path, file_limit(relative.as_posix())) as (_, info):
                 archive.require(info.st_size <= expected[relative.as_posix()]['size'])
-    shutil.rmtree(directory)
+    remove_tree(directory, owner)
     sync_directory(directory.parent)
 
 
@@ -142,9 +222,11 @@ def history_file_limit(name):
     return file_limit(name)
 
 
-def history_inventory(directory):
+def history_inventory(directory, owner=None):
     files, count = [], 0
     for path in directory.rglob('*'):
+        if physical_marker(path, directory, owner):
+            continue
         count += 1
         archive.require(not path.is_symlink() and len(files) <= archive.MAX_FILES + 2 and count <= 4 * archive.MAX_FILES)
         relative = path.relative_to(directory).as_posix()
@@ -174,7 +256,7 @@ class GenerationPublisher:
 
     def generation_owner(self, prepared):
         directory = archive.private_directory(self.root / ('generation-' + prepared['generation']))
-        info = directory.stat()
+        info = directory_identity(directory)
         expected = {'schema': 'recovery-generation-owner/1', 'identity': prepared['identity'], 'role': prepared['role'],
                     'generation': prepared['generation'], 'job_id': prepared['job_id'],
                     'initialization_sha256': hashlib.sha256(canonical(prepared['selection']['initialization'])).hexdigest(),
@@ -195,7 +277,7 @@ class GenerationPublisher:
     def history_required(self, prepared):
         return (self.root / 'history-pruning.json').exists() or bool(self.history_targets(prepared))
 
-    def prune_history(self, prepared):
+    def prune_history(self, prepared, generation_admission=None):
         # Caller holds the application-root lock with every backend stopped.
         # Keep the original migration generation, selected generation, and its
         # immediate predecessor. A private inode-bound marker proves ownership.
@@ -209,16 +291,16 @@ class GenerationPublisher:
                     return
                 generation = targets[0]
                 directory = self.root / ('generation-' + generation)
-                with directory_lock(directory):
+                with database_lock(directory, generation_admission) as sql_owner:
                     owner, _ = read_record(self.owner_path(generation))
                     archive.closed(owner, ('schema', 'identity', 'role', 'generation', 'job_id', 'initialization_sha256', 'device', 'inode'))
-                    info = directory.stat()
+                    info = directory_identity(directory)
                     archive.require(owner['schema'] == 'recovery-generation-owner/1' and owner['identity'] == prepared['identity']
                                     and owner['role'] == prepared['role'] and owner['generation'] == generation
                                     and type(owner['job_id']) is str and archive.ID.fullmatch(owner['job_id'])
                                     and owner['initialization_sha256'] == initial and type(owner['device']) is int and type(owner['inode']) is int
                                     and owner['device'] == info.st_dev and owner['inode'] == info.st_ino)
-                    pending = {'schema': 'recovery-history-pruning/1', 'owner': owner, 'files': history_inventory(directory)}
+                    pending = {'schema': 'recovery-history-pruning/1', 'owner': owner, 'files': history_inventory(directory, sql_owner)}
                     publish_record(pending_path, pending, None)
                 self.checkpoint('history-pruning-admitted')
             archive.closed(pending, ('schema', 'owner', 'files'))
@@ -246,13 +328,15 @@ class GenerationPublisher:
             directory = self.root / ('generation-' + generation)
             if directory.exists() or directory.is_symlink():
                 archive.require(retained == owner)
-                with directory_lock(directory):
-                    info = directory.stat()
+                with history_lock(directory, generation_admission) as sql_owner:
+                    info = directory_identity(directory)
                     archive.require(info.st_dev == owner['device'] and info.st_ino == owner['inode'])
                     # Deletion can have stopped after any member. Every remaining
                     # file still has to match the durable pre-deletion inventory.
                     count = 0
                     for path in directory.rglob('*'):
+                        if physical_marker(path, directory, sql_owner):
+                            continue
                         count += 1
                         archive.require(count <= 4 * archive.MAX_FILES and not path.is_symlink())
                         if path.is_dir():
@@ -264,7 +348,10 @@ class GenerationPublisher:
                         archive.require(name in expected)
                         with archive.private_input(path, history_file_limit(name)) as (stream, info):
                             archive.require(info.st_size == expected[name]['size'] and archive.file_digest(stream) == expected[name]['sha256'])
-                    shutil.rmtree(directory)
+                    if sql_owner is None and sys.platform == 'win32':
+                        directory.rmdir()
+                    else:
+                        remove_tree(directory, sql_owner)
                     sync_directory(self.root)
                 self.checkpoint('history-directory-removed')
             if retained is not None:
@@ -276,11 +363,11 @@ class GenerationPublisher:
             self.checkpoint('history-pruned')
 
     def finish_history(self, prepared):
-        with directory_lock(self.root):
+        with directory_lock(self.root, generation=True) as generation_admission:
             selected, _ = read_record(self.root / 'authority.json')
             held, _ = read_record(self.root / 'restore-hold.json')
             archive.require(selected == prepared['selection'] and held == prepared['hold'])
-            self.prune_history(prepared)
+            self.prune_history(prepared, generation_admission)
 
     def phase(self, record, phase):
         _, observation = read_record(self.journal)
@@ -310,13 +397,13 @@ class GenerationPublisher:
 
     def publish(self, prepared):
         prepared = self.admit(prepared)
-        with directory_lock(self.root):
+        with directory_lock(self.root, generation=True) as generation_admission:
             existing, _ = read_record(self.journal)
             if existing is not None:
                 archive.require(existing['prepared'] == prepared)
-                outcome = self._recover(existing)
+                outcome = self._recover(existing, generation_admission)
                 if outcome['state'] == 'restored_generation_held':
-                    self.prune_history(prepared)
+                    self.prune_history(prepared, generation_admission)
                     return outcome
                 # Resume this same admitted data publication from its complete
                 # private candidate. This never replays any external command.
@@ -330,56 +417,80 @@ class GenerationPublisher:
                 record = self.phase({'schema': 'recovery-publication/1', 'prepared': prepared,
                                      'previous_selection': previous, 'previous_hold': previous_hold}, 'admitted')
             candidate = self.job / 'candidate'
-            verify_files(candidate, prepared['files'])
-            sync_tree(candidate)
-            record = self.phase(record, 'candidate-verified')
-            destination = self.root / ('generation-' + prepared['generation'])
-            try:
-                move_no_replace(candidate, destination)
-                sync_directory(self.job)
-            except OSError as error:
-                if error.errno != errno.EXDEV:
-                    raise
-                # Fixed-root cross-filesystem staging remains streamed and
-                # private; no backend can observe it before selector publication.
-                archive.require(shutil.disk_usage(self.root).free >= sum(item['size'] + 4096 for item in prepared['files']))
-                staging = self.root / ('generation-' + prepared['generation'] + '.restore-' + self.job.name)
-                if staging.exists():
-                    discard_partial_copy(staging, prepared['files'])
-                staging.mkdir(mode=0o700)
-                for item in prepared['files']:
-                    source, target = candidate / item['name'], staging / item['name']
-                    target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-                    for parent in target.parents:
-                        if parent == staging:
-                            break
-                        parent.chmod(0o700)
-                    with archive.private_input(source, file_limit(item['name'])) as (input_stream, _):
-                        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-                        with os.fdopen(descriptor, 'wb') as output:
-                            archive.require(archive.copy_exact(input_stream, output, item['size']) == item['sha256'])
-                            output.flush()
-                            os.fsync(output.fileno())
-                verify_files(staging, prepared['files'])
-                sync_tree(staging)
-                move_no_replace(staging, destination)
+            with database_lock(candidate, generation_admission) as candidate_owner:
+                verify_files(candidate, prepared['files'], candidate_owner)
+                sync_tree(candidate, candidate_owner)
+                record = self.phase(record, 'candidate-verified')
+                destination = self.root / ('generation-' + prepared['generation'])
+                try:
+                    if sys.platform == 'win32':
+                        move_no_replace(candidate, destination, candidate_owner)
+                    else:
+                        move_no_replace(candidate, destination)
+                    sync_directory(self.job)
+                except OSError as error:
+                    if error.errno != errno.EXDEV:
+                        raise
+                    # Fixed-root cross-filesystem staging remains streamed and
+                    # private; no backend can observe it before selector publication.
+                    archive.require(shutil.disk_usage(self.root).free >= sum(item['size'] + 4096 for item in prepared['files']))
+                    staging = self.root / ('generation-' + prepared['generation'] + '.restore-' + self.job.name)
+                    if staging.exists():
+                        with database_lock(staging, generation_admission) as staging_owner:
+                            discard_partial_copy(staging, prepared['files'], staging_owner)
+                    if sys.platform == 'win32':
+                        from . import native_files
+                        native_files.make_directory(staging)
+                        native_files.initialize_database_snapshot(staging)
+                    else:
+                        staging.mkdir(mode=0o700)
+                    with database_lock(staging, generation_admission) as staging_owner:
+                        for item in prepared['files']:
+                            source, target = candidate / item['name'], staging / item['name']
+                            if sys.platform == 'win32':
+                                for parent in reversed(target.relative_to(staging).parents):
+                                    native_files.make_directory(staging / parent, exist_ok=True)
+                            else:
+                                target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+                                for parent in target.parents:
+                                    if parent == staging:
+                                        break
+                                    parent.chmod(0o700)
+                            with archive.private_input(source, file_limit(item['name'])) as (input_stream, _):
+                                if sys.platform == 'win32':
+                                    with native_files.private_output(target, item['size']) as (output, native):
+                                        archive.require(archive.copy_exact(input_stream, output, item['size']) == item['sha256'])
+                                        output.flush()
+                                        native.sync()
+                                else:
+                                    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                                    with os.fdopen(descriptor, 'wb') as output:
+                                        archive.require(archive.copy_exact(input_stream, output, item['size']) == item['sha256'])
+                                        output.flush()
+                                        os.fsync(output.fileno())
+                        verify_files(staging, prepared['files'], staging_owner)
+                        sync_tree(staging, staging_owner)
+                        if sys.platform == 'win32':
+                            move_no_replace(staging, destination, staging_owner)
+                        else:
+                            move_no_replace(staging, destination)
             sync_directory(self.root)
             record = self.phase(record, 'generation-ready')
-            outcome = self._recover(record)
-            self.prune_history(prepared)
+            outcome = self._recover(record, generation_admission)
+            self.prune_history(prepared, generation_admission)
             return outcome
 
     def recover(self):
-        with directory_lock(self.root):
+        with directory_lock(self.root, generation=True) as generation_admission:
             record, _ = read_record(self.journal)
             if record is None:
                 return None
-            outcome = self._recover(record)
+            outcome = self._recover(record, generation_admission)
             if outcome['state'] == 'restored_generation_held':
-                self.prune_history(record['prepared'])
+                self.prune_history(record['prepared'], generation_admission)
             return outcome
 
-    def _recover(self, record):
+    def _recover(self, record, generation_admission=None):
         archive.closed(record, ('schema', 'prepared', 'previous_selection', 'previous_hold', 'phase'))
         archive.require(record['schema'] == 'recovery-publication/1' and record['phase'] in
                         ('admitted', 'candidate-verified', 'generation-ready', 'publishing', 'published'))
@@ -397,25 +508,26 @@ class GenerationPublisher:
             # An interrupted pre-publication copy never changes selected files.
             archive.require(current == previous and current_hold == previous_hold)
             return {'state': 'prior_generation_held', 'generation': prepared['previous_generation']}
-        verify_files(destination, prepared['files'])
-        self.generation_owner(prepared)
-        if record['phase'] == 'published' and current == prepared['selection'] and current_hold == prepared['hold']:
+        with database_lock(destination, generation_admission) as destination_owner:
+            verify_files(destination, prepared['files'], destination_owner)
+            self.generation_owner(prepared)
+            if record['phase'] == 'published' and current == prepared['selection'] and current_hold == prepared['hold']:
+                return {'state': 'restored_generation_held', 'generation': prepared['generation']}
+            record = self.phase(record, 'publishing')
+            if current_hold != prepared['hold']:
+                publish_record(self.root / 'restore-hold.json', prepared['hold'], hold_observation)
+            self.checkpoint('hold-published')
+            if current != prepared['selection']:
+                publish_record(self.root / 'authority.json', prepared['selection'], current_observation)
+            self.checkpoint('selection-published')
+            self.phase(record, 'published')
             return {'state': 'restored_generation_held', 'generation': prepared['generation']}
-        record = self.phase(record, 'publishing')
-        if current_hold != prepared['hold']:
-            publish_record(self.root / 'restore-hold.json', prepared['hold'], hold_observation)
-        self.checkpoint('hold-published')
-        if current != prepared['selection']:
-            publish_record(self.root / 'authority.json', prepared['selection'], current_observation)
-        self.checkpoint('selection-published')
-        self.phase(record, 'published')
-        return {'state': 'restored_generation_held', 'generation': prepared['generation']}
 
 
 def recover_hold_preparation(application_root, job_directory):
     """Finish one admitted hold while no backend owns the application root."""
     root, job = archive.private_directory(application_root), archive.private_directory(job_directory)
-    with directory_lock(root):
+    with directory_lock(root, generation=True):
         intent, _ = read_record(root / 'restore-preparation.json')
         if intent is None:
             return None

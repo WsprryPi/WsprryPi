@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "application_state.hpp"
+#include "provenance_path.hpp"
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#endif
 #include "application_recovery/restore_hold.hpp"
 #include "config_handler.hpp"
 #include "recurrence_authority.hpp"
@@ -57,17 +61,25 @@ std::string application_origin_namespace(){
         source.value("role",nlohmann::json(nullptr))!=(database->role()==StateRole::Pi?"pi":"controller"))
         throw StateStorageError(StateStorageError::Code::Unavailable);
     if(source.value("origin",nlohmann::json(nullptr))=="fresh"&&source.value("source_namespace",nlohmann::json(nullptr))=="fresh"){
+#ifdef _WIN32
+        const auto directory=windows_file::path_from_utf8(database->directory());
+#else
         const auto directory=std::filesystem::path(database->directory());
+#endif
         if(directory.filename().string().starts_with("generation-")){
             if(source.value("generation",nlohmann::json(nullptr))!="1")throw StateStorageError(StateStorageError::Code::Unavailable);
+#ifdef _WIN32
+            const auto bytes=(directory.parent_path()/L"generation-1/configuration").u8string();return {bytes.begin(),bytes.end()};
+#else
             return (directory.parent_path()/"generation-1/configuration").string();
+#endif
         }
         return application_configuration_namespace();
     }
     if(source.value("origin",nlohmann::json(nullptr))!="migration"||!source.contains("source_namespace")||!source["source_namespace"].is_string())
         throw StateStorageError(StateStorageError::Code::Unavailable);
     const auto result=source["source_namespace"].get<std::string>();
-    if(result.empty()||result.front()!='/'||result.find('\0')!=std::string::npos)
+    if(!valid_provenance_namespace(result))
         throw StateStorageError(StateStorageError::Code::Unavailable);
     return result;
 }

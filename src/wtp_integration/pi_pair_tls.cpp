@@ -8,13 +8,11 @@
 #include <cerrno>
 #include <charconv>
 #include <chrono>
-#include <fcntl.h>
 #include <stdexcept>
-#include <sys/socket.h>
-#include <unistd.h>
 namespace wsprrypi {
 namespace {
 using Clock=std::chrono::steady_clock;
+namespace ns=native_socket;
 constexpr std::string_view management="Wsprry-Management/1/",retirement="Wsprry-Retirement/1/";
 constexpr std::string_view session_context="Wsprry-Pair/1/external-psk";
 bool id(std::string_view value){return value.size()==32&&value.find_first_not_of("0123456789abcdef")==std::string_view::npos;}
@@ -31,7 +29,7 @@ void require(bool value){if(!value)throw std::runtime_error("pairing_tls_unavail
 bool valid_credential(const PiPairTlsCredential &value,const PiPairTlsIdentity &identity){
     return value.identity==identity&&id(value.self_id)&&id(value.peer_id)&&value.self_id!=value.peer_id;
 }
-struct SocketBio {int fd;bool wrote{};};
+struct SocketBio {ns::Handle fd;bool wrote{};};
 // Per-socket suppression preserves the application's signal policy. As in the
 // existing TLS adapter, EAGAIN/EINTR is retryable and no BIO owns the descriptor.
 BIO_METHOD *socket_method(){
@@ -41,20 +39,17 @@ BIO_METHOD *socket_method(){
             BIO_meth_set_destroy(value,[](BIO *){return 1;})==1&&
             BIO_meth_set_read(value,[](BIO *bio,char *data,int size){
                 BIO_clear_retry_flags(bio);
+                if(size<=0)return 0;
                 const auto &socket=*static_cast<SocketBio *>(BIO_get_data(bio));
-                const auto count=recv(socket.fd,data,size,0);
-                if(count<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))BIO_set_retry_read(bio);
+                const auto count=ns::receive(socket.fd,data,static_cast<std::size_t>(size));
+                if(count<0&&(ns::retry(ns::error())))BIO_set_retry_read(bio);
                 return static_cast<int>(count);
             })==1&&BIO_meth_set_write(value,[](BIO *bio,const char *data,int size){
                 BIO_clear_retry_flags(bio);
-#ifdef MSG_NOSIGNAL
-                constexpr int flags=MSG_NOSIGNAL;
-#else
-                constexpr int flags=0;
-#endif
+                if(size<=0)return 0;
                 auto &socket=*static_cast<SocketBio *>(BIO_get_data(bio));
-                const auto count=send(socket.fd,data,size,flags);if(count>0)socket.wrote=true;
-                if(count<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))BIO_set_retry_write(bio);
+                const auto count=ns::send(socket.fd,data,static_cast<std::size_t>(size));if(count>0)socket.wrote=true;
+                if(count<0&&(ns::retry(ns::error())))BIO_set_retry_write(bio);
                 return static_cast<int>(count);
             })==1&&BIO_meth_set_ctrl(value,[](BIO *,int command,long,void *)->long{return command==BIO_CTRL_FLUSH?1:0;})==1);
         return value;
@@ -83,7 +78,7 @@ std::string pi_pair_tls_identity(const PiPairTlsIdentity &value){
     return encoded;
 }
 struct PiPairTlsChannel::Impl {
-    int fd;
+    ns::Handle fd;
     SocketBio socket_bio;
     Lookup lookup;
     SSL_CTX *context{};
@@ -95,15 +90,15 @@ struct PiPairTlsChannel::Impl {
     Handshake state{Handshake::Pending};
     const Clock::time_point born{Clock::now()};
     Clock::time_point io_deadline{born+std::chrono::seconds(24)};
-    Impl(int socket,Lookup owner,std::optional<PiPairTlsIdentity> outgoing):fd(socket),socket_bio{socket,false},lookup(std::move(owner)),client(std::move(outgoing)){}
-    ~Impl(){if(ssl)SSL_free(ssl);if(context)SSL_CTX_free(context);if(fd>=0)::close(fd);}
+    Impl(ns::Handle socket,Lookup owner,std::optional<PiPairTlsIdentity> outgoing):fd(socket),socket_bio{socket,false},lookup(std::move(owner)),client(std::move(outgoing)){}
+    ~Impl(){if(ssl)SSL_free(ssl);if(context)SSL_CTX_free(context);ns::close(fd);}
     static Impl &owner(SSL *ssl){return *static_cast<Impl *>(SSL_get_app_data(ssl));}
     static SSL_SESSION *session(SSL *ssl,const PiPairTlsCredential &credential){
         static constexpr std::array<unsigned char,2> cipher{0x13,0x01};
         const auto selected=SSL_CIPHER_find(ssl,cipher.data());if(!selected)return nullptr;
         auto value=SSL_SESSION_new();if(!value)return nullptr;
         if(SSL_SESSION_set_protocol_version(value,TLS1_3_VERSION)!=1||SSL_SESSION_set_cipher(value,selected)!=1||
-            SSL_SESSION_set1_id_context(value,reinterpret_cast<const unsigned char *>(session_context.data()),session_context.size())!=1||
+            SSL_SESSION_set1_id_context(value,reinterpret_cast<const unsigned char *>(session_context.data()),static_cast<unsigned>(session_context.size()))!=1||
             SSL_SESSION_set1_master_key(value,credential.key.bytes().data(),credential.key.bytes().size())!=1){SSL_SESSION_free(value);return nullptr;}
         return value;
     }
@@ -139,11 +134,7 @@ struct PiPairTlsChannel::Impl {
         *out=in+1;*length=in[0];return SSL_TLSEXT_ERR_OK;
     }
     void prepare(){
-        require(fd>=0&&bool(lookup));const auto flags=fcntl(fd,F_GETFL);require(flags>=0&&fcntl(fd,F_SETFL,flags|O_NONBLOCK)==0);
-        const auto descriptor_flags=fcntl(fd,F_GETFD);require(descriptor_flags>=0&&!fcntl(fd,F_SETFD,descriptor_flags|FD_CLOEXEC));
-#ifdef SO_NOSIGPIPE
-        const int yes=1;require(setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes))==0);
-#endif
+        require(fd!=ns::invalid&&bool(lookup)&&ns::configure_stream(fd));
         context=SSL_CTX_new(TLS_method());require(context);
         require(SSL_CTX_set_min_proto_version(context,TLS1_3_VERSION)==1&&SSL_CTX_set_max_proto_version(context,TLS1_3_VERSION)==1&&
             SSL_CTX_set_ciphersuites(context,"TLS_AES_128_GCM_SHA256")==1&&SSL_CTX_set1_groups_list(context,"P-256")==1);
@@ -152,7 +143,7 @@ struct PiPairTlsChannel::Impl {
         // OpenSSL 3.0 also checks a local session-id context for external PSK
         // when VERIFY_PEER is set. Bind that library metadata on both the
         // context and fresh callback session; caches/tickets remain disabled.
-        require(SSL_CTX_set_session_id_context(context,reinterpret_cast<const unsigned char *>(session_context.data()),session_context.size())==1);
+        require(SSL_CTX_set_session_id_context(context,reinterpret_cast<const unsigned char *>(session_context.data()),static_cast<unsigned>(session_context.size()))==1);
         require(SSL_CTX_set_num_tickets(context,0)==1&&SSL_CTX_set_max_early_data(context,0)==1);
         SSL_CTX_set_verify(context,SSL_VERIFY_PEER,nullptr);
         SSL_CTX_set_psk_use_session_callback(context,use);SSL_CTX_set_psk_find_session_callback(context,find);
@@ -164,7 +155,7 @@ struct PiPairTlsChannel::Impl {
         if(client){
             encoded=pi_pair_tls_identity(*client);selected=client->purpose;
             const std::string offer=alpn(client->purpose);std::string framed(1,static_cast<char>(offer.size()));framed+=offer;
-            require(SSL_set_alpn_protos(ssl,reinterpret_cast<const unsigned char *>(framed.data()),framed.size())==0);SSL_set_connect_state(ssl);
+            require(SSL_set_alpn_protos(ssl,reinterpret_cast<const unsigned char *>(framed.data()),static_cast<unsigned>(framed.size()))==0);SSL_set_connect_state(ssl);
         }else SSL_set_accept_state(ssl);
     }
     Failure admitted(){
@@ -197,10 +188,10 @@ struct PiPairTlsChannel::Impl {
         state=Handshake::Failed;return {error==SSL_ERROR_ZERO_RETURN?wtp::IoState::Closed:wtp::IoState::Failed,0};
     }
 };
-PiPairTlsChannel::PiPairTlsChannel(int fd,Lookup lookup,std::optional<PiPairTlsIdentity> client)
+PiPairTlsChannel::PiPairTlsChannel(ns::Handle fd,Lookup lookup,std::optional<PiPairTlsIdentity> client)
     :impl_(nullptr){
-    struct Guard{int fd;~Guard(){if(fd>=0)::close(fd);}} guard{fd};
-    impl_=std::make_unique<Impl>(fd,std::move(lookup),std::move(client));guard.fd=-1;impl_->prepare();
+    struct Guard{ns::Handle fd;~Guard(){ns::close(fd);}} guard{fd};
+    impl_=std::make_unique<Impl>(fd,std::move(lookup),std::move(client));guard.fd=ns::invalid;impl_->prepare();
 }
 PiPairTlsChannel::~PiPairTlsChannel()=default;
 PiPairTlsChannel::Handshake PiPairTlsChannel::handshake(){

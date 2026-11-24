@@ -4080,8 +4080,8 @@ int main(int argc, char *argv[])
             make_managed_ini_data("W1AW", "FN31", "80m", false));
 
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
-        callback_ini_changed();
-        callback_ini_changed();
+        notify_saved_configuration_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4136,7 +4136,7 @@ int main(int argc, char *argv[])
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         iniFile.setData(
             make_managed_ini_data("W1AW", "FN31", "80m", false));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4210,7 +4210,7 @@ int main(int argc, char *argv[])
         write_managed_ini_file(
             ini_path,
             make_managed_ini_data("W1AW", "FN31", "80m", false));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4267,7 +4267,7 @@ int main(int argc, char *argv[])
 
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", true));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4281,7 +4281,7 @@ int main(int argc, char *argv[])
 
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", false));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4325,7 +4325,7 @@ int main(int argc, char *argv[])
         iniFile.setData(
             make_managed_ini_data("<AA0NT>", "EM18", "20m", true));
 
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -4414,7 +4414,7 @@ int main(int argc, char *argv[])
         iniFile.setData(
             make_managed_ini_data("W1AW", "FN31", "80m", true));
 
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -6541,7 +6541,7 @@ int main(int argc, char *argv[])
 
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", true));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
         require(
             !ini_reload_pending.load(std::memory_order_relaxed),
             "GPIO test tone stop must not leave managed reload deferred after a later INI change");
@@ -6651,7 +6651,7 @@ int main(int argc, char *argv[])
         wsprTransmitter.backendSetStateValue(WsprTransmitter::State::TRANSMITTING);
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", true));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             ini_reload_pending.load(std::memory_order_relaxed),
@@ -6680,7 +6680,7 @@ int main(int argc, char *argv[])
 
         iniFile.setData(
             make_managed_ini_data("AA0NT", "EM18", "20m", false));
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             set_config(true),
@@ -7605,7 +7605,7 @@ int main(int argc, char *argv[])
         ini_reload_pending.store(false, std::memory_order_relaxed);
         exiting_wspr.store(true, std::memory_order_relaxed);
 
-        callback_ini_changed();
+        notify_saved_configuration_changed();
 
         require(
             !ini_reload_pending.load(std::memory_order_relaxed),

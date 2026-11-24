@@ -10,10 +10,6 @@
 #include <array>
 #include <cerrno>
 #include <filesystem>
-#include <fcntl.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <unistd.h>
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;

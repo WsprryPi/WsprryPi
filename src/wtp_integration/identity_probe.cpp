@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "identity_probe.hpp"
+#include "hardware_access_policy.hpp"
 #include "browser_api.hpp"
 #include "configuration.hpp"
 #include "consumer_radio.hpp"
@@ -17,8 +18,7 @@ std::uint64_t now_ms() {
       std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 void require_probe_allowed() {
-  if (const char *disabled=std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-      disabled && std::string(disabled)=="1")
+  if (hardware_access_disabled())
     throw std::runtime_error("Device identification is disabled in hardware-free validation");
 }
 nlohmann::json identify(const WtpSettings &settings,const PicoManagementExchange &exchange,
@@ -51,7 +51,7 @@ nlohmann::json identify(const WtpSettings &settings,const PicoManagementExchange
 nlohmann::json wtp_probe_usb_identity(const WtpSettings &settings) {
   require_probe_allowed();
   if (settings.transport!="usb") throw std::runtime_error("USB management endpoint required");
-  validate_wtp_settings(settings,true);
+  validate_native_wtp_settings(settings,true);
   // A temporary read-only owner does not start the periodic time worker.
   auto channel=pico_usb_management_channel(settings,false);
   std::lock_guard lock(channel->mutex);
@@ -65,7 +65,7 @@ nlohmann::json wtp_probe_network_identity(const WtpSettings &settings) {
   require_probe_allowed();
   if (settings.transport!="network")
     throw std::runtime_error("Use authenticated HTTPS or the explicit Consumer Wi-Fi login to identify this device");
-  validate_wtp_settings(settings,true);
+  validate_native_wtp_settings(settings,true);
   TlsStream tls(now_ms,TlsStream::Access::Production,management_tls_resolver());
   TlsSelection selection{settings.hostname,settings.tls_identity,settings.tls_ca,
       settings.tls_certificate,settings.tls_key,static_cast<unsigned>(settings.tcp_port)};

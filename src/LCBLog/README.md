@@ -116,6 +116,10 @@ license file.
 
 ## Shutdown validation
 
+UTC timestamps use the native thread-safe conversion on Windows and POSIX hosts, retaining `YYYY-MM-DD HH:MM:SS.mmm UTC` output. Run `make timestamp-test SUDO=` from the component's `src` directory to check the actual asynchronous logger's timestamp format, UTC clock, and drain. Windows execution remains required independently of a cross-build.
+
+The standalone CMake entry point builds the library and timestamp test without parent application headers: `cmake -S src/LCBLog -B /tmp/lcblog-build`, `cmake --build /tmp/lcblog-build --config Debug`, and `ctest --test-dir /tmp/lcblog-build -C Debug --output-on-failure` from the repository root. On Windows, select a native writable build directory in place of `/tmp/lcblog-build` and use the intended native compiler and architecture.
+
 Logger destruction publishes its shutdown predicate under both queue mutexes, wakes the workers and joins them after releasing the locks. Pending messages drain before destruction returns. Logging producers must stop before the logger is destroyed.
 
 From the WsprryPi repository root on Linux with the existing C/C++ toolchain and libsystemd development package, run `python3 scripts/tests/logger_shutdown_test.py`. This compiles the actual component, forces the predicate-to-wait scheduling window and checks pending-record drain. `python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi` checks bounded informational CLI exits against an already built application; neither command starts the application service or submits RF jobs.

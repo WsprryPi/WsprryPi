@@ -16,18 +16,42 @@ from . import archive
 from .jobs import BackendUnavailable, RecoveryBusy, RecoveryJobs
 
 
+def bootstrap_descriptor():
+    if sys.platform != 'win32':
+        archive.require(sys.argv[1:] == ['--serve'])
+        return 4
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+    archive.require(len(sys.argv) == 4 and sys.argv[1:3] == ['--serve', '--bootstrap-handle'])
+    value = sys.argv[3]
+    archive.require(value.isascii() and value.isdecimal() and str(int(value)) == value and 0 < int(value) < 2 ** (ctypes.sizeof(wintypes.HANDLE) * 8) - 1)
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.GetFileType.argtypes, kernel.GetFileType.restype = (wintypes.HANDLE,), wintypes.DWORD
+    archive.require(kernel.GetFileType(wintypes.HANDLE(int(value))) == 3)  # FILE_TYPE_PIPE
+    descriptor = msvcrt.open_osfhandle(int(value), os.O_RDONLY | os.O_BINARY)
+    os.set_inheritable(descriptor, False)
+    msvcrt.setmode(0, os.O_BINARY)
+    msvcrt.setmode(1, os.O_BINARY)
+    return descriptor
+
+
 def framed_config():
-    with os.fdopen(4, 'rb') as source:
+    with os.fdopen(bootstrap_descriptor(), 'rb') as source:
         length = struct.unpack('!I', archive.exact(source, 4))[0]
         archive.require(0 < length <= 32768)
         config = archive.strict_json(archive.exact(source, length))
         archive.require(not source.read(1))
+        if sys.platform == 'win32':
+            archive.closed(config, ('root', 'application_root', 'backend_command', 'backend_runtime', 'age', 'identity', 'role', 'lifecycle', 'backend_owner', 'native_library'))
+            archive.require(type(config['native_library']) is str)
+            from . import native_files
+            native_files.configure(config.pop('native_library'))
         return config
 
 
 def main():
-    archive.require(sys.argv[1:] == ['--serve'])
-    owner = RecoveryJobs(framed_config())
+    owner = RecoveryJobs(framed_config(), owner_failure=lambda: os._exit(2))
     while True:
         line = sys.stdin.buffer.readline(144 * 1024 + 1)
         if not line:

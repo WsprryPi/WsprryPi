@@ -54,3 +54,23 @@ and add an appropriate license file.
 
 While part of WsprryPi, this component is covered by the repository-root
 `LICENSE.md` (MIT).
+
+## Native installation ownership
+
+`src/installation_lock.hpp` adds `InstallationLock(directory)` for an installation with multiple independent state owners. Supply the fixed private owner directory, retain the guard for the entire operation, and call `operator()()` to acquire it. A simultaneous owner returns `false`; unsafe storage or an operating-system failure throws. The class is noncopyable and nonmovable.
+
+Linux and macOS use a nonblocking exclusive `flock`; Windows uses a nonblocking exclusive `LockFileEx` byte-range lock. The zero-byte `instance.lock` file remains after release. Never delete it to clear contention: deleting a live lock file can create two owners on different inodes. Operating-system process cleanup releases ownership after abrupt termination. Existing database locks remain necessary for database integrity. The POSIX overload taking an expected owner UID lets root maintenance acquire an existing backend-owned lock; it cannot create that owner’s directory or file.
+
+The directory is created privately under an existing trusted owner parent. POSIX paths reject symbolic links, untrusted writable ancestors, wrong owners, permissive access modes, hard links, and unexpected file contents. macOS also checks extended ACL grants. Windows creates a protected owner/System/Administrators DACL, checks existing owners and ACLs, rejects reparse points and hard links, and retains directory handles without delete sharing. Only local fixed-drive paths are accepted on Windows. Network filesystems are not qualified by these tests.
+
+The UDP API remains available; Windows uses Winsock with exclusive address ownership. Controller installations use the file-lock API, while ordinary Pi operation retains its UDP guard.
+
+The portable standalone build is:
+
+```sh
+cmake -S src/Singleton -B /tmp/wsprrypi-singleton-build
+cmake --build /tmp/wsprrypi-singleton-build
+ctest --test-dir /tmp/wsprrypi-singleton-build --output-on-failure
+```
+
+On Windows, select a private build directory using native path syntax. The file-lock tests use private temporary state, verify competing processes and reacquisition, and reject unsafe storage. POSIX tests additionally terminate their own child to check release after abrupt death. Windows test sources require a native Windows runner for runtime qualification; cross-compilation only checks the build.

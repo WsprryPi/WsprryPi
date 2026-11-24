@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
+#include "native_socket.hpp"
 #include "tls.hpp"
+#include "host_references.hpp"
 #include "identity.hpp"
+#include "hardware_access_policy.hpp"
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#endif
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
@@ -15,16 +21,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#ifndef _WIN32
 #include <fcntl.h>
-#include <mutex>
-#include <netdb.h>
-#include <poll.h>
-#include <stdexcept>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <thread>
 #include <unistd.h>
-#include <arpa/inet.h>
+#endif
+#include <mutex>
+#include <stdexcept>
+#include <thread>
 
 namespace wsprrypi {
 namespace {
@@ -35,6 +39,7 @@ struct Resolution {
 };
 std::vector<std::string> resolve_system(const std::string &host, unsigned port) {
   std::vector<std::string> addresses;
+  if (!native_socket::initialize()) return addresses;
   addrinfo hints{}, *found = nullptr;
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -46,7 +51,8 @@ std::vector<std::string> resolve_system(const std::string &host, unsigned port) 
   if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &found) == 0) {
     for (auto p = found; p && addresses.size() < 8; p = p->ai_next) {
       char address[NI_MAXHOST]{};
-      if (getnameinfo(p->ai_addr, p->ai_addrlen, address, sizeof(address),
+      if (p->ai_addrlen > sizeof(sockaddr_storage)) continue;
+      if (getnameinfo(p->ai_addr, static_cast<native_socket::Length>(p->ai_addrlen), address, sizeof(address),
                       nullptr, 0, NI_NUMERICHOST) == 0 &&
           std::find(addresses.begin(), addresses.end(), address) == addresses.end())
         addresses.emplace_back(address);
@@ -110,6 +116,11 @@ public:
   void cancel() noexcept override { pending_.reset(); result_.reset(); }
 };
 std::vector<unsigned char> read_credential(const std::string &path, bool key) {
+  if(!host_references::native_file(path))
+    throw std::runtime_error("TLS credentials require an absolute file reference on this host");
+#ifdef _WIN32
+  return windows_file::read_protected(path,key,262144);
+#else
   const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
   if (fd < 0) throw std::runtime_error("TLS credential is not readable as a regular local file");
   struct Guard { int fd; ~Guard() { ::close(fd); } } guard{fd};
@@ -126,6 +137,7 @@ std::vector<unsigned char> read_credential(const std::string &path, bool key) {
     offset += static_cast<std::size_t>(n);
   }
   return bytes;
+#endif
 }
 int no_password(char *, int, int, void *) { return 0; }
 bool literal(const std::string &s) {
@@ -159,19 +171,16 @@ BIO_METHOD *socket_method() {
     BIO_meth_set_destroy(m, [](BIO *) { return 1; });
     BIO_meth_set_read(m, [](BIO *b, char *data, int size) {
       BIO_clear_retry_flags(b);
-      const auto n = recv(static_cast<int>(reinterpret_cast<intptr_t>(BIO_get_data(b))), data, size, 0);
-      if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) BIO_set_retry_read(b);
+      if (size <= 0) return 0;
+      const auto n = native_socket::receive(static_cast<native_socket::Handle>(reinterpret_cast<uintptr_t>(BIO_get_data(b))), data, static_cast<std::size_t>(size));
+      if (n < 0 && (native_socket::retry(native_socket::error()))) BIO_set_retry_read(b);
       return static_cast<int>(n);
     });
     BIO_meth_set_write(m, [](BIO *b, const char *data, int size) {
       BIO_clear_retry_flags(b);
-#ifdef MSG_NOSIGNAL
-      constexpr int flags = MSG_NOSIGNAL;
-#else
-      constexpr int flags = 0;
-#endif
-      const auto n = send(static_cast<int>(reinterpret_cast<intptr_t>(BIO_get_data(b))), data, size, flags);
-      if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) BIO_set_retry_write(b);
+      if (size <= 0) return 0;
+      const auto n = native_socket::send(static_cast<native_socket::Handle>(reinterpret_cast<uintptr_t>(BIO_get_data(b))), data, static_cast<std::size_t>(size));
+      if (n < 0 && (native_socket::retry(native_socket::error()))) BIO_set_retry_write(b);
       return static_cast<int>(n);
     });
     BIO_meth_set_ctrl(m, [](BIO *, int command, long, void *) -> long {
@@ -256,7 +265,7 @@ struct TlsStream::Impl {
   TlsSelection selection;
   std::string alpn;
   SSL *ssl{};
-  int fd{-1};
+  native_socket::Handle fd{native_socket::invalid};
   mutable std::mutex mutex;
   TlsObservation status;
   std::atomic_bool cancelled{false};
@@ -274,8 +283,8 @@ struct TlsStream::Impl {
   void close() noexcept {
     resolver->cancel();
     SSL_free(ssl); ssl = nullptr;
-    if (fd >= 0) ::close(fd);
-    fd = -1; pending.clear(); credentials.reset();
+    native_socket::close(fd);
+    fd = native_socket::invalid; pending.clear(); credentials.reset();
   }
   void fail(const char *why) { close(); state("failed", why); }
   bool check() {
@@ -283,36 +292,32 @@ struct TlsStream::Impl {
     return ssl != nullptr;
   }
   void connect_next() {
-    if (fd >= 0) ::close(fd);
-    fd = -1;
+    if (!native_socket::initialize()) { fail("Native socket runtime unavailable"); return; }
+    native_socket::close(fd);
+    fd = native_socket::invalid;
     if (clock() >= deadline) { fail("TCP connection deadline exceeded"); return; }
     while (next_address < addresses.size()) {
       const auto address = addresses[next_address++];
       sockaddr_storage storage{};
-      socklen_t length{};
+      native_socket::Length length{};
       auto &v4 = reinterpret_cast<sockaddr_in &>(storage);
       auto &v6 = reinterpret_cast<sockaddr_in6 &>(storage);
       bool loopback = false;
       if (inet_pton(AF_INET, address.c_str(), &v4.sin_addr) == 1) {
-        v4.sin_family = AF_INET; v4.sin_port = htons(selection.port); length = sizeof(v4);
+        v4.sin_family = AF_INET; v4.sin_port = htons(static_cast<std::uint16_t>(selection.port)); length = sizeof(v4);
         loopback = (ntohl(v4.sin_addr.s_addr) >> 24) == 127;
       } else if (inet_pton(AF_INET6, address.c_str(), &v6.sin6_addr) == 1) {
-        v6.sin6_family = AF_INET6; v6.sin6_port = htons(selection.port); length = sizeof(v6);
+        v6.sin6_family = AF_INET6; v6.sin6_port = htons(static_cast<std::uint16_t>(selection.port)); length = sizeof(v6);
         loopback = IN6_IS_ADDR_LOOPBACK(&v6.sin6_addr);
       } else continue;
       if (access == Access::LoopbackTest && !loopback) { fail("Test TLS transport requires loopback addresses"); return; }
-      fd = socket(storage.ss_family, SOCK_STREAM, IPPROTO_TCP);
-      if (fd < 0) continue;
-      if (fcntl(fd, F_SETFL, O_NONBLOCK) || fcntl(fd, F_SETFD, FD_CLOEXEC)) { ::close(fd); fd = -1; continue; }
-#ifdef SO_NOSIGPIPE
-      int yes = 1;
-      setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
-#endif
+      fd = native_socket::open_stream(storage.ss_family);
+      if (fd == native_socket::invalid) continue;
       { std::lock_guard lock(mutex); status.address = address; }
-      if (::connect(fd, reinterpret_cast<sockaddr *>(&storage), length) == 0 || errno == EINPROGRESS) {
+      if (::connect(fd, reinterpret_cast<sockaddr *>(&storage), length) == 0 || native_socket::pending(native_socket::error())) {
         state("connecting"); return;
       }
-      ::close(fd); fd = -1;
+      native_socket::close(fd); fd = native_socket::invalid;
     }
     fail("TCP endpoint connection failed");
   }
@@ -336,8 +341,7 @@ bool TlsStream::begin_open(const TlsSelection &s, std::shared_ptr<TlsCredentials
   close(); auto &p = *impl_; p.cancelled = false;
   { std::lock_guard lock(p.mutex); p.status = {}; }
   if (p.access == Access::Production) {
-    const char *disabled = std::getenv("WSPRRYPI_DISABLE_HARDWARE_ACCESS");
-    if (disabled && std::string(disabled) == "1") { p.fail("Hardware access disabled; network transmitter access is prohibited"); return false; }
+    if (hardware_access_disabled()) { p.fail("Hardware access disabled; network transmitter access is prohibited"); return false; }
   }
   const auto host = canonical_network_identity(s.host);
   const auto identity = canonical_network_identity(s.expected_identity.empty() ? s.host : s.expected_identity);
@@ -360,16 +364,14 @@ void TlsStream::poll_open() {
     p.deadline = p.clock() + connect_timeout_ms; p.connect_next(); return;
   }
   if (p.state() == "connecting") {
-    pollfd fd{p.fd, POLLOUT, 0};
-    const auto result = ::poll(&fd, 1, 0);
-    if (!result || (result < 0 && errno == EINTR)) return;
-    int error = 0; socklen_t size = sizeof(error);
-    if (result < 0 || getsockopt(p.fd, SOL_SOCKET, SO_ERROR, &error, &size) || error) { p.connect_next(); return; }
+    const auto result = native_socket::poll_write(p.fd);
+    if (!result || (result < 0 && native_socket::interrupted(native_socket::error()))) return;
+    if (result < 0 || !native_socket::connected(p.fd)) { p.connect_next(); return; }
     p.ssl = SSL_new(p.credentials->impl_->context);
     if (!p.ssl) { p.fail("TLS session allocation failed"); return; }
     auto *bio = BIO_new(socket_method());
     if (!bio) { p.fail("TLS socket allocation failed"); return; }
-    BIO_set_data(bio, reinterpret_cast<void *>(static_cast<intptr_t>(p.fd)));
+    BIO_set_data(bio, reinterpret_cast<void *>(static_cast<uintptr_t>(p.fd)));
     SSL_set_bio(p.ssl, bio, bio);
     SSL_set_connect_state(p.ssl);
     const auto name = p.selection.expected_identity.empty() ? p.selection.host : p.selection.expected_identity;
@@ -379,7 +381,7 @@ void TlsStream::poll_open() {
         : X509_VERIFY_PARAM_set1_host(parameters, name.c_str(), name.size()) == 1 &&
           SSL_set_tlsext_host_name(p.ssl, name.c_str()) == 1;
     std::string wire(1, static_cast<char>(p.alpn.size())); wire += p.alpn;
-    if (!identity || SSL_set_alpn_protos(p.ssl, reinterpret_cast<const unsigned char *>(wire.data()), wire.size())) {
+    if (!identity || SSL_set_alpn_protos(p.ssl, reinterpret_cast<const unsigned char *>(wire.data()), static_cast<unsigned>(wire.size()))) {
       p.fail("TLS identity or ALPN setup failed"); return;
     }
     p.deadline = p.clock() + handshake_timeout_ms; p.state("handshaking");

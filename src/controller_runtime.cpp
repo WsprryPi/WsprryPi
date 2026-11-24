@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Lee Bussy
 #include "controller_runtime.hpp"
+#include "application_storage/controller_identity.hpp"
 #include "application_storage/application_state.hpp"
 #include "application_storage/controller_settings.hpp"
 #include "application_storage/sqlite_catalog.hpp"
@@ -30,7 +31,8 @@
 #include <thread>
 
 namespace {
-std::atomic_bool controller_role{false}, controller_ready{false};
+std::atomic_bool controller_role{false}, controller_ready{false},identity_fenced{false};
+bool verify_controller_identity{};
 std::string controller_identity,controller_boot;
 std::unique_ptr<wsprrypi::ControllerSettings> controller_settings;
 std::unique_ptr<wsprrypi::WtpCatalog> controller_catalog;
@@ -51,7 +53,13 @@ bool controller_only_requested(int argc, char *argv[]) noexcept {
     return false;
 }
 bool controller_only_mode() noexcept { return controller_role.load(std::memory_order_acquire); }
-bool controller_only_ready() noexcept { return controller_ready.load(std::memory_order_acquire); }
+bool controller_only_ready() noexcept {
+    if(!controller_ready.load(std::memory_order_acquire))return false;
+    if(verify_controller_identity&&(identity_fenced.load()||!wsprrypi::controller_identity_matches(controller_identity))){
+        identity_fenced.store(true);return false;
+    }
+    return true;
+}
 
 void configure_controller_only(int argc, char *argv[]) {
     if (controller_only_mode()) throw std::logic_error("Controller role is already configured");
@@ -142,7 +150,7 @@ void configure_controller_only(int argc, char *argv[]) {
     controller_role.store(true, std::memory_order_release);
 }
 
-std::string controller_only_process_boot(){return controller_ready.load(std::memory_order_acquire)?controller_boot:std::string{};}
+std::string controller_only_process_boot(){return controller_only_ready()?controller_boot:std::string{};}
 std::string prepare_controller_process_boot(){
     if(!controller_only_mode())throw std::logic_error("Controller role has not been selected");
     if(controller_boot.empty())controller_boot=wsprrypi::WtpPiBootIdentity{}.new_boot_id();
@@ -151,7 +159,7 @@ std::string prepare_controller_process_boot(){
 std::string persist_controller_advanced_settings(const std::string &expected,const nlohmann::json &changes){
     std::lock_guard lock(config_update_mutex());
     if(!controller_only_mode()||!controller_settings)throw wsprrypi::LocalCommandRefused(wsprrypi::LocalRefusal::StorageUnavailable);
-    if(!controller_ready.load(std::memory_order_acquire)||exiting_wspr.load())
+    if(!controller_only_ready()||exiting_wspr.load())
         throw wsprrypi::LocalCommandRefused(wsprrypi::LocalRefusal::Busy);
     const auto revision=controller_settings->persist_advanced(expected,changes);
     if(changes.contains("Meta.debug_logging")){
@@ -168,12 +176,13 @@ wsprrypi::WtpCatalog &controller_storage_catalog(){
 std::string persist_controller_network_safety_setting(const std::string &revision,bool insecure_disabled){
     if(!controller_only_mode()||!wsprrypi::application_database_selected()||!controller_settings)
         throw std::runtime_error("controller_storage_unavailable");
+    if(!controller_identity.empty()&&!controller_only_ready())throw wsprrypi::LocalCommandRefused(wsprrypi::LocalRefusal::StorageUnavailable);
     return controller_settings->persist_network_safety(revision,insecure_disabled?
         wsprrypi::SavedNetworkSafety::InsecureDisabled:wsprrypi::SavedNetworkSafety::Enforced);
 }
 
 nlohmann::json controller_only_status() {
-    return {{"role", "controller-only"}, {"controller_ready", controller_ready.load()},
+    return {{"role", "controller-only"}, {"controller_ready", controller_only_ready()},
         {"device_id", controller_identity}, {"local_output", nullptr},
         {"local_transmission_available", false}};
 }
@@ -182,7 +191,7 @@ bool controller_http_allowed(std::string_view method, std::string_view path) {
     if (!controller_only_mode()) return true;
     if (method == "GET" && (path == "/" || path == "/version" || path == "/status" ||
         path == "/api/control/v1/status")) return true;
-    if (!controller_ready.load(std::memory_order_acquire)) return false;
+    if (!controller_only_ready()) return false;
     if((method=="GET"&&wsprrypi::local_pairing_read_path(path))||
         (method=="POST"&&wsprrypi::local_pairing_mutation_path(path))||wsprrypi::pi_pair_bootstrap_path(method,path))return true;
     if(path=="/api/control/v1/targets"||path.starts_with("/api/control/v1/targets/"))
@@ -202,6 +211,7 @@ bool controller_only_loop(const std::string &fixture_identity) {
     std::shared_ptr<wsprrypi::PiPairOwner> pairing_owner;
     const char *stage = "identity";
     try {
+        verify_controller_identity=fixture_identity.empty();identity_fenced.store(false);
         controller_identity = fixture_identity.empty() ? wsprrypi::wtp_pi_device_id() : fixture_identity;
         if (controller_identity.size() != 32 || controller_identity.find_first_not_of("0123456789abcdef") != std::string::npos)
             throw std::runtime_error("Controller identity is invalid");
@@ -239,14 +249,20 @@ bool controller_only_loop(const std::string &fixture_identity) {
             if (!webServer.isListening()) throw std::runtime_error("Controller HTTP listener unavailable");
         }
         stage = "WebSocket listener";
-        if (config.enable_web&&!wsprrypi::application_database_selected() && !socketServer.start(config.socket_port, SOCKET_KEEPALIVE,
-                config.socket_loopback_only, config.socket_loopback_family))
+        if (config.enable_web&&!wsprrypi::application_database_selected() && (config.socket_port<1||config.socket_port>65535||!socketServer.start(static_cast<std::uint16_t>(config.socket_port), SOCKET_KEEPALIVE,
+                config.socket_loopback_only, config.socket_loopback_family)))
             throw std::runtime_error("Controller WebSocket listener unavailable");
         controller_ready.store(true, std::memory_order_release);
         llog.logS(INFO, "Controller ready; no local transmitter output. Listener settings require process restart.");
         std::unique_lock lock(exitwspr_mtx);
-        exitwspr_cv.wait(lock, [] { return exitwspr_ready; });
-        result = true;
+        while(!exitwspr_ready){
+            exitwspr_cv.wait_for(lock,std::chrono::milliseconds(100),[]{return exitwspr_ready;});
+            if(!controller_only_ready()){
+                llog.logS(ERROR,"Controller identity is unavailable; management admission has stopped.");
+                break;
+            }
+        }
+        result = exitwspr_ready;
     } catch (const std::exception &) {
         // Do not relay private profile contents or filesystem paths to browsers.
         llog.logS(ERROR, "Controller startup failed at ", stage, "; inspect controller identity, catalog, recovery state, and listeners.");

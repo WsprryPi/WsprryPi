@@ -6,7 +6,7 @@
 #include <map>
 #include <set>
 #include <stdexcept>
-#include <arpa/inet.h>
+#include "native_socket.hpp"
 namespace wsprrypi {
 namespace {
 void require(bool value){if(!value)throw std::invalid_argument("invalid_pairing_http");}
@@ -166,7 +166,7 @@ PiPairHttpResponseDecoder::State PiPairHttpResponseDecoder::append(std::span<con
         }
         const auto received=bytes_.size()-boundary_-4;require(received<=length_);
         if(received<length_)return state_;
-        reply_.payload.body=bytes_.substr(boundary_+4);(void)strict_browser_json(reply_.payload.body,depth_);
+        reply_.payload.body=bytes_.substr(boundary_+4);(void)strict_browser_json(reply_.payload.body,static_cast<unsigned>(depth_));
         state_=State::Ready;bytes_.clear();
     }catch(...){state_=State::Refused;bytes_.clear();reply_=PiPairHttpReply{};}
     return state_;

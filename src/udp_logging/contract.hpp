@@ -201,8 +201,8 @@ inline void count(Json &c, const char *key) {
 inline void target(const Json &t, std::string_view device,
                    std::string_view boot) {
   require(fields(t, {"scope", "device_id", "boot_id"}) &&
-              t["scope"] == "member" && t["device_id"] == device &&
-              t["boot_id"] == boot,
+              t["scope"] == "member" && t["device_id"] == std::string(device) &&
+              t["boot_id"] == std::string(boot),
           "udp_member_binding");
 }
 inline void capabilities(const Json &c, std::string_view device,

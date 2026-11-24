@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "http_domain.hpp"
+#include "backend_capabilities.hpp"
 #include "http_contract.hpp"
 #include "backend_services.hpp"
 #include "local_transport.hpp"
@@ -14,7 +15,7 @@
 #include "support_bundle_intake_production.hpp"
 #include "web_server_routes.hpp"
 #include <algorithm>
-#include <arpa/inet.h>
+#include "wtp_integration/native_socket.hpp"
 #include <cstring>
 #include <mutex>
 namespace wsprrypi {
@@ -40,7 +41,7 @@ void validate(const BrowserHttpInput &input){
 }
 class DomainStream final:public httplib::Stream {
 public:
-    explicit DomainStream(const BrowserHttpInput &input):descriptor_(input.transport_descriptor),peer_(input.peer){
+    explicit DomainStream(const BrowserHttpInput &input):descriptor_(input.transport_descriptor),alive_(input.transport_alive),peer_(input.peer){
         request_=input.method+" "+input.target+" HTTP/1.1\r\n";
         auto headers=input.headers;headers.erase("Content-Length");headers.erase("Connection");
         headers.emplace("Content-Length",std::to_string(input.body.size()));headers.emplace("Connection","close");
@@ -56,14 +57,28 @@ public:
     ssize_t write(const char *,std::size_t length)override{discarded_+=length;require(discarded_<=8192);return static_cast<ssize_t>(length);}
     void get_remote_ip_and_port(std::string &ip,int &port)const override{ip=peer_;port=0;}
     void get_local_ip_and_port(std::string &ip,int &port)const override{ip="127.0.0.1";port=0;}
-    socket_t socket()const override{return descriptor_;}
+    socket_t socket()const override{
+#ifdef _WIN32
+        return INVALID_SOCKET; // A named-pipe handle is never a Winsock socket.
+#else
+        return descriptor_;
+#endif
+    }
+    std::function<bool()> connection_closed_handler()const override{
+        if(alive_)return [alive=alive_]{return !alive();};
+        return httplib::Stream::connection_closed_handler();
+    }
     time_t duration()const override{return 0;}
 private:
-    int descriptor_;std::string peer_,request_;std::size_t offset_{},discarded_{};
+    LocalTransportDescriptor descriptor_;std::function<bool()> alive_;std::string peer_,request_;std::size_t offset_{},discarded_{};
 };
 class DomainRouter final:public ApplicationHttpRouter {
 public:
-    DomainRouter():jobs_(backend_support_jobs()),network_(PrivilegedNetworkAdminPaths{application_configuration_namespace()},run_privileged_network_command,
+    DomainRouter():
+#if !WSPRRYPI_CONTROLLER_ONLY
+        jobs_(backend_support_jobs()),
+#endif
+        network_(PrivilegedNetworkAdminPaths{application_configuration_namespace()},run_privileged_network_command,
         PrivilegedNetworkIniIO{},managed_network_settings_io()){
         set_payload_max_length(1024*1024);
         const auto snapshot=[] {return SupportRequestGuard::discover_local_networks();};
@@ -72,7 +87,9 @@ public:
             response.set_header("Access-Control-Allow-Methods","GET, POST, PUT, PATCH, DELETE, OPTIONS");
             response.set_header("Access-Control-Allow-Headers","Content-Type, Accept");
         };
+#if !WSPRRYPI_CONTROLLER_ONLY
         register_support_bundle_http_routes(*this,*jobs_,snapshot,resolve_support_bundle_intake_production);
+#endif
         web_server_routes::register_request_guard(*this,snapshot);
         web_server_routes::register_config(*this,cors);
         web_server_routes::register_pairing(*this,backend_pairing_service,snapshot);

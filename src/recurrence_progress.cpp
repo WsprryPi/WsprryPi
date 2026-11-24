@@ -30,7 +30,7 @@ Json envelope(const Json &record){const auto bytes=record.dump();return {{"recor
 bool valid_recurrence_progress(const Json &v,std::string_view self) noexcept {
     try{
         if(!hex(std::string(self),32)||!fields(v,{"schema","device_id","authority_generation","configuration_generation","clock_generation","consumed_through_utc_ns","cursors","in_flight"})||
-            v.at("schema")!="pi-recurrence-progress/1"||v.at("device_id")!=self||!cursors(v.at("cursors")))return false;
+            v.at("schema")!="pi-recurrence-progress/1"||v.at("device_id")!=std::string(self)||!cursors(v.at("cursors")))return false;
         for(auto key:{"authority_generation","configuration_generation","clock_generation","consumed_through_utc_ns"})(void)number(v.at(key));
         const auto &flight=v.at("in_flight");
         if(!flight.is_null()){

@@ -3,7 +3,7 @@
 #include "wtp_runtime_bridge.hpp"
 #include "wtp_managed_output.hpp"
 #include "wtp_integration/management_identity.hpp"
-#include "pico_usb_installer_state.hpp"
+#include "pico_usb_runtime_ownership.hpp"
 #include <mutex>
 #include <thread>
 #include <stdexcept>

@@ -1,6 +1,11 @@
 #include "WTP-Server/include/wtp_server/observation.hpp"
 #include "wtp_endpoint/runtime.hpp"
 #include "wtp_retirement.hpp"
+#ifdef _WIN32
+#include "native_windows_owners.hpp"
+#else
+#include "native_controller_owners.hpp"
+#endif
 
 #include "wtp_endpoint/authority.hpp"
 #include "wtp_endpoint/identity.hpp"
@@ -26,16 +31,21 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#ifndef _WIN32
 #include <pwd.h>
+#include <unistd.h>
+#endif
 #include <stdexcept>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <tuple>
+#include <vector>
 #include <filesystem>
 
 #include "backend_capabilities.hpp"
 #include "wtp_endpoint/capabilities.hpp"
+#if WSPRRYPI_BACKEND_RPI_GPIO || WSPRRYPI_BACKEND_RP1_GPCLK || WSPRRYPI_BACKEND_SI5351
 #include "wtp_endpoint/native_bridge.hpp"
+#endif
 #include "scheduling.hpp"
 #include "rp1_route_bridge.hpp"
 #if WSPRRYPI_BACKEND_SIMULATED
@@ -52,9 +62,24 @@
 #endif
 
 namespace wsprrypi {
+#if !WSPRRYPI_CONTROLLER_ONLY
 static WtpExternalReconcileResult reconcile_native_external_output(const WtpManagedOutput &);
+#endif
 namespace {
 std::string fixture_private_state_path;
+std::string fixture_controller_owner_home;
+#ifdef _WIN32
+std::string windows_path_text(const std::filesystem::path &path){const auto value=path.u8string();return {value.begin(),value.end()};}
+void verify_windows_fixture_home(const std::filesystem::path &home) {
+    const auto owner=windows_file::current_sid();
+    windows_file::ParentChain parents(home/L".fixture-owner-check",owner);
+    windows_file::Handle directory(::CreateFileW(windows_file::api_path(home).c_str(),READ_CONTROL|FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT|FILE_FLAG_BACKUP_SEMANTICS,nullptr));
+    windows_file::require(directory.get()!=INVALID_HANDLE_VALUE);(void)windows_file::inspect(directory.get(),true);
+    windows_file::verify_exact_owner(directory.get(),owner);windows_file::verify_security(directory.get(),owner,true,true);
+}
+#endif
+#if !WSPRRYPI_CONTROLLER_ONLY
 std::string private_state_path() {
     if(!fixture_private_state_path.empty())return fixture_private_state_path;
     const passwd* owner = getpwuid(geteuid());
@@ -273,11 +298,13 @@ private:
     mutable std::mutex state_mutex_;
 };
 
+#endif // Local execution runtime
 struct ManagementHttpListener {const void *owner{};std::string self;unsigned port{};std::function<bool()> ready;};
 std::mutex management_http_mutex;
 ManagementHttpListener management_http;
-std::mutex runtime_mutex;
 std::recursive_mutex lifecycle_mutex;
+#if !WSPRRYPI_CONTROLLER_ONLY
+std::mutex runtime_mutex;
 std::shared_ptr<Runtime> runtime;
 std::string runtime_start_error;
 std::optional<ArgParserConfig> pending_settings;
@@ -291,19 +318,89 @@ auto output_settings(const ArgParserConfig& s) {
         s.wtp_server_port_override, s.allow_unqualified_frequency,
         s.allow_non_amateur_frequency};
 }
+#endif
 } // namespace
 
 bool wtp_pi_has_prior_output_history() noexcept {
     try{
         std::lock_guard lifecycle(lifecycle_mutex);
         std::string path=fixture_private_state_path;
+#ifdef _WIN32
+        auto owner_sid=windows_file::current_sid();
+        if(path.empty()) {
+            const auto owner=native_windows_controller_owners().backend;owner_sid=owner.sid;
+            path=windows_path_text(windows_file::path_from_utf8(owner.home)/L".wsprrypi-wtp");
+        }
+        const auto selected=windows_file::path_from_utf8(path);
+        windows_file::ParentChain parents(selected,owner_sid);
+        if(::GetFileAttributesW(windows_file::api_path(selected).c_str())!=INVALID_FILE_ATTRIBUTES)return true;
+        const auto error=::GetLastError();return error!=ERROR_FILE_NOT_FOUND&&error!=ERROR_PATH_NOT_FOUND;
+#else
         if(path.empty()){
             const auto owner=getpwuid(geteuid());if(!owner||!owner->pw_dir||!*owner->pw_dir)return true;
             path=std::string(owner->pw_dir)+"/.wsprrypi-wtp";
         }
         struct stat info{};if(!::lstat(path.c_str(),&info))return true;
         return errno!=ENOENT;
+#endif
     }catch(...){return true;}
+}
+void testing::set_wtp_pi_private_state_path(const std::string &path){
+    std::lock_guard lifecycle(lifecycle_mutex);
+#if !WSPRRYPI_CONTROLLER_ONLY
+    std::lock_guard lock(runtime_mutex);
+    if(runtime||pending_settings)throw std::logic_error("Runtime already selected");
+#endif
+#ifdef _WIN32
+    const auto selected=windows_file::path_from_utf8(path);
+    verify_windows_fixture_home(selected.parent_path());
+    fixture_private_state_path=windows_path_text(selected);
+#else
+    if(path.empty()||path.front()!='/'||path.back()=='/'||path.find('\0')!=std::string::npos)
+        throw std::invalid_argument("Invalid isolated endpoint ledger path or runtime lifecycle");
+    const auto parent=path.substr(0,path.find_last_of('/'));
+    struct stat info{};
+    if(lstat(parent.c_str(),&info)!=0||!S_ISDIR(info.st_mode)||info.st_uid!=geteuid()||(info.st_mode&0077)!=0)
+        throw std::invalid_argument("Isolated endpoint ledger requires a private fixture parent");
+    fixture_private_state_path=path;
+#endif
+}
+
+void testing::set_controller_installation_owner_home(const std::string &home){
+    std::lock_guard lock(lifecycle_mutex);
+#ifdef _WIN32
+    if(fixture_private_state_path.empty()||!fixture_controller_owner_home.empty())
+        throw std::invalid_argument("Invalid isolated controller owner home");
+    const auto selected=windows_file::path_from_utf8(home);verify_windows_fixture_home(selected);
+    fixture_controller_owner_home=windows_path_text(selected);
+#else
+    struct stat info{};
+    if(fixture_private_state_path.empty()||!fixture_controller_owner_home.empty()||home.empty()||
+        home.find('\0')!=std::string::npos||std::filesystem::canonical(home).string()!=home||
+        ::lstat(home.c_str(),&info)||!S_ISDIR(info.st_mode)||info.st_uid!=::geteuid()||(info.st_mode&0777)!=0700)
+        throw std::invalid_argument("Invalid isolated controller owner home");
+    fixture_controller_owner_home=home;
+#endif
+}
+ControllerInstallationOwner controller_installation_owner(){
+    std::lock_guard lifecycle(lifecycle_mutex);
+#ifdef _WIN32
+    if(!fixture_controller_owner_home.empty())return {fixture_controller_owner_home,windows_file::current_sid()};
+    if(!fixture_private_state_path.empty())return {
+        windows_path_text(windows_file::path_from_utf8(fixture_private_state_path).parent_path()),windows_file::current_sid()};
+    const auto owner=native_windows_controller_owners().backend;
+    return {owner.home,owner.sid};
+#else
+    if(!fixture_controller_owner_home.empty())return {fixture_controller_owner_home,::geteuid()};
+    if(!fixture_private_state_path.empty())return {
+        std::filesystem::canonical(std::filesystem::path(fixture_private_state_path).parent_path()).string(),::geteuid()};
+#if WSPRRYPI_CONTROLLER_ONLY
+    if(const auto owners=native_controller_owners())return {owners->backend.home,owners->backend.uid};
+#endif
+    const auto owner=native_controller_account(nullptr);
+    if(!owner)throw std::runtime_error("private_device_owner_unavailable");
+    return {owner->home,owner->uid};
+#endif
 }
 std::string private_device_state_directory(PrivateDeviceDomain domain,const std::string &device){
     if(device.size()!=32||device.find_first_not_of("0123456789abcdef")!=std::string::npos)
@@ -317,9 +414,15 @@ std::string private_device_state_directory(PrivateDeviceDomain domain,const std:
         default:throw std::runtime_error("private_device_domain_unavailable");
     }
     if(!fixture_private_state_path.empty())return fixture_private_state_path+"."+label+"-"+device;
+#ifdef _WIN32
+    const auto owner=native_windows_controller_owners().backend;
+    return windows_path_text(windows_file::path_from_utf8(owner.home)/std::filesystem::path(L".wsprrypi-"+
+        std::wstring(label.begin(),label.end())+L"-"+std::wstring(device.begin(),device.end())));
+#else
     const auto owner=getpwuid(geteuid());
     if(!owner||!owner->pw_dir||!*owner->pw_dir)throw std::runtime_error("private_device_owner_unavailable");
     return std::string(owner->pw_dir)+"/.wsprrypi-"+label+"-"+device;
+#endif
 }
 PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device,const std::string &ini,
     const std::function<void(OwnedStatePublicationPoint)> &checkpoint){
@@ -333,6 +436,7 @@ PiRecurrenceStorage prepare_pi_recurrence_storage(const std::string &device,cons
     return {storage.file,storage.existed,prior};
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) {
     std::lock_guard lifecycle(lifecycle_mutex);
     if(const auto refusal=wtp_retirement_configuration_refusal(settings);!refusal.empty()){if(error)*error=refusal;return false;}
@@ -368,17 +472,6 @@ bool start_wtp_pi_endpoint(const ArgParserConfig& settings, std::string* error) 
     }
 }
 
-void testing::set_wtp_pi_private_state_path(const std::string &path){
-    std::lock_guard lifecycle(lifecycle_mutex);
-    std::lock_guard lock(runtime_mutex);
-    if(runtime||pending_settings||path.empty()||path.front()!='/'||path.back()=='/'||path.find('\0')!=std::string::npos)
-        throw std::invalid_argument("Invalid isolated endpoint ledger path or runtime lifecycle");
-    const auto parent=path.substr(0,path.find_last_of('/'));
-    struct stat info{};
-    if(lstat(parent.c_str(),&info)!=0||!S_ISDIR(info.st_mode)||info.st_uid!=geteuid()||(info.st_mode&0077)!=0)
-        throw std::invalid_argument("Isolated endpoint ledger requires a private fixture parent");
-    fixture_private_state_path=path;
-}
 
 void poll_wtp_pi_endpoint() noexcept {
     try {
@@ -488,6 +581,22 @@ void wtp_pi_with_configuration(const std::function<void()>& action) {
     action();
 }
 
+#else
+bool start_wtp_pi_endpoint(const ArgParserConfig &, std::string *error) {
+    if(error)*error="Local WTP execution is unavailable in the controller build";
+    return false;
+}
+void activate_wtp_pi_endpoint() { throw std::logic_error("Local WTP execution is unavailable"); }
+void poll_wtp_pi_endpoint() noexcept {}
+void stop_wtp_pi_endpoint() noexcept {}
+std::string wtp_pi_endpoint_status_json() { throw std::logic_error("Local WTP execution is unavailable"); }
+void wtp_pi_enable_interactive(bool,bool,const std::function<void()> &,const std::string &,const std::string &) {
+    throw std::logic_error("Local WTP execution is unavailable");
+}
+void wtp_pi_configuration_committed(const ArgParserConfig &) { throw std::logic_error("Local WTP execution is unavailable"); }
+void wtp_pi_with_configuration(const std::function<void()> &) { throw std::logic_error("Local WTP execution is unavailable"); }
+#endif
+
 void wtp_pi_publish_management_http(const void *owner,const std::string &self,unsigned port,std::function<bool()> ready){
     if(!owner||!ready||self.size()!=32||self.find_first_not_of("0123456789abcdef")!=std::string::npos||!port||port>65535)
         throw std::invalid_argument("actual_management_http_listener_required");
@@ -497,6 +606,7 @@ void wtp_pi_withdraw_management_http(const void *owner) noexcept{
     try{std::lock_guard lock(management_http_mutex);if(management_http.owner==owner)management_http={};}catch(...){}
 }
 
+#if !WSPRRYPI_CONTROLLER_ONLY
 std::optional<PiManagementObservation> wtp_pi_management_observation(){
     std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
     if(!lifecycle.owns_lock())return {};
@@ -595,4 +705,9 @@ bool wtp_pi_recover_remote_output() {
     if (recovered && !pending_settings) current->activate();
     return recovered;
 }
+#else
+std::optional<PiManagementObservation> wtp_pi_management_observation(){ return {}; }
+bool wtp_pi_stop_remote_work(){ return true; }
+bool wtp_pi_recover_remote_output(){ return false; }
+#endif
 } // namespace wsprrypi

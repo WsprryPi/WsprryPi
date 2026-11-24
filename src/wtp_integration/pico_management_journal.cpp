@@ -9,7 +9,14 @@
 #include <array>
 #include <cerrno>
 #include <charconv>
+#ifdef _WIN32
+#include "native_windows_file.hpp"
+#include "native_random.hpp"
+#else
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <filesystem>
 #include <set>
 #include <map>
@@ -17,8 +24,6 @@
 #include <atomic>
 #include <limits>
 #include <stdexcept>
-#include <sys/stat.h>
-#include <unistd.h>
 namespace wsprrypi {
 struct PicoManagementTargetState {
     std::recursive_mutex operation;
@@ -27,6 +32,9 @@ struct PicoManagementTargetState {
 namespace {
 using Json=nlohmann::json;
 constexpr std::size_t maximum_bytes=16*1024*1024;
+#ifdef _WIN32
+#include "pico_management_files_windows.hpp"
+#else
 struct FileStamp {
     std::uint64_t device{},inode{},size{},mode{},uid{},links{};
     std::int64_t modified{},modified_ns{},changed{},changed_ns{};
@@ -42,6 +50,10 @@ FileStamp stamp(const std::string &path) {
 #endif
     return value;
 }
+std::filesystem::path disk_path(const std::string &value){return value;}
+std::string path_text(const std::filesystem::path &value){return value.string();}
+#endif
+
 struct Authority {
     struct File {FileStamp stamp;unsigned unresolved;std::string epoch;bool nonempty;};
     std::string controller;
@@ -50,7 +62,7 @@ struct Authority {
 };
 std::recursive_mutex recovery_mutex;
 std::map<std::string,Authority> authorities;
-std::string authority_key(const std::string &directory){return std::filesystem::weakly_canonical(directory).string();}
+std::string authority_key(const std::string &directory){return path_text(std::filesystem::weakly_canonical(disk_path(directory)));}
 std::mutex target_states_mutex;
 std::map<std::pair<std::string,std::string>,std::weak_ptr<PicoManagementTargetState>> target_states;
 std::shared_ptr<PicoManagementTargetState> target_state(const std::string &directory,const std::string &device){
@@ -120,6 +132,9 @@ bool native_receipt_matches(const Json &body,const Json &reserved,const std::str
 }
 void require(bool value) {if(!value)throw std::runtime_error("invalid_management_recovery_state");}
 bool directory(const std::string &path,bool create) {
+#ifdef _WIN32
+    return native_prepare_directory(path,create);
+#else
     struct stat existing{};
     if(lstat(path.c_str(),&existing)&&errno==ENOENT&&!create)return false;
     if(create&&mkdir(path.c_str(),0700)&&errno!=EEXIST)throw std::runtime_error("management_storage_unavailable");
@@ -131,6 +146,7 @@ bool directory(const std::string &path,bool create) {
         const auto synced=fsync(fd);close(fd);require(!synced);
     }
     return true;
+#endif
 }
 }
 PicoManagementJournal::TargetAdmission::TargetAdmission(std::shared_ptr<PicoManagementTargetState> state)
@@ -211,12 +227,17 @@ void PicoManagementJournal::validate(const Json &data) const {
 nlohmann::json PicoManagementJournal::load() {
     const auto empty=[&]{Json result{{"schema","pico-management-operations/1"},{"controller_id",controller_},{"device_id",device_},{"history_id",initial_epoch_},{"receipts",Json::array()}};result["checksum"]=digest(result.dump());return result;};
     if(!directory(directory_,false))return empty();
+#ifdef _WIN32
+    if(!native_present(disk_path(path_)))return empty();
+    const auto input=windows_file::read_protected(path_,true,maximum_bytes);const std::string bytes(input.begin(),input.end());
+#else
     const int fd=open(path_.c_str(),O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK);
     if(fd<0) {if(errno==ENOENT)return empty();throw std::runtime_error("management_storage_unavailable");}
     struct Close {int fd;~Close(){close(fd);}} close_fd{fd};struct stat s{};
     require(!fstat(fd,&s)&&S_ISREG(s.st_mode)&&s.st_nlink==1&&s.st_uid==geteuid()&&!(s.st_mode&0077)&&s.st_size>=0&&static_cast<std::size_t>(s.st_size)<=maximum_bytes);
     std::string bytes;std::array<char,4096> block{};
     for(;;) {auto n=read(fd,block.data(),block.size());if(n<0&&errno==EINTR)continue;require(n>=0);if(!n)break;bytes.append(block.data(),n);require(bytes.size()<=maximum_bytes);}
+#endif
     std::vector<std::set<std::string>> keys;
     auto data=Json::parse(bytes,[&](int depth,Json::parse_event_t event,Json &v) {
         require(depth<=24);if(event==Json::parse_event_t::object_start)keys.emplace_back();
@@ -229,6 +250,9 @@ nlohmann::json PicoManagementJournal::load() {
 void PicoManagementJournal::save(const Json &data) {
     auto sealed=data;sealed.erase("checksum");sealed["checksum"]=digest(sealed.dump());
     validate(sealed);const auto bytes=sealed.dump();require(bytes.size()<=maximum_bytes);directory(directory_,true);
+#ifdef _WIN32
+    native_save(path_,bytes);record_authority(sealed);
+#else
     auto pattern=path_+".tmp.XXXXXX";std::vector<char> name(pattern.begin(),pattern.end());name.push_back(0);
     int fd=mkstemp(name.data());if(fd<0)throw std::runtime_error("management_storage_unavailable");
     try {
@@ -239,6 +263,7 @@ void PicoManagementJournal::save(const Json &data) {
         const int dir=open(directory_.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(dir>=0);
         const int synced=fsync(dir);close(dir);require(!synced);record_authority(sealed);
     } catch(...) {if(fd>=0)close(fd);unlink(name.data());throw;}
+#endif
 }
 void PicoManagementJournal::check_authority() {
     const auto key=authority_key(directory_);
@@ -263,14 +288,18 @@ void PicoManagementJournal::check_authority() {
     std::map<std::string,FileStamp> observed;
     if(directory(directory_,false)) {
         unsigned temporary=0;
-        for(const auto &entry:std::filesystem::directory_iterator(directory_)) {
-            const auto name=entry.path().filename().string();
+        for(const auto &entry:std::filesystem::directory_iterator(disk_path(directory_))) {
+            const auto name=path_text(entry.path().filename());
             const bool journal=name.size()==37&&name.ends_with(".json")&&hex(name.substr(0,32),32);
             const bool staging=name.size()==48&&name.substr(32,10)==".json.tmp."&&hex(name.substr(0,32),32)&&
                 name.substr(42).find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")==std::string::npos;
             require(journal||staging);
-            const auto current=stamp(entry.path().string());
+            const auto current=stamp(path_text(entry.path()));
+#ifdef _WIN32
+            require(current.size<=maximum_bytes); // Native stamp admitted SID, ACL, type, and link count.
+#else
             require(S_ISREG(current.mode)&&current.uid==geteuid()&&!(current.mode&0077)&&current.links==1&&current.size<=maximum_bytes);
+#endif
             if(staging) {require(++temporary<=64);continue;}
             observed.emplace(name.substr(0,32),current);require(observed.size()<=96);
         }
@@ -299,18 +328,26 @@ void PicoManagementJournal::prune_retired() {
     const auto view=history_.read();auto &known=authorities.at(authority_key(directory_)).files;
     const auto files=known;
     const auto sync_absence=[&]{
-        auto selected=std::filesystem::path(directory_);
+        auto selected=disk_path(directory_);
         if(!directory(directory_,false)){selected=selected.parent_path();if(selected.empty())selected=".";}
         selected=std::filesystem::canonical(selected);
+#ifdef _WIN32
+        windows_file::flush_directory(selected,windows_file::current_sid());
+#else
         const int fd=::open(selected.c_str(),O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);require(fd>=0);
         const auto synced=::fsync(fd);::close(fd);require(!synced);
+#endif
     };
     for(const auto &[id,file]:files) {
         const bool empty_unpublished=!view.epochs.contains(id)&&!file.nonempty;
         if(!empty_unpublished&&(view.devices.contains(id)||file.unresolved))continue;
         if(!empty_unpublished)history_.retire(id,file.epoch);
         const auto path=directory_+"/"+id+".json";
+#ifdef _WIN32
+        native_remove(path);
+#else
         require(!::unlink(path.c_str())||errno==ENOENT);
+#endif
         sync_absence();known.erase(id);
         if(!empty_unpublished)history_.finish_retirement(id,file.epoch);
     }

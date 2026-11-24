@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 #include "management_resolver.hpp"
+#ifdef _WIN32
+#include "native_windows_network.hpp"
+#else
 #include <arpa/inet.h>
 #include <ifaddrs.h>
+#endif
 #include <array>
 #include <cstring>
 #include <set>
@@ -9,6 +13,9 @@
 namespace wsprrypi {
 namespace {
 std::optional<std::vector<std::string>> self_addresses() {
+#ifdef _WIN32
+    return windows_local_addresses();
+#else
     ifaddrs *list{};
     if (getifaddrs(&list)) return {};
     struct Release {ifaddrs *p;~Release(){freeifaddrs(p);}} release{list};
@@ -22,6 +29,7 @@ std::optional<std::vector<std::string>> self_addresses() {
         if (address && inet_ntop(family,address,text.data(),text.size())) result.emplace_back(text.data());
     }
     return result;
+#endif
 }
 class ManagementResolver final : public TlsResolver {
 public:

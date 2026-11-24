@@ -5,6 +5,7 @@
 #include "WTP-Client/include/wtp/transport.hpp"
 #include <filesystem>
 #include <optional>
+#include <memory>
 #include <string>
 
 namespace wsprrypi {
@@ -29,6 +30,7 @@ struct CdcTransfer {
 struct CdcPoll {
   int count{}, events{}, error{};
 };
+enum CdcPollEvent {CdcPollReadable=1,CdcPollWritable=4,CdcPollFailure=8|16|32};
 
 // Typed OS seam for deterministic tests, not a CLI/configuration escape hatch.
 // Setup operations throw on failure. I/O returns captured errno; close never
@@ -92,6 +94,32 @@ public:
   CdcTransfer write(int fd, std::span<const std::uint8_t> bytes) override;
   int close(int fd) noexcept override;
 };
+#ifdef _WIN32
+class WindowsCdcSystem final:public CdcSystem {
+public:
+  WindowsCdcSystem();
+  ~WindowsCdcSystem() override;
+  WindowsCdcSystem(const WindowsCdcSystem &)=delete;
+  WindowsCdcSystem &operator=(const WindowsCdcSystem &)=delete;
+  CdcIdentity inspect(const std::string &) override;
+  int open(const std::string &,int) override;
+  void verify(int,const CdcIdentity &) override;
+  void exclusive(int) override;
+  void unexclusive(int) override;
+  void raw(int) override;
+  void dtr(int,bool) override;
+  void discard(int) override;
+  CdcPoll poll(int,bool) override;
+  CdcTransfer read(int,std::span<std::uint8_t>) override;
+  CdcTransfer write(int,std::span<const std::uint8_t>) override;
+  int close(int) noexcept override;
+private:
+  struct Impl;std::unique_ptr<Impl> impl_;
+};
+using NativeCdcSystem=WindowsCdcSystem;
+#else
+using NativeCdcSystem=PosixCdcSystem;
+#endif
 
 enum class CdcState { Closed, Resetting, Ready, Failed };
 class UsbCdcStream final : public wtp::ByteStream {

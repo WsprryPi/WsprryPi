@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <iostream>
 #include <regex>
+#include <stdexcept>
 
 #if defined(__has_include)
 #  if __has_include(<systemd/sd-journal.h>)
@@ -486,11 +487,16 @@ std::string LCBLog::getStamp()
 
     // Convert to UTC broken-down time
     std::tm tm{};
+#ifdef _WIN32
+    if (gmtime_s(&tm, &now_time_t) != 0)
+        throw std::runtime_error("UTC log timestamp unavailable");
+#else
     gmtime_r(&now_time_t, &tm);
+#endif
 
     // Format date and time, then append milliseconds and UTC label
     std::ostringstream oss;
-    oss << std::put_time(&tm, "%F %T");
+    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
     oss << '.' << std::setfill('0') << std::setw(3) << now_ms.count() << " UTC";
 
     return oss.str();
