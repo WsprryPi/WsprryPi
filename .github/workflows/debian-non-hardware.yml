@@ -132,13 +132,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Select the pinned native Python runtime
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.15.2'
       - name: Select OpenSSL 4 development and fixture tools
         run: |
-          brew install openssl@4 sqlite python@3.15
+          brew install openssl@4 sqlite
           macos_openssl_prefix=$(brew --prefix openssl@4)
           macos_sqlite_prefix=$(brew --prefix sqlite)
           echo "${macos_openssl_prefix}/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix python@3.15)/libexec/bin" >> "$GITHUB_PATH"
           echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig:${macos_sqlite_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
           "${macos_openssl_prefix}/bin/openssl" version
 
