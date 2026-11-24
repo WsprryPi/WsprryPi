@@ -132,23 +132,55 @@ def run(fixture, helper, fault_phase=None):
             status = response.status
             connection.close()
             return status, fields, data
+        def upload_cli(file):
+            def inventory():
+                status, _, data = request('GET', '/api/recovery/jobs')
+                assert status == 200, (status, data)
+                return {job['job_id'] for job in json.loads(data)['jobs']}
+            before = inventory()
+            uploaded = cli(['upload', '--file', str(file)])
+            if uploaded.returncode == 0:
+                return uploaded
+            # Archive retention explicitly refuses admission before effects.
+            # Prove that refusal and no new job before a fresh operator attempt;
+            # never replay an upload with an admitted or uncertain outcome.
+            assert len(before) >= 4 and not uploaded.stdout, uploaded.stderr
+            assert json.loads(uploaded.stderr.splitlines()[0]) == {'error': 'busy', 'ok': False}, uploaded.stderr
+            deadline = time.monotonic() + 5
+            while True:
+                after = inventory()
+                assert after <= before, 'Refused upload must not create a job'
+                if len(after) < 4:
+                    break
+                assert time.monotonic() < deadline, 'Archive retention did not finish'
+                time.sleep(.05)
+            uploaded = cli(['upload', '--file', str(file)])
+            assert uploaded.returncode == 0, uploaded.stderr
+            return uploaded
+
+        def wait_services():
+            # A ready backend does not imply that the independent maintenance
+            # broker has started. Probe both through read-only production routes
+            # before issuing either session mutation; never replay a mutation.
+            deadline = time.monotonic() + 25
+            while True:
+                assert all(item.poll() is None for item in (backend, maintenance, web)), [path.read_text() for path in root.glob('*.log')]
+                try:
+                    status, _, _ = request('GET', '/version')
+                    if status == 200 and request('GET', '/api/recovery/jobs', admitted=False)[0] == 403:
+                        return
+                except OSError:
+                    pass
+                assert time.monotonic() < deadline, [path.read_text() for path in root.glob('*.log')]
+                time.sleep(.05)
+
         try:
             backend = start('backend', ['--state-directory', str(state), '--runtime-directory', str(runtime), '--backend', 'simulated',
                                       '--socket-loopback-only', '--web-port', str(ports[0]), '--socket-port', str(ports[1]),
                                       '--socket-loopback-family', 'ipv4'] + (['--controller-only'] if controller else []))
             maintenance = start('maintenance', maintenance_arguments + (['--fixture-fault-phase', fault_phase] if fault_phase and fault_phase != '--browser' else []) + ['--maintenance-worker', '--role', role])
             web = start('web', ['--web-service', '--runtime-directory', str(runtime), '--listener-cache', str(listener_cache)])
-            deadline = time.monotonic() + 25
-            while True:
-                assert all(item.poll() is None for item in (backend, maintenance, web)), [path.read_text() for path in root.glob('*.log')]
-                try:
-                    status, _, _ = request('GET', '/version')
-                    if status == 200 and (maintenance_runtime / 'http.sock').exists():
-                        break
-                except OSError:
-                    pass
-                assert time.monotonic() < deadline, [path.read_text() for path in root.glob('*.log')]
-                time.sleep(.05)
+            wait_services()
             if fault_phase == '--browser':
                 subprocess.run(['node', str(Path(__file__).resolve().parents[2] / 'WsprryPi-UI/tests/recovery_actual_browser_test.js'),
                                 str(ports[0]), str(root), role], env=environment, check=True, timeout=180)
@@ -237,17 +269,10 @@ def run(fixture, helper, fault_phase=None):
                 maintenance = start('destination-maintenance', ['--maintenance-worker', '--role', role])
                 web = start('destination-web', ['--web-service', '--runtime-directory', str(runtime), '--listener-cache', str(listener_cache)])
                 cookie, csrf, recovery_cookie, recovery_csrf = '', '', '', ''
-                deadline = time.monotonic() + 25
-                while True:
-                    try:
-                        status, fields, data = request('POST', '/api/control/v1/host/management-session',
-                                                      {'contract': 'Wsprry-Control/1', 'schema': 'controller-browser-session'})
-                        if status == 200:
-                            break
-                    except OSError:
-                        pass
-                    assert time.monotonic() < deadline
-                    time.sleep(.05)
+                wait_services()
+                status, fields, data = request('POST', '/api/control/v1/host/management-session',
+                                              {'contract': 'Wsprry-Control/1', 'schema': 'controller-browser-session'})
+                assert status == 200, (status, data)
                 cookie, csrf = fields['Set-Cookie'].split(';')[0], fields['X-WsprryPi-CSRF']
                 status, fields, data = request('POST', '/api/recovery/session', {})
                 assert status == 200, (status, data)
@@ -255,7 +280,7 @@ def run(fixture, helper, fault_phase=None):
             # Validation is a separate explicit action. Wrong credentials and
             # a subsequent valid preview must leave the active generation alone.
             before = (state / 'authority.json').read_bytes()
-            uploaded = cli(['upload', '--file', str(saved_backup)])
+            uploaded = upload_cli(saved_backup)
             assert uploaded.returncode == 0, uploaded.stderr
             restore = json.loads(uploaded.stdout)
             path = '/api/recovery/jobs/' + restore['job_id']
@@ -425,7 +450,7 @@ def run(fixture, helper, fault_phase=None):
                 second_file = root / 'restored-backup.age'
                 copied = cli(['download', '--job-id', second['job_id'], '--output', str(second_file)])
                 assert copied.returncode == 0, copied.stderr
-                uploaded = cli(['upload', '--file', str(second_file)])
+                uploaded = upload_cli(second_file)
                 assert uploaded.returncode == 0, uploaded.stderr
                 again = json.loads(uploaded.stdout)
                 path = '/api/recovery/jobs/' + again['job_id']
@@ -441,7 +466,7 @@ def run(fixture, helper, fault_phase=None):
                 if history:
                     for generation in (3, 4):
                         if generation == 4:
-                            uploaded = cli(['upload', '--file', str(second_file)])
+                            uploaded = upload_cli(second_file)
                             assert uploaded.returncode == 0, uploaded.stderr
                             again = json.loads(uploaded.stdout)
                             path = '/api/recovery/jobs/' + again['job_id']

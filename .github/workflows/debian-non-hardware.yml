@@ -7,6 +7,11 @@ on:
         description: Run native macOS runtime jobs only (other jobs are skipped)
         type: boolean
         default: false
+      macos_runtime_profiles:
+        description: Native macOS profiles for a runtime-only dispatch
+        type: choice
+        default: all
+        options: [all, arm64, macos-26, macos-26-intel, xcode-27]
       pico_ref:
         description: Pico source ref (defaults to the commit in the vendored contract provenance)
         type: string
@@ -127,7 +132,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-26, macos-26-intel, xcode-27]
+        runner: ${{ fromJSON('{"all":["macos-26","macos-26-intel","xcode-27"],"arm64":["macos-26","xcode-27"],"macos-26":["macos-26"],"macos-26-intel":["macos-26-intel"],"xcode-27":["xcode-27"]}')[(inputs.macos_runtime_only && inputs.macos_runtime_profiles) || 'all'] }}
     runs-on: ${{ matrix.runner }}
     # Cold controller, native recovery, and both actual software carriers run
     # on each architecture; retain their source checks and final runtime cases.

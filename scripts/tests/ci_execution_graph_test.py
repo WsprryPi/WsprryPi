@@ -233,6 +233,20 @@ class SourceIdentityTests(unittest.TestCase):
         selection = triggers['workflow_dispatch']['inputs']['macos_runtime_only']
         self.assertEqual(selection['type'], 'boolean')
         self.assertIs(selection['default'], False)
+        profiles = triggers['workflow_dispatch']['inputs']['macos_runtime_profiles']
+        self.assertEqual(profiles['type'], 'choice')
+        self.assertEqual(profiles['default'], 'all')
+        expression = workflow['jobs']['macos-simulated-profile']['strategy']['matrix']['runner']
+        pattern = r"\$\{\{ fromJSON\('(.+)'\)\[\(inputs\.macos_runtime_only && inputs\.macos_runtime_profiles\) \|\| 'all'\] \}\}"
+        match = re.fullmatch(pattern, expression)
+        self.assertIsNotNone(match, 'full dispatch must ignore partial profile selection')
+        mapping = json.loads(match[1])
+        self.assertEqual(set(profiles['options']), set(mapping))
+        self.assertEqual(mapping['all'], ['macos-26', 'macos-26-intel', 'xcode-27'])
+        self.assertEqual(mapping['arm64'], ['macos-26', 'xcode-27'])
+        for runner in mapping['all']:
+            self.assertEqual(mapping[runner], [runner])
+        self.assertIsNone(mapping.get('self-hosted'))
         jobs = workflow['jobs']
         self.assertNotIn('if', jobs['change_scope'])
         self.assertNotIn('inputs.macos_runtime_only', jobs['macos-simulated-profile']['if'])
@@ -248,7 +262,6 @@ class SourceIdentityTests(unittest.TestCase):
             'wtp-network-loopback', 'wtp-usb-management-pair', 'strict-i2c-profile',
             'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components'})
         self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
-        self.assertEqual(jobs['macos-simulated-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
         self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
         for profile in ('macos-simulated-profile', 'macos-si5351-profile'):
             self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], "${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}")
