@@ -341,6 +341,45 @@ void external_edits_and_versions() {
     edit(temporary, "CREATE TABLE unexpected(value TEXT)");
     refuses(Code::Unavailable, [&] { SqliteStateStore store(temporary.root(), identity, StateRole::Pi, StateOpen::Existing); });
 }
+void live_read_only_observers() {
+    Temporary temporary;
+    SqliteStateStore store(temporary.root(), identity, StateRole::Pi, StateOpen::CreateNew);
+    store.commit("0", {{StateRecord::Configuration, "original"}});
+    const auto saved = store.snapshot();
+    for (unsigned repeat = 0; repeat < 3; ++repeat) {
+        const auto child = testing::launch_software_child(executable, {"--read-only-observe", temporary.database()});
+        assert(testing::wait_software_child(child) == 0);
+        assert(store.snapshot() == saved && !store.held());
+    }
+    assert(store.commit("1", {{StateRecord::Configuration, "later"}}) == "2");
+}
+void live_sidecar_refusals() {
+#ifdef __APPLE__
+    for (const auto *suffix : {"-wal", "-shm"}) {
+        Temporary temporary;
+        SqliteStateStore store(temporary.root(), identity, StateRole::Pi, StateOpen::CreateNew);
+        store.commit("0", {{StateRecord::Configuration, "original"}});
+        const auto sidecar = temporary.database() + suffix;
+        assert(std::filesystem::is_regular_file(sidecar));
+        set_software_other_read_acl(sidecar.c_str(), true);
+        refuses(Code::Unavailable, [&] { (void)store.snapshot(); });
+        assert(store.held());
+        set_software_other_read_acl(sidecar.c_str(), false);
+        refuses(Code::Unavailable, [&] { (void)store.snapshot(); });
+    }
+    for (const auto *suffix : {"-wal", "-shm"}) {
+        Temporary temporary;
+        SqliteStateStore store(temporary.root(), identity, StateRole::Pi, StateOpen::CreateNew);
+        store.commit("0", {{StateRecord::Configuration, "original"}});
+        const auto sidecar = temporary.database() + suffix;
+        std::filesystem::rename(sidecar, sidecar + ".displaced");
+        { std::ofstream replacement(sidecar, std::ios::binary); assert(replacement.good()); }
+        assert(!chmod(sidecar.c_str(), 0600));
+        refuses(Code::Unavailable, [&] { (void)store.snapshot(); });
+        assert(store.held());
+    }
+#endif
+}
 void private_snapshot() {
     Temporary source, target, standalone;
     StateSnapshot saved;
@@ -369,6 +408,14 @@ void private_snapshot() {
 }
 }
 int main(int argc,char **argv) {
+    if(argc==3&&std::string(argv[1])=="--read-only-observe") {
+        sqlite3 *database{};
+        assert(sqlite3_open_v2(argv[2],&database,SQLITE_OPEN_READONLY|SQLITE_OPEN_NOFOLLOW,nullptr)==SQLITE_OK);
+        assert(sqlite3_db_readonly(database,"main")==1);
+        assert(sqlite3_exec(database,"SELECT kind,payload FROM records ORDER BY kind",nullptr,nullptr,nullptr)==SQLITE_OK);
+        assert(sqlite3_close(database)==SQLITE_OK);
+        return 0;
+    }
     if(argc==4&&std::string(argv[1])=="--crash-write") {
         const std::string selected=argv[3];
         if(selected!="records"&&selected!="committed")return 2;
@@ -381,6 +428,8 @@ int main(int argc,char **argv) {
     if(argc!=1)return 2;
     executable=argv[0];
     ordinary_transactions();
+    live_read_only_observers();
+    live_sidecar_refusals();
     role_and_path_refusals();
     unsafe_sidecars_and_live_permissions();
     extended_acl_refusals();

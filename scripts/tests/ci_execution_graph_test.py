@@ -235,7 +235,7 @@ class SourceIdentityTests(unittest.TestCase):
         self.assertEqual(jobs['macos-simulated-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
         self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
         for profile in ('macos-simulated-profile', 'macos-si5351-profile'):
-            self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], '26.0')
+            self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], "${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}")
         resolver = jobs['change_scope']
         self.assertEqual(reference(resolver['outputs']['pico_sha']), ('steps', 'pico-output', 'outputs', 'pico_sha'))
         selected = [s for s in resolver['steps'] if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico']

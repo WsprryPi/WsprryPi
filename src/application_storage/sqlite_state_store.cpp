@@ -11,8 +11,6 @@
 #error SQLite 3.31 or later is required for private state storage
 #endif
 #include <array>
-#include <cstdio>
-#include <source_location>
 #include <atomic>
 #include <charconv>
 #include <cerrno>
@@ -41,8 +39,8 @@ constexpr std::string_view records_schema =
 constexpr std::string_view versions_schema =
     "CREATE TABLE record_versions (kind TEXT PRIMARY KEY NOT NULL, revision TEXT NOT NULL) WITHOUT ROWID";
 
-[[noreturn]] void fail(Code code = Code::Unavailable,std::source_location location=std::source_location::current()) { std::fprintf(stderr,"CI_SQL_FAIL line=%u code=%d errno=%d\n",location.line(),static_cast<int>(code),errno);throw StateStorageError(code); }
-void require(bool value, Code code = Code::Unavailable,std::source_location location=std::source_location::current()) { if (!value) {std::fprintf(stderr,"CI_SQL_REQUIRE line=%u code=%d errno=%d\n",location.line(),static_cast<int>(code),errno);fail(code);} }
+[[noreturn]] void fail(Code code = Code::Unavailable) { throw StateStorageError(code); }
+void require(bool value, Code code = Code::Unavailable) { if (!value) fail(code); }
 const char *message(Code code) {
     switch (code) {
     case Code::InvalidInput: return "state_invalid_input";
@@ -153,6 +151,11 @@ struct SqliteStateStore::Impl {
     std::unique_ptr<WindowsSqliteFiles> native_files;
 #else
     int directory_fd{-1}, file_fd{-1};
+#ifdef __APPLE__
+    // Closing any descriptor for a WAL sidecar releases this process's POSIX
+    // SQLite locks. Keep ACL-inspection descriptors until SQLite is closed.
+    std::array<int, 3> sidecar_fds{{-1, -1, -1}};
+#endif
 #endif
     std::string directory, path, identity, role;
     StateRole selected_role;
@@ -256,6 +259,12 @@ struct SqliteStateStore::Impl {
 #ifdef _WIN32
         native_files.reset();
 #else
+#ifdef __APPLE__
+        for (auto &descriptor : sidecar_fds) {
+            if (descriptor >= 0) ::close(descriptor);
+            descriptor = -1;
+        }
+#endif
         if (file_fd >= 0) ::close(file_fd);
         if (directory_fd >= 0) ::close(directory_fd);
         file_fd = directory_fd = -1;
@@ -291,10 +300,38 @@ struct SqliteStateStore::Impl {
         require(!lstat(path.c_str(), &named) && private_file(named, 32 * 1048576) &&
             !fstat(file_fd, &opened) && same_file(named, opened));
         require(native_private_acl(directory_fd,root.st_uid)&&native_private_acl(file_fd,named.st_uid));
+#ifdef __APPLE__
+        std::size_t sidecar_index = 0;
+#endif
         for (const auto *suffix : {"-wal", "-shm", "-journal"}) {
+            const auto sidecar = path + suffix;
             struct stat info{};
-            if (!lstat((path + suffix).c_str(), &info)) require(private_file(info, 64 * 1048576)&&native_private_acl_path((path+suffix).c_str(),info.st_uid));
-            else require(errno == ENOENT);
+            if (!lstat(sidecar.c_str(), &info)) {
+                require(private_file(info, 64 * 1048576));
+#ifdef __APPLE__
+                if (!db) {
+                    // Before SQLite opens, no SQLite locks can be released,
+                    // and its crash recovery may still replace a sidecar.
+                    require(native_private_acl_path(sidecar.c_str(), info.st_uid));
+                } else {
+                    auto &descriptor = sidecar_fds[sidecar_index];
+                    if (descriptor < 0) descriptor = open(sidecar.c_str(), O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+                    struct stat secured{};
+                    require(descriptor >= 0 && !fstat(descriptor, &secured) && same_file(info, secured) &&
+                        private_file(secured, 64 * 1048576) && native_private_acl(descriptor, secured.st_uid));
+                }
+#else
+                require(native_private_acl_path(sidecar.c_str(), info.st_uid));
+#endif
+            } else {
+                require(errno == ENOENT);
+#ifdef __APPLE__
+                require(sidecar_fds[sidecar_index] < 0);
+#endif
+            }
+#ifdef __APPLE__
+            ++sidecar_index;
+#endif
         }
 #endif
     }

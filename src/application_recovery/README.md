@@ -74,6 +74,12 @@ Completed restore history retains the original migration generation, the selecte
 Small backend control queries retain a 12-second child deadline. Stopped-backend candidate construction and sealing allow up to 30 minutes for bounded archive I/O on the destination card; they do not inherit that short query deadline. A timeout preserves the held job and its recovery evidence for explicit resume. These are lifecycle limits, not a storage-speed qualification or a promise that every supported archive size finishes on a particular card.
 
 
+## Native macOS storage boundary
+
+The SQLite owner retains ACL-inspection descriptors for its WAL, shared-memory, and rollback-journal files until SQLite has closed. SQLite owns the file-lock lifetime; closing another descriptor for the same file releases process-wide POSIX locks, as described in the [SQLite locking guidance](https://www.sqlite.org/howtocorrupt.html#posix_advisory_locks_canceled_by_a_separate_thread_doing_close). Checks before opening SQLite permit its normal crash recovery, and live checks verify the retained descriptor against the named file, private mode, owner, link count, and extended ACL. Missing or replaced live sidecars close admission.
+
+Read-only SQL observers leave the healthy owner available. External SQL commits, widened ACLs, unsafe modes, and changed file identities retain the existing storage hold. The encrypted archive, database schema, identity, and authority rules remain the shared recovery contracts. The [platform matrix](../../docs/development/issue-475-platform-matrix.md) records native qualification separately from installation, services, and physical USB.
+
 ## Native Windows adapter boundary
 
 The Windows adapters under issue #475 are implementation candidates, not qualified recovery support. Native program paths use the OS ProgramFiles known folder, private owner roots use ProgramData and fixed service SIDs, and typed fixtures use their actual process SID. The private child launcher retains the caller's account, starts suspended, assigns a kill-on-close job before execution, inherits only an explicit handle list, and supplies a private working directory and bounded environment. A worker's successful exit cannot conceal live owned descendants. Private child pipes use protected local endpoints, native overlapped deadlines, and cancellation/drain before buffers or handles are retired. These primitives do not grant the maintenance owner access to backend files or switch it into the backend account.

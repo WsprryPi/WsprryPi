@@ -145,11 +145,7 @@ def main(fixture, recovery_helper=None):
                 capture_busy_check = None
                 if recovery_helper:
                     from recovery_capture_backend_checks import exercise
-                    try:
-                        capture_busy_check = exercise(Connection, runtime, ledger, state, identity, backend_boot, recovery_helper)
-                    except Exception:
-                        print((root / "backend.log").read_text(), flush=True)
-                        raise
+                    capture_busy_check = exercise(Connection, runtime, ledger, state, identity, backend_boot, recovery_helper)
                 saved_ports = json.loads(original_saved)["configuration"]["Operation"]
                 assert view["settings"]["Operation.Web Port"]["saved"] == saved_ports["Web Port"]
                 assert view["settings"]["Operation.Socket Port"]["saved"] == saved_ports["Socket Port"]

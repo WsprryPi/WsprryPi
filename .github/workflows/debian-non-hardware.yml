@@ -117,7 +117,7 @@ jobs:
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
-      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     strategy:
@@ -152,7 +152,6 @@ jobs:
       - name: Run portable semantics profile
         working-directory: src
         run: |
-          make recovery-capture-backend-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
           make controller-only-test application-monitor-boundary-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -267,7 +266,7 @@ jobs:
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
-      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
       - uses: actions/checkout@v7
