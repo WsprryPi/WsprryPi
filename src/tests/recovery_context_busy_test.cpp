@@ -26,9 +26,12 @@ int main(){try{
     const auto before=database->snapshot();
     std::promise<void> entered,release;auto ready=entered.get_future(),finish=release.get_future();
     std::exception_ptr failure;
-    std::jthread worker([&]{try{owner->with_backup_files([&](const auto &){entered.set_value();finish.wait();});}
+    std::thread worker([&]{try{owner->with_backup_files([&](const auto &){entered.set_value();finish.wait();});}
         catch(...){failure=std::current_exception();entered.set_value();}});
-    struct Release {std::promise<void> &promise;~Release(){promise.set_value();}} wake{release};
+    struct Release {
+        std::promise<void> &promise;std::thread &worker;
+        ~Release(){promise.set_value();if(worker.joinable())worker.join();}
+    } wake{release,worker};
     check(ready.wait_for(std::chrono::seconds(5))==std::future_status::ready);
     if(failure)std::rethrow_exception(failure);
     bool busy=false;
