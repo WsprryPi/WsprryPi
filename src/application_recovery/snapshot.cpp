@@ -150,7 +150,9 @@ Json capture_application_recovery_snapshot(const std::string &requested){
     const auto database=application_database();require(bool(database)&&!database->held());
     if(controller_only_mode())require(controller_only_status().value("controller_ready",false));
     else{
-        require(!pi_managed_host_held());
+        const bool held=pi_managed_host_held();
+        if(held)std::fprintf(stderr,"CI_MANAGED_STATE value=%d\n",static_cast<int>(pi_managed_host_state()));
+        require(!held);
         // No long snapshot barrier may delay an armed local occurrence or an
         // execution. Capture is observational and never stops output itself.
         if((config.transmit&&!local_restore_output_held())||native_occurrence_active()||current_test_tone_status().owned||!transmitter_output_inactive_confirmed())
