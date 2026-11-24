@@ -41,7 +41,7 @@ constexpr std::string_view records_schema =
 constexpr std::string_view versions_schema =
     "CREATE TABLE record_versions (kind TEXT PRIMARY KEY NOT NULL, revision TEXT NOT NULL) WITHOUT ROWID";
 
-[[noreturn]] void fail(Code code = Code::Unavailable) { throw StateStorageError(code); }
+[[noreturn]] void fail(Code code = Code::Unavailable,std::source_location location=std::source_location::current()) { std::fprintf(stderr,"CI_SQL_FAIL line=%u code=%d errno=%d\n",location.line(),static_cast<int>(code),errno);throw StateStorageError(code); }
 void require(bool value, Code code = Code::Unavailable,std::source_location location=std::source_location::current()) { if (!value) {std::fprintf(stderr,"CI_SQL_REQUIRE line=%u code=%d errno=%d\n",location.line(),static_cast<int>(code),errno);fail(code);} }
 const char *message(Code code) {
     switch (code) {
