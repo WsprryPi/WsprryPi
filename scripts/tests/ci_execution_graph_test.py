@@ -256,6 +256,39 @@ class SourceIdentityTests(unittest.TestCase):
                 self.assertIn('!cancelled()', job['if'], name)
                 self.assertIn("needs.change_scope.outputs.run_full_ci != 'false'", job['if'], name)
 
+    def test_macos_controller_scope_preserves_full_semantics_and_runtime_gates(self):
+        workflow = yaml.safe_load(WORKFLOW.read_text())
+        triggers = workflow.get('on', workflow.get(True))
+        selection = triggers['workflow_dispatch']['inputs']['macos_controller_only']
+        self.assertEqual(selection['type'], 'boolean')
+        self.assertIs(selection['default'], False)
+        job = workflow['jobs']['macos-simulated-profile']
+        steps = {step.get('name'): step for step in job['steps']}
+        scope = 'inputs.macos_runtime_only && inputs.macos_controller_only'
+        portable = steps['Run portable semantics profile']
+        self.assertEqual(portable['if'], '${{ !(' + scope + ') }}')
+        self.assertIn(['make', 'semantics-test-portable', 'SUDO='],
+                      [shlex.split(line) for line in portable['run'].splitlines()])
+        state = steps['Run controller state and native adapter contracts']
+        self.assertEqual(state['if'], '${{ ' + scope + ' }}')
+        goals = make_goals({'steps': [state]})
+        for target in ('sqlite-state-store-test', 'state-migration-test', 'controller-identity-store-test',
+                       'recovery-capture-backend-test', 'usb-cdc-native-test', 'native-socket-test',
+                       'local-control-transport-test', 'database-controller-runtime-test'):
+            self.assertEqual(goals[target], 1, target)
+        for name in ('Run controller and target management contracts',
+                     'Build and audit the isolated controller profile',
+                     'Run bounded recovery role, relocation, and restart matrix',
+                     'Exercise actual native Mac controller and Pico network peers',
+                     'Exercise native Mac clients through production Pico USB handlers',
+                     'Exercise native controller recovery owners and restart'):
+            self.assertNotIn('if', steps[name], name)
+        # Portable semantics already runs both local-transmitter recurrence tests.
+        # Do not rerun their precision-dependent launches in a later step.
+        self.assertNotIn('native-recurrence-test', make_goals(job))
+        source = (ROOT / 'src/Makefile').read_text()
+        self.assertIn('-j1 native-recurrence-test native-recurrence-main-test', source)
+
     def test_workflow_uses_one_immutable_owner_and_verifies_both_consumers(self):
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',

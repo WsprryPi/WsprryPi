@@ -132,6 +132,8 @@ mistake Linux sysfs/termios for native Windows/macOS support or add a kernel dri
 Gate: actual controller management, pairing, and recovery through production peers,
 two-target isolation, private state, and accurate unavailable-carrier reporting.
 
+Native host qualification in slice 2 covers the no-output controller profile: private state and identity, management/pairing, both production software carriers, and encrypted recovery. It does not promise local-transmitter execution on macOS or Windows. Retain ordinary Pi regression coverage on the Linux profile and keep the full/portable semantics entry points unchanged. An explicitly selected controller-host subset is not a pass of ordinary-transmitter semantics; record failed timing checks separately without weakening launch deadlines or accepting output where admission refused.
+
 ### Slice 3 — controller browser startup
 
 Use Impeccable before design/implementation and read existing PRODUCT/DESIGN

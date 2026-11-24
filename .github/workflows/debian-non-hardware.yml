@@ -7,6 +7,10 @@ on:
         description: Run native macOS runtime jobs only (other jobs are skipped)
         type: boolean
         default: false
+      macos_controller_only:
+        description: Qualify controller host contracts without local-transmitter semantics (runtime-only)
+        type: boolean
+        default: false
       macos_runtime_profiles:
         description: Native macOS profiles for a runtime-only dispatch
         type: choice
@@ -26,7 +30,7 @@ permissions:
 
 concurrency:
   # A documentation-only successor must not cancel an in-flight code check.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}-${{ inputs.macos_runtime_only }}-${{ inputs.macos_runtime_profiles }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}-${{ inputs.macos_runtime_only }}-${{ inputs.macos_runtime_profiles }}-${{ inputs.macos_controller_only }}
   cancel-in-progress: true
 
 jobs:
@@ -123,6 +127,7 @@ jobs:
           ctest --test-dir "${{ runner.temp }}/wsprrypi-native-windows" -C Debug --output-on-failure
 
   macos-simulated-profile:
+    name: ${{ inputs.macos_runtime_only && inputs.macos_controller_only && 'Controller host contracts' || 'macos-simulated-profile' }} (${{ matrix.runner }})
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
@@ -159,10 +164,23 @@ jobs:
         run: make usb-logging-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
       - name: Run portable semantics profile
+        if: ${{ !(inputs.macos_runtime_only && inputs.macos_controller_only) }}
         working-directory: src
         run: |
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
+
+      - name: Run controller state and native adapter contracts
+        if: ${{ inputs.macos_runtime_only && inputs.macos_controller_only }}
+        working-directory: src
+        run: |
+          make native-clock-test native-socket-test native-controller-owners-test controller-identity-store-test usb-cdc-native-test usb-cdc-descriptors-test usb-cdc-windows-metadata-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make companion-files-test sqlite-state-store-test persistent-configuration-test controller-settings-test state-migration-test sqlite-catalog-test sqlite-state-entry-test application-companion-capture-test recovery-capture-backend-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make local-control-transport-test local-event-feed-test browser-http-resource-test web-bootstrap-test database-controller-runtime-test controller-retirement-storage-binding-test diagnostic-export-test recovery-context-busy-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Run controller and target management contracts
+        working-directory: src
+        run: |
           make controller-only-test application-monitor-boundary-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-target-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-journal-test pico-management-history-test pico-target-controller-test controller-contract-test pico-usb-settings-test pi-config-persistence-coordinator-test pi-management-anchor-test pi-management-journal-test pi-managed-records-test pi-managed-store-test pi-management-service-test pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test pi-private-network-persistence-test pi-managed-wtp-main-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -187,7 +205,7 @@ jobs:
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test wtp-usb-management-test native-recurrence-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-protocol-test wtp-usb-test wtp-usb-management-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-production-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
