@@ -66,7 +66,7 @@ docker run --rm \
   '
 ```
 
-These focused commands are an initial check. For complete acceptance, run every `non-hardware-validation` step from the checked-in workflow in the copied checkout, including its syscall traces and final hardware-access audit. Supply the exact pinned RP1 reference and explicitly selected Pico/Mbed TLS checkouts for the separate pair suites. Preserve logs outside a disposable container before removing it. Use no `--privileged` or device passthrough.
+These focused commands are an initial check. For complete acceptance, run the `linux-native-contracts` and `non-hardware-validation` jobs from the checked-in workflow in the copied checkout, including the syscall traces and final hardware-access audit in `non-hardware-validation`. Supply the exact pinned RP1 reference and explicitly selected Pico/Mbed TLS checkouts for the separate pair suites. Preserve logs outside a disposable container before removing it. Use no `--privileged` or device passthrough.
 
 For the Ubuntu compiler matrix, use `FROM ubuntu:24.04` in a separate image, retain the common build packages above, and omit Chromium, age, and `device-tree-compiler` when running only compiler/profile checks. Build and run with `--platform linux/amd64` when x86-64 is required; record emulation on an ARM host. In the isolated copy, use the exact `ubuntu-gcc13-release` workflow recipe, including:
 
