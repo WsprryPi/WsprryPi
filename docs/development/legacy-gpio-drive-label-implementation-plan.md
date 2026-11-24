@@ -20,7 +20,7 @@ These are nominal drive-current settings, not frequencies, calibrated RF power, 
 
 ## Pico producer handoff — 2026-11-24
 
-Pin WsprryPico commit `8df9ea0565d819083dd9d884aced954d45ea54f9` for both Pi companion suites. It was the verified head of the open draft Pico PR targeting `devel` from `codex/issue-478-pico-drive-current` on 2026-11-24. [Pico PR #30](https://github.com/WsprryPi/WsprryPico/pull/30)
+Both Pi companion suites select the frozen, clean WsprryPico commit [`8df9ea0565d819083dd9d884aced954d45ea54f9`](https://github.com/WsprryPi/WsprryPico/commit/8df9ea0565d819083dd9d884aced954d45ea54f9). It was the verified head of the open draft Pico PR targeting `devel` from `codex/issue-478-pico-drive-current` on 2026-11-24. [Pico PR #30](https://github.com/WsprryPi/WsprryPico/pull/30)
 
 The Pico handoff consolidates gray-line research into the standalone guide, removes the superseded plan, and updates qualification guidance for native execution following the retirement of external WTP jobs and for the current Si5351 profile. It retains prior test evidence, qualification limits, and recovery instructions. The Pico handoff reports four local prompts retired, a clean working tree, and passing documentation checks and six RF-calculation tests. Hardware qualification remains at the previously recorded scope. [Gray-line research](https://github.com/WsprryPi/WsprryPico/blob/8df9ea0565d819083dd9d884aced954d45ea54f9/engineering/development/standalone.md#gray-line-research-and-measurement-limits) · [Native RF qualification](https://github.com/WsprryPi/WsprryPico/blob/8df9ea0565d819083dd9d884aced954d45ea54f9/engineering/development/pico-rf-qualification.md)
 
@@ -101,19 +101,19 @@ Exact local commands/results, both tested source revisions and companion working
 
 ### Verified baseline and open pair checks
 
-At the 2026-11-24 recheck, WsprryPi `devel` was `41f22cf47393b0d8417ce1ac33e02617ad160074`. The intervening Pi commits since the original review at `99d5f6c4` touched only these planning docs. The vendored Control/1 provenance still records clean Pico `devel` commit `7c09ff0fb15bb421f9010fb6faa6868f61b7a1a4`, which was still the live Pico `devel` head. The Pi vendor schema and that Pico `devel` schema have the same SHA-256. The Pico PR schema differs from the vendored copy. It is byte-identical at the pinned head, `aed2462f`, the prior pin `0d8f30b6`, the earlier reviewed PR head `064319a0`, and implementation commit `b0edc0dd`.
+At the 2026-11-24 recheck, WsprryPi `devel` was `e7d44eaae25d763af97fde4776382443098d3e28`. The intervening Pi commits since the original review at `99d5f6c4` touched only these planning docs. The Pi base commit recorded clean Pico `devel` commit `7c09ff0fb15bb421f9010fb6faa6868f61b7a1a4`, which was still the live Pico `devel` head. The Pi base vendor schema and that Pico `devel` schema had the same SHA-256. The frozen Pico PR schema differs from the Pi base vendor copy. It is byte-identical at the pinned head, `aed2462f`, the prior pin `0d8f30b6`, the earlier reviewed PR head `064319a0`, and implementation commit `b0edc0dd`.
 
 | Control/1 schema source | SHA-256 |
 | --- | --- |
-| Pi vendor copy and Pico `devel` | `09f561a31a46eceb961b9dd495f98091a4ff18e71707c532004a42956f5472e1` |
+| Pi base vendor copy and then-current Pico `devel` | `09f561a31a46eceb961b9dd495f98091a4ff18e71707c532004a42956f5472e1` |
 | Pinned Pico PR head, earlier reviewed head, and implementation commit | `5a5f47a7909b3dbc530bfcfda8ffdd8eb4ac824ff526eb0ea56d53d13aeee2f0` |
 
-No Pi companion PR or successful production pair run against the pinned Pico head was found. Both required suites remain pending for the companion pair. The recent green Pi macOS controller runs skipped both paired jobs. [Xcode 27 run](https://github.com/WsprryPi/WsprryPi/actions/runs/45441599007) · [macOS 26 Intel run](https://github.com/WsprryPi/WsprryPi/actions/runs/45441589588) · [Pinned-head Pico-only CI](https://github.com/WsprryPi/WsprryPico/actions/runs/45462062405)
+At the pre-implementation recheck, no Pi companion PR or successful production pair run against the pinned Pico head was found. The recent green Pi macOS controller runs skipped both paired jobs. [Xcode 27 run](https://github.com/WsprryPi/WsprryPi/actions/runs/45441599007) · [macOS 26 Intel run](https://github.com/WsprryPi/WsprryPi/actions/runs/45441589588) · [Pinned-head Pico-only CI](https://github.com/WsprryPi/WsprryPico/actions/runs/45462062405)
 
 Historical attempts used Pico `9ea181daf3cb38c531c96f3cf5bb697804af81d8` (the tested uncommitted candidate was subsequently committed and verified by CI) and Pi `06282dd8834c44c18320fc70aa8819977d496c60` plus its then-uncommitted state, retained in the evidence JSON with diff SHA-256 `24a59ad78270847af9d46bc0f8526eb3b1e39ebff60bf2048bc5714604ba0d8c`. That snapshot is not a claim that today's dirty tree is identical.
 
-- The explicit Pico source list in `src/tests/network/CMakeLists.txt` still omits Test Tone and ARM admission sources. The earlier build reported undefined Test Tone and `assess_arm` references.
-- The earlier production USB pair rejected capabilities as `invalid_remote_response`, status 502, `mutation_attempted=false`. Some settings/component checks pass; the complete USB suite does not.
+- The explicit Pico source list in `src/tests/network/CMakeLists.txt` omitted Test Tone and ARM admission sources in the historical attempt. The earlier build reported undefined Test Tone and `assess_arm` references.
+- The earlier production USB pair rejected capabilities as `invalid_remote_response`, status 502, `mutation_attempted=false`. Some settings and component checks passed in that attempt. The complete USB suite failed.
 - The runtime check needed retained SQLite headers/libraries supplied in an isolated container. Its retry then failed because that Python lacks `TarFile.extractall(filter=...)` required by the companion recovery-image builder. This is a test-environment dependency failure, not evidence of a Pico RF defect.
 
 ### Bounded Pi companion acceptance

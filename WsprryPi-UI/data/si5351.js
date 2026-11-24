@@ -68,7 +68,7 @@
         q.system_clock_hz === p.system_clock_hz && q.i2c_pair === p.i2c_pair && valid(b) &&
         b.reference_hz === p.reference_hz && b.reference_source === p.reference_source &&
         b.crystal_load_pf === p.crystal_load_pf && b.address === p.address &&
-        b.transmit_output === p.transmit_output && b.drive_ma === p.drive_ma &&
+        b.transmit_output === p.transmit_output && p.drive_ma.includes(b.drive_ma) &&
         b.rf_gate_gp === p.rf_gate_gp && (b.loopback_output === null ? p.allow_none :
           b.loopback_output === p.loopback_output && b.loopback_input_gp === p.loopback_input_gp) &&
         ['si5351','si5351-engineering'].includes(value.execution_engine) &&
@@ -101,7 +101,7 @@
   function profileDescription(profile) {
     if (profile?.qualified !== true) return '';
     const pair = pairs[profile.i2c_pair];
-    return `Qualified setup: QRP Labs Rev. 6 with a ${profile.reference_hz/1e6} MHz TCXO into XA; SDA GP${pair[0]} / SCL GP${pair[1]}; CLK${profile.transmit_output} at ${profile.drive_ma} mA. Loopback: None or CLK${profile.loopback_output} to GP${profile.loopback_input_gp}. Independent RF gate: None wired. Pico clock: ${profile.system_clock_hz/1e6} MHz.`;
+    return `Qualified setup: QRP Labs Rev. 6 with a ${profile.reference_hz/1e6} MHz TCXO into XA; SDA GP${pair[0]} / SCL GP${pair[1]}; CLK${profile.transmit_output} at ${profile.drive_ma.join('/')} mA. Loopback: None or CLK${profile.loopback_output} to GP${profile.loopback_input_gp}. Independent RF gate: None wired. Pico clock: ${profile.system_clock_hz/1e6} MHz.`;
   }
   function create(container, {changed = ()=>{}, bootstrap = false, compact = false} = {}) {
     const profile = root.WsprryControl?.descriptors?.si5351?.ordinary_profile;

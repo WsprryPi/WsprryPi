@@ -33,6 +33,8 @@ The current saved-network representation supports one connection. A Wi-Fi save i
 
 USB changes consume the shared revision. Every mutation invalidates editors; read authoritative state before another change. A lost reply may follow a committed save. The UI preserves the draft, never retries a mutation, and asks for review before a new explicit change after uncertain delivery.
 
+The current Pico capability document can include a Test Tone descriptor. The Pi validates its closed engine map, limits, and availability fields during management negotiation. Availability describes the Pico implementation. Native admission still depends on the Pico's current engine, configuration, clock, and output ownership. Direct GPIO uses SDK pad observations, while Si5351 uses current execution-epoch register evidence. The Pi gateway and Consumer-Radio client deny Test Tone Review, Start, Status (including query forwarding), and Stop.
+
 ## Wire and timing
 
 The third CDC control interface is 4 (CDC instance 2). Console remains interface 0, Logging interface 6, and interfaces 2/3 are Reserved and inert in application images. RFBench alone retains its non-WTP Commands exception. Management uses ASCII UMP1, a four-byte unsigned big-endian payload length, then strict JSON. Request limit is 32768 bytes and response limit 65536 bytes. One request, response, and acknowledgement transaction is live; identities, strictly increasing IDs, duplicate keys, nesting, lengths, and absolute deadlines are checked. The resource response carries original status, JSON body string and ETag. A matching ACK completes response delivery; only its transaction's deferred effects can then apply. No blind replay or transport fallback occurs.
