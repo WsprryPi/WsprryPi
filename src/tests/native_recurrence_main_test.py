@@ -142,6 +142,7 @@ def main():
             # writes can legitimately contend with the fail-closed launch guard;
             # an occurrence disabled before launch is not an execution promise.
             # Each autonomous attempt is a fresh future slot, never a replay.
+            repeat_minutes = 1
             for launch_attempt in range(9):
                 if progress.exists():
                     horizon = int(json.loads(progress.read_text())['record']['consumed_through_utc_ns']) / 1e9
@@ -149,10 +150,11 @@ def main():
                          max(12, horizon - time.time() + 3))
                 context, saved = read(base + 'context'), read(base + 'settings')
                 candidate = copy.deepcopy(saved['saved'])
-                local = time.localtime(time.time() + 5)
+                # Leave extra time to disable and observe draining on the first slot.
+                local = time.localtime(time.time() + (10 if launch_attempt == 0 else 5))
                 candidate['configuration']['Operation'].update({'Mode': 'QRSS', 'Transmit': True, 'Enable on Boot': 'Follow'})
                 candidate['configuration']['CW'].update({'Message': 'E', 'Base Frequency': 14097000, 'Dot Seconds': .02,
-                    'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': 1,
+                    'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': repeat_minutes,
                     'Fade Shape': 'none', 'Fade In Ms': 0, 'Fade Out Ms': 0, 'Fade Slice Ms': 5})
                 mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
                     'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
@@ -161,6 +163,9 @@ def main():
                 previous_plan = previous_trace['plan_id'] if previous_trace else None
                 action('enable', 'target-enable', True)
                 reserved = wait(lambda: progress.exists() and json.loads(progress.read_text())['record']['in_flight'], 'Durable accepted occurrence')
+                # Enable may cross the planned slot and reserve the next one.
+                slot_wait = max(0, int(reserved['last_start_ns']) / 1e9 - time.time())
+                assert slot_wait <= repeat_minutes * 60, reserved
                 if launch_attempt == 0:
                     status = read(base + 'status')
                     assert status['execution_owner'] == self_id and status['destination_id'] == self_id
@@ -185,7 +190,7 @@ def main():
                                 int(record['consumed_through_utc_ns']) >= int(reserved['last_start_ns']):
                             return {'trace': observed}
                         return False
-                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', 10)['trace']
+                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', slot_wait + 10)['trace']
                 action('disable', 'target-action')
                 if launch_attempt == 0:
                     assert read(base + 'status')['phase'] == 'draining'
@@ -195,7 +200,8 @@ def main():
                     # reconciles that work before the restart checks below.
                     consumed_before_stop = json.loads(progress.read_text())['record']['consumed_through_utc_ns']
                     action('stop', 'target-stop')
-                wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Accepted message drains', 10)
+                wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None,
+                     'Accepted message drains', slot_wait + 10 if launch_attempt == 0 else 10)
                 if launch_attempt == 0:
                     assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
                     assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == reserved['last_start_ns']
