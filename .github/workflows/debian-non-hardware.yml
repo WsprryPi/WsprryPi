@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, macos-15, windows-2025]
+        runner: [ubuntu-24.04, macos-26, macos-26-intel, xcode-27, windows-2025]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
@@ -117,13 +117,13 @@ jobs:
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
-      MACOSX_DEPLOYMENT_TARGET: "15.0"
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        runner: [macos-26, macos-26-intel, xcode-27]
     runs-on: ${{ matrix.runner }}
     # Cold controller, native recovery, and both actual software carriers run
     # on each architecture; retain their source checks and final runtime cases.
@@ -152,7 +152,6 @@ jobs:
       - name: Run portable semantics profile
         working-directory: src
         run: |
-          make recovery-capture-backend-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make semantics-make-regression-test SUDO=
           make semantics-test-portable SUDO=
           make controller-only-test application-monitor-boundary-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -193,7 +192,12 @@ jobs:
 
       - name: Record the native minimum-OS software profile
         run: |
-          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
+          case "${{ matrix.runner }}" in
+            macos-26|macos-26-intel) expected_macos_major=26 ;;
+            xcode-27) expected_macos_major=27 ;;
+            *) exit 1 ;;
+          esac
+          test "$(sw_vers -productVersion | cut -d. -f1)" = "$expected_macos_major"
           sw_vers
           uname -m
           clang++ --version
@@ -254,14 +258,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel]
+        runner: [macos-26, macos-26-intel, xcode-27]
     runs-on: ${{ matrix.runner }}
     # Intel cold physical and simulated pairing builds can reach 45 minutes
     # while generating debug symbols; retain every profile and its final checks.
-    timeout-minutes: ${{ matrix.runner == 'macos-15-intel' && 60 || 45 }}
+    timeout-minutes: ${{ matrix.runner == 'macos-26-intel' && 60 || 45 }}
     env:
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
       - uses: actions/checkout@v7

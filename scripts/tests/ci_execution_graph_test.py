@@ -231,8 +231,11 @@ class SourceIdentityTests(unittest.TestCase):
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',
             'wtp-network-loopback', 'wtp-usb-management-pair', 'strict-i2c-profile',
             'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components'})
-        self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-15', 'macos-15-intel'])
-        self.assertEqual(jobs['macos-simulated-profile']['strategy']['matrix']['runner'], ['macos-15', 'macos-15-intel'])
+        self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
+        self.assertEqual(jobs['macos-simulated-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
+        self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
+        for profile in ('macos-simulated-profile', 'macos-si5351-profile'):
+            self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], '26.0')
         resolver = jobs['change_scope']
         self.assertEqual(reference(resolver['outputs']['pico_sha']), ('steps', 'pico-output', 'outputs', 'pico_sha'))
         selected = [s for s in resolver['steps'] if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico']

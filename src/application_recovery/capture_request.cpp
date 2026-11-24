@@ -9,8 +9,6 @@
 #include "wtp_integration/pi_management_journal.hpp"
 #include "wtp_integration/browser_api.hpp"
 #include <filesystem>
-#include <cstdio>
-#include <typeinfo>
 #include <mutex>
 #ifdef _WIN32
 #include "windows_file_io.hpp"
@@ -64,8 +62,7 @@ nlohmann::json recovery_capture_request(const nlohmann::json &input,const std::s
     try{
         result["inventory"]=capture_application_recovery_snapshot(text(job/"snapshot"));result["state"]="ready";
     }catch(const LocalCommandRefused &error){result["error"]=error.reason()==LocalRefusal::Busy?"busy":"storage_unavailable";}
-    catch(const std::exception &error){std::fprintf(stderr,"CI_CAPTURE_EXCEPTION type=%s\n",typeid(error).name());result["error"]="storage_unavailable";}
-    catch(...){std::fprintf(stderr,"CI_CAPTURE_EXCEPTION unknown\n");result["error"]="storage_unavailable";}
+    catch(...){result["error"]="storage_unavailable";}
     const auto after=PiManagementJournal::read_private_record(text(job/"capture-admission.json"));
     require(after&&after->bytes==source->bytes&&after->signature==source->signature);
     (void)PiManagementJournal::publish_private_record(result_path,{},result.dump());
