@@ -437,7 +437,7 @@ jobs:
 
   non-hardware-validation:
     needs: change_scope
-    if: &linux-validation-scope ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     # Keep the traced tests and final audit on the same runner.
     timeout-minutes: 40
@@ -647,7 +647,7 @@ jobs:
 
   linux-native-contracts:
     needs: change_scope
-    if: *linux-validation-scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     container: debian:trixie-slim
