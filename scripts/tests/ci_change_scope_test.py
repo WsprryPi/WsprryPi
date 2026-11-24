@@ -80,7 +80,7 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(raw=raw), patch.object(scope.subprocess, "check_output", return_value=raw):
                 self.assertTrue(scope.full_ci_required(ROOT, "push", event)[0])
 
-    def test_workflow_cannot_bypass_scope_failure_or_skip_by_event_paths(self):
+    def test_selected_jobs_cannot_bypass_scope_failure_or_skip_by_event_paths(self):
         text = (ROOT / ".github/workflows/debian-non-hardware.yml").read_text()
         self.assertNotIn("paths-ignore:", text)
         self.assertNotIn("\n    paths:", text)
@@ -98,7 +98,11 @@ class PolicyTests(unittest.TestCase):
         for name, body in jobs.items():
             with self.subTest(job=name):
                 self.assertIn("    needs: change_scope\n", body)
-                self.assertIn(guard, body)
+                # Explicit manual partial qualification skips unselected jobs;
+                # every selected job retains the fail-closed source guard.
+                expected = guard if name == "macos-simulated-profile" else guard.replace(
+                    "!cancelled()", "!cancelled() && inputs.macos_runtime_only != true")
+                self.assertIn(expected, body)
 
     def test_documentation_successor_cannot_cancel_an_older_source_run(self):
         text = (ROOT / ".github/workflows/debian-non-hardware.yml").read_text()
