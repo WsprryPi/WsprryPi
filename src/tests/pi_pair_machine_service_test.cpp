@@ -166,7 +166,7 @@ int main(int argc,char **argv){try{
     if(argc==4&&std::string_view(argv[1])=="--recover-handover")return recover_handover(argv[2],static_cast<unsigned>(std::stoul(argv[3])));
     if(argc==4&&std::string_view(argv[1])=="--recover-authority-registration")return recover_registration(argv[2],static_cast<unsigned>(std::stoul(argv[3])));
     const bool refuse_second=argc==2&&std::string_view(argv[1])=="--refuse-second";check(argc==1||refuse_second);
-    char pattern[]="/tmp/pi-pair-machine-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary);const std::string root=temporary,ini=root+"/settings.ini";
+    char pattern[]="/tmp/pi-pair-machine-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary);const std::string root=std::filesystem::canonical(temporary).string(),ini=root+"/settings.ini";
     struct Remove {std::string root;~Remove(){std::filesystem::remove_all(root);}} remove{root};
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
     config.use_ini=true;config.ini_filename=ini;config.transmit=false;config.simulated_backend_override=true;config.transmit_backend=TransmitBackendKind::SIMULATED;
