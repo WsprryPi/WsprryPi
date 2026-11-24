@@ -108,6 +108,10 @@ class PolicyTests(unittest.TestCase):
         text = (ROOT / ".github/workflows/debian-non-hardware.yml").read_text()
         group = next(line for line in text.splitlines() if line.startswith("  group:"))
         self.assertIn("${{ github.sha }}", group)
+        self.assertIn("${{ inputs.macos_runtime_only }}", group)
+        self.assertIn("${{ inputs.macos_runtime_profiles }}", group)
+        self.assertNotEqual(group.replace("${{ inputs.macos_runtime_profiles }}", "arm64"),
+                            group.replace("${{ inputs.macos_runtime_profiles }}", "macos-26-intel"))
         self.assertNotEqual(group.replace("${{ github.sha }}", "1"*40),
                             group.replace("${{ github.sha }}", "2"*40))
 
