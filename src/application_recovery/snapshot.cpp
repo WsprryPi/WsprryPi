@@ -19,6 +19,8 @@
 #include "wtp_integration/tls.hpp"
 #include "wtp_settings_json.hpp"
 #include <array>
+#include <cstdio>
+#include <source_location>
 #include <cerrno>
 #include <filesystem>
 #ifdef _WIN32
@@ -35,7 +37,7 @@
 namespace wsprrypi {
 namespace {
 using Json=nlohmann::json;
-void require(bool value){if(!value)throw LocalCommandRefused(LocalRefusal::StorageUnavailable);}
+void require(bool value,std::source_location location=std::source_location::current()){if(!value){std::fprintf(stderr,"CI_CAPTURE_REQUIRE line=%u errno=%d\n",location.line(),errno);throw LocalCommandRefused(LocalRefusal::StorageUnavailable);}}
 #ifdef _WIN32
 std::filesystem::path disk_path(const std::string &path){return windows_file::path_from_utf8(path);}
 std::string text(const std::filesystem::path &path){return recovery_windows::text(path);}
