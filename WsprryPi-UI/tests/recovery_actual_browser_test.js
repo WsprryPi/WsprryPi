@@ -17,6 +17,9 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
     const phpPort = await freePort();
     let php, proxy, browser, client, profile, failure, dropConfirm = true, failReadback = false;
     const mutations = [];
+    const timeline = [];
+    let validationAttempt = 0, admittedAttempt = 0, observedJob;
+    const record = value => { timeline.push({ ms: Math.round(performance.now()), ...value }); if (timeline.length > 40) timeline.shift(); };
     try {
         php = spawnFixtureChild('php', ['-S', `127.0.0.1:${phpPort}`, '-t', 'data', 'tests/browser_fixture_router.php'], { cwd: ui, env: { ...process.env, WSPRRYPI_UI_FIXTURE_PREFIX: basePath }, stdio: ['ignore', 'pipe', 'pipe'] });
         await waitForPhp(php, `http://127.0.0.1:${phpPort}/index.php?page=maintenance`, 'Maintenance templates');
@@ -25,6 +28,8 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
             if (failReadback && request.method === 'GET' && route === '/api/recovery/jobs') {
                 response.writeHead(503, { 'Content-Type': 'application/json' });response.end(JSON.stringify({ error: 'backend_unavailable' }));return;
             }
+            if (request.method === 'POST' && route.endsWith('/validate')) ++validationAttempt;
+            const attempt = admittedAttempt;
             const api = route.startsWith('/api/') || route === '/version' || route === '/config';
             if (api && request.method !== 'GET') mutations.push(route);
             const outgoing = http.request({ hostname: '127.0.0.1', port: api ? backendPort : phpPort,
@@ -34,6 +39,24 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
                         response.writeHead(503, { 'Content-Type': 'application/json' });
                         response.end(JSON.stringify({ error: 'outcome_unknown' }));
                     }); return;
+                }
+                if (request.method === 'POST' && route.endsWith('/validate') && incoming.statusCode === 200) admittedAttempt = validationAttempt;
+                if (api && route.startsWith('/api/recovery/jobs')) {
+                    record({ method: request.method, action: route.replace(/[a-f0-9]{32}/g, ':job'), status: incoming.statusCode });
+                    if (request.method === 'GET' && route === '/api/recovery/jobs') {
+                        let bytes = 0, chunks = [];
+                        incoming.on('data', chunk => { bytes += chunk.length; if (bytes <= 65536) chunks.push(chunk); else chunks = []; });
+                        incoming.on('end', () => {
+                            if (bytes > 65536) return;
+                            try { const value = JSON.parse(Buffer.concat(chunks));
+                                if (Array.isArray(value.jobs)) {
+                                    const jobs = value.jobs.slice(0, 4).map(job => ({ job_id: job.job_id, kind: job.kind, state: job.state, error: job.error }));
+                                    record({ attempt, jobs });
+                                    observedJob = { attempt, jobs };
+                                }
+                            } catch (_) {}
+                        });
+                    }
                 }
                 response.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(response);
             });
@@ -93,7 +116,13 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         await run("document.getElementById('restorePassphrase').value='wrong phrase';document.getElementById('restoreValidate').click()"); await settled();
         await waitFor(() => run("document.getElementById('recoveryStatus').textContent.includes('passphrase')"), 'Wrong phrase recovery', 15000);
         await run(`document.getElementById('restorePassphrase').value=${JSON.stringify(phrase)};document.getElementById('restoreValidate').click()`); await settled();
-        await waitFor(() => run("!document.getElementById('restorePreview').hidden"), 'Actual owner preview', 25000);
+        await waitFor(async () => {
+            if (observedJob?.attempt === 2) {
+                const failed = observedJob.jobs.find(job => job.kind === 'restore' && job.state === 'failed' && job.error !== null);
+                if (failed) throw Error(`Correct-passphrase validation rejected: ${failed.error}; job=${failed.job_id}; attempt=2`);
+            }
+            return run("!document.getElementById('restorePreview').hidden");
+        }, 'Actual owner preview', 25000);
         assert.equal(await run('document.activeElement.id'), 'restorePreviewTitle', 'Explicit validation hands focus to its preview');
         assert(await run("document.getElementById('restoreConfirm').disabled"), 'Exact review consent required');
         failReadback = true;
@@ -133,6 +162,7 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         console.log('PASS actual Maintenance create/download/upload/wrong-passphrase/preview/keyboard-confirm/lost-reply/reload/destination-review; desktop/mobile light/dark captures: ' + captures);
     } catch (error) {
         failure = error;
+        console.error('Recovery browser timeline:', JSON.stringify(timeline));
         if (client) try { console.error(await client.evaluate("({status:document.getElementById('recoveryStatus')?.textContent,feedback:document.getElementById('recoveryActionFeedback')?.textContent,backup:document.getElementById('backupFeedback')?.textContent,upload:document.getElementById('restoreUploadFeedback')?.textContent,destination:document.getElementById('destinationFeedback')?.textContent})")); } catch (_) {}
     } finally {
         await finishFixture({ failure, client, browser, php, profile, cleanups: [async () => { if (proxy) await closeServer(proxy); }] });
