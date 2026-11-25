@@ -13,6 +13,7 @@ def main():
                       'wsprrypi::(anonymous namespace)::Runtime::Runtime',
                       'Rp1PpsCalibration::Impl::Capture', 'JobService::JobService',
                       'WsprRpiBackend::WsprRpiBackend', 'SimulatedTransmitBackend::SimulatedTransmitBackend',
+                      'set_application_simulation_fixture', 'visit_application_simulation_idle',
                       'pthread_setaffinity_np', 'MonitorFile::', 'iniMonitor', 'ppmManager', 'PPMManager::',
                       'SupportBundleCollectorExecutor::', 'SupportBundleJobManager::create(', 'SupportBundleRuntime::create_production(', 'getopt_long'):
         assert forbidden not in symbols, forbidden

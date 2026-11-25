@@ -29,7 +29,10 @@
 #include "rp1_route_bridge.hpp"
 #include "runtime_config_operations.hpp"
 #include "application_storage/application_state.hpp"
+#include "backend_capabilities.hpp"
+#if WSPRRYPI_BACKEND_SIMULATED
 #include "application_simulation_fixture.hpp"
+#endif
 #include "signal_handler.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "version.hpp"
@@ -1037,7 +1040,9 @@ bool wspr_loop()
                 wtp_pi_end_configuration();
                 (void)set_config(false);
             }
+#if WSPRRYPI_BACKEND_SIMULATED
             wsprrypi::testing::visit_application_simulation_idle();
+#endif
             lk.lock();
         }
     }
