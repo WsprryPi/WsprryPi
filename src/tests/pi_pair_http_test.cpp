@@ -37,9 +37,9 @@ int main(){try{
         "/api/pair/v1/rotate/commit?x=1","/api/pair/v1/%63ommit","/api/pair/v1/rotate/commit#x","/api/pair/v1/rotate\\commit"})check(decode(raw("POST",path))==State::Refused);
     for(const auto *host:{"","evil@target.local","target.local/path","target.local:1:2","[fd00::1","[bad]:31418","[fd00::1]:",
         "target.local:031418","target.local:65536","target.local:0","target.local?x","target..local"})
-        refuses([&]{(void)pi_pair_http_request("GET","/api/pair/v1/resume",host);});
+        refuses([&]{(void)pi_pair_http_request("GET","/api/pair/v1/operations/"+std::string(32,'a'),host);});
     for(const auto *host:{"target.local","target.local:31418","[fd00::1]:31418","[::1]:12345","192.168.1.20:31418"})
-        check(decode(pi_pair_http_request("GET","/api/pair/v1/resume",host))==State::Ready);
+        check(decode(pi_pair_http_request("GET","/api/pair/v1/operations/"+std::string(32,'a'),host))==State::Ready);
     auto wrong=raw();wrong.replace(wrong.find("HTTP/1.1"),8,"HTTP/1.0");check(decode(wrong)==State::Refused);
     wrong=raw();wrong.replace(wrong.find("Content-Length: 2"),17,"Content-Length: 02");check(decode(wrong)==State::Refused);
     check(decode(raw()+wire)==State::Refused);check(decode(raw()+"x")==State::Refused);
@@ -47,7 +47,7 @@ int main(){try{
     check(decode(raw("POST","/api/pair/v1/rotate/commit",{},"{\"x\":1,\"x\":2}"))==State::Refused);
     check(decode(raw("POST","/api/pair/v1/rotate/commit",{},std::string(4097,' ')))==State::Refused);
     check(decode(raw("POST","/api/control/v1/targets/a/settings",{},std::string(32769,' ')))==State::Refused);
-    check(decode("GET /api/pair/v1/resume HTTP/1.1\r\nHost: "+std::string(8193,'a'))==State::Refused);
+    check(decode("GET /api/pair/v1/operations/"+std::string(32,'a')+" HTTP/1.1\r\nHost: "+std::string(8193,'a'))==State::Refused);
     refuses([&]{(void)pi_pair_http_request("POST","/api/pair/v1/rotate/commit","target.local","{}",{{"If-Match","a\r\nInjected: yes"}});});
     refuses([&]{(void)pi_pair_http_request("POST","/api/pair/v1/rotate/commit","target.local","{}",{{"Cookie","not authority"}});});
     PiPairHttpReply reply{{200,"{}","\"fixture\""},"/api/pair/v1/operations/"+std::string(32,'a'),"settings"};
@@ -60,7 +60,7 @@ int main(){try{
         return decoder.state();
     };
     for(const auto chunk:{1U,2U,17U,4096U})check(response_state(response,chunk)==State::Ready);
-    PiPairHttpResponseDecoder response_decoder("/api/pair/v1/resume");refuses([&]{(void)response_decoder.reply();});
+    PiPairHttpResponseDecoder response_decoder("/api/pair/v1/operations/"+std::string(32,'a'));refuses([&]{(void)response_decoder.reply();});
     check(response_decoder.append({})==State::More);
     check(response_decoder.append(std::span(reinterpret_cast<const std::uint8_t *>(response.data()),response.size()))==State::Ready);
     check(response_decoder.append(std::span(&extra,1))==State::Refused);

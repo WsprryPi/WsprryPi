@@ -27,20 +27,19 @@ async function main() {
             "Review the current saved values beside your preserved draft. Matching values do not prove an earlier save committed. Send one new explicit save with this fresh revision?",
             "Review current saved and active observations beside your preserved draft. Send one new explicit save using the fresh revision?"
         ]}));await client.send("Page.enable");
-        // Navigate the owned target explicitly; startup can expose a blank page.
-        await client.send("Page.navigate", {url}, 60000);
-        const evaluate=async expression=>{const result=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
-        await waitFor(async()=>await evaluate('document.readyState==="complete" && !!window.WtpUi && !!window.WtpUsbSettingsEditor'),"USB scripts");
-        await evaluate(`(() => {
-            configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
-            backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
+        // Install the fixture transport before host-role detection can start Fleet reads.
+        await client.send("Page.addScriptToEvaluateOnNewDocument", {source:`(() => {
             const target={scope:'member',device_id:'a'.repeat(32),boot_id:'b'.repeat(32)};
             window.__snapshot={selected:true,transport:'usb',ready:true,management_available:true,host_utc_valid:true,phase:'idle',session_phase:'ready',now_ms:'10000',status_observed_ms:'9000',remote:{output_active:false},owns:false,
                 identity:{device_id:target.device_id,boot_id:target.boot_id},common_name:'workbench-pico.local',common_name_confirmed:true,name_pending_restart:false,
                 usb:{management:{connected:true,time:{accepted:true,selected:true,uncertainty_ns:'2400000',observed_ms:'9000'}},hostname:{saved:'workbench-pico.local'}}};
             window.__mutations=[];
             window.__catalog={scope:'wsprrypi-wtp-catalog/1',profiles:[{id:'c'.repeat(32),name:'Saved precision Pico',method:'manual',settings:{Transport:'usb',Endpoint:'/dev/serial/by-id/pico-if02','USB Serial':'PICO123','USB Vendor ID':51966,'USB Product ID':16402,'Device ID':'a'.repeat(32)}}],active_id:'c'.repeat(32)};
+            const originalFetch=window.fetch;
             window.fetch=async(url,options={})=>{
+                const requestPath=String(url);
+                // The fixture router owns the verified role and global maintenance readback.
+                if(requestPath.endsWith('/version') || requestPath.endsWith('/api/control/v1/status')) return originalFetch(url,options);
                 if(options.method && options.method!=='GET') {
                     window.__mutations.push({url:String(url),body:JSON.parse(options.body||'{}')});
                     if(String(url).endsWith('/host/devices') && options.method==='POST') {
@@ -49,8 +48,8 @@ async function main() {
                         window.__catalog.profiles[0].name=body.name;
                     }
                 }
-                const path=String(url);if(path.endsWith('/member/logging') && window.__loggingConflict)return {ok:false,status:412,headers:{get:()=>''},json:async()=>({error:{code:'revision_conflict'}})};const header={get:()=> '\\"usb-r1\\"'};
-                let value=(path.includes('/api/wtp') || path.endsWith('/api/control/v1/status'))?window.__snapshot:
+                const path=requestPath;if(path.endsWith('/member/logging') && window.__loggingConflict)return {ok:false,status:412,headers:{get:()=>''},json:async()=>({error:{code:'revision_conflict'}})};const header={get:()=> '\\"usb-r1\\"'};
+                let value=path.includes('/api/wtp')?window.__snapshot:
                     path.endsWith('/member/management')?{carrier:'usb_physical',connected:true,host:'',selection_id:'f'.repeat(32),session:null}:
                     path.endsWith('/member/hostname')?{schema:'hostname',target,saved:'workbench-pico.local',active:'workbench-pico.local',default:'wsprrypico-aaaaaaaa.local',writable:true,pending_restart:false}:
                     path.endsWith('/member/progress')?{schema:'progress',target,draft_revision:'1',config_revision:'0',profile_revision:'0',fields:{callsign:'AA0NT'},last_receipt:null,last_outcomes:{},applied_station:null,station:{callsign:'AA0NT',locator:null,power_dbm:null},station_complete:false,complete:false,apply_domains:{all:false,drive:false,network:false,radio:false,station:false},wspr_plan:null,schedule_enabled:false,matches_applied:false,schedule_suspended:true}:
@@ -60,6 +59,13 @@ async function main() {
                     path.endsWith('/host/discovery')?(window.__discovery || {available:false,candidates:[],reason:'USB workflow'}):{};
                 return {ok:true,status:200,headers:header,json:async()=>value?.schema?{contract:'Wsprry-Control/1',...value}:value};
             };
+        })()`});
+        await client.send("Page.navigate", {url}, 60000);
+        const evaluate=async expression=>{const result=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value;};
+        await waitFor(async()=>await evaluate('document.readyState==="complete" && window.ControllerMode?.transmitter && window.PicoFirmwareSafety?.locked===false && !!window.WtpUi && !!window.WtpUsbSettingsEditor'),"USB scripts and verified host");
+        await evaluate(`(() => {
+            configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
+            backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
             // Explicit reusable-component fixture; production target routing is
             // exercised separately by the independent controller pair.
             document.getElementById('fleet-pane').append(document.getElementById('pico-target-template').content.cloneNode(true));
@@ -93,6 +99,7 @@ async function main() {
                 }
             }
         }
+        await waitFor(async()=>await evaluate("!document.getElementById('wtp-usb-load').matches(':disabled')"),"USB read ready");
         await evaluate("document.getElementById('wtp-usb-load').click()");
         await waitFor(async()=>await evaluate("document.getElementById('wtp-usb-feedback').textContent.includes('No saved Wi-Fi')"),"USB no-network state");
         // The standalone fixture owns availability; production uses its captured target handle.

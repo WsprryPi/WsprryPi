@@ -22,6 +22,6 @@ Rollback requires explicit native authority disable/retirement, confirmed output
 
 ## Current recovery
 
-Legacy rows and durable receipts are read-only in retirement software. They do not authorize reconnect, remote job inspection, or new dispatch. If prerequisite cleanup was not completed, keep the target held and restore compatible WTP-capable recovery software under an explicit authority restoration procedure. Do not delete records or automatically re-enable recurrence.
+Control/1 migration readback reports scheduling authority without WTP listener bindings. The rollback action supports a previous local schedule on the selected Pi. Remote WTP handback requests are refused. Legacy rows and durable receipts are read-only in retirement software. They do not authorize reconnect, remote job inspection, or new dispatch. If prerequisite cleanup was not completed, keep the target held and restore compatible WTP-capable recovery software under an explicit authority restoration procedure. Do not delete records or automatically re-enable recurrence.
 
 For native stop, preserve unknown state until an explicit authenticated readback verifies disabled schedules and inactive, unowned output. Use local Console safety recovery when the target cannot be reached. Settings drafts remain separate from saved or enabled schedules.

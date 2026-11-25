@@ -4,7 +4,7 @@
     if (!root.document) return;
     let maintenance = true, observed = false, localPending = false, timer = null, closed = false, polling = false, setupLock;
     const held = new Map();
-    const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle"]);
+    const safeIds = new Set(["wtp-firmware-read", "wtp-firmware-recover", "fleet-refresh", "updateCheckToggle", "hostRoleRetry"]);
     function allowed(control) {
         if(control.closest('#backupRestore')) {
             // Independent maintenance remains reachable through backend loss.
@@ -30,7 +30,8 @@
         const active = locked();
         const banner = root.document.getElementById("pico-firmware-safety");
         if (banner) {
-            banner.hidden = !active || root.ConfigurationRecovery?.active === true;
+            banner.hidden = !active || root.ConfigurationRecovery?.active === true ||
+                !!root.ControllerMode && !root.ControllerMode.transmitter;
             const text = active ? observed || localPending
                 ? "Pico firmware maintenance is active. Settings, device selection, transmission, reboot and shutdown are disabled. Use Pico firmware over USB to continue or recover the update."
                 : "Checking Pico firmware status before allowing changes. Settings, transmission, reboot and shutdown remain disabled until the controller responds." : "";
@@ -56,7 +57,7 @@
         if (setupLock !== active) {setupLock = active;root.SetupTargets?.render?.();}
     }
     async function poll() {
-        if (polling || closed) return;
+        if (polling || closed || root.ControllerMode && !root.ControllerMode.transmitter) return;
         if(root.ConfigurationRecovery?.active) {
             clearTimeout(timer);render();timer = root.setTimeout(poll,1500);return;
         }
@@ -67,11 +68,11 @@
                 {cache:"no-store", signal:AbortSignal.timeout(5000)});
             if (!response.ok) throw Error("Status unavailable");
             const status = await response.json();
-            if (typeof status.host?.firmware_maintenance === "boolean") { maintenance = status.host.firmware_maintenance; observed = true; }
+            if (!root.ControllerMode?.active && typeof status.host?.firmware_maintenance === "boolean") { maintenance = status.host.firmware_maintenance; observed = true; }
         } catch (_) { /* Retain a known hold when a status read fails. */ }
         polling = false;
         render();
-        if (!closed) timer = root.setTimeout(poll, 1500);
+        if (!closed && !root.ControllerMode?.active) timer = root.setTimeout(poll, 1500);
     }
     root.PicoFirmwareSafety = {
         render,
@@ -101,7 +102,17 @@
         }, true);
         root.addEventListener("pagehide", () => { closed = true; clearTimeout(timer); });
         root.addEventListener("pageshow", () => { closed = false; void poll(); });
-        void poll();
+        const hostChanged = () => {
+            if (root.ControllerMode?.active) {
+                clearTimeout(timer);
+                maintenance = false;
+                render();
+            } else {
+                void poll();
+            }
+        };
+        root.addEventListener("wsprry-host-status", hostChanged);
+        hostChanged();
     }
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init);
     else init();

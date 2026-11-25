@@ -42,6 +42,8 @@ The profile requires empty `BACKENDS`, `ANCILLARY_GPIO=0`, and no explicit `SI53
 
 Controller objects, generated headers, link maps, license notices, and executables use isolated `controller` paths. Its artifact does not replace the ordinary `build/bin/wsprrypi` or `build/bin/wsprrypi_debug` aliases. The explicit `scripts/controller_sources.mk` manifest admits sources. Parent no-output adapters refuse local transmitter, PPS capture, and RP1 route operations; the controller excludes the local WTP execution runtime while retaining shared identity and private-state validation.
 
+The [controller browser route inventory](controller-browser-routes.md) records the role bootstrap, navigation, HTTP methods, WebSocket commands, and hardware-free browser checks.
+
 A build is not a qualified installation. The [platform matrix](issue-475-platform-matrix.md) records current #475 evidence and outstanding native gates. The finite `src/tests/controller_profile_production_test.py` gate and reviewed `scripts/tests/controller_native_namespace.sh` isolation launcher require an explicitly authorized isolated native Linux amd64 environment, private OS home, hidden host service sockets, and ordinary unprivileged execution. It uses the actual binary and host identity without fixture identity or hardware-suppression environment, checks empty enrollment and restart, refuses local operations, and audits syscall traces. Do not run it against an interactive account's unisolated home or live transmitters. Native path/transport adapters, browser acceptance, and installed services belong to later authorized slices.
 
 ## Production application and browser regressions

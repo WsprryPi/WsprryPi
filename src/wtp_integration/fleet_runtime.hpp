@@ -14,7 +14,6 @@ void stop_wtp_fleet() noexcept;
 void wtp_fleet_with_backup_files(const std::function<void(const std::map<std::string,std::string> &)> &);
 // Read-only positive closure from the actual source owner; unavailable holds.
 bool wtp_fleet_retirement_scope_closed(const nlohmann::json &,const nlohmann::json &);
-std::optional<nlohmann::json> wtp_fleet_resume(const PiPairResumeGrantProof &,PiPairHistory &,const std::function<bool()> &cancelled);
 PicoHttpResponse wtp_fleet_retirement(const PiPairRetirementPrincipal &,PiPairHistory &,const std::function<bool()> &cancelled);
 PicoHttpResponse wtp_fleet_api(const std::string& method, const std::string& body,
                               const std::string& revision,

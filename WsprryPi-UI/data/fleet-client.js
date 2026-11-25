@@ -173,7 +173,7 @@
         return fullPending;
     }
     async function lookup() {
-        if (closed || root.document.hidden) return;
+        if (closed || root.document.hidden || root.ControllerMode?.blocked) return;
         if (!incarnation || candidate || !refs.size) return;
         const all = [...refs.values()].filter(r => r.controller_incarnation === incarnation);
         if (!all.length) return;
@@ -193,7 +193,7 @@
     }
     async function poll() {
         clearTimeout(timer);
-        if (closed || root.document.hidden) return;
+        if (closed || root.document.hidden || root.ControllerMode?.blocked) return;
         if (polling) {pollAgain = true;return;}
         polling = true;
         try {
@@ -320,6 +320,7 @@
     let renderTimer;
     function startRendering() {clearInterval(renderTimer);renderTimer = setInterval(() => {if (!closed && !root.document.hidden) notify();}, 1000);}
     startRendering();
+    root.addEventListener("wsprry-host-status", () => {clearTimeout(timer);void poll();});
     root.document.addEventListener("visibilitychange", () => {sequence++;valid = false;baselineValid = false;notify();clearTimeout(timer);if (!root.document.hidden) poll();});
     root.addEventListener("pagehide", () => {closed = true;sequence++;valid = false;baselineValid = false;clearTimeout(timer);clearInterval(renderTimer);});
     root.addEventListener("pageshow", event => {if (event.persisted) {closed = false;sequence++;valid = false;baselineValid = false;startRendering();poll();}});

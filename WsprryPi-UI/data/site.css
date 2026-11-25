@@ -212,6 +212,17 @@
     max-width: 68ch;
 }
 
+.page-warning__retry {
+    --bs-btn-color: var(--bs-alert-color);
+    --bs-btn-border-color: var(--bs-alert-color);
+    --bs-btn-hover-color: var(--bs-alert-bg);
+    --bs-btn-hover-bg: var(--bs-alert-color);
+    --bs-btn-hover-border-color: var(--bs-alert-color);
+    --bs-btn-active-color: var(--bs-alert-bg);
+    --bs-btn-active-bg: var(--bs-alert-color);
+    --bs-btn-active-border-color: var(--bs-alert-color);
+}
+
 /* ------------------------------------------------------------
        Nav Items Wrapping
 ------------------------------------------------------------ */
@@ -1211,4 +1222,10 @@ footer .container {
 #fleet-pane .btn-outline-secondary:disabled {
     color: var(--bs-secondary-color);
     border-color: var(--bs-border-color);
+}
+
+/* Role-specific controls stay off the page until the host is verified. */
+:root:not([data-host-role="transmitter"]) [data-transmitter-only],
+:root:not([data-host-role="controller-only"]) [data-controller-only] {
+    display: none !important;
 }

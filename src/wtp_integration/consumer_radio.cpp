@@ -169,7 +169,7 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
   try {
     const bool usb=carrier=="usb_physical";
     if (!fields(j, {"contract", "schema", "target", "profile", "preclock",
-                    "profile_generation", "selected", "carriers", "unsupported",
+                    "profile_generation", "selected", "carriers",
                     "operations", "limits"}) ||
         j["contract"] != "Wsprry-Control/1" || !supported_management_schema(j["schema"], usb) ||
         j["selected"] != carrier || !j["preclock"].is_boolean() ||
@@ -232,8 +232,7 @@ bool valid_management_contract(const Json &j, const std::string &carrier,
       j["limits"]["idle_ms"] <= j["limits"]["absolute_ms"] &&
       j["limits"]["consumer_pending_logins"] <= j["limits"]["consumer_sessions"] &&
       j["limits"]["update"] <= j["limits"]["consumer_plaintext"] &&
-      j["limits"]["consumer_plaintext"] < j["limits"]["http_body"] &&
-      j["unsupported"] == Json::array({"plain_wtp_json","tls_wtp_json","ble_json"});
+      j["limits"]["consumer_plaintext"] < j["limits"]["http_body"];
   } catch (...) {
     return false;
   }

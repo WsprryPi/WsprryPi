@@ -106,7 +106,9 @@ async function main() {
             window.__discoveryState = "active";
             window.__snapshot = { selected:true, firmware_maintenance:false, transport:'network', ready:true, host_utc_valid:true, phase:'idle', session_phase:'ready', now_ms:'10000', status_observed_ms:'1000',
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
+            const originalFetch=window.fetch;
             window.fetch = async (url, options = {}) => {
+                if (String(url).endsWith('/version')) return originalFetch(url,options);
                 window.__requests.push({url,options});
                 if (String(url).endsWith('/member/filter-selector')) {
                     const defaults={policy:'fixed_manual',release_ms:20,settle_ms:20,selectors:[],ranges:[]};

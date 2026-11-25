@@ -17,8 +17,8 @@ def generated():
         raise ValueError("Unsupported pairing identity, profile, or bounds")
     expected = {
         "bootstrap": {"GET": ["window"], "POST": ["hello", "exchange", "confirm", "commit"]},
-        "management": {"GET": ["operations/{operation_id}", "resume"],
-                       "POST": ["rotate/prepare", "rotate/commit", "authorities/register", "resume/ack"]},
+        "management": {"GET": ["operations/{operation_id}"],
+                       "POST": ["rotate/prepare", "rotate/commit", "authorities/register"]},
         "retirement": {"POST": ["retirement", "retirement/status"]}}
     if spec["routes"] != expected or len(spec["documents"]) != len(set(spec["documents"])):
         raise ValueError("Pairing purpose/route registry differs")

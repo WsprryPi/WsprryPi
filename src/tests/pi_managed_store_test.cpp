@@ -217,6 +217,13 @@ int main(int argc,char **argv){
   recovery_request["expected_revision"]=recovery_store.recovery_revision();
   PiManagedStore::Operation recovery_operation{self,"1","/api/control/v1/host/configuration-recovery",recovery_request};
   unsigned recovery_attempts=0;
+  auto retired_recovery=recovery_operation;
+  retired_recovery.request["configuration"]["Operation"]["Transmit Backend"]="wtp";
+  check(!valid_controller_document(retired_recovery.request,"configuration-recovery-save"),
+      "Recovery contract rejects the retired backend in an otherwise current request");
+  refuses([&]{recovery_store.persist_recovery(recovery_internal,[&]{++recovery_attempts;},retired_recovery);});
+  check(recovery_attempts==0&&!recovery_store.initialized()&&!std::filesystem::exists(recovery_ini+".pi-management"),
+      "Retired recovery backend refuses before initial storage reservation");
   auto wrong_candidate=recovery_internal;wrong_candidate["CW"]["Message"]="DIFFERENT";
   refuses([&]{recovery_store.persist_recovery(wrong_candidate,[&]{++recovery_attempts;},recovery_operation);});
   check(recovery_attempts==0&&!recovery_store.initialized()&&!std::filesystem::exists(recovery_ini+".pi-management"),

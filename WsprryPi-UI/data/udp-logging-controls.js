@@ -35,5 +35,9 @@ function init(){
   usbSources:async()=>{const r=await exchange('host/logging');if(r.value.schema!=='host-usb-logging/1')throw Error('USB collection settings unavailable');return r.value;}});
  }
 }
-if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);else init();
+function start(){
+ if(root.ControllerMode)root.ControllerMode.onTransmitter(init);
+ else init();
+}
+if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start);else start();
 })(typeof window==='undefined'?globalThis:window);

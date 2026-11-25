@@ -230,7 +230,6 @@ public:
     void poll() {
         if (authority_) authority_->poll();
     }
-    std::optional<unsigned> active_port() const { return {}; }
 
     std::string status_json() const {
         std::lock_guard lock(state_mutex_);
@@ -299,9 +298,6 @@ private:
 };
 
 #endif // Local execution runtime
-struct ManagementHttpListener {const void *owner{};std::string self;unsigned port{};std::function<bool()> ready;};
-std::mutex management_http_mutex;
-ManagementHttpListener management_http;
 std::recursive_mutex lifecycle_mutex;
 #if !WSPRRYPI_CONTROLLER_ONLY
 std::mutex runtime_mutex;
@@ -597,15 +593,6 @@ void wtp_pi_configuration_committed(const ArgParserConfig &) { throw std::logic_
 void wtp_pi_with_configuration(const std::function<void()> &) { throw std::logic_error("Local WTP execution is unavailable"); }
 #endif
 
-void wtp_pi_publish_management_http(const void *owner,const std::string &self,unsigned port,std::function<bool()> ready){
-    if(!owner||!ready||self.size()!=32||self.find_first_not_of("0123456789abcdef")!=std::string::npos||!port||port>65535)
-        throw std::invalid_argument("actual_management_http_listener_required");
-    std::lock_guard lock(management_http_mutex);management_http={owner,self,port,std::move(ready)};
-}
-void wtp_pi_withdraw_management_http(const void *owner) noexcept{
-    try{std::lock_guard lock(management_http_mutex);if(management_http.owner==owner)management_http={};}catch(...){}
-}
-
 #if !WSPRRYPI_CONTROLLER_ONLY
 std::optional<PiManagementObservation> wtp_pi_management_observation(){
     std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);
@@ -635,13 +622,6 @@ std::optional<PiManagementObservation> wtp_pi_management_observation(){
             // cleanup path does not save again or change scheduling.enabled.
             (void)stop_transmission_by_user_request(false);
         }};
-    if(const auto port=current->active_port();port&&!observed.first.revocation_unavailable&&!observed.first.output_unknown){
-        std::lock_guard http(management_http_mutex);
-        bool ready=false;
-        if(management_http.owner&&management_http.self==current->device_id()&&management_http.port&&management_http.ready)
-            try{ready=management_http.ready();}catch(...){/* Unavailable readiness is never a qualified binding. */}
-        if(ready)result.wtp_binding=PiWtpBinding{observed.first.revocation_generation,*port,management_http.port};
-    }
     if(current->settings().transmit_backend!=TransmitBackendKind::WTP){
         result.destination_id=current->device_id();return result;
     }

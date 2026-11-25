@@ -7343,7 +7343,6 @@
                 "profile_generation",
                 "selected",
                 "carriers",
-                "unsupported",
                 "operations",
                 "limits"
             ],
@@ -7496,19 +7495,6 @@
                             "maxContains": 1
                         }
                     ]
-                },
-                "unsupported": {
-                    "type": "array",
-                    "minItems": 3,
-                    "maxItems": 3,
-                    "uniqueItems": true,
-                    "items": {
-                        "enum": [
-                            "plain_wtp_json",
-                            "tls_wtp_json",
-                            "ble_json"
-                        ]
-                    }
                 },
                 "operations": {
                     "type": "object",
@@ -12164,8 +12150,7 @@
                                     "enum": [
                                         "gpio",
                                         "rp1-gpclk",
-                                        "si5351",
-                                        "wtp"
+                                        "si5351"
                                     ]
                                 },
                                 {
@@ -14481,8 +14466,7 @@
                 "controllers",
                 "retirements",
                 "jobs",
-                "staged_revision",
-                "wtp_binding"
+                "staged_revision"
             ],
             "properties": {
                 "contract": {
@@ -14547,16 +14531,6 @@
                     "anyOf": [
                         {
                             "$ref": "#/$defs/target-digest"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
-                },
-                "wtp_binding": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/$defs/pi-wtp-binding"
                         },
                         {
                             "type": "null"
@@ -15199,30 +15173,6 @@
                 },
                 "readback_revision": {
                     "$ref": "#/$defs/target-digest"
-                }
-            }
-        },
-        "pi-wtp-binding": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-                "revocation_generation",
-                "wtp_port",
-                "management_port"
-            ],
-            "properties": {
-                "revocation_generation": {
-                    "$ref": "#/$defs/target-counter"
-                },
-                "wtp_port": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                },
-                "management_port": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
                 }
             }
         },
@@ -18025,8 +17975,7 @@
             "pair-discovery-entry",
             "pair-discovery",
             "target-operation-review",
-            "target-operation-reviewed",
-            "pi-wtp-binding"
+            "target-operation-reviewed"
         ],
         "browser_session": "host/management-session",
         "reconciliation_reads": {
@@ -18079,10 +18028,7 @@
                 "src/config_handler_serialization.cpp",
                 "src/config_handler_deserialization.cpp",
                 "src/config_handler.cpp",
-                "src/arg_parser.cpp",
-                "src/wtp_settings.hpp",
-                "src/wtp_settings_json.hpp",
-                "src/wtp_server_settings_json.hpp"
+                "src/arg_parser.cpp"
             ]
         },
         "management": {

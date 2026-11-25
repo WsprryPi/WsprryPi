@@ -9,7 +9,6 @@
 #include "support_bundle_runtime.hpp"
 #include "support_bundle_job_manager.hpp"
 #include "web_server.hpp"
-#include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/discovery.hpp"
 #include <atomic>
 #include <chrono>
@@ -113,7 +112,6 @@ void BackendServices::stop_pairing_supervisor() noexcept{
     pairing_stopping_.store(true);
     {std::lock_guard lock(pairing_mutex_);if(pairing_runtime_)pairing_runtime_->request_stop();}
     if(pairing_thread_.joinable())pairing_thread_.join();
-    wtp_pi_withdraw_management_http(this);
     std::lock_guard lock(pairing_mutex_);pairing_runtime_.reset();
 }
 

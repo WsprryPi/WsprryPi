@@ -2143,12 +2143,7 @@ wtp-production-cpp-test: $(BIN_DIR)/wtp_production_test
 
 wtp-production-test: wtp-production-cpp-test wtp-ui-test
 
-.PHONY: pi-wtp-binding-test
-$(BIN_DIR)/pi_wtp_binding_test: tests/pi_wtp_binding_test.cpp $(SEMANTICS_TEST_DEPS)
-	$(Q)mkdir -p $(BIN_DIR)
-	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
-pi-wtp-binding-test: $(BIN_DIR)/pi_wtp_binding_test
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_wtp_binding_test"
+
 
 .PHONY: wtp-managed-output-test
 $(BIN_DIR)/wtp_managed_output_test: tests/wtp_managed_output_test.cpp $(SEMANTICS_TEST_DEPS)
@@ -2479,10 +2474,6 @@ $(BIN_DIR)/pi_pair_machine_service_test: tests/pi_pair_machine_service_test.cpp 
 pi-pair-machine-service-test: $(BIN_DIR)/pi_pair_machine_service_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test"
 
-.PHONY: pi-pair-resume-refusal-test
-pi-pair-resume-refusal-test: $(BIN_DIR)/pi_pair_machine_service_test
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 "$(BIN_DIR)/pi_pair_machine_service_test" --refuse-second
-
 $(BIN_DIR)/pi_pair_owner_test: tests/pi_pair_owner_test.cpp $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $^ -o $@ $(LDFLAGS)
@@ -2598,7 +2589,7 @@ WTP_NETWORK_CXXFLAGS ?= -O2 -g
 WTP_NETWORK_LDFLAGS ?=
 WTP_NETWORK_FLAGS = -std=c++20 -pthread -Wall -Wextra -Wpedantic -Werror $(WTP_NETWORK_CXXFLAGS) -I. -IWTP-Client/include $(OPENSSL_CFLAGS)
 include ../scripts/network_build_rules.mk
-.PHONY: wtp-api-test wtp-config-test wtp-config-client-build wtp-config-interop-test wtp-tls-build wtp-network-interop-test wtp-network-process-test
+.PHONY: wtp-api-test wtp-config-test pico-control-client-build pico-control-interop-test wtp-tls-build pico-https-management-interop-test wtp-network-process-test
 wtp-config-cpp-test: $(NETWORK_BIN_DIR)/wtp_configuration_test
 	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test.tmp"
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_test"
@@ -2625,10 +2616,10 @@ wtp-network-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(MAKE) --no-print-directory -C WTP-Client all BUILD_DIR="$(abspath $(WTP_NETWORK_BUILD_DIR)/client)" CXXFLAGS="$(WTP_NETWORK_CXXFLAGS)"
-	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/wtp_network_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
+	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) tests/pico_https_management_interop_test.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
 		WSPR-Transmitter/src/execution_plan_compiler.cpp WSPR-Transmitter/src/transmission_controller.cpp \
-		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_network_interop_test"
-wtp-config-client-build:
+		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/pico_https_management_interop_test"
+pico-control-client-build:
 	$(Q)pkg-config --atleast-version=3.0 openssl
 	$(Q)mkdir -p "$(WTP_NETWORK_BUILD_DIR)"
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) -IWSPR-Transmitter/src tests/wtp_configuration_client.cpp wtp_integration/tls.cpp wtp_integration/network_http.cpp \
@@ -2636,10 +2627,10 @@ wtp-config-client-build:
 		$(OPENSSL_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$(WTP_NETWORK_BUILD_DIR)/wtp_configuration_client"
 # These fixtures share a CMake tree, credentials and loopback TLS port.
 # Serialize an invocation that requests both; parallel recipe builds still use CMake -j.
-ifneq ($(filter wtp-config-interop-test wtp-network-interop-test,$(MAKECMDGOALS)),)
+ifneq ($(filter pico-control-interop-test pico-https-management-interop-test,$(MAKECMDGOALS)),)
 .NOTPARALLEL:
 endif
-wtp-config-interop-test: wtp-config-client-build wtp-config-test
+pico-control-interop-test: pico-control-client-build wtp-config-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 2
 	$(Q)node ../WsprryPi-UI/tests/wtp_configuration_interop_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))"
@@ -2656,11 +2647,11 @@ wtp-config-interop-test: wtp-config-client-build wtp-config-test
 	$(Q)node ../WsprryPi-UI/tests/pico_management_transport_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_management_pair_client)"
 	$(Q)$(MAKE) --no-print-directory $(BIN_DIR)/pico_controller_pair_fixture BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 	$(Q)node ../WsprryPi-UI/tests/pico_controller_http_pair_test.js "$(abspath $(WTP_NETWORK_BUILD_DIR))" "$(abspath $(BIN_DIR)/pico_controller_pair_fixture)"
-wtp-network-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
+pico-https-management-interop-test: wtp-tls-build wtp-api-test wtp-network-process-test
 	$(Q)cmake -S tests/network -B "$(WTP_NETWORK_BUILD_DIR)" -DPICO_SOURCE="$(abspath $(PICO_SOURCE))" -DMBEDTLS_SOURCE="$(abspath $(MBEDTLS_SOURCE))"
 	$(Q)cmake --build "$(WTP_NETWORK_BUILD_DIR)" -j 4
-	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_fixture_clock_test"
-	$(Q)python3 -B tests/wtp_network_interop_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
+	$(Q)"$(WTP_NETWORK_BUILD_DIR)/pico_execution_fixture_clock_test"
+	$(Q)python3 -B tests/pico_https_management_interop_test.py "$(abspath $(WTP_NETWORK_BUILD_DIR))"
 
 .PHONY: wtp-tls-test
 wtp-tls-test: wtp-tls-probe-build $(NETWORK_BIN_DIR)/wtp_tls_contract_test
@@ -2688,9 +2679,9 @@ wtp-plain-tcp-test: $(NETWORK_BIN_DIR)/wtp_plain_tcp_test
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_plain_tcp_test"
 
-.PHONY: wtp-network-runtime-test
+.PHONY: pi-network-runtime-regression-test
 # Runtime certificate-rotation cases consume the fixtures generated by TLS tests.
-wtp-network-runtime-test: wtp-tls-test wtp-plain-tcp-test $(BIN_DIR)/wtp_production_test
+pi-network-runtime-regression-test: wtp-tls-test wtp-plain-tcp-test $(BIN_DIR)/wtp_production_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 ./$(BIN_DIR)/wtp_production_test "$(abspath $(WTP_NETWORK_BUILD_DIR)/tls-fixtures)"
 
 # Header ABI changes must invalidate every selected object configuration.
@@ -2735,17 +2726,17 @@ $(BIN_DIR)/test_tone_lifecycle_test: tests/test_tone_lifecycle_test.cpp $(SEMANT
 test-tone-lifecycle-test: $(BIN_DIR)/test_tone_lifecycle_test
 	$(Q)python3 -c 'import subprocess; subprocess.run(["./$(BIN_DIR)/test_tone_lifecycle_test"], check=True, timeout=30)'
 
-.PHONY: wtp-usb-management-test
-wtp-usb-management-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
+.PHONY: pico-usb-management-contract-test
+pico-usb-management-contract-test: $(NETWORK_BIN_DIR)/wtp_usb_management_test
 	$(Q)cp "$<" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp"
 	$(Q)mv "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test.tmp" "$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 	$(Q)"$(WTP_NETWORK_BUILD_DIR)/wtp_usb_management_test"
 
-WTP_USB_PAIR_SOURCES := tests/wtp_usb_pair_client.cpp wtp_integration/usb_cdc.cpp $(NATIVE_CDC_SOURCES) wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
+WTP_USB_PAIR_SOURCES := tests/pico_usb_control_client.cpp wtp_integration/usb_cdc.cpp $(NATIVE_CDC_SOURCES) wtp_integration/usb_management.cpp wtp_integration/configuration.cpp wtp_integration/controller_contract.cpp wtp_integration/pico_usb_settings.cpp wtp_integration/browser_api.cpp wtp_integration/consumer_radio.cpp wtp_integration/plain_tcp.cpp wtp_integration/network_http.cpp wtp_integration/tls.cpp privileged_network_policy.cpp backend_http_guard.cpp support_request_guard.cpp httplib.cpp
 WTP_USB_PAIR_OBJECTS := $(addprefix $(WTP_NETWORK_BUILD_DIR)/usb-pair/,$(WTP_USB_PAIR_SOURCES:.cpp=.o))
-.PHONY: wtp-usb-pair-client-build
-wtp-usb-pair-client-build: $(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client
-$(WTP_NETWORK_BUILD_DIR)/wtp_usb_pair_client: $(WTP_USB_PAIR_OBJECTS)
+.PHONY: pico-usb-control-client-build
+pico-usb-control-client-build: $(WTP_NETWORK_BUILD_DIR)/pico_usb_control_client
+$(WTP_NETWORK_BUILD_DIR)/pico_usb_control_client: $(WTP_USB_PAIR_OBJECTS)
 	$(Q)$(CXX) $(WTP_NETWORK_FLAGS) $^ $(OPENSSL_LIBS) $(NATIVE_USB_LIBS) $(WTP_NETWORK_LDFLAGS) -o "$@"
 $(WTP_NETWORK_BUILD_DIR)/usb-pair/%.o: %.cpp
 	$(Q)mkdir -p "$(dir $@)"

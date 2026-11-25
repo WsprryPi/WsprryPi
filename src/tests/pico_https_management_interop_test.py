@@ -53,7 +53,7 @@ try:
     client_env = dict(os.environ)
     client_env.pop('WSPRRY_TEST_SECOND_LOOPBACK', None)
     if second_loopback: client_env['WSPRRY_TEST_SECOND_LOOPBACK'] = '1'
-    client = subprocess.Popen([str(build / 'wtp_network_interop_test'), str(build / 'credentials-v3')],
+    client = subprocess.Popen([str(build / 'pico_https_management_interop_test'), str(build / 'credentials-v3')],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, env=client_env)
     lines = PipeLines(client.stdout)
     deadline = time.monotonic() + 180

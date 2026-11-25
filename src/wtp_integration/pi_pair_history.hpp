@@ -76,15 +76,6 @@ public:
     std::optional<PiPairRetiredProof> retired_proof(const PiPairPrincipal &,const nlohmann::json &original_request,const nlohmann::json &response);
     // Sign only an owner's actual retained terminal outcome. No wire handler
     // accepts an arbitrary acknowledgement for signing or grants consumption.
-    std::optional<nlohmann::json> resume_acknowledgement(const nlohmann::json &unsigned_ack);
-    std::optional<PiPairResumeOutcomeProof> resume_outcome_proof(const PiPairPrincipal &,const nlohmann::json &);
-    std::optional<PiPairMutationGuard> admit_resume_outcome(const PiPairResumeOutcomeProof &);
-    std::optional<PiPairResumeGrantProof> outgoing_resume_grant(const std::string &profile_id,const PiPairPrincipal &,
-        const nlohmann::json &grant,const nlohmann::json &migration,const nlohmann::json &settings);
-    std::optional<PiPairMutationGuard> admit_resume_grant(const PiPairResumeGrantProof &);
-    std::optional<PiPairResumeTargetProof> incoming_resume_target(const BrowserRequest &,const LocalBrowserPrincipal &);
-    std::optional<PiPairResumeTargetProof> incoming_resume_target(const BrowserRequest &,const PiPairPrincipal &);
-    std::optional<PiPairMutationGuard> admit_resume_target(const PiPairResumeTargetProof &);
     PiPairCommitResult commit_pair(const PiPairCommitApproval &);
     std::optional<nlohmann::json> pair_operation(const PiPairPrincipal &,const std::string &operation_id);
     // Actual target-side two-phase rotation. Only an authenticated current

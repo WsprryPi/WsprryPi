@@ -57,7 +57,7 @@
                                 <span class="ms-2"><?= htmlspecialchars($navMetadata['navLabel']) ?></span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-start" aria-labelledby="spotsDropdown">
-                                <li>
+                                <li data-transmitter-only>
                                     <a
                                         class="dropdown-item<?= $isActive ? ' active' : '' ?>"
                                         href="<?= htmlspecialchars($href) ?>"
@@ -79,7 +79,7 @@
                             </ul>
                         </li>
                     <?php else: ?>
-                        <li class="nav-item">
+                        <li class="nav-item"<?= $viewKey === 'logs' ? ' data-transmitter-only' : '' ?>>
                             <a
                                 class="nav-link nav-link-primary<?= $isActive ? ' active' : '' ?>"
                                 href="<?= htmlspecialchars($href) ?>"

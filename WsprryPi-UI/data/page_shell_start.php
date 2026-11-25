@@ -22,9 +22,13 @@ if (!isset($cardClass)) {
             renderPageWarning('pico-firmware-safety');
             renderPageWarning('uiConsistencyDiagnostic', 'ui-consistency-diagnostic', 'UI consistency could not be confirmed', true);
             ?>
-            <section id="controllerOnlyNotice" class="alert alert-info page-warning" role="status" aria-live="polite" aria-atomic="true" hidden>
-                <h2 class="h6">Controller only</h2>
-                <p class="page-warning__message mb-0"></p>
+            <section id="controllerOnlyNotice" class="alert alert-info page-warning" aria-labelledby="hostRoleTitle">
+                <div role="status" aria-atomic="true">
+                    <h2 id="hostRoleTitle" class="h6">Connecting to Wsprry Pi</h2>
+                    <p class="page-warning__message mb-0">Checking the host before enabling controls.</p>
+                    <p id="controllerHostIdentity" class="small text-break mb-0 mt-1" hidden></p>
+                </div>
+                <button type="button" id="hostRoleRetry" class="btn btn-sm page-warning__retry mt-2" hidden>Retry connection</button>
             </section>
             <section id="configurationRecoveryNotice" class="alert alert-warning page-warning" role="status" aria-live="polite" hidden>
                 <h2 class="h6">Transmitter startup is blocked</h2>

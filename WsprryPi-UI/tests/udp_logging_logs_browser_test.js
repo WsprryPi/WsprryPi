@@ -54,6 +54,7 @@ const server=http.createServer((req,res)=>{
   const timer=setInterval(()=>res.write(': heartbeat\n\n'),1000);req.on('close',()=>clearInterval(timer));return;
  }
  if(url.pathname==='/index.php'||url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(html);return;}
+ if(url.pathname==='/version'&&req.method==='GET'){res.setHeader('Content-Type','application/json');res.end('{"host_status":{"role":"transmitter"}}');return;}
  if(url.pathname==='/api/control/v1/status'){res.setHeader('Content-Type','application/json');res.end('{"host":{"selected":false,"firmware_maintenance":false}}');return;}
  const file=path.resolve(root,'.'+url.pathname);
  if(file.startsWith(root+path.sep)&&fs.existsSync(file)&&fs.statSync(file).isFile()&&!file.endsWith('.php')){

@@ -3,7 +3,7 @@
 const { waitForPhp, createBrowserProfile, freePort, waitFor, launchBrowser, finishFixture, spawnFixtureChild, waitForSpawn, childDiagnostic } = require("./browser_harness.js");
 // SPDX-License-Identifier: MIT
 // Opt-in rendered recovery workflow with real shipped UI and mocked HTTP responses.
-// Generate the source-paired resource JSON with wtp-config-interop-test first.
+// Generate the source-paired resource JSON with pico-control-interop-test first.
 
 const assert = require("node:assert/strict");
 const http = require("node:http");
@@ -60,7 +60,9 @@ async function main() {
             window.__discoveryState = "active";
             window.__snapshot = { selected:true, firmware_maintenance:false, transport:'network', ready:true, host_utc_valid:true, phase:'idle', session_phase:'ready', now_ms:'10000', status_observed_ms:'1000',
                 remote:{output_active:false}, owns:false, network:{hostname:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',port:18443,expected_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',resolved_address:'192.0.2.27',authenticated_identity:'wsprrypico-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local',state:'ready',observed_ms:'9000'} };
+            const originalFetch=window.fetch;
             window.fetch = async (url, options = {}) => {
+                if (String(url).endsWith('/version')) return originalFetch(url,options);
                 window.__requests.push({url,options});
                 if (String(url).endsWith('/member/management')) {
                     const body = options.body ? JSON.parse(options.body) : null;

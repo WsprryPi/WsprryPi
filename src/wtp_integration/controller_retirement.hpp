@@ -62,7 +62,6 @@ public:
     nlohmann::json publish_resume(const ResumeIntent &,const nlohmann::json &signed_acknowledgement);
     std::optional<nlohmann::json> replay(const nlohmann::json &intent,const std::string &revision);
     bool permits(const std::string &target);
-    std::string active_resume(const std::string &target);
     bool pending(const std::string &target);
     // Root supplies a current authenticated native target readback. Closure
     // requires this owner's permanent fences and a matching target receipt;

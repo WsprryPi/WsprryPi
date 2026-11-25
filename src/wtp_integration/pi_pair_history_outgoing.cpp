@@ -37,36 +37,6 @@ Json commit(const Json &intent){return {{"contract","Wsprry-Pair/1"},{"schema","
 Json committed(const Json &intent){return {{"contract","Wsprry-Pair/1"},{"schema","rotate-committed"},{"operation_id",intent["operation_id"]},
     {"pair_id",intent["pair_id"]},{"epoch",intent["prepared"]["next_epoch"]}};}
 }
-std::optional<PiPairResumeGrantProof> PiPairHistory::outgoing_resume_grant(const std::string &selector,const PiPairPrincipal &principal,
-    const Json &grant,const Json &migration,const Json &settings){
-    PiPairPolicyAdmission policy;if(!policy.allowed())return {};
-    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return {};
-    try{
-        require(running_marked_&&service_permits()&&valid_pi_pair_document(grant,"resume-grant")&&valid_controller_document(migration,"target-migration-read")&&
-            valid_controller_document(settings,"target-settings"));verify_selection();const auto state=store_->snapshot();require(state.peers.has_value());
-        auto peers=parse_pi_pair_peers(state.peers->bytes,self_);const auto &selected=profile(peers,selector);const auto &pair=selected["pair"];
-        require(bound(selected,principal,self_)&&pair["current"]["epoch"]==principal.identity().epoch&&grant["controller_id"]==self_&&
-            grant["target_id"]==selected["target_id"]&&migration["binding"]["device_id"]==selected["target_id"]&&
-            settings["binding"]==migration["binding"]&&valid_pi_candidate_shape(settings["saved"])&&
-            settings["candidate_digest"]==PiManagementJournal::digest(canonical_pi_management_json(settings["saved"])));
-        bool assignment=false,retired=false;
-        for(const auto &row:migration["controllers"])if(row["controller_id"]==self_&&row["assignment_id"]==grant["assignment_id"]&&row["assignment_revision"]==grant["assignment_revision"])assignment=true;
-        for(const auto &row:migration["retirements"])if(row["controller_id"]==self_&&row["assignment_id"]==grant["assignment_id"]&&row["transition_id"]==grant["transition_id"]&&
-            row["receipt_digest"]==grant["retirement_receipt_digest"]&&epoch(row["retirement_generation"])<epoch(grant["authority_generation"]))retired=true;
-        const bool original=grant["pair_id"]==principal.identity().pair_id&&grant["authorization_generation"]==principal.identity().authorization_generation;
-        const bool current=original&&assignment&&retired&&grant["target_boot_id"]==migration["binding"]["boot_id"]&&migration["state"]=="reconciling"&&
-            migration["authority_generation"]==grant["authority_generation"]&&!migration["wtp_binding"].is_null()&&migration["wtp_binding"]==grant["wtp_binding"]&&
-            settings["candidate_digest"]==grant["candidate_digest"]&&settings["saved"]["scheduling"]["enabled"]==false&&
-            settings["saved"]["configuration"]["Operation"]["Transmit"]==false&&settings["pending_application"]!="held"&&
-            settings["observed_output"]["owner_id"].is_null()&&settings["observed_output"]["job_id"].is_null()&&migration["jobs"].empty();
-        return PiPairResumeGrantProof(this,principal,selector,selected["profile_generation"].get<std::string>(),
-            selected["endpoint"]["host"].get<std::string>(),grant,original,current);
-    }catch(...){return {};}
-}
-std::optional<PiPairMutationGuard> PiPairHistory::admit_resume_grant(const PiPairResumeGrantProof &proof){
-    if(proof.owner_!=this||std::chrono::steady_clock::now()>=proof.until_)return {};
-    return admit_outgoing_mutation(proof.profile_,proof.generation_,proof.principal_);
-}
 bool PiPairHistory::publish_outgoing(const PiPairCatalogStore::Snapshot &before,Json catalog,const Json &operations,Json peers){
     prepare_usage(before,catalog,peers);
     try{store_->publish(before,catalog,operations,peers);}

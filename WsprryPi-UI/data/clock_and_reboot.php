@@ -4,7 +4,7 @@
 <!-- Group wrapper: Icons + Clocks -->
 <div class="d-flex flex-wrap align-items-center group-wrapper machine-power-group">
     <!-- icons -->
-    <div class="icons-wrapper d-flex align-items-center mb-2 mb-sm-0 me-sm-3">
+    <div class="icons-wrapper d-flex align-items-center mb-2 mb-sm-0 me-sm-3" data-transmitter-only>
         <!-- Reboot button with extra right margin -->
         <button
             type="button"
@@ -46,5 +46,5 @@
             <span class="time-value" id="utcTime">--:--:--</span>
         </div>
     </div>
-    <span id="machine-power-status" class="small text-body-secondary" role="status" aria-live="polite">Checking machine power support…</span>
+    <span id="machine-power-status" data-transmitter-only class="small text-body-secondary" role="status" aria-live="polite">Checking machine power support…</span>
 </div>

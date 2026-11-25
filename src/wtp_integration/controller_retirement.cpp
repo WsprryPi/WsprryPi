@@ -264,10 +264,6 @@ Json ControllerRetirementBook::projection(const std::string &incarnation,const J
 }
 Json ControllerRetirementBook::read(const std::string &incarnation,const Json &assignments){std::lock_guard lock(mutex_);verify();return projection(incarnation,assignments);}
 bool ControllerRetirementBook::permits(const std::string &target){std::lock_guard lock(mutex_);verify();const auto row=find(data_["assignments"],target);return row&&(row->at("state")=="legacy"||row->contains("resume_operation"));}
-std::string ControllerRetirementBook::active_resume(const std::string &target){
-    std::lock_guard lock(mutex_);verify();const auto row=find(data_["assignments"],target);
-    return row&&row->contains("resume_operation")?(*row)["resume_operation"].get<std::string>():std::string{};
-}
 bool ControllerRetirementBook::pending(const std::string &target){std::lock_guard lock(mutex_);verify();const auto row=find(data_["assignments"],target);return row&&row->at("state")=="retiring";}
 bool ControllerRetirementBook::retirement_scope_closed(const Json &pair,const Json &migration){
     std::lock_guard lock(mutex_);verify();

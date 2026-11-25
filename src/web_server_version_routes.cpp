@@ -128,6 +128,7 @@ void register_version(
         [set_cors_headers](
             const httplib::Request &, httplib::Response &response) {
             set_cors_headers(response);
+            response.set_header("Cache-Control", "no-store");
             const std::string version =
                 get_raw_version_string()
                 + " on a "
@@ -151,6 +152,9 @@ void register_version(
             j["wspr_build_dirty"] = get_exe_build_dirty();
             j["wspr_build_dirty_state"] = build_dirty_metadata(
                 get_exe_build_dirty());
+            j["host_status"] = controller_only_mode()
+                ? controller_only_status()
+                : nlohmann::json{{"role", "transmitter"}};
             j["compiled_backends"] = get_compiled_backends();
             j["ancillary_gpio"] = has_ancillary_gpio();
             response.set_content(j.dump(4), "application/json");

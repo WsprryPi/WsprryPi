@@ -36,10 +36,11 @@
             }
             if(disposed||generation!==viewGeneration)return;
             state=value;
-            const text=state.state==='paired'?'Managed by '+state.manager.name+'.':state.state==='unpaired'?'No controller is paired with this Pi.':
+            const host=root.ControllerMode?.active?'this host':'this Pi';
+            const text=state.state==='paired'?'Managed by '+state.manager.name+'.':state.state==='unpaired'?'No controller is paired with '+host+'.':
                 state.state==='access_recovery'?'Pairing access needs recovery. Pair again to establish fresh controller access.':'Controller access is unavailable. Check network safety and refresh status.';
             element('pairingState').textContent=text;
-            element('pairingWindow').textContent=state.state==='paired'?'Replace controller':state.state==='access_recovery'?'Pair again':'Pair this Pi';
+            element('pairingWindow').textContent=state.state==='paired'?'Replace controller':state.state==='access_recovery'?'Pair again':'Pair '+host;
             if(!state.window||state.window.window_id!==windowId)clearCode();
             controls();return state;
         }

@@ -8,10 +8,10 @@ Certificate-authenticated engineering HTTPS retains TLS certificate, hostname/IP
 
 DNS-SD management discovery uses `_http._tcp` with the exact current management TXT descriptor. An observation is a candidate locator, not authentication. Preserve explicit saved hostnames, ports, identities, and credentials. Never replace an explicit port with a default or fall back to an older carrier. New manual Consumer-Radio profiles default to port 80.
 
-The actual network acceptance recipes remain `wtp-network-runtime-test`, `wtp-network-interop-test`, and `wtp-config-interop-test` in the [Debian workflow](../.github/workflows/debian-non-hardware.yml). Their historical names do not advertise WTP support. Select the edited Pico source and pinned MbedTLS explicitly. Both network and USB actual-source suites are required for a shared control change.
+The [Debian workflow](../.github/workflows/debian-non-hardware.yml) runs `pico-network-management-pair` and `pico-usb-management-pair` against the selected source pair. The HTTPS and Control/1 interop targets exercise the production management handlers. The Pi network runtime regression also checks retirement and refusal behavior. Select the candidate Pico and pinned Mbed TLS sources explicitly.
 
 ## Tool compatibility
 
-The maintained Pico `rf_wtp.py`, `wtp_probe.py`, `wtp_monitor.py`, `usb_inventory.py`, `check_usb_target.py`, and `inhibited_network_acceptance.py` command entry points refuse before device I/O. Console-only trace and standalone diagnostics use the independent Console helper. Independent decoding, calibration, RFBench Commands, and bounded transport test libraries retain their own responsibilities.
+Pico removed its WTP execution tools. Console-only trace and standalone diagnostics use the independent Console helper. Independent decoding, calibration, RFBench Commands, and bounded transport test libraries retain their own responsibilities.
 
 The sibling Qualification Harness’s WTP-based live Pico smoke and execution campaigns depend on its `wtp_control`, `pico_live`, and `pico_smoke` adapters and cannot operate this candidate. Those sources were inspected read-only; no harness compatibility or replacement remote API is provided. Keep its independent capture/decoder workflows separate from retired transmitter control.

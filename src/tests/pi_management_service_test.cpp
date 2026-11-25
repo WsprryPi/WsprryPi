@@ -53,7 +53,6 @@ int main(){
   iniFile.set_file_writer([&](const std::string &path,const std::string &image){check(path==ini,"Fixed owning INI publication");store.write_committed_ini(image);});
   struct Clear{~Clear(){iniFile.set_file_writer({});set_config_persistence_owner({},{},{});}} clear;
   TestClock clock;TestIdentity identity;InhibitedRfEngine engine;JobService jobs(clock,engine,identity);WtpPiAuthority authority(jobs,false);
-  std::optional<PiWtpBinding> legacy_binding;bool legacy_authority_unknown=false;
   bool available=true,race_claim=false,race_stop=false,fail_cancel=false;unsigned cancellations=0;std::string stopping_id,management_boot;
   bool wrong_identity=false;
   try{PiLocalManagementService wrong(store,std::string(32,'b'),"Other Pi",[]()->std::optional<PiManagementObservation>{return {};});}
@@ -64,9 +63,8 @@ int main(){
   PiLocalManagementService service(store,self,"This Pi",[&]()->std::optional<PiManagementObservation>{
       if(!available)return {};
       auto observed=authority.management_snapshot(self);
-      if(legacy_authority_unknown)observed.first.revocation_unavailable=true;
       if(!management_boot.empty())observed.first.remote.boot_id=management_boot;
-      auto result=PiManagementObservation{self,std::move(observed.first),std::move(observed.second),[&]{if(race_claim){race_claim=false;claim();}return authority.begin_configuration();},[&]{authority.end_configuration();},
+      return PiManagementObservation{self,std::move(observed.first),std::move(observed.second),[&]{if(race_claim){race_claim=false;claim();}return authority.begin_configuration();},[&]{authority.end_configuration();},
           [&](const WtpPiAuthority::ObservedOutput &expected){
               if(race_stop){race_stop=false;check(authority.begin_test_tone(),"Racing output admission");}
               return authority.reserve_observed_stop(self,identity.boot,expected);
@@ -77,7 +75,6 @@ int main(){
               check(authority.local_stop(),"Existing Stop cancels fixture authority");authority.end_local_work(true);
               config.transmit=false;config_to_json();
           }};
-      result.wtp_binding=legacy_binding;return result;
   });
   const auto path="/api/control/v1/targets/"+self+"/";
   const auto call=[&](const std::string &resource,const std::string &method="GET",Json body=Json(),const std::string &revision=std::string{},bool authenticated=true,bool origin=true){
@@ -316,20 +313,13 @@ int main(){
   check(reloaded_solar.settings()["scheduling"]==draft,"Cold recovery retains exact disabled draft");
   // Retire the existing self-owned recurrence through the production API.
   // A manual output must finish before handover; retirement never stops it.
-  check(Json::parse(call("migration").body)["wtp_binding"].is_null(),"Unknown listeners cannot advertise a guessed legacy binding");
-  legacy_binding=PiWtpBinding{authority.snapshot().revocation_generation,31417,31415};
-  const auto qualified_binding=Json::parse(call("migration").body)["wtp_binding"];
-  check(qualified_binding==Json({{"revocation_generation",std::to_string(authority.snapshot().revocation_generation)},{"wtp_port",31417},{"management_port",31415}}),"Legacy binding uses the exact native authority counter and explicit observed ports");
-  legacy_authority_unknown=true;check(Json::parse(call("migration").body)["wtp_binding"].is_null(),"Unknown revocation history cannot qualify a legacy binding");legacy_authority_unknown=false;
-  ++legacy_binding->revocation_generation;check(Json::parse(call("migration").body)["wtp_binding"].is_null(),"Different authority observation cannot be mixed into the migration frame");
-  legacy_binding->revocation_generation=authority.snapshot().revocation_generation;legacy_binding->wtp_port=0;
-  check(Json::parse(call("migration").body)["wtp_binding"].is_null(),"Unbound WTP port remains unavailable");
-  legacy_binding->wtp_port=31417;legacy_binding->management_port=65536;
-  check(Json::parse(call("migration").body)["wtp_binding"].is_null(),"Invalid active HTTP port cannot qualify legacy handback");legacy_binding.reset();
   auto migration_context=Json::parse(call("context").body),migration_settings=Json::parse(call("settings").body);
   const auto migration_state=Json::parse(call("migration").body);
   check(valid_controller_document(migration_state,"target-migration-read")&&migration_state["controllers"].size()==1&&
       migration_state["controllers"][0]["controller_id"]==self,"Target-owned local inventory is returned without browser-supplied proof");
+  auto retired_readback=migration_state;retired_readback["wtp_binding"]=nullptr;
+  check(!migration_state.contains("wtp_binding")&&!valid_controller_document(retired_readback,"target-migration-read"),
+      "Migration readback omits and rejects a retired WTP binding");
   Json migrate{{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",migration_context["binding"]},
       {"capability_revision",migration_context["capability_revision"]},{"operation_id",std::string(32,'4')},
       {"expected_revision",migration_settings["revision"]},{"expected_authority_generation",migration_state["authority_generation"]},

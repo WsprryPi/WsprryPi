@@ -47,6 +47,14 @@ module.exports=async function exercise({backendOrigin,socketPort,profiles,failA,
   };
   const load=async()=>{await run("document.getElementById('scheduling-tab').click();document.getElementById('wtp-combined-settings').open=true;document.getElementById('wtp-remote-load').click()");await waitFor(()=>run("!document.getElementById('wtp-remote-save').disabled && document.getElementById('wtp-management').getAttribute('aria-busy')==='false'"),'saved target settings',30000);};
   const draft=async value=>run(`document.getElementById('wtp-remote-callsign').value='${value}';document.getElementById('wtp-remote-callsign').dispatchEvent(new Event('input',{bubbles:true}));`);
+  await client.send('Page.navigate',{url:origin+'/index.php?page=operation'});
+  await waitFor(()=>run("window.ControllerMode?.ready && TargetOperation.options().length===2"),'two production controller targets in Operation',20000);
+  assert.equal(await run("document.getElementById('operationDevice').value"),'','Discovery must not choose a target');
+  for(const id of ['a','b']){
+   await run(`document.getElementById('operationDevice').value='target:${id.repeat(32)}';document.getElementById('operationDevice').dispatchEvent(new Event('change',{bubbles:true}))`);
+   await waitFor(()=>run(`document.getElementById('operationTargetIdentity').textContent.includes('${id.repeat(32)}') && document.getElementById('operationTargetFeedback').textContent.includes('Current device status read')`),'verified Operation target '+id,30000);
+   assert(await run("document.getElementById('controllerHostIdentity').textContent.includes('cccccccccccccccccccccccccccccccc') && document.getElementById('operationLocalView').hidden"));
+  }
   await navigate();await manage('a');await load();await draft('K1ABC');
   assert.equal(await run("document.getElementById('setup-device').closest('form,[role=tablist]')"),null);
   assert.equal(await run("document.getElementById('wtp-remote-callsign').closest('form')"),null);

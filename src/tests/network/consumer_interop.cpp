@@ -81,22 +81,22 @@ struct NoWtp : pi::wtp::ByteStream {
   }
   void close() noexcept override {}
 };
-struct FixtureEngine : pico::wtp::RfEngine {
+struct FixtureEngine : pico::execution::RfEngine {
   pico::standalone::DryRunEngine dry;
   bool can_disable=true, failure_report=false, reported_active=false;
   unsigned disables{},prepares{};
-  std::optional<pico::wtp::Job> accepted;
-  pico::wtp::PrepareResult prepare(const pico::wtp::Job &j) override {
+  std::optional<pico::execution::Job> accepted;
+  pico::execution::PrepareResult prepare(const pico::execution::Job &j) override {
     ++prepares;
     auto result = dry.prepare(j);
     if (result.accepted) accepted = j;
     return result;
   }
   bool schedules_locally() const override { return true; }
-  bool schedule(const pico::wtp::Job &j,std::uint64_t n,const pico::wtp::LocalStartConditions &c) override {return dry.schedule(j,n,c);}
-  bool begin(const pico::wtp::Job &j,std::uint64_t n) override {return dry.begin(j,n);}
-  pico::wtp::EngineReport poll(std::uint64_t n) override {
-    return failure_report ? pico::wtp::EngineReport{pico::wtp::EngineState::Failed,reported_active,{}} : dry.poll(n);
+  bool schedule(const pico::execution::Job &j,std::uint64_t n,const pico::execution::LocalStartConditions &c) override {return dry.schedule(j,n,c);}
+  bool begin(const pico::execution::Job &j,std::uint64_t n) override {return dry.begin(j,n);}
+  pico::execution::EngineReport poll(std::uint64_t n) override {
+    return failure_report ? pico::execution::EngineReport{pico::execution::EngineState::Failed,reported_active,{}} : dry.poll(n);
   }
   bool disable(std::uint64_t n) override {++disables;return can_disable&&dry.disable(n);}
   bool output_active() const override {return reported_active;}
@@ -109,7 +109,7 @@ struct ResourceFixture {
   network_test::Clock clock;
   FixtureEngine engine;
   network_test::Identity identities;
-  pico::wtp::JobService service{clock,engine,identities,network_test::Fixture::physical_policy()};
+  pico::execution::JobService service{clock,engine,identities,network_test::Fixture::physical_policy()};
   pico::standalone::Scheduler scheduler{store,service};
   network_test::Network network;
   pico::network::BrowserApi api{service,store,scheduler,network,device,"test-firmware"};
@@ -127,19 +127,19 @@ struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
   std::array<std::uint8_t, 32> public_key() const override {
     return actual.public_key();
   }
-  bool authenticate(pico::wtp::FrameBuffer &packet,
+  bool authenticate(pico::execution::FrameBuffer &packet,
                     const pico::network::ConsumerRadioBinding &binding,
                     std::string_view password) override {
     return actual.authenticate(packet, binding, password);
   }
-  std::optional<pico::wtp::InputView>
-  open(pico::wtp::FrameBuffer &packet,
+  std::optional<pico::execution::InputView>
+  open(pico::execution::FrameBuffer &packet,
        const pico::network::ConsumerRadioBinding &binding,
        std::uint64_t sequence) override {
     return actual.open(packet, binding, sequence);
   }
   std::optional<pico::network::HttpResponse>
-  seal(pico::wtp::InputView plain,
+  seal(pico::execution::InputView plain,
        const pico::network::ConsumerRadioBinding &binding,
        std::uint64_t sequence) {
     if (version || management_edit) {
@@ -163,7 +163,7 @@ struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
     return actual.seal(plain, binding, sequence);
   }
   std::optional<pico::network::HttpResponse>
-  seal_parts(std::span<const pico::wtp::InputView> parts,
+  seal_parts(std::span<const pico::execution::InputView> parts,
              const pico::network::ConsumerRadioBinding &binding,
              std::uint64_t sequence) override {
     if (version || management_edit) {
@@ -174,14 +174,14 @@ struct PolicyCrypto : pico::network::ConsumerRadioCrypto {
     return actual.seal_parts(parts, binding, sequence);
   }
   std::optional<pico::network::HttpResponse>
-  seal_buffer(pico::wtp::OutputBuffer plain,
+  seal_buffer(pico::execution::OutputBuffer plain,
               const pico::network::ConsumerRadioBinding &binding,
               std::uint64_t sequence) override {
     if (version || management_edit) return seal(plain.view(), binding, sequence);
     return actual.seal_buffer(std::move(plain), binding, sequence);
   }
   std::optional<pico::network::HttpResponse>
-  seal_source(pico::wtp::ResponseSourcePtr plain,
+  seal_source(pico::execution::ResponseSourcePtr plain,
               const pico::network::ConsumerRadioBinding &binding,
               std::uint64_t sequence) override {
     if (version || management_edit) {
@@ -310,9 +310,9 @@ struct Test {
         replay = false;
       } else
         previous_packet = body;
-      r.buffered_body = std::make_shared<pico::wtp::FrameBuffer>();
+      r.buffered_body = std::make_shared<pico::execution::FrameBuffer>();
       assert(r.buffered_body->reserve(body.size()));
-      r.buffered_body->append(pico::wtp::InputView(body));
+      r.buffered_body->append(pico::execution::InputView(body));
     } else
       r.body = body;
     const auto before = f.store.config_sequence();
@@ -548,7 +548,7 @@ void hostname_progress_preservation_cases() {
     Test t;
     auto &progress = t.progress;
     const auto fields =
-        pico::wtp::json::parse(R"({"callsign":"BB1BB","locator":null})");
+        pico::execution::json::parse(R"({"callsign":"BB1BB","locator":null})");
     assert(progress.save(*fields, std::string(64, 'a')));
     const auto saved_draft = progress.fields();
     const auto saved_sequence = progress.sequence();
@@ -762,30 +762,30 @@ void retirement_job_authority_cases() {
     assert(victim->login(device,"consumer_station","test-password").status==200);
     t.host.now+=1000;assert(peer->login(device,"consumer_station","test-password").status==200);
     unsigned sequence=0;
-    const auto invoke=[&](const std::string &operation,pico::wtp::RequestBody body) {
-      pico::wtp::Request request;request.principal="fixture-owner";request.session_id=std::string(32,'b');
+    const auto invoke=[&](const std::string &operation,pico::execution::RequestBody body) {
+      pico::execution::Request request;request.principal="fixture-owner";request.session_id=std::string(32,'b');
       request.request_id=std::string(31,'0')+std::to_string(++sequence);request.operation=operation;
       request.body=std::move(body);request.payload_digest[0]=sequence;return t.f.service.handle(request);
     };
-    assert(invoke("HELLO",pico::wtp::HelloBody{{"WTP/1"}}).ok);
-    assert(invoke("CLAIM",pico::wtp::ClaimBody{std::string(32,'b'),60000}).ok);
-    pico::wtp::Job job{std::string(32,'c'),"rf-events/1","tone",1'000'000'000,{},false};
+    assert(invoke("HELLO",pico::execution::HelloBody{{pico::execution::session_version}}).ok);
+    assert(invoke("CLAIM",pico::execution::ClaimBody{std::string(32,'b'),60000}).ok);
+    pico::execution::Job job{std::string(32,'c'),"rf-events/1","tone",1'000'000'000,{},false};
     assert(job.events.push_back({0,job.total_duration_ns,true,7'040'000'000'000'000ULL}));
     assert(invoke("LOAD",std::move(job)).ok);
-    if (phase>=1) assert(invoke("ARM",pico::wtp::ArmBody{std::string(32,'c'),t.f.clock.snapshot().utc_now_ns+3'000'000'000,1000}).ok);
+    if (phase>=1) assert(invoke("ARM",pico::execution::ArmBody{std::string(32,'c'),t.f.clock.snapshot().utc_now_ns+3'000'000'000,1000}).ok);
     if (phase>=2) {
       t.f.clock.now+=3'000'000'000;t.f.service.poll();
-      assert(t.f.service.status().state==pico::wtp::State::Running);
+      assert(t.f.service.status().state==pico::execution::State::Running);
     }
     if (phase==3) {t.f.engine.failure_report=true;t.f.service.poll();}
     if (phase==4) {
       t.f.engine.can_disable=false;t.f.engine.reported_active=true;
-      assert(!invoke("ABORT",pico::wtp::AbortBody{std::string(32,'c')}).ok);
+      assert(!invoke("ABORT",pico::execution::AbortBody{std::string(32,'c')}).ok);
     }
     const auto before=t.f.service.status();
-    const std::array expected{pico::wtp::State::Loaded,pico::wtp::State::Armed,pico::wtp::State::Running,pico::wtp::State::Failed,pico::wtp::State::Failed};
+    const std::array expected{pico::execution::State::Loaded,pico::execution::State::Armed,pico::execution::State::Running,pico::execution::State::Failed,pico::execution::State::Failed};
     assert(before.state==expected[phase] && before.owner_id==std::string(32,'b') && before.job_id==std::string(32,'c'));
-    if (phase>=3) assert(before.terminal_records.front().error==(phase==3 ? pico::wtp::ErrorCode::DeviceFault : pico::wtp::ErrorCode::OutputStateUnknown));
+    if (phase>=3) assert(before.terminal_records.front().error==(phase==3 ? pico::execution::ErrorCode::DeviceFault : pico::execution::ErrorCode::OutputStateUnknown));
     const auto flash=t.f.flash.bytes,profile=t.media.data;
     const auto scheduler=t.f.scheduler.status();const auto watermark=t.f.store.watermark();
     const auto disables=t.f.engine.disables,prepares=t.f.engine.prepares;
@@ -951,8 +951,8 @@ void runtime_recovery_admission_cases() {
   assert(owner.request("member/management","POST",Json{{"action","connect"},{"carrier","consumer_station"},
       {"host",t.authority},{"password","test-password"}}.dump()).status==200);
   const std::string session(32,'d');
-  assert(network_test::internal_command(t.f.service,"HELLO",pico::wtp::HelloBody{{"WTP/1"}},"native-fixture",session).ok);
-  assert(network_test::internal_command(t.f.service,"CLAIM",pico::wtp::ClaimBody{session,60000},"native-fixture",session).ok);
+  assert(network_test::internal_command(t.f.service,"HELLO",pico::execution::HelloBody{{pico::execution::session_version}},"native-fixture",session).ok);
+  assert(network_test::internal_command(t.f.service,"CLAIM",pico::execution::ClaimBody{session,60000},"native-fixture",session).ok);
   const auto before=t.f.service.status();
   const auto list=owner.request("member/management","POST",Json{{"action","inspect_logins"},{"carrier","consumer_station"},{"host",t.authority}}.dump());
   assert(list.status==200); // Login recovery is independent of native output ownership.
@@ -1026,21 +1026,21 @@ void resource_admission_cases() {
     const auto app=Json::parse(loaded.body);
     const Json edit={{"contract","Wsprry-Control/1"},{"schema","hardware"},{"target",app["target"]},{"pins",app["application"]["hardware"]["saved"]}};
     unsigned sequence=0;
-    const auto invoke=[&](std::string operation,pico::wtp::RequestBody body) {
-      pico::wtp::Request r; r.principal="fixture-owner";r.session_id=std::string(32,'b');
+    const auto invoke=[&](std::string operation,pico::execution::RequestBody body) {
+      pico::execution::Request r; r.principal="fixture-owner";r.session_id=std::string(32,'b');
       r.request_id=std::string(31,'0')+std::to_string(++sequence);r.operation=operation;r.body=std::move(body);r.payload_digest[0]=sequence;
       return t.f.service.handle(r);
     };
-    assert(invoke("HELLO",pico::wtp::HelloBody{{"WTP/1"}}).ok);
-    assert(invoke("CLAIM",pico::wtp::ClaimBody{std::string(32,'b'),60000}).ok);
+    assert(invoke("HELLO",pico::execution::HelloBody{{pico::execution::session_version}}).ok);
+    assert(invoke("CLAIM",pico::execution::ClaimBody{std::string(32,'b'),60000}).ok);
     if (phase>=1) {
-      pico::wtp::Job job{std::string(32,'c'),"rf-events/1","tone",1'000'000'000,{},false};
+      pico::execution::Job job{std::string(32,'c'),"rf-events/1","tone",1'000'000'000,{},false};
       assert(job.events.push_back({0,job.total_duration_ns,true,7'040'000'000'000'000ULL}));
       assert(invoke("LOAD",std::move(job)).ok);
     }
-    if (phase>=2) assert(invoke("ARM",pico::wtp::ArmBody{std::string(32,'c'),t.f.clock.snapshot().utc_now_ns+3'000'000'000,1000}).ok);
-    if (phase==3) {t.f.clock.now+=3'000'000'000;t.f.service.poll();assert(t.f.service.status().state==pico::wtp::State::Running);}
-    if (phase==4) {t.f.engine.can_disable=false;(void)invoke("ABORT",pico::wtp::AbortBody{std::string(32,'c')});assert(t.f.service.status().state==pico::wtp::State::Failed);}
+    if (phase>=2) assert(invoke("ARM",pico::execution::ArmBody{std::string(32,'c'),t.f.clock.snapshot().utc_now_ns+3'000'000'000,1000}).ok);
+    if (phase==3) {t.f.clock.now+=3'000'000'000;t.f.service.poll();assert(t.f.service.status().state==pico::execution::State::Running);}
+    if (phase==4) {t.f.engine.can_disable=false;(void)invoke("ABORT",pico::execution::AbortBody{std::string(32,'c')});assert(t.f.service.status().state==pico::execution::State::Failed);}
     const auto bytes=t.f.flash.bytes;const auto status=t.f.service.status();
     const auto result=request("PUT",edit.dump(),loaded.etag);
     assert(result.status==409 && t.f.flash.bytes==bytes && t.f.service.status()==status && t.mutations==0 && t.wtp.io==0);
@@ -1112,7 +1112,7 @@ void interactive(bool ap,bool configured=true) {
         if (config) config->password.clear();
         std::cout<<Json{{"healthy",healthy},{"config",config ? Json::parse(pico::standalone::serialize_config(*config)) : Json(nullptr)},
           {"generation",std::to_string(reload.config_sequence())},{"cursor",std::to_string(reload.watermark())},
-          {"bytes_sha256",pico::network::bootstrap_hex(pico::wtp::sha256(t.f.flash.bytes))},
+          {"bytes_sha256",pico::network::bootstrap_hex(pico::execution::sha256(t.f.flash.bytes))},
           {"inhibit",t.f.service.output_inhibited()},{"pending_restart",t.f.scheduler.hardware_restart_required()},
           {"application_error",t.f.scheduler.hardware_application_failed()},{"scheduler",Json::parse(t.f.scheduler.status())},
           {"disables",t.f.engine.disables},{"prepares",t.f.engine.prepares},{"mutations",t.mutations},{"wtp_io",t.wtp.io}}.dump()<<std::endl;
@@ -1132,12 +1132,12 @@ void scheduler_frequency_interop(const char *path) {
   assert(f.store.save(config));
   const auto saved = f.flash.bytes;
   const std::string native_session(32,'1');
-  const auto command=[&](std::string op,pico::wtp::RequestBody body={}){
+  const auto command=[&](std::string op,pico::execution::RequestBody body={}){
     const auto result=network_test::internal_command(f.service,std::move(op),std::move(body),"scheduler-frequency-test",native_session);
     assert(result.ok);
   };
-  command("HELLO",pico::wtp::HelloBody{{"WTP/1"}});
-  command("CLAIM",pico::wtp::ClaimBody{native_session,30000});
+  command("HELLO",pico::execution::HelloBody{{pico::execution::session_version}});
+  command("CLAIM",pico::execution::ClaimBody{native_session,30000});
   std::ifstream input(path);
   assert(input.is_open());
   std::string line;
@@ -1148,7 +1148,7 @@ void scheduler_frequency_interop(const char *path) {
     assert(frame < 5);
     const auto wire = Json::parse(line);
     assert(wire.at("schema")=="native-plan-fixture/1");
-    pico::wtp::Job submitted;submitted.job_id=wire.at("job_id");submitted.mode=wire.at("mode");
+    pico::execution::Job submitted;submitted.job_id=wire.at("job_id");submitted.mode=wire.at("mode");
     submitted.total_duration_ns=std::stoull(wire.at("total_duration_ns").get<std::string>());submitted.allow_frequency_adjustment=true;
     for(const auto &event:wire.at("events"))submitted.events.push_back({std::stoull(event.at("offset_ns").get<std::string>()),
         std::stoull(event.at("duration_ns").get<std::string>()),event.at("rf_on").get<bool>(),std::stoull(event.at("frequency_nhz").get<std::string>())});
@@ -1171,7 +1171,7 @@ void scheduler_frequency_interop(const char *path) {
     for (auto tone : zero) expected.insert(static_cast<std::uint64_t>(static_cast<std::int64_t>(tone) + shift));
     assert(actual == expected);
     assert(f.flash.bytes == saved); // Neither the dial nor calibration is persisted again.
-    command("ABORT",pico::wtp::AbortBody{job.job_id});
+    command("ABORT",pico::execution::AbortBody{job.job_id});
     ++frame;
   }
   assert(frame == 5);
@@ -1438,7 +1438,7 @@ int main(int argc, char **argv) {
     assert(t.mutations == 0);
   }
   // Discovery refusals pass through the actual native coordinator and never write.
-  for (unsigned variant=0;variant<12;++variant) {
+  for (unsigned variant=0;variant<13;++variant) {
     Test t;auto c=t.client();assert(c->login(device,"consumer_station","test-password").status==200);
     const auto before_bytes=t.f.flash.bytes;
     const auto exchange=[&](const std::string& resource,const std::string& method,const std::string& body,const std::string& revision) {
@@ -1462,6 +1462,7 @@ int main(int argc, char **argv) {
           j["limits"]["idle_ms"]=300000;
           j["limits"]["absolute_ms"]=900000;
         }
+        if(variant==12)j["unsupported"]={"plain_wtp_json","tls_wtp_json","ble_json"};
         response.body=j.dump();
       }
       return response;

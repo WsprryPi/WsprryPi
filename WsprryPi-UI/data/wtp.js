@@ -210,7 +210,7 @@
             : fleetCatalog.active_unmatched ? "Choose the intended saved management profile." : "Choose a saved device or nearby candidate. Exploring does not connect or save.";
     }
     async function fleetLoad() {
-        if (!byId("fleet-device") || fleetBusy || fleetLoading) return;
+        if (!byId("fleet-device") || root.ControllerMode?.blocked || fleetBusy || fleetLoading) return;
         fleetLoading = true;
         try {
             const [catalogResponse, discoveryResponse] = await Promise.all([
@@ -221,10 +221,12 @@
             const catalog = await readReply(catalogResponse);
             if (catalog.scope !== "wsprrypi-wtp-catalog/1" || !Array.isArray(catalog.profiles))
                 throw new Error("Catalog response is invalid.");
+            const discovery = discoveryResponse.ok ? await readReply(discoveryResponse) :
+                {available:false, reason:"Discovery read failed", candidates:[]};
+            if (root.ControllerMode?.blocked) return;
             fleetCatalog = catalog;
             fleetRevision = catalogResponse.headers?.get?.("ETag") || "";
-            fleetDiscovery = discoveryResponse.ok ? await readReply(discoveryResponse) :
-                {available:false, reason:"Discovery read failed", candidates:[]};
+            fleetDiscovery = discovery;
             if (!Array.isArray(fleetDiscovery.candidates)) fleetDiscovery.candidates = [];
             if (!Array.isArray(fleetDiscovery.usb?.candidates)) fleetDiscovery.usb = {available:false, candidates:[]};
             if (!fleetDiscovery.usb.available) fleetDiscovery.usb.candidates = [];
@@ -303,7 +305,7 @@
         if (fleetUsbId) void fleetIdentify();
     }
     async function fleetMutation(body, feedback) {
-        if (root.ControllerMode?.active && !root.ControllerMode.ready) {
+        if (root.ControllerMode?.blocked) {
             fleetFeedback("Controller management is unavailable. Read current controller status before saving.");
             return;
         }
@@ -445,6 +447,7 @@
         if(!byId("wtp-controls"))return;
         fleetInit();
         const refresh=()=>{void fleetLoad().finally(()=>{if(!closed)timer=setTimeout(refresh,5000);});};
+        root.addEventListener("wsprry-host-status",()=>void fleetLoad());
         root.addEventListener("pagehide",()=>{closed=true;clearTimeout(timer);});
         root.addEventListener("pageshow",()=>{closed=false;clearTimeout(timer);refresh();});
         render();refresh();

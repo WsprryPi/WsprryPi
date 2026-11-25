@@ -205,7 +205,7 @@ jobs:
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test wtp-usb-management-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-protocol-test wtp-usb-test pico-usb-management-contract-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-production-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
@@ -260,19 +260,19 @@ jobs:
         working-directory: src
         run: |
           make -j2 wtp-network-tools-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-network-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
-          make wtp-config-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
+          make pi-network-runtime-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make pico-https-management-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
+          make pico-control-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
       - name: Build the actual software Pico USB endpoint on native Mac
         run: |
           cmake -S src/build/controller-native-reference/pico -B src/build/controller-native-reference/pico-usb -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build src/build/controller-native-reference/pico-usb --target usb_management_driver -j2
-          make -C src wtp-usb-pair-client-build wtp-usb-management-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make -C src pico-usb-control-client-build pico-usb-management-contract-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Exercise native Mac clients through production Pico USB handlers
         env:
           WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
         run: |
-          WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/controller-native-reference/pico-usb/usb_management_driver
+          WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/pico_usb_control_pair_test.js src/build/wtp-network/pico_usb_control_client src/build/controller-native-reference/pico-usb/usb_management_driver
           node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/controller-native-reference/pico-usb/usb_management_driver
           node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/controller-native-reference/pico-usb/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
       - name: Exercise native controller recovery owners and restart
@@ -316,14 +316,14 @@ jobs:
 
       - name: Qualify pairing and controller roles without hardware on both Mac architectures
         run: |
-          make -C src pairing-provider-test pi-pair-contract-test pi-pair-crypto-test pi-pair-tls-test pi-pair-machine-service-test pi-pair-resume-refusal-test pi-wtp-binding-test pi-pair-runtime-test pi-pair-local-http-test pi-pair-service-lifetime-test pi-pair-outgoing-rotation-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make -C src pairing-provider-test pi-pair-contract-test pi-pair-crypto-test pi-pair-tls-test pi-pair-machine-service-test pi-pair-runtime-test pi-pair-local-http-test pi-pair-service-lifetime-test pi-pair-outgoing-rotation-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           python3 scripts/tests/pairing_provider_build_test.py
           python3 scripts/tests/pairing_support_redaction_test.py
           python3 scripts/tests/copy_exe_notice_test.py
           cmp docs/licenses/botan/BSD-2-Clause.txt src/build/bin/BOTAN-LICENSE.txt
           cmp scripts/pairing_provider.json src/build/bin/PAIRING-PROVIDER.json
 
-  wtp-network-loopback:
+  pico-network-management-pair:
     needs: change_scope
     if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
@@ -389,9 +389,9 @@ jobs:
           make tls-observer-test SUDO=
           make wtp-catalog-test SUDO=
           make -j2 wtp-network-tools-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-network-runtime-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-network-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
-          make wtp-config-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+          make pi-network-runtime-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make pico-https-management-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
+          make pico-control-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           node ../WsprryPi-UI/tests/fleet_operations_pair_test.js build/bin/wtp_fleet_operations_driver network "$PWD/build/wtp-network/pico_tls_server" "$PWD/build/wtp-network/credentials-v3"
       - name: Shipped Pico controls through actual public and encrypted HTTP handlers
         env:
@@ -456,7 +456,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  wtp-usb-management-pair:
+  pico-usb-management-pair:
     needs: change_scope
     if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
@@ -512,11 +512,11 @@ jobs:
           cmake -S src/build/usb-reference/pico -B src/build/usb-reference/pico-host -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build src/build/usb-reference/pico-host --target usb_management_driver -j2
       - name: Build Pi USB clients and negative contract checks
-        run: make -C src wtp-usb-pair-client-build wtp-usb-management-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+        run: make -C src pico-usb-control-client-build pico-usb-management-contract-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Actual UI producer through production Pi and Pico USB handlers
         run: |
           node WsprryPi-UI/tests/wtp_usb_settings_test.js
-          WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
+          WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/pico_usb_control_pair_test.js src/build/wtp-network/pico_usb_control_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
 
@@ -716,7 +716,8 @@ jobs:
           npm run test:browser
           make -C ../src -j1 recovery-maintenance-browser-test recovery-maintenance-controller-browser-test SUDO=
           make -C ../src controller-only-test pico-management-target-test SUDO=
-          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/controller_only_fixture" node tests/controller_mode_browser_test.js
+          make -C ../src -j2 build/bin/controller_only_production_fixture BUILD_PROFILE=controller SUDO=
+          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/controller_only_production_fixture" node tests/controller_mode_browser_test.js
 
       - name: Read-only RP1-GPIO-CLK-DKMS stable reference
         uses: actions/checkout@v7
@@ -863,7 +864,7 @@ jobs:
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test wtp-usb-management-test wtp-production-cpp-test native-recurrence-test SUDO=
+          make wtp-protocol-test wtp-usb-test pico-usb-management-contract-test wtp-production-cpp-test native-recurrence-test SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \

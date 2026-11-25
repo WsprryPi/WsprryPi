@@ -16,7 +16,7 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   for(const resource of ['migration','stop','pi-scheduling'])if(!context.capabilities.some(cap=>cap.resource===resource))context.capabilities.push({...control.controllerPiDescriptors[resource],resource,read:resource!=='stop',write:true,activation:resource==='pi-scheduling'?'next_occurrence':'immediate',maximum_bytes:32768});
   settings.binding=structuredClone(context.binding);settings.capability_revision=context.capability_revision;settings.revision=context.configuration_revision;
   settings.saved.configuration.Operation.Transmit=true;settings.saved.scheduling.enabled=true;
-  Object.assign(migration,{binding:structuredClone(context.binding),state:'native',authority_generation:'4',controllers:[{controller_id:b,assignment_id:(device===a?'4':'5').repeat(32),assignment_revision:'6'.repeat(64)}],retirements:[],jobs:[],transition_id:'7'.repeat(32),staged_revision:null,wtp_binding:{revocation_generation:'8',wtp_port:31417,management_port:31415}});
+  Object.assign(migration,{binding:structuredClone(context.binding),state:'native',authority_generation:'4',controllers:[{controller_id:b,assignment_id:(device===a?'4':'5').repeat(32),assignment_revision:'6'.repeat(64)}],retirements:[],jobs:[],transition_id:'7'.repeat(32),staged_revision:null});
   assert(control.validControllerDocument(context,'target-context'));assert(control.validControllerDocument(settings,'target-settings'));assert(control.validControllerDocument(migration,'target-migration-read'));
   targets.set(device,{context,settings,migration,generation:5,last:null});
  }
@@ -85,7 +85,6 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   await capture('controller-held');
   const nativePrevious={...targets.get(a).migration.controllers[0],controller_id:a,assignment_id:'1'.repeat(32)};
   targets.get(a).migration.controllers.unshift(nativePrevious);
-  targets.get(a).migration.wtp_binding=null;
   await click('Refresh');await waitFor(()=>run("!document.getElementById('recurrenceMigrationAssignment').disabled"),'native previous schedule read');
   await run(`document.getElementById('recurrenceMigrationAssignment').value='${a}/${'1'.repeat(32)}';document.getElementById('recurrenceMigrationAssignment').dispatchEvent(new Event('change'))`);
   await waitFor(()=>run("!document.getElementById('recurrenceMigrationRollback').disabled"),'explicit previous local schedule');

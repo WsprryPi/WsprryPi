@@ -5,7 +5,7 @@
     let selected = null, frozen = false, latest, confirmation, announced = "";
     const setHidden = (id, hidden) => {el(id).hidden = hidden;};
     function headline(output, row, age, valid) {
-        if (!output) return {state: "Removed output", detail: "This selected assignment was removed. Return to This Pi to choose another output."};
+        if (!output) return {state: "Removed output", detail: "This assignment was removed. Return to the device list to choose another output."};
         if(output.state==='migration_required')return {state:'Migration required',detail:output.message||'Legacy controller work remains held. Use WTP-capable software to finish cleanup and retirement.'};
         if(output.state==='retired')return {state:'Controller retired',detail:'Retirement is confirmed. Manage the device’s native schedule separately.'};
         const wtp = output.wtp;
@@ -52,7 +52,8 @@
             selector.value = target ? 'target:'+target.target.device_id : selected?.key || "";
             el("operationDeviceField").hidden = options.length === 1 && !root.ControllerMode?.active;
         }
-        selector.disabled = frozen || state.busy || !!root.TargetOperation?.busy;
+        const hostBlocked = root.ControllerMode?.blocked === true;
+        selector.disabled = hostBlocked || frozen || state.busy || !!root.TargetOperation?.busy;
         const remote = !!selected || !!target;
         const noLocalOutput = root.ControllerMode?.active === true;
         setHidden("operationLocalView", remote || noLocalOutput);el("operationLocalView").inert = remote || noLocalOutput;
@@ -60,8 +61,16 @@
         const controllerView = el("operationControllerView");
         if (controllerView) {
             controllerView.hidden = !noLocalOutput || remote;
-            text("operationControllerHeading", root.TargetOperation?.options().length ? "Select a device" : "No managed devices");
-            text("operationControllerDetail", "This controller has no local transmitter. Choose a managed device above, or add a device in Setup. Legacy entries show migration history only.");
+            const inventory = root.TargetOperation?.inventoryState;
+            text("operationControllerHeading", hostBlocked ? "Device management unavailable"
+                : inventory === "loading" ? "Checking for managed devices"
+                : inventory === "unavailable" ? "Device list unavailable"
+                : root.TargetOperation?.options().length ? "Select a device" : "No managed devices");
+            text("operationControllerDetail", inventory === "unavailable" ? "Refresh status to check for managed devices again."
+                : hostBlocked || inventory === "loading" ? ""
+                : root.TargetOperation?.options().length ? "Select a managed device above to read its status."
+                : "Add a Pico in Setup or pair a Pi in Maintenance.");
+            controllerView.setAttribute("aria-busy", String(!hostBlocked && inventory === "loading"));
         }
         for (const label of root.document.querySelectorAll(".times-wrapper .time-label")) {
             const original = label.dataset.localLabel || label.textContent;label.dataset.localLabel = original;
@@ -114,7 +123,7 @@
     }
     function choose() {
         const value = el("operationDevice").value;
-        if (frozen || latest?.busy || root.TargetOperation?.busy) {render();return;}
+        if (root.ControllerMode?.blocked || frozen || latest?.busy || root.TargetOperation?.busy) {render();return;}
         if (value.startsWith('target:')) {selected=null;void root.TargetOperation.select(value.slice(7));render();return;}
         root.TargetOperation?.leave();
         if (!value) selected = null;

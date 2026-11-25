@@ -44,14 +44,12 @@
     },
     "management": {
       "GET": [
-        "operations/{operation_id}",
-        "resume"
+        "operations/{operation_id}"
       ],
       "POST": [
         "rotate/prepare",
         "rotate/commit",
-        "authorities/register",
-        "resume/ack"
+        "authorities/register"
       ]
     },
     "retirement": {

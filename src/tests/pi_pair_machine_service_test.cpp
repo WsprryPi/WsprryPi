@@ -118,54 +118,10 @@ int recover_handover(const std::string &root,unsigned port){
     std::cout<<"PASS fresh-process target handover: exact retained unknown command, original persisted keys, unclean start, status-only verified retirement, disabled atomic staging and exact receipt\n";
     return 0;
 }
-int resume_target_crash(const std::string &root,const std::string &mode,unsigned point){
-    init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
-    initialize_privileged_network_runtime("enforced");config.transmit_backend=TransmitBackendKind::SIMULATED;config.simulated_backend_override=true;
-    const auto name=root+"/resume-crash-"+mode+"-"+std::to_string(point),ini=root+"/remote-handover-target.ini";
-    auto keys=std::make_shared<PiPairHistory>(name+"-target",id('a'));check(keys->available()&&keys->begin_service());
-    WtpCatalog catalog(ini+".wtp-devices.json");PiManagedStore store(ini,id('a'),catalog.pi_management_anchor(id('a'),{}),
-        [&](PiManagedWritePoint at){if(static_cast<unsigned>(at)==point)_exit(73);});store.recover();
-    Clock clock;Identity identity;wsprrypico::wtp::InhibitedRfEngine engine;wsprrypico::wtp::JobService jobs(clock,engine,identity);WtpPiAuthority authority(jobs,false);
-    PiLocalManagementService native(store,id('a'),"Crash target",[&]()->std::optional<PiManagementObservation>{auto observed=authority.management_snapshot(id('a'));
-        PiManagementObservation result{id('a'),observed.first,observed.second,[&]{return authority.begin_configuration();},[&]{authority.end_configuration();},{},{},{}};
-        result.wtp_binding=PiWtpBinding{observed.first.revocation_generation,31417,31415};return result;});
-    if(mode=="grant"){
-        const auto context=Json::parse(native.handle({"GET","/api/control/v1/targets/"+id('a')+"/context",{},{},false},true).body);
-        const auto controller=store.recurrence_authority()["controllers"][0];
-        const Json body{{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",context["binding"]},
-            {"capability_revision",context["capability_revision"]},{"operation_id",id('2')},{"expected_revision",store.settings()["revision"]},
-            {"expected_authority_generation",store.recurrence_authority()["generation"]},{"resume_controller_id",controller["controller_id"]},{"resume_assignment_id",controller["assignment_id"]}};
-        ManagementBrowserSessions sessions;httplib::Request request;request.method="POST";request.path="/api/control/v1/targets/"+id('a')+"/migration/rollback";
-        request.target=request.path;request.remote_addr="192.168.1.20";request.body=body.dump();request.headers={{"Host","device.local"},{"Origin","http://device.local"},
-            {"Content-Type","application/json"},{"X-WsprryPico-Request","1"},{"If-Match","\""+body["expected_revision"].get<std::string>()+"\""}};
-        httplib::Response response;check(sessions.establish(request,response));const auto cookie=response.get_header_value("Set-Cookie");
-        request.headers.emplace("Cookie",cookie.substr(0,cookie.find(';')));request.headers.emplace("X-WsprryPi-CSRF",response.get_header_value("X-WsprryPi-CSRF"));
-        const auto principal=sessions.authorize_local_mutation(request,{true,"device.local",{},{{"192.168.1.10","255.255.255.0"}}});check(bool(principal));
-        const auto browser=wtp_browser_http_request(request);check(bool(browser));(void)native.handle(*browser,*principal,*keys);return 4;
-    }
-    check(mode=="ack");auto source=std::make_shared<PiPairHistory>(name+"-source",id('b'));check(source->available()&&source->begin_service());
-    PiPairAdmission incoming,outgoing;ManagementBrowserSessions sessions,source_sessions;
-    PiPairMachineService machine(*keys,sessions,id('a'),[](const auto &,const auto &){return controller_target_error(503,"authority_pending");},
-        [&](const auto &principal,const auto &request,const auto &){const auto browser=wtp_browser_http_request(request);check(bool(browser));return PiPairHttpReply{native.handle(*browser,principal,*keys),{},{}};});
-    PiPairServer server(incoming,[&](const auto &identity){return keys->management_credential(identity);},
-        [&](const auto &principal){return keys->accept_finished(principal,&sessions)!=PiPairHistory::ManagementAccess::Denied;},
-        [&](const auto &principal,const auto &request,auto &connection,const auto &cancelled){return machine.handle(principal,request,connection,cancelled);},PiPairServer::Access::LoopbackTest);
-    check(server.start());PiPairRenewal renewal(*source,source_sessions,outgoing,id('b'),PiPairRenewal::LoopbackTest{{"127.0.0.1",server.port()}});
-    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);
-    while(renewal.advance(id('9'))!=PiPairRenewal::Result::Ready&&std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    check(!source->outgoing_renewal_due(id('9')));
-    const auto peers=parse_pi_pair_peers(source->snapshot().peers->bytes,id('b'));const auto &pair=peers["profiles"][0]["pair"];
-    const PiPairTlsIdentity tls{PiPairTlsPurpose::Management,pair["pair_id"].get<std::string>(),pair["authorization_generation"].get<std::string>(),pair["current"]["epoch"].get<std::string>()};
-    std::ifstream file(root+"/resume-crash-ack.json");const auto ack=Json::parse(file);PiPairClient client(outgoing,PiPairClient::Access::LoopbackTest);
-    (void)client.exchange({"127.0.0.1",server.port()},id('a'),[&](const auto &identity){return source->outgoing_credential(id('9'),identity);},tls,
-        [&](const auto &principal){return source->record_outgoing_finished(id('9'),principal);},"POST","/api/pair/v1/resume/ack",ack.dump());
-    return 5;
-}
 int main(int argc,char **argv){try{
-    if(argc==5&&std::string_view(argv[1])=="--resume-target-crash")return resume_target_crash(argv[2],argv[3],static_cast<unsigned>(std::stoul(argv[4])));
     if(argc==4&&std::string_view(argv[1])=="--recover-handover")return recover_handover(argv[2],static_cast<unsigned>(std::stoul(argv[3])));
     if(argc==4&&std::string_view(argv[1])=="--recover-authority-registration")return recover_registration(argv[2],static_cast<unsigned>(std::stoul(argv[3])));
-    const bool refuse_second=argc==2&&std::string_view(argv[1])=="--refuse-second";check(argc==1||refuse_second);
+    check(argc==1);
     char pattern[]="/tmp/pi-pair-machine-XXXXXX";const auto temporary=mkdtemp(pattern);check(temporary);const std::string root=std::filesystem::canonical(temporary).string(),ini=root+"/settings.ini";
     struct Remove {std::string root;~Remove(){std::filesystem::remove_all(root);}} remove{root};
     init_default_config();set_scheduler_execution_suppressed_for_test(true);set_patch_all_from_web_runtime_apply_suppressed_for_test(true);
@@ -204,13 +160,6 @@ int main(int argc,char **argv){try{
     PiPairAdmission incoming,outgoing;ManagementBrowserSessions sessions;PiPairTlsIdentity tls_identity{PiPairTlsPurpose::Management,id('c'),"1","1"};
     std::atomic_bool hold_settings{false},settings_entered{false},release_settings{false};
     bool lose_prepare=false,lose_commit=false,lose_native_reply=false,malform_native_reply=false,lose_registration_reply=false;unsigned prepares=0,commits=0,registration_requests=0;std::string rotation_operation,profile_generation="1";
-    const Json unsigned_resume_ack={{"contract","Wsprry-Pair/1"},{"schema","resume-ack"},{"operation_id",id('1')},{"pair_id",id('c')},
-        {"authorization_generation","1"},{"target_id",id('a')},{"controller_id",id('b')},{"assignment_id",id('4')},
-        {"grant_digest",std::string(64,'6')},{"outcome","refused"},{"controller_generation","3"},{"receipt_digest",std::string(64,'8')}};
-    const auto signed_resume_ack=controller->resume_acknowledgement(unsigned_resume_ack);check(bool(signed_resume_ack));
-    // Independently calculated with Python's hmac/hashlib and canonical JSON.
-    check((*signed_resume_ack)["proof"]=="K0wVwzKAlQwiO8zBrH79y3Q-2NW94l6-246bFww1QWM");
-    std::optional<Json> resume_probe;bool resume_probe_expected=false;unsigned resume_probes=0;
     const auto make_machine=[&]{return std::make_unique<PiPairMachineService>(*paired,sessions,id('a'),
         [&](const auto &,const auto &){return PicoHttpResponse{200,Json{{"contract","Wsprry-Control/1"},{"schema","targets"},{"targets",Json::array({service.target()})}}.dump(),{}};},
         [&](const auto &principal,const httplib::Request &request,const auto &){
@@ -221,10 +170,6 @@ int main(int argc,char **argv){try{
     PiPairServer server(incoming,[&](const auto &requested){return paired->management_credential(requested);},
         [&](const auto &principal){return paired->accept_finished(principal,&sessions)!=PiPairHistory::ManagementAccess::Denied;},
         [&](const auto &principal,const httplib::Request &request,auto &connection,const auto &cancelled){
-            if(resume_probe){
-                const auto proof=paired->resume_outcome_proof(principal,*resume_probe);check(bool(proof)==resume_probe_expected);++resume_probes;
-                if(proof){check(!controller->admit_resume_outcome(*proof));const auto guard=paired->admit_resume_outcome(*proof);check(bool(guard));}
-            }
             if(request.method=="GET"&&request.path.ends_with("/settings")&&hold_settings.exchange(false)){
                 settings_entered.store(true);const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
                 while(!release_settings.load()&&!cancelled()&&std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -420,7 +365,6 @@ int main(int argc,char **argv){try{
         const auto good=guarded_exchange(*signed_request);check(good.principal&&good.reply&&good.reply->payload.status==200&&accepted==1&&guarded_handoffs>0);
         const auto response=parse_pi_pair_document(good.reply->payload.body,"retired");
         check(bool(paired->retired_proof(*good.principal,*signed_request,response)));
-        check(!paired->resume_outcome_proof(*good.principal,*signed_resume_ack));
         auto changed=response;changed["receipt_digest"]=std::string(64,'0');check(!paired->retired_proof(*good.principal,*signed_request,changed));
         changed=*signed_request;changed["assignment_revision"]=std::string(64,'0');check(!paired->retired_proof(*good.principal,changed,response));
         check(!controller->retired_proof(*good.principal,*signed_request,response));
@@ -494,19 +438,15 @@ int main(int argc,char **argv){try{
             check(setup.is_object());setup["binding"]["device_id"]=id('a');setup["operation_id"]=id('d');setup["expected_revision"]=target_store->recovery_revision();
             setup["configuration"]=config_handler_serialization::saved_configuration_from_internal_json(internal);
             target_store->persist_recovery(internal,[]{},PiManagedStore::Operation{id('a'),"1","/api/control/v1/host/configuration-recovery",setup});
-            bool ready_binding=false;unsigned binding_port=31417;
             const auto observe=[&]()->std::optional<PiManagementObservation>{auto state=authority.management_snapshot(id('a'));
                 PiManagementObservation result{id('a'),state.first,state.second,[&]{return authority.begin_configuration();},[&]{authority.end_configuration();},{},{},{}};
-                if(ready_binding)result.wtp_binding=PiWtpBinding{state.first.revocation_generation,binding_port,31415};
                 return result;};
             auto native=std::make_unique<PiLocalManagementService>(*target_store,id('a'),"Handover target",observe);
             ManagementBrowserSessions target_sessions;PiPairAdmission target_admission;
-            bool lose_resume_ack=false;
             PiPairMachineService native_machine(*paired,target_sessions,id('a'),[&](const auto &,const auto &){return PicoHttpResponse{200,
                 Json{{"contract","Wsprry-Control/1"},{"schema","targets"},{"targets",Json::array({native->target()})}}.dump(),{}};},
                 [&](const auto &principal,const auto &request,const auto &){const auto browser=wtp_browser_http_request(request);check(bool(browser));
                     auto response=native->handle(*browser,principal,*paired);
-                    if(lose_resume_ack&&request.path=="/api/pair/v1/resume/ack"&&response.status==200){lose_resume_ack=false;throw std::runtime_error("fixture lost target ACK response");}
                     return PiPairHttpReply{std::move(response),{},{}};});
             PiPairServer native_server(target_admission,[&](const auto &identity){return paired->management_credential(identity);},
                 [&](const auto &principal){return paired->accept_finished(principal,&target_sessions)!=PiPairHistory::ManagementAccess::Denied;},
@@ -602,101 +542,31 @@ int main(int argc,char **argv){try{
             check(native_request("POST",prefix+"migration",repeat_command).reply->payload.status==202);
             check(target_store->remote_handover()->at("requests")[0]["state"]=="confirmed");
             native->advance_migration();check(target_store->recurrence_authority()["state"]=="staged"&&target_store->recurrence_authority()["retirements"]==prior_fences&&accepted==accepted_before+1);
-            const auto disable_reference=target_store->disabled_snapshot();check(bool(disable_reference));
-            const auto crash_boundaries=[&](const std::string &mode){
-                native_server.stop();native.reset();
-                const auto before=target_store->recurrence_authority(),before_settings=target_store->settings();target_store.reset();
-                std::map<std::string,std::optional<std::string>> backup;
-                for(const auto *suffix:{"",".managed-settings.json",".management-operations.json",".wtp-devices.json",".recurrence-authority.json",".legacy-recurrence.json",".recurrence-progress-initialization.json"}){
-                    const auto path=target_ini+suffix;
-                    if(std::filesystem::exists(path)){std::ifstream input(path,std::ios::binary);backup[path]=std::string((std::istreambuf_iterator<char>(input)),{});}else backup[path]=std::nullopt;
-                }
-                const auto copy_keys=[&](const std::string &from,const std::string &to,const PiPairCatalogStore::Snapshot &snapshot){
-                    const auto namespace_id=Json::parse(snapshot.authority->bytes)["namespace_id"].get<std::string>();
-                    std::filesystem::copy(from,to,std::filesystem::copy_options::recursive);
-                    std::filesystem::copy(from+".ns-"+namespace_id,to+".ns-"+namespace_id,std::filesystem::copy_options::recursive);
-                };
-                for(unsigned point=0;point<4;++point){
-                    const auto label=root+"/resume-crash-"+mode+"-"+std::to_string(point);
-                    copy_keys(root+"/pairing",label+"-target",paired->snapshot());
-                    if(mode=="ack")copy_keys(root+"/controller",label+"-source",controller->snapshot());
-                    const auto selected=std::to_string(point);std::array<char *,6> arguments{argv[0],const_cast<char *>("--resume-target-crash"),
-                        const_cast<char *>(root.c_str()),const_cast<char *>(mode.c_str()),const_cast<char *>(selected.c_str()),nullptr};
-                    pid_t child{};check(posix_spawn(&child,argv[0],nullptr,nullptr,arguments.data(),environ)==0);int status{};
-                    check(waitpid(child,&status,0)==child&&WIFEXITED(status)&&WEXITSTATUS(status)==73);
-                    {PiManagedStore cold(target_ini,id('a'),target_catalog.pi_management_anchor(id('a'),{}));cold.recover();
-                        if(point<2)check(cold.recurrence_authority()==before&&cold.settings()==before_settings);
-                        else if(mode=="grant")check(cold.recurrence_authority()["state"]=="reconciling"&&cold.recurrence_authority()["management"]["resume"]["grant"]["operation_id"]==id('2')&&cold.receipt(id('a'),"1",id('2'))->at("state")=="pending");
-                        else check(recurrence_remote_resume_active(cold.recurrence_authority())&&cold.receipt(id('c'),"1",id('7'))->at("state")=="committed");
-                        check(cold.settings()["scheduling"]["enabled"]==false&&cold.settings()["configuration"]["Operation"]["Transmit"]==false);
-                    }
-                    for(const auto &[path,bytes]:backup){
-                        if(bytes){
-                            if(std::filesystem::exists(path)&&PiManagementJournal::read_ini_input(path).bytes==*bytes)continue;
-                            std::ofstream output(path,std::ios::binary|std::ios::trunc);output<<*bytes;output.close();check(!chmod(path.c_str(),0600));
-                        }else std::filesystem::remove(path);
-                    }
-                }
-                target_store=std::make_unique<PiManagedStore>(target_ini,id('a'),target_catalog.pi_management_anchor(id('a'),{}));target_store->recover();
-                check(target_store->recurrence_authority()==before&&target_store->settings()==before_settings);
-                native=std::make_unique<PiLocalManagementService>(*target_store,id('a'),"Handover target",observe);check(native_server.start());
-            };
-            crash_boundaries("grant");
             const auto rollback_context=Json::parse(native_request("GET",prefix+"context").reply->payload.body);
             Json restore{{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",rollback_context["binding"]},
                 {"capability_revision",rollback_context["capability_revision"]},{"operation_id",id('7')},
                 {"expected_revision",target_store->settings()["revision"]},{"expected_authority_generation",target_store->recurrence_authority()["generation"]},
                 {"resume_controller_id",id('b')},{"resume_assignment_id",source_before["assignments"][0]["assignment_id"]}};
-            check(native_request("POST",prefix+"migration/rollback",restore).reply->payload.status==409);
-            check(target_store->recurrence_authority()["state"]=="staged");
-            ready_binding=true;
-            auto bad_restore=restore;bad_restore["resume_controller_id"]=id('e');
-            check(native_request("POST",prefix+"migration/rollback",bad_restore).reply->payload.status==409);
-            const auto pending_restore=native_request("POST",prefix+"migration/rollback",restore);
-            if(!pending_restore.reply||pending_restore.reply->payload.status!=202)throw std::runtime_error("resume prepare: "+(pending_restore.reply?pending_restore.reply->payload.body:"no reply"));
-            check(target_store->recurrence_authority()["state"]=="reconciling");
-            const auto issued=native_request("GET","/api/pair/v1/resume");check(issued.reply&&issued.reply->payload.status==200);
-            const auto issued_grant=Json::parse(issued.reply->payload.body);check(valid_pi_pair_document(issued_grant,"resume-grant"));
-            check(issued_grant["controller_incarnation"]==registration["controller_incarnation"]&&issued_grant["disabled_revision"]==(*disable_reference)["receipt"]["revision"]);
-            check(native_request("POST",prefix+"migration/rollback",restore).reply->payload.status==202);
-            check(PiManagementJournal::read_ini_input(target_ini).signature==ini_observation.signature);
-            native_server.stop();native.reset();target_store.reset();
-            target_store=std::make_unique<PiManagedStore>(target_ini,id('a'),target_catalog.pi_management_anchor(id('a'),{}));target_store->recover();
-            check(target_store->recurrence_authority()["state"]=="reconciling"&&target_store->settings()["scheduling"]["enabled"]==false);
-            native=std::make_unique<PiLocalManagementService>(*target_store,id('a'),"Handover target",observe);check(native_server.start());
-            check(Json::parse(native_request("GET","/api/pair/v1/resume").reply->payload.body)==issued_grant);
-            Json outcome{{"contract","Wsprry-Pair/1"},{"schema","resume-ack"},{"operation_id",issued_grant["operation_id"]},
-                {"pair_id",issued_grant["pair_id"]},{"authorization_generation",issued_grant["authorization_generation"]},
-                {"target_id",id('a')},{"controller_id",id('b')},{"assignment_id",issued_grant["assignment_id"]},{"grant_digest",issued_grant["grant_digest"]},
-                {"outcome","resumed"},{"controller_generation","4"},{"receipt_digest",std::string(64,'8')}};
-            const auto signed_outcome=controller->resume_acknowledgement(outcome);check(bool(signed_outcome));
-            auto forged=*signed_outcome;forged["proof"]=std::string(43,'A');
-            check(native_request("POST","/api/pair/v1/resume/ack",forged).reply->payload.status==403&&target_store->recurrence_authority()["state"]=="reconciling");
-            const auto pending_migration=native_request("GET",prefix+"migration"),pending_settings=native_request("GET",prefix+"settings");
-            check(pending_settings.principal&&pending_settings.reply&&pending_migration.reply);
-            const auto pending_proof=controller->outgoing_resume_grant(id('9'),*pending_settings.principal,issued_grant,
-                Json::parse(pending_migration.reply->payload.body),Json::parse(pending_settings.reply->payload.body));check(bool(pending_proof));
-            const auto held_authority=target_store->recurrence_authority(),held_settings=target_store->settings();
-            const auto held_source=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
-            check(!wtp_fleet_resume(*pending_proof,*controller,[]{return false;}));
-            check(target_store->recurrence_authority()==held_authority&&target_store->settings()==held_settings);
-            check(Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)==held_source&&source_contacts==0);
-            // An old target may already have durably issued a handback grant.
-            // Current software must leave it held, never recreate dispatch or
-            // fabricate a successful resume acknowledgement.
-            WtpCatalog source_catalog(source_ini+".devices.json");
-            PiPairRemoteController source_worker([&]{return controller;},requests,id('b'),source_catalog,source_ini+".management",
-                PiPairRemoteController::LoopbackTest{{"127.0.0.1",native_server.port()}});
-            source_worker.authority_source([]{return wtp_fleet_api("GET",{},{},"retirements");});
-            check(source_worker.observe(id('9')));(void)source_worker.maintain(id('9'));
-            check(target_store->recurrence_authority()["state"]=="reconciling"&&target_store->settings()["scheduling"]["enabled"]==false);
-            check(!recurrence_remote_resume_active(target_store->recurrence_authority())&&source_contacts==0);
-            check(PiManagementJournal::read_ini_input(target_ini).signature==ini_observation.signature);
-            if(refuse_second){
-                binding_port=31419;
-                check(!wtp_fleet_resume(*pending_proof,*controller,[]{return false;}));
-                check(target_store->settings()==held_settings&&source_contacts==0);
+            const auto prior_authority=target_store->recurrence_authority();
+            const auto prior_settings=target_store->settings();
+            const auto prior_source=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
+            const auto refusal=native_request("POST",prefix+"migration/rollback",restore);
+            check(refusal.reply&&refusal.reply->payload.status==409);
+            check(Json::parse(refusal.reply->payload.body)["error"]["code"]=="unsupported_resource");
+            const auto readback=native_request("GET",prefix+"migration");
+            check(readback.reply&&readback.reply->payload.status==200);
+            const auto migration_after_refusal=Json::parse(readback.reply->payload.body);
+            check(valid_controller_document(migration_after_refusal,"target-migration-read")&&!migration_after_refusal.contains("wtp_binding"));
+            const auto retired_read=native_request("GET","/api/pair/v1/resume");
+            const auto retired_ack=native_request("POST","/api/pair/v1/resume/ack",Json::object());
+            for(const auto *retired:{&retired_read,&retired_ack}){
+                check(retired->reply&&retired->reply->payload.status==403);
+                check(Json::parse(retired->reply->payload.body)["code"]=="invalid_proof");
             }
+            check(target_store->recurrence_authority()==prior_authority&&target_store->settings()==prior_settings);
+            check(!target_store->receipt(id('c'),"1",id('7')));
+            check(Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)==prior_source&&source_contacts==0);
+            check(PiManagementJournal::read_ini_input(target_ini).signature==ini_observation.signature);
             check(!engine.output_active());actual_handover_source=false;
             native_server.stop();
         }
@@ -746,7 +616,7 @@ int main(int argc,char **argv){try{
             const auto signed_status=paired->retirement_request(status);check(bool(signed_status));
             const auto readback=send("POST","/api/pair/v1/retirement/status",*signed_status);
             check(readback.reply&&readback.reply->payload.status==404&&parse_pi_pair_document(readback.reply->payload.body,"result")["code"]=="operation_unknown");
-            for(const auto &path:{"/api/pair/v1/resume/ack","/api/pair/v1/authorities/register","/api/pair/v1/rotate/prepare","/api/control/v1/targets"}){
+            for(const auto &path:{"/api/pair/v1/authorities/register","/api/pair/v1/rotate/prepare","/api/control/v1/targets"}){
                 const auto denied=send("POST",path,*signed_command);check(denied.reply&&denied.reply->payload.status==403);
             }
             check(ordinary_calls==0);
@@ -792,43 +662,6 @@ int main(int argc,char **argv){try{
             check(saved["assignments"][0]["receipt"]==old_receipt&&saved["assignments"][0]["state"]=="retired"&&attempted_carrier==contacts_before);
             const auto count=handoffs;const auto recovered=retired_client.exchange(registered,*frozen,Mode::Status,verify_only);
             check(recovered.state==State::Retired&&recovered.proof&&handoffs==count&&attempted_carrier==contacts_before);
-            // Isolate source grant consumption using synthetic closed disabled
-            // and reservation readbacks, with a real current normal-TLS
-            // principal and the actual source Fleet/book/assignment/WAL owner.
-            // Target grant issuance is a separate unfinished integration gate.
-            PiPairClient manager(requests,PiPairClient::Access::LoopbackTest);
-            const auto actual=manager.exchange({"127.0.0.1",server.port()},id('a'),[&](const auto &identity){return controller->outgoing_credential(id('9'),identity);},tls_identity,
-                [&](const auto &principal){return controller->record_outgoing_finished(id('9'),principal);},"GET","/api/control/v1/targets/"+id('a')+"/settings");
-            check(actual.principal&&actual.reply&&actual.reply->payload.status==200);
-            auto disabled=Json::parse(actual.reply->payload.body);disabled["saved"]["scheduling"]["enabled"]=false;
-            disabled["candidate_digest"]=PiManagementJournal::digest(canonical_pi_management_json(disabled["saved"]));
-            const auto live_book=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
-            Json grant={{"contract","Wsprry-Pair/1"},{"schema","resume-grant"},{"operation_id",id('7')},{"pair_id",id('c')},{"authorization_generation","1"},
-                {"target_id",id('a')},{"target_boot_id",disabled["binding"]["boot_id"]},{"controller_id",id('b')},{"controller_incarnation",live_book["controller_incarnation"]},
-                {"assignment_id",request["assignment_id"]},{"assignment_revision",request["assignment_revision"]},{"transition_id",request["transition_id"]},
-                {"retirement_receipt_digest",PiManagementJournal::digest(canonical_pi_management_json(old_receipt))},{"authority_generation","9"},
-                {"disabled_revision",disabled["revision"]},{"disable_receipt_digest",std::string(64,'d')},{"candidate_digest",disabled["candidate_digest"]},
-                {"wtp_binding",{{"revocation_generation","8"},{"wtp_port",31419},{"management_port",31416}}}};
-            grant["grant_digest"]=PiManagementJournal::digest(canonical_pi_management_json(grant));
-            Json reservation={{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",disabled["binding"]},{"authority_generation","9"},
-                {"transition_id",grant["operation_id"]},{"state","reconciling"},
-                {"controllers",Json::array({{{"controller_id",id('b')},{"assignment_id",request["assignment_id"]},{"assignment_revision",request["assignment_revision"]}}})},
-                {"retirements",Json::array({{{"controller_id",id('b')},{"assignment_id",request["assignment_id"]},{"transition_id",request["transition_id"]},
-                    {"retirement_generation","8"},{"receipt_digest",grant["retirement_receipt_digest"]}}})},{"jobs",Json::array()},{"staged_revision",nullptr},{"wtp_binding",grant["wtp_binding"]}};
-            check(valid_controller_document(disabled,"target-settings")&&valid_controller_document(reservation,"target-migration-read"));
-            const auto proof=controller->outgoing_resume_grant(id('9'),*actual.principal,grant,reservation,disabled);
-            check(proof&&proof->original_scope()&&proof->current_target());
-            auto malformed=reservation;malformed["extra"]=true;check(!controller->outgoing_resume_grant(id('9'),*actual.principal,grant,malformed,disabled));
-            auto wrong_digest=disabled;wrong_digest["candidate_digest"]=std::string(64,'0');check(!controller->outgoing_resume_grant(id('9'),*actual.principal,grant,reservation,wrong_digest));
-            const auto source_before=PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json");check(bool(source_before));
-            const auto before_book=Json::parse(wtp_fleet_api("GET",{},{},"retirements").body);
-            check(!wtp_fleet_resume(*proof,*controller,[]{return false;}));
-            const auto after=PiManagementJournal::read_private_record(retired_ini+".wtp-assignments.json");
-            check(after&&after->signature==source_before->signature&&attempted_carrier==contacts_before);
-            check(Json::parse(wtp_fleet_api("GET",{},{},"retirements").body)==before_book);
-            auto changed_boot=reservation;changed_boot["binding"]["boot_id"]=id('0');auto changed_settings=disabled;changed_settings["binding"]=changed_boot["binding"];
-            const auto recovery=controller->outgoing_resume_grant(id('9'),*actual.principal,grant,changed_boot,changed_settings);check(recovery&&!recovery->current_target());
-            check(!wtp_fleet_resume(*recovery,*controller,[]{return false;})&&attempted_carrier==contacts_before);
             source_server.stop();stop_wtp_fleet();
         }
     }
@@ -1036,16 +869,6 @@ int main(int argc,char **argv){try{
         if(stale.reply&&stale.reply->payload.status==200&&store.settings()["revision"]!=before_save&&store.receipt(id('d'),"3",id('4')))
             std::cerr<<"REPRO: pre-removal native draft committed under new manager scope\n";
         check(stale.reply&&stale.reply->payload.status==409&&store.settings()["revision"]==before_save&&!store.receipt(id('d'),"3",id('4')));
-        check(controller->resume_acknowledgement(unsigned_resume_ack)==signed_resume_ack);
-        resume_probe=*signed_resume_ack;resume_probe_expected=true;const auto probes_before=resume_probes;
-        check(exchange("context").reply->payload.status==200);
-        resume_probe_expected=false;(*resume_probe)["proof"]="xmj5DjfS6hTgs4wuAIWHwrKYXs25rjGsJ97pRqto45Y";
-        check(exchange("context").reply->payload.status==200); // A fresh pair's key cannot forge the old outcome.
-        resume_probe=*signed_resume_ack;(*resume_probe)["outcome"]="resumed";
-        check(exchange("context").reply->payload.status==200);
-        resume_probe=*signed_resume_ack;(*resume_probe)["controller_id"]=id('e');
-        check(exchange("context").reply->payload.status==200);
-        check(resume_probes==probes_before+4);resume_probe.reset();
         const auto new_context=exchange("context");check(new_context.reply&&new_context.reply->payload.status==200);
         const auto rebound=Json::parse(new_context.reply->payload.body);
         check(rebound["binding"]["connection_generation"]!=bound["binding"]["connection_generation"]&&rebound["binding"]["profile_generation"]=="1");

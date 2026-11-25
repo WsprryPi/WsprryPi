@@ -48,7 +48,9 @@
     function options() {
         const select = node('setup-device');if (!select) return;
         const focused = root.document.activeElement === select;
-        const values = [['local',root.ControllerMode?.active ? 'Controller · no local transmitter' : 'This Pi · local settings']];
+        const hostLabel = root.ControllerMode?.active ? 'Controller · no local transmitter'
+            : root.ControllerMode?.blocked ? 'Host not verified' : 'This Pi · local settings';
+        const values = [['local',hostLabel]];
         for (const profile of profiles) if (identity(profile.id) && identity(profile.settings?.['Device ID']))
             values.push(['known:'+profile.id,`${profile.name} · ${connectionLabel(profile.settings.Transport)} · ${profile.legacy_unverified ? 'unverified' : 'saved device'}`]);
         for (const profile of managedProfiles) if (!values.some(([id]) => id === selectionValue(profile))) values.push([selectionValue(profile),`${profile.name} · USB · through paired Pi`]);
@@ -73,14 +75,15 @@
         if (!initialized || !node('setup-device')) return;
         options();
         const recovery = root.ConfigurationRecovery?.active === true, locked = root.PicoFirmwareSafety?.locked === true;
-        const pico = choice.startsWith('known:') || choice.startsWith('managed:'), pi = choice.startsWith('pi:'), own = choice === 'local' && !root.ControllerMode?.active;
+        const hostBlocked = root.ControllerMode?.blocked === true;
+        const pico = choice.startsWith('known:') || choice.startsWith('managed:'), pi = choice.startsWith('pi:'), own = choice === 'local' && (!root.ControllerMode || root.ControllerMode.transmitter);
         const fleet = node('fleet-tab')?.classList.contains('active'), scheduling=node('scheduling-tab')?.classList.contains('active');
         const state = pi ? root.PiTargetEditors?.state : root.PicoTargetEditors?.state;
-        node('setup-device').disabled = recovery || locked || !root.WtpUi?.catalogReady && !managedPis.length && !managedProfiles.length;
+        node('setup-device').disabled = hostBlocked || recovery || locked || !root.WtpUi?.catalogReady && !managedPis.length && !managedProfiles.length;
         node('wsprform').hidden = !own || scheduling;node('wsprform').inert = !own || !localReady || recovery || locked;
         node('setup-pico-workspace').hidden = !pico || fleet || recovery;
-        node('setup-pico-workspace').inert = locked || recovery;
-        if(node('setup-pi-workspace')){node('setup-pi-workspace').hidden=!pi||scheduling||fleet||recovery;node('setup-pi-workspace').inert=locked||recovery;}
+        node('setup-pico-workspace').inert = hostBlocked || locked || recovery;
+        if(node('setup-pi-workspace')){node('setup-pi-workspace').hidden=!pi||scheduling||fleet||recovery;node('setup-pi-workspace').inert=hostBlocked||locked||recovery;}
         if (node('setup-local-output')) {node('setup-local-output').hidden = !own;node('setup-local-output').inert = !own || locked || recovery;}
         if (node('setup-controller-output-fields')) node('setup-controller-output-fields').inert = !own || !localReady || locked || recovery;
         node('setup-local-draft').hidden = !own || !localDraft || scheduling || recovery;
@@ -91,7 +94,8 @@
             const tab = node(tabs[i]);if (!tab) continue;
             const pane = pi ? (i===1?'setup-scheduling':'setup-pi-workspace') : pico ? picoPanes[i] : localPanes[i];
             tab.setAttribute('data-bs-target','#'+pane);tab.setAttribute('aria-controls',pane);
-            const unavailable = recovery || !(own || pi || pico && state?.profile === current?.id);
+            const unavailable = hostBlocked || recovery || !(own || pi || pico && state?.profile === current?.id);
+            tab.closest('li').hidden = !own && !pi && !pico;
             tab.disabled = unavailable;tab.setAttribute('aria-disabled',String(unavailable));
             for (const id of [localPanes[i],picoPanes[i]]) {
                 const panel = node(id);if (!panel) continue;
@@ -99,6 +103,11 @@
                 panel.classList.toggle('active',visible);panel.classList.toggle('show',visible);
             }
         }
+        if (root.ControllerMode?.active && !pi && !pico && !fleet) {
+            root.bootstrap.Tab.getOrCreateInstance(node('fleet-tab')).show();
+        }
+        const catalog = root.document.querySelector('.fleet-catalog');
+        if (catalog) catalog.inert = hostBlocked || recovery;
         const detail = node('setup-device-detail'),status = node('setup-device-state');
         if (pico) {
             detail.textContent = `${current?.name || 'Saved device'} · ${state?.connected ? 'Pico' : 'Pico management not verified'} · ${current?.managed ? 'USB through paired Pi' : connectionLabel(current?.settings?.Transport)} · device ${current?.settings?.['Device ID'] || 'unavailable'}`;
@@ -116,10 +125,10 @@
             detail.textContent = 'Nearby device · identity and management permission unverified';
             status.textContent = 'Identify and add this device in Fleet before managing settings. Selection does not enroll it.';
         } else {
-            detail.textContent = root.ControllerMode?.active ? `Controller · ${root.ControllerMode.ready ? 'ready' : 'not ready'} · no local transmitter`
-                : '';
-            status.textContent = localDraft ? 'Local draft retained. Review it and choose Save retained local draft to resume saving.'
-                : root.ControllerMode?.active ? 'Choose a saved Pico to manage its settings. Paired Pis are available from the Device selector.'
+            detail.textContent = '';
+            status.textContent = hostBlocked ? ''
+                : root.ControllerMode?.active ? 'Select a saved Pico or a paired Pi to manage it. Use Fleet to add a Pico.'
+                : localDraft ? 'Local draft retained. Review it and choose Save retained local draft to resume saving.'
                 : !localReady ? 'Reading this Pi’s saved settings. Editing remains unavailable until they load.' : '';
         }
         detail.hidden = !detail.textContent;
@@ -157,7 +166,7 @@
         render();
     }
     async function selectProfile(profile) {
-        if (!node('setup-device') || root.ConfigurationRecovery?.active || root.PicoFirmwareSafety?.locked) return;
+        if (!node('setup-device') || root.ControllerMode?.blocked || root.ConfigurationRecovery?.active || root.PicoFirmwareSafety?.locked) return;
         if (!profile || !identity(profile.id) || !identity(profile.settings?.['Device ID'])) return;
         root.PiTargetEditors?.leave?.();
         retainLocal();current = structuredClone(profile);choice = selectionValue(profile);
@@ -179,7 +188,7 @@
         }
     }
     async function select(value) {
-        if (root.ConfigurationRecovery?.active || root.PicoFirmwareSafety?.locked) {render();return;}
+        if (root.ControllerMode?.blocked || root.ConfigurationRecovery?.active || root.PicoFirmwareSafety?.locked) {render();return;}
         if(value.startsWith('pi:')) {
             const id=value.slice(3),target=managedPis.find(item=>item.device_id===id)||retainedPis().find(item=>item.device_id===id);
             if(!target)return;retainLocal();root.PicoTargetEditors.leave();current=structuredClone(target);choice=value;const captured=++sequence;loading=true;render();
@@ -201,16 +210,22 @@
     async function readLocalIdentity() {
         if (inventoryReading || closed) return;inventoryReading = true;
         try {
+            if (root.ControllerMode?.blocked) return;
+            const controller = root.ControllerMode?.active;
             const base=root.WSPRRYPI_PATHS?.sharedApiPath || '/api/control/v1';
             const response=await root.fetch(base+'/targets',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:AbortSignal.timeout(10000)});
             const value=await response.json();
             if(!response.ok||!root.WsprryControl.validControllerDocument(value,'targets'))throw Error('target_inventory_unavailable');
-            const ready=await root.fetch(base+'/host/readiness',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:AbortSignal.timeout(10000)});
-            const host=await ready.json();
-            if(!ready.ok||!root.WsprryControl.validControllerDocument(host,'host-readiness'))throw Error('host_identity_unavailable');
-            if(closed)return;
-            local=value.targets.find(target=>target.device_id===host.device_id&&target.product==='WsprryPi')||null;
-            managedPis=value.targets.filter(target=>target.product==='WsprryPi'&&target.device_id!==host.device_id);
+            let hostId = root.ControllerMode?.deviceId;
+            if (!controller) {
+                const ready=await root.fetch(base+'/host/readiness',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:AbortSignal.timeout(10000)});
+                const host=await ready.json();
+                if(!ready.ok||!root.WsprryControl.validControllerDocument(host,'host-readiness'))throw Error('host_identity_unavailable');
+                hostId = host.device_id;
+            }
+            if(closed || root.ControllerMode?.blocked)return;
+            local=controller?null:value.targets.find(target=>target.device_id===hostId&&target.product==='WsprryPi')||null;
+            managedPis=value.targets.filter(target=>target.product==='WsprryPi'&&target.device_id!==hostId);
             // Native-editor rendering can select local Scheduling immediately.
             // Publish its availability first so that selection uses this snapshot.
             root.SchedulingEditor?.targetsChanged?.([...(local?[local]:[]),...managedPis]);
@@ -235,8 +250,8 @@
         }
     }
     root.SetupTargets = Object.freeze({
-        get localSelected() {return choice === 'local' && !root.ControllerMode?.active;},
-        get localWritable() {return localReady && choice === 'local' && !localDraft && !root.ControllerMode?.active && !root.ConfigurationRecovery?.active && !root.PicoFirmwareSafety?.locked;},
+        get localSelected() {return choice === 'local' && (!root.ControllerMode || root.ControllerMode.transmitter);},
+        get localWritable() {return localReady && this.localSelected && !localDraft && !root.ConfigurationRecovery?.active && !root.PicoFirmwareSafety?.locked;},
         get retainingLocalDraft() {return localDraft;},
         get managingPi() {return choice.startsWith('pi:');},
         get managingPico() {return choice.startsWith('known:') || choice.startsWith('managed:');},
@@ -258,6 +273,7 @@
         if (root.WtpUi?.catalogReady) root.SetupTargets.catalogChanged(root.WtpUi.savedProfiles,root.WtpUi.nearbyDevices);
         root.addEventListener('pagehide',()=>{closed=true;root.clearTimeout(inventoryTimer);});
         root.addEventListener('pageshow',()=>{if(closed){closed=false;void readLocalIdentity();}});
+        root.addEventListener('wsprry-host-status',()=>{root.clearTimeout(inventoryTimer);void readLocalIdentity();});
         render();void readLocalIdentity();
     }
     if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded',init);else init();

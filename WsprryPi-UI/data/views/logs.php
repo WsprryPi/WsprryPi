@@ -4,7 +4,10 @@ $cardTitleText = 'Wsprry Pi Log';
 require __DIR__ . '/../card_header.php';
 ?>
 
-            <div class="card-body logs-card-body">
+            <div class="card-body" data-controller-only>
+                <p class="mb-0">This log viewer uses the Raspberry Pi system journal. View controller logs through the host operating system.</p>
+            </div>
+            <div class="card-body logs-card-body" data-transmitter-only>
                 <div class="logs-control-row">
                     <div id="logs-overlay-controls" role="toolbar" aria-label="Log controls" class="logs-overlay">
                         <button id="btn-clear"

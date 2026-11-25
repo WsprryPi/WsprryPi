@@ -151,12 +151,12 @@ set(core
     time/usb_time_source.cpp
     usb/management_endpoint.cpp
     usb/time_exchange.cpp
-    wtp/json.cpp
-    wtp/arm_admission.cpp
-    wtp/observation.cpp
-    wtp/inhibited_rf_engine.cpp
-    wtp/job_service.cpp
-    wtp/sha256.cpp
+    runtime/json.cpp
+    rf/arm_admission.cpp
+    rf/observation.cpp
+    rf/inhibited_rf_engine.cpp
+    rf/job_service.cpp
+    runtime/sha256.cpp
 )
 list(TRANSFORM core PREPEND "${PICO_SOURCE}/src/")
 add_executable(pico_tls_server pico_tls_server.cpp ${core}
@@ -197,10 +197,10 @@ target_link_libraries(consumer_interop PRIVATE pico_consumer_fixture mbedcrypto 
     pthread)
 target_compile_options(consumer_interop PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
 
-add_executable(wtp_fixture_clock_test fixture_clock_test.cpp)
-target_include_directories(wtp_fixture_clock_test PRIVATE "${PICO_SOURCE}/src")
-target_link_libraries(wtp_fixture_clock_test PRIVATE pico_consumer_fixture)
-target_compile_options(wtp_fixture_clock_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_executable(pico_execution_fixture_clock_test fixture_clock_test.cpp)
+target_include_directories(pico_execution_fixture_clock_test PRIVATE "${PICO_SOURCE}/src")
+target_link_libraries(pico_execution_fixture_clock_test PRIVATE pico_consumer_fixture)
+target_compile_options(pico_execution_fixture_clock_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 # Phase-4 Pi geometry versus the actual caller-selected Pico implementation.
 add_executable(pi_solar_geometry_pair ../solar_geometry_pair_test.cpp ../../solar_geometry.cpp)

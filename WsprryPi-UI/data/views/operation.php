@@ -15,7 +15,7 @@ unset($cardFleetSelector);
                         <button id="operationControllerRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
                     </div>
                 </section>
-                <div id="operationLocalView">
+                <div id="operationLocalView" data-transmitter-only>
                 <p id="operationLocalRoute" class="form-text" hidden></p>
                 <section class="operation-hero" aria-labelledby="operationPageTitle">
                     <div class="operation-hero__status">

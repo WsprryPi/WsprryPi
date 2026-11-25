@@ -10,10 +10,8 @@ const {freePort,createBrowserProfile,spawnFixtureChild,waitForSpawn,waitForPhp,l
   php=spawnFixtureChild('php',['-S',`127.0.0.1:${port}`,'-t','data','tests/browser_fixture_router.php'],{cwd:ui});await waitForSpawn(php);await waitForPhp(php,url,'retired Fleet fixture');
   profile=createBrowserProfile();({browser,client}=await launchBrowser({executable:process.env.CHROME_BIN||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':'chromium'),args:['--headless','--no-sandbox','--disable-gpu','--disable-background-networking','about:blank'],profile,timeoutMs:60000}));
   const run=expression=>client.evaluate(expression);
-  await client.send('Page.navigate',{url});await waitFor(()=>run("document.readyState==='complete' && !!window.FleetClient && !!window.FleetSchedules"),'Fleet scripts');
-  const install=async()=>run(`(()=>{
-   if(typeof clearPendingPopulateConfigRetry==='function'){configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();}
-   if(typeof syncConnectionAlert==='function'){backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();}
+  // Host-role detection can start Fleet's first refresh during page boot.
+  await client.send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{
    window.__originalFetch=window.fetch;window.__requests=[];window.__fail=false;window.__revision=0;
    const id='a'.repeat(32);
    window.__fleet={scope:'wsprrypi-wtp-fleet/1',version:1,maximum_outputs:32,controller_incarnation:'f'.repeat(32),publication_revision:'1',now_ms:'10000',removals:[],assignments:[{device_id:id,name:'Bench Pico with retained controller work',product:'WsprryPico',enabled:true,in_flight:true,schedule:{mode:'tone',frequency_hz:14097100,duration_ms:1000,period_seconds:60,phase_seconds:0}}],outputs:{[id]:{state:'migration_required',message:'Migration required. Output and ownership remain unconfirmed.',assignment_generation:id,control_revision:'0',observation_revision:'1',observation_age_ms:null,boot_id:null,can_resume:false,can_pause:false,can_reconcile:false,actions:[]}}};
@@ -30,9 +28,14 @@ const {freePort,createBrowserProfile,spawnFixtureChild,waitForSpawn,waitForPhp,l
     if(String(url).endsWith('/host/discovery'))return new Response(JSON.stringify({available:false,candidates:[],reason:'Fixture'}));
     return window.__originalFetch(url,options);
    };
+  })()`});
+  const showFleet=async()=>run(`(()=>{
+   if(typeof clearPendingPopulateConfigRetry==='function'){configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();}
+   if(typeof syncConnectionAlert==='function'){backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();}
    if(document.getElementById('fleet-tab'))bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();
   })()`);
-  await install();await run('FleetClient.refresh(true)');
+  await client.send('Page.navigate',{url});await waitFor(()=>run("document.readyState==='complete' && !!window.FleetClient && !!window.FleetSchedules"),'Fleet scripts');
+  await showFleet();await run('FleetClient.refresh(true)');
   await waitFor(()=>run("document.getElementById('fleet-output-list').textContent.includes('accepted work recorded: yes')"),'retained legacy record');
   assert.equal(await run("document.getElementById('fleet-schedule-new')===null"),true,'No new legacy assignment control');
   assert.equal(await run("[...document.querySelectorAll('#fleet-output-list button')].map(n=>n.textContent).join(',')"),'View retirement');
@@ -47,7 +50,7 @@ const {freePort,createBrowserProfile,spawnFixtureChild,waitForSpawn,waitForPhp,l
   }
   await client.send('Page.navigate',{url:url.replace('page=config','page=operation')});
   await waitFor(()=>run("document.readyState==='complete' && !!window.FleetOperation"),'Operations scripts');
-  await install();await run('FleetClient.refresh(true)');
+  await showFleet();await run('FleetClient.refresh(true)');
   await run("document.getElementById('operationDevice').value='a'.repeat(32)+':'+'a'.repeat(32);document.getElementById('operationDevice').dispatchEvent(new Event('change'))");
   assert.equal(await run("document.getElementById('operationFleetState').textContent"),'Migration required');
   assert.match(await run("document.getElementById('operationFleetOutput').textContent"),/unknown/);
@@ -56,7 +59,7 @@ const {freePort,createBrowserProfile,spawnFixtureChild,waitForSpawn,waitForPhp,l
   assert.equal(await run("document.getElementById('operationLocalView').hidden"),false,'Native local Operations remains available');
   assert.equal(await run("window.__requests.filter(r=>r.method!=='GET').length"),0,'Operations selection cannot mutate or dispatch');
   // Return to the same read-only saved-state component for failed-read coverage.
-  await client.send('Page.navigate',{url});await waitFor(()=>run("document.readyState==='complete' && !!window.FleetSchedules"),'Fleet return');await install();await run('FleetClient.refresh(true)');
+  await client.send('Page.navigate',{url});await waitFor(()=>run("document.readyState==='complete' && !!window.FleetSchedules"),'Fleet return');await showFleet();await run('FleetClient.refresh(true)');
   await run('window.__fail=true;FleetClient.refresh(true).catch(()=>{})');
   await waitFor(()=>run("document.getElementById('fleet-schedule-feedback').textContent.includes('unavailable or stale')"),'failed read remains unknown');
   assert.equal(await run("window.__requests.filter(r=>r.method!=='GET').length"),0,'Reads, navigation, and failure cannot dispatch or rewrite history');

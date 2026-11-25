@@ -33,6 +33,9 @@ for(const number of [NaN,Infinity,-Infinity]){
     const value=JSON.parse(JSON.stringify(piSave.value));value.candidate.configuration.CW['Base Frequency']=number;
     assert.equal(control.validControllerDocument(value,'target-save'),false,'Nonfinite Pi configuration');
 }
+const recoverySave=structuredClone(samples.cases.find(item=>item.name==='P209 complete recovery save').value);
+recoverySave.configuration.Operation['Transmit Backend']='wtp';
+assert.equal(control.validControllerDocument(recoverySave,'configuration-recovery-save'),false,'Retired recovery backend');
 assert.equal(control.validControllerDocument({},'unknown'),false);
 for(const item of samples.recovery_cases)assert.equal(control.controllerRecoveryRead(item.resource),item.read,item.resource);
 assert.equal(control.controllerAdapter.headers.recovery,'X-WsprryPi-Recovery-Resource');

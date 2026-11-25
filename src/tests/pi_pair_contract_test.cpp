@@ -59,6 +59,8 @@ int main(){
         for(const auto resource:{"hello","commit","rotate/prepare","rotate/commit","authorities/register","resume/ack","stop","settings","jobs/load"})
             check(!pi_pair_route(Purpose::Retirement,"POST",resource));
         check(!pi_pair_route(Purpose::Retirement,"GET","resume"));
+        check(!pi_pair_route(Purpose::Management,"GET","resume"));
+        check(!pi_pair_route(Purpose::Management,"POST","resume/ack"));
         check(!pi_pair_route(static_cast<Purpose>(99),"POST","retirement"));
         Json registration{{"contract","Wsprry-Pair/1"},{"schema","authority-register"},{"operation_id",id('a')},
             {"pair_id",id('b')},{"authorization_generation","1"},{"target_id",id('c')},{"controller_id",id('d')},

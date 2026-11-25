@@ -21,7 +21,7 @@ The target is also part of full and portable semantics coverage. It uses control
 The configuration interoperability target compares test-exported native compiler events with an actual Pico standalone scheduler plan through typed internal fixture calls. This is a software frequency-grid comparison, not a replacement remote job API. It checks paired placement, independent subsequent plans, the native standalone grid, immutable settings, and calibration isolation.
 
 ```sh
-WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j4 wtp-config-interop-test SUDO= \
+WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 make -j4 pico-control-interop-test SUDO= \
   PICO_SOURCE=/path/to/selected/WsprryPico MBEDTLS_SOURCE=/path/to/pinned/mbedtls
 ```
 

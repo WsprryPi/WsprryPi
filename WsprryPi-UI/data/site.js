@@ -668,14 +668,30 @@ function loadPage() {
     scheduleChromeOffsetSync();
     hideConnectionAlert();
     setConnectionState("disconnected");
-    connectWebSocket(WEBSOCKET_ENDPOINT, WS_RECONNECT);
     updateClocks();
-    if (typeof initLogStream === "function") {
-        initLogStream();
-    }
     initUiBuildChangePolling();
     initGithubUpdatePolling();
-    populateConfig();
+    let transmitterStarted = false;
+    function syncHostConnection() {
+        if (!window.ControllerMode || window.ControllerMode.available) initPersistedTabState();
+        if (!window.ControllerMode || window.ControllerMode.transmitter) {
+            if (!transmitterStarted) {
+                transmitterStarted = true;
+                if (typeof initLogStream === "function") initLogStream();
+            }
+            if (!websocketCurrentlyConnected) connectWebSocket(WEBSOCKET_ENDPOINT, WS_RECONNECT);
+            if (!backendCurrentlyConnected) populateConfig();
+            return;
+        }
+        if (!window.ControllerMode.active) return;
+        backendCurrentlyConnected = window.ControllerMode.available;
+        backendConnectedOnce ||= backendCurrentlyConnected;
+        setConnectionState(backendCurrentlyConnected ? "connected" : "disconnected");
+        syncConnectionAlert();
+        if (backendCurrentlyConnected) updateWsprryPiVersion();
+    }
+    if (window.ControllerMode) window.addEventListener("wsprry-host-status", syncHostConnection);
+    syncHostConnection();
 }
 
 // Verify a requested refresh before polling for later installed-UI changes.
@@ -988,7 +1004,6 @@ function bindActions() {
         mainNav.addEventListener("hidden.bs.collapse", scheduleChromeOffsetSync);
     }
     window.addEventListener("resize", scheduleChromeOffsetSync, { passive: true });
-    initPersistedTabState();
 
     // Grab the modal element and its Bootstrap instance
     const systemModalEl = document.getElementById("systemModal");
@@ -1633,6 +1648,7 @@ function createOperationConfigSnapshot({
 }
 
 function populateConfig(callback = null) {
+    if (window.ControllerMode && !window.ControllerMode.transmitter) return;
     if (populateConfigRunning) return;
     populateConfigRunning = true;
 
@@ -2209,17 +2225,6 @@ function populateConfig(callback = null) {
                 backendConnectedOnce = true;
                 clearPendingPopulateConfigRetry();clearConfigLoadFailureState();syncConnectionAlert();pageLoaded();
                 if (typeof callback === 'function') callback();
-                return;
-            }
-            if (jqXHR.status === 409 && window.ControllerMode?.accept(jqXHR.responseJSON?.controller)) {
-                backendCurrentlyConnected = true;
-                backendConnectedOnce = true;
-                clearPendingPopulateConfigRetry();
-                clearConfigLoadFailureState();
-                syncConnectionAlert();
-                window.ControllerMode.render();
-                pageLoaded();
-                if (typeof callback === "function") callback();
                 return;
             }
             if (isConfigView() &&
@@ -3839,6 +3844,7 @@ function debugConsole(method, ...args) {
  *   Milliseconds to wait before trying to reconnect after a close or error.
  */
 function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
+    if (window.ControllerMode && !window.ControllerMode.transmitter) return null;
     if (attemptIndex === 0) {
         clearWebSocketReconnectTimer();
     }
@@ -3941,7 +3947,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
         armOutageBannerIfReady();
         setConnectionState("connected");
         syncTestToneControlState(isTestToneRuntimeActive());
-        const requestedCatalog = requestWsprBandCatalog(socket);
+        const requestedCatalog = !window.ControllerMode || window.ControllerMode.transmitter ? requestWsprBandCatalog(socket) : null;
         if (requestedCatalog) {
             catalogRequest = requestedCatalog;
         }
@@ -3981,11 +3987,8 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
             return;
         }
 
-        if (window.ControllerMode?.accept(msg)) {
-            backendCurrentlyConnected = true;
-            backendConnectedOnce = true;
-            setConnectionState("connected");
-            syncConnectionAlert();
+        if (msg.role === "controller-only") {
+            void window.ControllerMode?.refresh();
             return;
         }
 
@@ -4214,6 +4217,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
  * Server should reply with JSON: { tx_state: true|false }
  */
 function getTxState() {
+    if (window.ControllerMode && !window.ControllerMode.transmitter) return;
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ command: "get_tx_state" }));
     } else {

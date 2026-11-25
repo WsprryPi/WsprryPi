@@ -9,6 +9,11 @@ function unlockUI() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    if (window.ControllerMode) window.ControllerMode.onTransmitter(initLocalMaintenance);
+    else initLocalMaintenance();
+});
+
+function initLocalMaintenance() {
     bindTestToneControls();
 
     const repairButton = document.getElementById("repairConfigButton");
@@ -1313,4 +1318,4 @@ document.addEventListener("DOMContentLoaded", () => {
         stopSupportBundlePolling();
     }, { once: true });
     setDownloadAvailability(false);
-});
+}

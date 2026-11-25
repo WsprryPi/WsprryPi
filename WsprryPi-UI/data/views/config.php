@@ -6,7 +6,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
 ?>
 
             <div class="card-header pb-0">
-                <div id="setup-local-output"><?php require __DIR__ . '/local-wtp-control.php'; ?></div>
+                <div id="setup-local-output" data-transmitter-only><?php require __DIR__ . '/local-wtp-control.php'; ?></div>
                 <div class="config-header-bar mb-2">
                     <div class="config-header-context">
                         <div class="config-header-copy">
@@ -29,7 +29,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                     </div>
 
                     <div class="config-header-actions" aria-label="Controller time and power">
-                        <p class="form-text mb-0">Controller time and power</p>
+                        <p class="form-text mb-0" data-transmitter-only>Controller time and power</p>
                         <?php require_once __DIR__ . '/../clock_and_reboot.php'; ?>
                     </div>
                 </div>
@@ -109,7 +109,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
             <div class="card-body">
                 <?php require __DIR__ . '/configuration-recovery.php'; ?>
 
-                <form id="wsprform" class="needs-validation config-setup-form" novalidate>
+                <form id="wsprform" data-transmitter-only class="needs-validation config-setup-form" novalidate>
                     <div class="tab-content config-tabs-content" id="configTabsContent">
                         <div id="configSaveStatusDetail" class="form-text" aria-live="polite" aria-atomic="true" hidden></div>
                         <div
@@ -1296,7 +1296,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                             tabindex="0">
                             <div class="config-pane-intro">
                                 <span class="config-pane-intro__label">Fleet</span>
-                                <p class="mb-0">Manage saved Pi and Pico outputs and assign their schedules.</p>
+                                <p class="mb-0">Manage saved devices and review earlier schedule assignments.</p>
                             </div>
                             <?php require __DIR__ . '/wtp-controls.php'; ?>
                         </div>

@@ -16,6 +16,7 @@ async function main(){
         const evaluate=async expression=>{const r=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
         await waitFor(()=>evaluate('document.readyState==="complete"&&!!window.WtpUi'),"native path controls loaded");
         await evaluate(`(()=>{
+            const originalFetch=window.fetch;
             configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
             backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
             window.__writes=[];window.__confirms=[];window.__refuse=false;
@@ -23,6 +24,7 @@ async function main(){
             window.confirm=message=>{window.__confirms.push(message);return true;};
             window.fetch=async(url,options={})=>{
                 const resource=String(url),write=options.method&&options.method!=='GET';
+                if(resource.endsWith('/version'))return originalFetch(url,options);
                 if(write){window.__writes.push({url:resource,body:JSON.parse(options.body)});if(window.__refuse)return {ok:false,status:409,headers:{get:()=>''},json:async()=>({error:{code:'catalog_request_rejected',message:'The selected host refused this file reference.'}})};}
                 return {ok:true,status:200,headers:{get:()=> '"profiles-1"'},json:async()=>resource.endsWith('/host/devices')?window.__catalog:{available:false,candidates:[],reason:'Software fixture',usb:{available:true,candidates:[]}}};
             };

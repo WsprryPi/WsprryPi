@@ -4,13 +4,10 @@
 #include "scheduling.hpp"
 #include "web_server.hpp"
 #include "application_storage/application_state.hpp"
-#include "wtp_endpoint/runtime.hpp"
 #include <mutex>
-#include <atomic>
 namespace wsprrypi {
 namespace {
-struct Lease {std::atomic_bool active{true};};
-struct Presence {std::mutex mutex;std::string connection;WebListeners listeners;nlohmann::json bootstrap;std::shared_ptr<Lease> lease;};
+struct Presence {std::mutex mutex;std::string connection;WebListeners listeners;nlohmann::json bootstrap;};
 Presence &presence(){static Presence value;return value;}
 void require(bool value){if(!value)throw LocalCommandRefused(LocalRefusal::InvalidRequest);}
 std::optional<int> port(const nlohmann::json &value){
@@ -39,19 +36,13 @@ nlohmann::json backend_web_presence(const LocalRequest &request){
     if(request.operation==LocalOperation::WebAttach){
         require(request.arguments.is_object()&&request.arguments.size()==2&&request.arguments.contains("web_port")&&request.arguments.contains("socket_port"));
         const WebListeners listeners{port(request.arguments["web_port"]),port(request.arguments["socket_port"])};
-        const auto lease=std::make_shared<Lease>();std::string self;
         {
             std::lock_guard selected(slot.mutex);
             require(!slot.bootstrap.is_null()&&listeners.http==(slot.bootstrap["http_enabled"]==true?std::optional<int>(slot.bootstrap["web_port"].get<int>()):std::nullopt)&&
                 listeners.websocket==(slot.bootstrap["websocket_enabled"]==true?std::optional<int>(slot.bootstrap["socket_port"].get<int>()):std::nullopt));
             if(!slot.connection.empty())throw LocalCommandRefused(LocalRefusal::Busy);
-            slot.connection=request.transport_connection;slot.listeners=listeners;slot.lease=lease;self=slot.bootstrap["device_id"].get<std::string>();
+            slot.connection=request.transport_connection;slot.listeners=listeners;
         }
-        // Endpoint observations may call readiness while holding their own
-        // lock. The callback reads only this lease's atomic admission flag.
-        if(listeners.http)wtp_pi_publish_management_http(lease.get(),self,*listeners.http,[weak=std::weak_ptr<Lease>(lease)]{
-            const auto current=weak.lock();return current&&current->active.load();
-        });
     }else{
         require(request.operation==LocalOperation::WebHeartbeat&&request.arguments.empty());
         std::lock_guard selected(slot.mutex);require(slot.connection==request.transport_connection);
@@ -59,11 +50,10 @@ nlohmann::json backend_web_presence(const LocalRequest &request){
     return {{"schema","web-service-presence/1"},{"connected",true}};
 }
 void backend_web_disconnected(const std::string &connection) noexcept{
-    auto &slot=presence();std::shared_ptr<Lease> lease;
+    auto &slot=presence();
     {std::lock_guard lock(slot.mutex);
         if(slot.connection!=connection)return;
-        slot.connection.clear();slot.listeners={};lease=std::move(slot.lease);if(lease)lease->active.store(false);
+        slot.connection.clear();slot.listeners={};
     }
-    if(lease)wtp_pi_withdraw_management_http(lease.get());
 }
 }

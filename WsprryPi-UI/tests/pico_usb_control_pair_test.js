@@ -7,7 +7,7 @@ const {browser,reply,target}=require("./wtp_usb_settings_test.js");
 const {grayLineCases}=require('./gray_line_pair_cases.js');
 const {driveCases}=require("./gpio_drive_pair_cases.js");
 (async()=>{
-    const args=process.argv.slice(2);if(!args.length)throw new Error("Usage: node wtp_usb_pair_test.js CLIENT_COMMAND [arguments]");
+    const args=process.argv.slice(2);if(!args.length)throw new Error("Usage: node pico_usb_control_pair_test.js CLIENT_COMMAND [arguments]");
     const child=spawn(args[0],args.slice(1),{stdio:["pipe","pipe","inherit"]});
     let pending=null, exited=false, primary;
     const lines=readline.createInterface({input:child.stdout});

@@ -88,7 +88,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         parent = (ROOT / 'src/Makefile').read_text()
         owners = []
         for target in ('wtp-api-cpp-test', 'wtp-config-cpp-test', 'wtp-plain-tcp-test',
-                       'wtp-usb-management-test', 'wtp-tls-probe-build', 'wtp-tls-build', 'wtp-tls-test'):
+                       'pico-usb-management-contract-test', 'wtp-tls-probe-build', 'wtp-tls-build', 'wtp-tls-test'):
             start = parent.index('\n'+target+':')+1
             owners.append(parent[start:parent.index('\n\n', start)])
         (self.src / 'Makefile').write_text('Q := @\nWTP_NETWORK_BUILD_DIR := build/network\n'
@@ -97,7 +97,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
             'WTP_NETWORK_FLAGS := -std=c++20 -I. $(EXTRA_FLAGS)\n'
             'OPENSSL_LIBS := $(shell pkg-config --libs openssl 2>/dev/null)\n'
             'include ../scripts/network_build_rules.mk\n'
-            '.PHONY: wtp-api-cpp-test wtp-config-cpp-test wtp-plain-tcp-test wtp-usb-management-test help clean\n'
+            '.PHONY: wtp-api-cpp-test wtp-config-cpp-test wtp-plain-tcp-test pico-usb-management-contract-test help clean\n'
             '.PHONY: wtp-tls-probe-build wtp-tls-build wtp-tls-test wtp-network-client-build\n'
             'wtp-network-client-build:\n\t@printf "%s\\n" interop-build >> interop-calls\n'
             'help:\n\t@true\nclean:\n\t@rm -rf build\n'+ '\n\n'.join(owners)+'\n')
@@ -189,7 +189,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
                 os.utime(output, ns=(output_stamp, output_stamp))
 
     def test_cold_warm_shared_objects_and_required_execution(self):
-        self.passed('-j2', 'wtp-network-tools-build', 'wtp-usb-management-test')
+        self.passed('-j2', 'wtp-network-tools-build', 'pico-usb-management-contract-test')
         commands = self.commands()
         self.assertEqual(sum('-c' in c for c in commands), 17)
         self.assertEqual(sum('-c' not in c for c in commands), 6)
@@ -204,7 +204,7 @@ os.execv('''+repr(shutil.which('c++'))+''',['c++',*args])
         self.assertEqual(sum('-c' not in c for c in self.commands()),1)
         self.reset_log()
         (self.root/'runs').unlink()
-        goals = ('wtp-api-cpp-test', 'wtp-config-cpp-test', 'wtp-plain-tcp-test', 'wtp-usb-management-test')
+        goals = ('wtp-api-cpp-test', 'wtp-config-cpp-test', 'wtp-plain-tcp-test', 'pico-usb-management-contract-test')
         for _ in range(2): self.passed(*goals)
         self.assertEqual(self.commands(), [])
         self.assertEqual(len((self.root/'runs').read_text().splitlines()), 8)

@@ -48,7 +48,7 @@ private:
         PiPairEndpoint endpoint;
         bool operator==(const Selection &) const;
     };
-    struct Entry {std::mutex operation,publication,registration;bool authority_turn{},registration_absence{},registration_context_ready{};std::optional<Selection> registration_selection;std::string registration_operation,resume_confirmed;std::optional<Selection> resume_selection;unsigned registration_failures{};std::chrono::steady_clock::time_point registration_next{};Selection selection; nlohmann::json targets=nlohmann::json::array();
+    struct Entry {std::mutex operation,publication,registration;bool authority_turn{},registration_absence{},registration_context_ready{};std::optional<Selection> registration_selection;std::string registration_operation;unsigned registration_failures{};std::chrono::steady_clock::time_point registration_next{};Selection selection; nlohmann::json targets=nlohmann::json::array();
         std::map<std::string,nlohmann::json> contexts;
         std::map<std::string,std::string> wire_contexts;
         std::map<std::string,std::string> public_contexts;
@@ -71,8 +71,6 @@ private:
     void validate_inventory(PiPairHistory &,const std::string &profile,const nlohmann::json &targets);
     std::shared_ptr<Entry> entry(const std::string &);
     std::shared_ptr<PicoManagementJournal> journal(const std::string &device);
-    enum class ResumeTurn {Ready,Advanced,Held};
-    ResumeTurn coordinate_resume(const std::string &,const std::function<bool()> &);
     bool register_authority(const std::string &,AuthoritySource,const std::function<bool()> &);
     PiPairClientResult exchange(PiPairHistory &,const Selection &,const std::string &,const std::function<bool()> &,const httplib::Headers & = {});
     WtpCatalog &catalog_;

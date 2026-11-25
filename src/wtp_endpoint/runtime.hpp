@@ -13,10 +13,6 @@
 
 namespace wsprrypi {
 
-// Actual ready HTTP listener publication, owned by its web-server instance.
-// Zero/unknown configured ports never qualify a legacy handback binding.
-void wtp_pi_publish_management_http(const void *owner,const std::string &self,unsigned port,std::function<bool()> ready);
-void wtp_pi_withdraw_management_http(const void *owner) noexcept;
 // Pre-startup observation only: no directory creation, output, or ledger writes.
 // Existing or unreadable prior endpoint state prevents new-install eligibility.
 bool wtp_pi_has_prior_output_history() noexcept;

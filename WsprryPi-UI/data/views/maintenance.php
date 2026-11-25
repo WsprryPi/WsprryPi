@@ -10,11 +10,11 @@ require __DIR__ . '/../card_header.php';
             </div>
 
             <div class="card-body tab-content bg-body">
-                <div id="installationSetup">
+                <div id="installationSetup" data-transmitter-only>
                     <?php require __DIR__ . '/configuration-recovery.php'; ?>
                 </div>
                 <?php require __DIR__ . '/backup-restore.php'; ?>
-                <section id="controllerAccess" class="maintenance-pane mb-4" aria-labelledby="controllerAccessTitle">
+                <section id="controllerAccess" data-verified-host inert class="maintenance-pane mb-4" aria-labelledby="controllerAccessTitle">
                     <h2 id="controllerAccessTitle" class="maintenance-pane__title h5 mb-0">Controller access</h2>
                     <p id="pairingState" class="maintenance-pane__body mb-0">Checking controller access…</p>
                     <div class="d-flex flex-wrap gap-2">
@@ -23,7 +23,7 @@ require __DIR__ . '/../card_header.php';
                         <button id="pairingRefresh" type="button" class="btn btn-outline-secondary">Refresh status</button>
                     </div>
                     <div id="pairingCodePanel" class="pairing-code-panel" hidden>
-                        <p class="mb-2">On your controller, open Maintenance, select this Pi, and enter this temporary code.</p>
+                        <p class="mb-2">On your controller, open Maintenance, select this host, and enter this temporary code.</p>
                         <output id="pairingCode" class="pairing-code" tabindex="-1" aria-label="Temporary pairing code"></output>
                         <p id="pairingExpiry" class="small mb-0 mt-2"></p>
                     </div>
@@ -55,7 +55,7 @@ require __DIR__ . '/../card_header.php';
                         <p id="pairingPendingFeedback" class="mt-2 mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
                     </div>
                 </section>
-                <section id="recurrenceMigration" class="maintenance-pane mb-4" aria-labelledby="recurrenceMigrationTitle" hidden>
+                <section id="recurrenceMigration" data-verified-host inert class="maintenance-pane mb-4" aria-labelledby="recurrenceMigrationTitle" hidden>
                     <h2 id="recurrenceMigrationTitle" class="maintenance-pane__title h5">Scheduling ownership</h2>
                     <p id="recurrenceMigrationState" class="maintenance-pane__body">Checking saved scheduling history…</p>
                     <div class="mb-3">
@@ -105,7 +105,7 @@ require __DIR__ . '/../card_header.php';
                     <p class="maintenance-result__body mb-0" id="maintenanceResultBody"></p>
                 </section>
 
-                <section class="maintenance-recovery" aria-label="Recovery actions">
+                <section class="maintenance-recovery" data-transmitter-only aria-label="Recovery actions">
                     <div class="maintenance-recovery__grid">
                         <section class="maintenance-pane maintenance-pane--primary">
                             <h2 class="maintenance-pane__title h5 mb-0">Repair configuration</h2>
@@ -169,6 +169,7 @@ require __DIR__ . '/../card_header.php';
 
                 <section
                     id="networkSafetyPanel"
+                    data-transmitter-only
                     class="maintenance-pane maintenance-pane--network-safety"
                     aria-labelledby="networkSafetyTitle">
                     <div class="maintenance-network-safety__heading">
@@ -253,7 +254,7 @@ require __DIR__ . '/../card_header.php';
 
                 <section class="maintenance-utility" aria-label="Maintenance utilities">
                     <div class="maintenance-utility__grid">
-                        <section class="maintenance-pane maintenance-pane--utility" aria-labelledby="maintenanceUtilityTitle">
+                        <section class="maintenance-pane maintenance-pane--utility" data-transmitter-only aria-labelledby="maintenanceUtilityTitle">
                             <h2 id="maintenanceUtilityTitle" class="maintenance-section-title h5 mb-0">Transmit test tone</h2>
                             <p class="maintenance-pane__body mb-0">
                                 Test tone opens the manual tone dialog so you can start or stop a quick output-path check and then return to normal scheduling.
@@ -306,6 +307,7 @@ require __DIR__ . '/../card_header.php';
 
                         <section
                             id="supportBundlePanel"
+                            data-transmitter-only
                             class="maintenance-pane maintenance-pane--support"
                             aria-labelledby="supportBundlePanelTitle">
                             <h2 id="supportBundlePanelTitle" class="maintenance-section-title h5 mb-0">Support Bundle</h2>

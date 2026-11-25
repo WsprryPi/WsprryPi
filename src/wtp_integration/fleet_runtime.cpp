@@ -22,7 +22,7 @@ using Json=nlohmann::json;
 // Retained records are projections only. No carrier, dispatch permit, worker,
 // mailbox, cleanup executor, or recurrence scheduler can be constructed here.
 struct FleetContext {
-    std::string id,generation{wtp_random_identity()},applied_resume,message;
+    std::string id,generation{wtp_random_identity()},message;
     std::uint64_t control{},observation{};
     Json row,retirement,published;
     bool recovery{},removed{},binding_conflict{},recurrence_retired{};
@@ -56,7 +56,7 @@ public:
         catch(const std::exception& e){journal_error_=bounded(e.what(),512);}
         unsigned index=0;
         for(const auto& row:config_.at("assignments")) {
-            auto c=create_context(row,index++);c->applied_resume=retirement_book_->active_resume(c->id);
+            auto c=create_context(row,index++);
             contexts_.emplace(c->id,c);
         }
         for(const auto& entry:entries) {
@@ -94,15 +94,6 @@ public:
     void shutdown() noexcept {
         {std::lock_guard lock(mutex_);accepting_=false;}
         if(hooks_.before_shutdown_join)hooks_.before_shutdown_join();
-    }
-    std::optional<Json> machine_resume(const PiPairResumeGrantProof &proof,PiPairHistory &history,const std::function<bool()> &cancelled){
-        if(!cancelled||cancelled()||proof.transport().self_id()!=self_id_||proof.grant()["controller_id"]!=self_id_)return {};
-        if(const auto retained=retirement_book_->resume_receipt(proof.grant())){
-            auto guard=history.admit_resume_grant(proof);return guard&&!cancelled()?retained:std::nullopt;
-        }
-        // Existing signed receipts remain readable; retired software cannot
-        // recreate controller recurrence through an old resume grant.
-        return {};
     }
     bool retirement_scope_closed(const Json &pair,const Json &migration){return retirement_book_->retirement_scope_closed(pair,migration);}
     PicoHttpResponse machine_retirement(const PiPairRetirementPrincipal &principal,PiPairHistory &history,const std::function<bool()> &cancelled){
@@ -294,11 +285,6 @@ void wtp_fleet_with_backup_files(const std::function<void(const std::map<std::st
     std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}
     if(!current)throw std::runtime_error("fleet_backup_unavailable");
     current->with_backup_files(capture);
-}
-std::optional<Json> wtp_fleet_resume(const PiPairResumeGrantProof &proof,PiPairHistory &history,const std::function<bool()> &cancelled){
-    std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);if(!lifecycle.owns_lock())return {};
-    std::shared_ptr<Fleet> current;{std::lock_guard lock(manager_mutex);current=manager;}if(!current)return {};
-    try{return current->machine_resume(proof,history,cancelled);}catch(...){return {};}
 }
 bool wtp_fleet_retirement_scope_closed(const Json &pair,const Json &migration){
     std::unique_lock lifecycle(lifecycle_mutex,std::try_to_lock);if(!lifecycle.owns_lock())return false;

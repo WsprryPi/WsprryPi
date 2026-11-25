@@ -5,12 +5,12 @@
     if(!node('View'))return;
     const base=root.WSPRRYPI_PATHS?.sharedApiPath||'/api/control/v1';
     const api=root.ConfigurationRecoveryClient.create({base}),picos=root.PicoTargetClient.create({base});
-    const entries=new Map();let targets=[],selected=null,inventoryBusy=false,closed=false,timer;
+    const entries=new Map();let targets=[],selected=null,inventoryState='loading',inventoryBusy=false,closed=false,timer;
     const identity=value=>typeof value==='string'&&/^[0-9a-f]{32}$/.test(value);
     const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
     const failure=()=>{throw Error('Device context or status could not be verified.');};
     const available=item=>!closed&&targets.some(target=>target.device_id===item.target.device_id&&target.product===item.target.product&&target.profile_generation===item.target.profile_generation);
-    const locked=()=>root.PicoFirmwareSafety?.locked||root.ConfigurationRecovery?.active;
+    const locked=()=>root.ControllerMode?.blocked||root.PicoFirmwareSafety?.locked||root.ConfigurationRecovery?.active;
     const pending=item=>!!item.client?.operation||item.unknown;
     function render() {
         const item=selected;node('View').hidden=!item;
@@ -19,9 +19,10 @@
             node('View').setAttribute('aria-busy',String(item.busy));
             node('Name').textContent=item.target.name;
             node('Identity').textContent=item.target.product+' · '+item.target.device_id+(pi?' · paired network':item.handle?.managed?' · USB through paired Pi':'');
+            const hostUnavailable=root.ControllerMode?.blocked;
             const phase=pi?item.status?.phase:item.status?.job.state;
-            node('State').textContent=item.unknown?'Outcome unconfirmed':!available(item)?'Device unavailable':!item.status?'Device state unknown':phase==='empty'?'Idle':phase.charAt(0).toUpperCase()+phase.slice(1).replaceAll('_',' ');
-            node('Detail').textContent=item.readOnly ? 'This Pi has no supported transmitter settings through this connection. Its supported attached Picos can be selected separately.' : item.status ? pi
+            node('State').textContent=item.unknown?'Outcome unconfirmed':hostUnavailable||!available(item)?'Device unavailable':!item.status?'Device state unknown':phase==='empty'?'Idle':phase.charAt(0).toUpperCase()+phase.slice(1).replaceAll('_',' ');
+            node('Detail').textContent=hostUnavailable ? 'The host connection is unavailable. Earlier device observations are historical.' : item.readOnly ? 'This Pi has no supported transmitter settings through this connection. Its supported attached Picos can be selected separately.' : item.status ? pi
                 ? `Transmit permission ${item.status.transmit_effective?'on':'off'}. Scheduling ${item.status.schedule_enabled?'enabled':'disabled'}. Waiting reason: ${item.status.waiting_reason}.`
                 : `Output ${item.status.job.output_active?'active':'inactive'}; ${item.status.job.owner_id?'owned':'unowned'}.`
                 : 'Read this device’s status before operating. Output state is unknown.';
@@ -113,13 +114,16 @@
         item.at=Date.now();item.feedback=pending(item)?'An earlier request remains unconfirmed. An ordinary status read does not clear it.':'Current device status read. Selection did not change settings or output.';
     }
     async function inventory(){
-        if(inventoryBusy||closed)return;inventoryBusy=true;
+        if(inventoryBusy||closed||root.ControllerMode?.blocked)return;inventoryBusy=true;
         try{
-            const [value,host]=await Promise.all([api.targets(),api.readiness()]);
-            const next=value.targets.filter(target=>target.device_id!==host.device_id);
-            targets=next;
-            if(selected&&!available(selected)){selected.status=null;selected.stop=null;selected.client?.pause();selected.handle?.retire();selected.feedback='This device or its profile changed. Return to This Pi and choose a current device; earlier requests remain attached to their original device.';}
-        }catch(_){targets=[];if(selected){selected.status=null;selected.stop=null;selected.client?.pause();selected.handle?.retire();selected.feedback='Device inventory is unavailable. Output state is unknown; refresh before operating.';}}
+            const controller=root.ControllerMode?.active;
+            const [value,hostId]=await Promise.all([api.targets(),controller
+                ? root.ControllerMode.deviceId : api.readiness().then(host=>host.device_id)]);
+            if(closed||root.ControllerMode?.blocked)return;
+            targets=value.targets.filter(target=>target.device_id!==hostId);
+            inventoryState='ready';
+            if(selected&&!available(selected)){selected.status=null;selected.stop=null;selected.client?.pause();selected.handle?.retire();selected.feedback='This device or its profile changed. Return to the device list and choose a current device. Earlier requests remain attached to their original device.';}
+        }catch(_){inventoryState='unavailable';targets=[];if(selected){selected.status=null;selected.stop=null;selected.client?.pause();selected.handle?.retire();selected.feedback='Device inventory is unavailable. Output state is unknown; refresh before operating.';}}
         finally{inventoryBusy=false;render();}
     }
     async function command(action){
@@ -164,10 +168,10 @@
         });
     }
     root.TargetOperation=Object.freeze({
-        get selected(){return selected;},get busy(){return !!selected?.busy;},
+        get selected(){return selected;},get busy(){return !!selected?.busy;},get inventoryState(){return inventoryState;},render,
         options(){return targets.map(target=>({id:'target:'+target.device_id,label:target.name+' · '+target.product+' · '+target.device_id.slice(0,8)}));},
         async select(id){
-            if(selected?.busy)return;
+            if(selected?.busy||root.ControllerMode?.blocked)return;
             let target=targets.find(target=>target.device_id===id);if(!target)return;
             let item=entries.get(id);
             if(item&&!pending(item)&&!equal(item.target,target)){item.client?.pause();item.handle?.retire();entries.delete(id);item=null;}
@@ -201,5 +205,6 @@
         });
         if(!closed)timer=root.setTimeout(tick,10000);
     }
+    root.addEventListener('wsprry-host-status',()=>void inventory());
     void tick();
 })(window);

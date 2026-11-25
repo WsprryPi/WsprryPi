@@ -310,7 +310,7 @@ function currentConfigPayloadSnapshot(options = {}) {
 }
 
 function hasUnsavedLocalConfigChanges() {
-    if (systemPaused) {
+    if (systemPaused || window.ControllerMode?.active) {
         return false;
     }
 
@@ -351,7 +351,7 @@ function removePersistedConfigDraft() {
 
 function persistLocalConfigDraftIfPossible() {
     if (
-        systemPaused ||
+        systemPaused || window.ControllerMode?.active ||
         typeof validatePage !== "function" ||
         !validatePage({ allowInvalidStationIdentity: true })
     ) {

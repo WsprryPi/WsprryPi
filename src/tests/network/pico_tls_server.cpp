@@ -24,7 +24,7 @@ struct DiagnosticNetwork final : network_test::Network {
 using Clock = network_test::FixtureClock;
 // Preserve the production dry-run engine's timing policy. Diagnose a host OS
 // scheduling miss instead of treating a later retry as evidence it never happened.
-struct ObservedEngine final : wsprrypico::wtp::RfEngine {
+struct ObservedEngine final : wsprrypico::execution::RfEngine {
   wsprrypico::standalone::DryRunEngine engine;
   Clock &clock;
   explicit ObservedEngine(Clock &value) : clock(value) {}
@@ -32,21 +32,21 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
   bool reported{};
   unsigned disables{}, prepares{};
   bool can_disable=true;
-  wsprrypico::wtp::PrepareResult prepare(const wsprrypico::wtp::Job &job) override {
+  wsprrypico::execution::PrepareResult prepare(const wsprrypico::execution::Job &job) override {
     ++prepares; return engine.prepare(job);
   }
   bool schedules_locally() const override { return true; }
-  bool schedule(const wsprrypico::wtp::Job &job, std::uint64_t when,
-                const wsprrypico::wtp::LocalStartConditions &conditions) override {
+  bool schedule(const wsprrypico::execution::Job &job, std::uint64_t when,
+                const wsprrypico::execution::LocalStartConditions &conditions) override {
     start = when; allowance = conditions.maximum_uncertainty_ns; start_utc = conditions.start_utc_ns; reported = false;
     return engine.schedule(job, when, conditions);
   }
-  bool begin(const wsprrypico::wtp::Job &job, std::uint64_t when) override {
+  bool begin(const wsprrypico::execution::Job &job, std::uint64_t when) override {
     return engine.begin(job, when);
   }
-  wsprrypico::wtp::EngineReport poll(std::uint64_t now) override {
+  wsprrypico::execution::EngineReport poll(std::uint64_t now) override {
     const auto result = engine.poll(now);
-    if (!reported && result.state == wsprrypico::wtp::EngineState::Missed) {
+    if (!reported && result.state == wsprrypico::execution::EngineState::Missed) {
       reported = true;
       const auto &sample = clock.last_snapshot();
       std::uint64_t mapped{};
@@ -54,7 +54,7 @@ struct ObservedEngine final : wsprrypico::wtp::RfEngine {
       std::cerr << "HOST_DRY_RUN_MISSED start_ns=" << start << " poll_ns=" << now
                 << " elapsed_ns=" << (now >= start ? now - start : 0)
                 << " allowance_ns=" << allowance << " start_utc_ns=" << start_utc
-                << " window_ns=" << wsprrypico::wtp::start_window_ns(start_utc)
+                << " window_ns=" << wsprrypico::execution::start_window_ns(start_utc)
                 << " mapping_valid=" << valid << " mapping_error_ns="
                 << (mapped > start_utc ? mapped - start_utc : start_utc - mapped)
                 << " uncertainty_ns=" << sample.uncertainty_ns << std::endl;
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     auto config = *wsprrypico::standalone::parse_config(network_test::config);
     config.power_dbm = 20;
     // A complete current-source fixture selects its standalone WSPR dial at
-    // runtime. This whole-Hz USB dial is independent of absolute WTP events.
+    // runtime. This whole-Hz USB dial is independent of native event frequencies.
     config.wspr_dial_frequency_hz = 3568600;
     config.pins.rf = 28;
     config.allow_unqualified_frequency = config.allow_non_amateur_frequency = true;
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   network_test::Identity identities;
   if (argc > 1) identities.boot = static_cast<unsigned>(std::stoul(argv[1]));
   ObservedEngine engine{clock};
-  wsprrypico::wtp::JobService service{clock, engine, identities};
+  wsprrypico::execution::JobService service{clock, engine, identities};
   wsprrypico::standalone::Scheduler scheduler{store, service};
   DiagnosticNetwork network;
   const std::string device(32, argc > 2 ? argv[2][0] : 'a');
@@ -132,23 +132,23 @@ int main(int argc, char **argv) {
       else if (input.starts_with("CONFIG ")) { std::cout << scheduler.command(input) << std::flush; }
       else if (input == "ACTIVE_JOB") {
         unsigned sequence=0;
-        const auto invoke=[&](const std::string &operation,wsprrypico::wtp::RequestBody body) {
-          wsprrypico::wtp::Request request;request.principal="shared-setup-software-fixture";
+        const auto invoke=[&](const std::string &operation,wsprrypico::execution::RequestBody body) {
+          wsprrypico::execution::Request request;request.principal="shared-setup-software-fixture";
           request.session_id=std::string(32,'d');request.request_id=std::string(31,'0')+std::to_string(++sequence);
           request.operation=operation;request.body=std::move(body);request.payload_digest[0]=sequence;
           return service.handle(request).ok;
         };
-        wsprrypico::wtp::Job job{std::string(32,'e'),"rf-events/1","tone",1'000'000'000,{},false};
+        wsprrypico::execution::Job job{std::string(32,'e'),"rf-events/1","tone",1'000'000'000,{},false};
         const bool events=job.events.push_back({0,job.total_duration_ns,true,7'040'000'000'000'000ULL});
-        const bool ready=events && invoke("HELLO",wsprrypico::wtp::HelloBody{{"WTP/1"}}) &&
-            invoke("CLAIM",wsprrypico::wtp::ClaimBody{std::string(32,'d'),60000}) && invoke("LOAD",std::move(job)) &&
-            invoke("ARM",wsprrypico::wtp::ArmBody{std::string(32,'e'),clock.snapshot().utc_now_ns+30'000'000'000ULL,1'000'000'000ULL});
+        const bool ready=events && invoke("HELLO",wsprrypico::execution::HelloBody{{wsprrypico::execution::session_version}}) &&
+            invoke("CLAIM",wsprrypico::execution::ClaimBody{std::string(32,'d'),60000}) && invoke("LOAD",std::move(job)) &&
+            invoke("ARM",wsprrypico::execution::ArmBody{std::string(32,'e'),clock.snapshot().utc_now_ns+30'000'000'000ULL,1'000'000'000ULL});
         std::cout << (ready ? "ACK" : "FAILED") << std::endl;
       }
       else if (input == "END_ACTIVE_JOB") {
-        wsprrypico::wtp::Request request;request.principal="shared-setup-software-fixture";
+        wsprrypico::execution::Request request;request.principal="shared-setup-software-fixture";
         request.session_id=std::string(32,'d');request.request_id=std::string(32,'9');
-        request.operation="ABORT";request.body=wsprrypico::wtp::AbortBody{std::string(32,'e')};request.payload_digest[0]=99;
+        request.operation="ABORT";request.body=wsprrypico::execution::AbortBody{std::string(32,'e')};request.payload_digest[0]=99;
         std::cout << (service.handle(request).ok ? "ACK" : "FAILED") << std::endl;
       }
       else if (input == "JOB_STATE") {
@@ -163,16 +163,16 @@ int main(int argc, char **argv) {
         if (reload.config()) {
           auto redacted = *reload.config();
           const auto &password = redacted.password;
-          for (const auto byte : wsprrypico::wtp::sha256(std::span(
+          for (const auto byte : wsprrypico::execution::sha256(std::span(
               reinterpret_cast<const std::uint8_t *>(password.data()), password.size()))) {
             digest += "0123456789abcdef"[byte >> 4]; digest += "0123456789abcdef"[byte & 15];
           }
           redacted.password.clear(); config = wsprrypico::standalone::serialize_config(redacted);
         }
         std::string flash_digest;
-        for (const auto byte : wsprrypico::wtp::sha256(flash.bytes)) { flash_digest += "0123456789abcdef"[byte >> 4]; flash_digest += "0123456789abcdef"[byte & 15]; }
+        for (const auto byte : wsprrypico::execution::sha256(flash.bytes)) { flash_digest += "0123456789abcdef"[byte >> 4]; flash_digest += "0123456789abcdef"[byte & 15]; }
         const auto status_text = scheduler.status();
-        const auto status = wsprrypico::wtp::json::parse(status_text);
+        const auto status = wsprrypico::execution::json::parse(status_text);
         std::cout << "DUMP {\"healthy\":" << (healthy ? "true" : "false") << ",\"config\":" << config
                   << ",\"cursor\":\"" << reload.watermark() << "\",\"password_sha256\":\"" << digest
                   << "\",\"generation\":\"" << reload.config_sequence() << "\",\"bytes_sha256\":\"" << flash_digest

@@ -3,10 +3,6 @@
 #include "authority.hpp"
 #include <functional>
 namespace wsprrypi {
-struct PiWtpBinding {
-    std::uint64_t revocation_generation{};
-    unsigned wtp_port{},management_port{};
-};
 struct PiManagementObservation {
     std::string device_id;
     WtpPiAuthority::Snapshot authority;
@@ -17,6 +13,5 @@ struct PiManagementObservation {
     std::function<void()> release_stop{};
     std::function<void()> cancel_reserved_stop{};
     std::optional<std::string> destination_id{};
-    std::optional<PiWtpBinding> wtp_binding{};
 };
 } // namespace wsprrypi

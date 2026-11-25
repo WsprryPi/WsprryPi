@@ -292,7 +292,7 @@ class SourceIdentityTests(unittest.TestCase):
     def test_workflow_uses_one_immutable_owner_and_verifies_both_consumers(self):
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',
-            'wtp-network-loopback', 'wtp-usb-management-pair', 'strict-i2c-profile',
+            'pico-network-management-pair', 'pico-usb-management-pair', 'strict-i2c-profile',
             'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components', 'linux-native-contracts'})
         self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
         self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
@@ -307,7 +307,7 @@ class SourceIdentityTests(unittest.TestCase):
         recorder = next(s for s in resolver['steps'] if s.get('id') == 'pico-output')
         self.assertEqual(source_arguments(recorder), ['record', selected[0]['with']['path']])
         self.assertFalse(recorder.get('continue-on-error', False))
-        for carrier in ('wtp-network-loopback', 'wtp-usb-management-pair', 'macos-simulated-profile'):
+        for carrier in ('pico-network-management-pair', 'pico-usb-management-pair', 'macos-simulated-profile'):
             steps = jobs[carrier]['steps']
             checkout = next(i for i, s in enumerate(steps) if s.get('with', {}).get('repository') == 'WsprryPi/WsprryPico')
             self.assertEqual(reference(steps[checkout]['with']['ref']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
@@ -326,7 +326,7 @@ class SourceIdentityTests(unittest.TestCase):
                     recorded = next(i for i, step in enumerate(steps) if step.get('name') == 'Record frozen pair source manifests')
                     budget = next(i for i, step in enumerate(steps) if step.get('name') == 'Select bounded build budget')
                     checked = next(i for i, step in enumerate(steps) if step.get('name') == 'Verify frozen pair sources after the complete recipe')
-                    final_recipe = 'Render network controls with mocked responses' if carrier == 'wtp-network-loopback' else 'Actual UI producer through production Pi and Pico USB handlers'
+                    final_recipe = 'Render network controls with mocked responses' if carrier == 'pico-network-management-pair' else 'Actual UI producer through production Pi and Pico USB handlers'
                     recipe = next(i for i, step in enumerate(steps) if step.get('name') == final_recipe)
                     self.assertLess(matches[0][0], recorded)
                     self.assertLess(recorded, budget)
@@ -336,7 +336,7 @@ class SourceIdentityTests(unittest.TestCase):
                         self.assertNotIn('if', step)
                         self.assertFalse(step.get('continue-on-error', False))
             self.assertFalse(steps[checkout].get('continue-on-error', False))
-        for name in ('wtp-network-loopback','wtp-usb-management-pair','strict-i2c-profile',
+        for name in ('pico-network-management-pair','pico-usb-management-pair','strict-i2c-profile',
                      'ubuntu-gcc13-release','non-hardware-validation','linux-native-contracts'):
             self.assertEqual(make_goals(jobs[name])['ci-build-budget'],1,name)
         for name in ('macos-simulated-profile','macos-si5351-profile'):
@@ -364,8 +364,8 @@ class SourceIdentityTests(unittest.TestCase):
         macos_goals = make_goals(jobs['macos-simulated-profile'])
         self.assertEqual(macos_goals['semantics-test-portable'], 1)
         self.assertEqual(macos_goals['native-recurrence-test'], 0)
-        self.assertEqual(make_goals(jobs['wtp-network-loopback'])['wtp-tls-test'], 0)
-        self.assertEqual(make_goals(jobs['wtp-network-loopback'])['wtp-network-runtime-test'], 1)
+        self.assertEqual(make_goals(jobs['pico-network-management-pair'])['wtp-tls-test'], 0)
+        self.assertEqual(make_goals(jobs['pico-network-management-pair'])['pi-network-runtime-regression-test'], 1)
 
 
 class MakeDispatchTests(unittest.TestCase):

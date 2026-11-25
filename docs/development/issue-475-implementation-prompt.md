@@ -199,11 +199,11 @@ origin/auth failures, lost replies, recovery, and no-target startup.
 
 Run both complete `.github/workflows/debian-non-hardware.yml` recipes:
 
-- `wtp-network-loopback`: `wtp-network-runtime-test`,
-  `wtp-network-interop-test`, and `wtp-config-interop-test`.
-- `wtp-usb-management-pair`: actual Pico `usb_management_driver`,
-  `wtp-usb-pair-client-build`, `wtp-usb-management-test`, and
-  `WsprryPi-UI/tests/wtp_usb_pair_test.js` through production Pi/Pico handlers.
+- `pico-network-management-pair`: `pi-network-runtime-regression-test`,
+  `pico-https-management-interop-test`, and `pico-control-interop-test`.
+- `pico-usb-management-pair`: actual Pico `usb_management_driver`,
+  `pico-usb-control-client-build`, `pico-usb-management-contract-test`, and
+  `WsprryPi-UI/tests/pico_usb_control_pair_test.js` through production Pi/Pico handlers.
 
 Additionally run the actual controller runtime through production peers and native
 platform adapters; existing pair clients alone cannot qualify new startup.

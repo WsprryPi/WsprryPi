@@ -21,6 +21,12 @@ if (getenv('WSPRRYPI_NATIVE_HOST_FIXTURE') === '1') {
         echo '<script src="/__native_host_fixture__.js"></script>'; return true;
     }
 }
+// Static tests exercise the ordinary shell unless they supply their own host.
+if ($path === '/version' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: application/json');
+    echo json_encode(['host_status' => ['role' => 'transmitter']]);
+    return true;
+}
 // Supply only synthetic read-only status so the production maintenance guard
 // can settle. No request is forwarded to an application or attached device.
 if ($path === '/api/control/v1/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {

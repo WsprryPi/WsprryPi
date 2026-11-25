@@ -4,7 +4,7 @@
     "use strict";
     const byId = id => root.document.getElementById(id);
     const url = suffix => (root.WSPRRYPI_PATHS?.sharedApiPath || "/api/control/v1") + "/host/" + suffix;
-    let pendingChoice = null, busy = false, closed = false, timer;
+    let pendingChoice = null, busy = false, closed = false, timer, initialized = false;
     function render(state) {
         const panel = byId("local-wtp-control");
         if (!panel) return;
@@ -20,7 +20,7 @@
         byId("local-wtp-recover").disabled = busy;
     }
     async function readStatus() {
-        if (closed || busy) return;
+        if (closed || busy || root.ControllerMode && !root.ControllerMode.transmitter) return;
         try {
             const response = await root.fetch(url("wtp-endpoint"), {cache: "no-store", signal: AbortSignal.timeout(5000)});
             if (!response.ok) throw new Error("Status unavailable");
@@ -53,6 +53,8 @@
     }
     function enable() {
         const result = root.jQuery.Deferred();
+        if (root.ControllerMode && !root.ControllerMode.transmitter)
+            return result.reject({status: 409, responseJSON: {message: "Local output is unavailable."}}, "error").promise();
         if (busy) return result.reject({status: 409, responseJSON: {message: "A local control action is already pending."}}, "error").promise();
         busy = true;
         clearTimeout(timer);
@@ -101,7 +103,7 @@
         return result.promise();
     }
     async function recover() {
-        if (busy || !root.confirm("Stop remote work and reconcile this Pi's output? This local action does not ask the controller for approval.")) return;
+        if (busy || root.ControllerMode && !root.ControllerMode.transmitter || !root.confirm("Stop remote work and reconcile this Pi's output? This local action does not ask the controller for approval.")) return;
         busy = true;
         byId("local-wtp-status").textContent = "Reconciling local output…";
         try {
@@ -116,12 +118,20 @@
     }
     function init() {
         if (!byId("local-wtp-control")) return;
+        initialized = true;
         for (const [id, choice] of [["local-wtp-end-now", "end_now"], ["local-wtp-finish", "finish_current"], ["local-wtp-decline", "decline"]])
             byId(id).addEventListener("click", () => settleChoice(choice));
         byId("local-wtp-recover").addEventListener("click", recover);
         readStatus();
         root.addEventListener("pagehide", () => {closed = true; clearTimeout(timer); settleChoice("decline");});
     }
+    root.addEventListener("wsprry-host-status", () => {
+        if (initialized && root.ControllerMode?.transmitter && !closed) { clearTimeout(timer); void readStatus(); }
+    });
     root.LocalWtp = {enable};
-    if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init); else init();
+    function start() {
+        if (root.ControllerMode) root.ControllerMode.onTransmitter(init);
+        else init();
+    }
+    if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", start); else start();
 })(window);

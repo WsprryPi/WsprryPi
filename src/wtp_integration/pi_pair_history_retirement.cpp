@@ -27,47 +27,6 @@ bool proof(const PiPairSecret &key,Json body,std::string_view prefix={}){
 }
 Json unsigned_body(Json value){value.erase("proof");return value;}
 }
-std::optional<PiPairResumeTargetProof> PiPairHistory::incoming_resume_target(const BrowserRequest &request,const LocalBrowserPrincipal &principal){
-    PiPairPolicyAdmission policy;if(!policy.allowed())return {};
-    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return {};
-    try{
-        require(running_marked_&&service_permits()&&principal.matches(request)&&request.method=="POST"&&
-            request.path=="/api/control/v1/targets/"+self_+"/migration/rollback");
-        const auto body=strict_browser_json(request.body,16);require(valid_controller_document(body,"target-migration-rollback")&&body["binding"]["device_id"]==self_);
-        verify_selection();const auto state=store_->snapshot();const auto catalog=parse_pi_pair_catalog(state.catalog.bytes,self_);const auto &pair=catalog["active"];
-        require(!pair.is_null()&&pair["state"]=="active"&&body["resume_controller_id"]==pair["peer_id"]);
-        const Json scope{{"pair_id",pair["pair_id"]},{"authorization_generation",pair["authorization_generation"]},{"controller_id",pair["peer_id"]}};
-        return PiPairResumeTargetProof(this,scope,PiManagementJournal::digest(canonical_pi_management_json(body)),principal.lease_,
-            std::min(principal.deadline_,std::chrono::steady_clock::now()+std::chrono::seconds(30)));
-    }catch(...){return {};}
-}
-std::optional<PiPairResumeTargetProof> PiPairHistory::incoming_resume_target(const BrowserRequest &request,const PiPairPrincipal &principal){
-    PiPairPolicyAdmission policy;if(!policy.allowed())return {};
-    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return {};
-    try{
-        require(running_marked_&&service_permits()&&request.method=="POST"&&request.path=="/api/control/v1/targets/"+self_+"/migration/rollback");
-        const auto body=strict_browser_json(request.body,16);require(valid_controller_document(body,"target-migration-rollback")&&body["binding"]["device_id"]==self_);
-        verify_selection();const auto state=store_->snapshot();const auto catalog=parse_pi_pair_catalog(state.catalog.bytes,self_);const auto &pair=catalog["active"];
-        require(!pair.is_null()&&pair["state"]=="active"&&principal.self_id()==self_&&principal.identity().purpose==PiPairTlsPurpose::Management&&
-            pair["peer_id"]==principal.peer_id()&&pair["pair_id"]==principal.identity().pair_id&&pair["authorization_generation"]==principal.identity().authorization_generation&&
-            pair["current"]["epoch"]==principal.identity().epoch&&body["resume_controller_id"]==principal.peer_id());
-        return PiPairResumeTargetProof(this,{{"pair_id",pair["pair_id"]},{"authorization_generation",pair["authorization_generation"]},{"controller_id",pair["peer_id"]}},
-            PiManagementJournal::digest(canonical_pi_management_json(body)),principal);
-    }catch(...){return {};}
-}
-std::optional<PiPairMutationGuard> PiPairHistory::admit_resume_target(const PiPairResumeTargetProof &proof){
-    if(proof.owner_!=this||std::chrono::steady_clock::now()>=proof.until_)return {};
-    if(proof.principal_)return admit_mutation(*proof.principal_);
-    PiPairPolicyAdmission policy;if(!policy.allowed())return {};
-    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return {};
-    try{
-        const auto lease=proof.lease_.lock();require(lease&&lease->load()&&running_marked_&&service_permits());
-        verify_selection();const auto state=store_->snapshot();const auto catalog=parse_pi_pair_catalog(state.catalog.bytes,self_);const auto &pair=catalog["active"];
-        require(!pair.is_null()&&pair["state"]=="active"&&pair["peer_id"]==proof.scope_["controller_id"]&&pair["pair_id"]==proof.scope_["pair_id"]&&
-            pair["authorization_generation"]==proof.scope_["authorization_generation"]);
-        return PiPairMutationGuard(std::move(policy.configuration),std::move(policy.admission),std::move(lock));
-    }catch(...){return {};}
-}
 std::optional<PiPairSecret> PiPairHistory::retirement_verifier(const PiPairTlsIdentity &identity,bool server,const std::string &peer){
     require(service_permits()&&identity.purpose==PiPairTlsPurpose::Retirement);(void)pi_pair_tls_identity(identity);verify_selection();const auto state=store_->snapshot();
     const auto selected=[&](const Json &pair)->std::optional<PiPairSecret>{
@@ -165,44 +124,6 @@ std::optional<PiPairRetiredProof> PiPairHistory::retired_proof(const PiPairPrinc
         auto expected=unsigned_body(request);expected["schema"]="retired";auto received=unsigned_body(response);received.erase("receipt_digest");
         require(received==expected);const auto key=retirement_verifier(principal.identity(),false,principal.peer_id());
         require(key&&proof(*key,request)&&proof(*key,response));return PiPairRetiredProof(response);
-    }catch(...){return {};}
-}
-std::optional<Json> PiPairHistory::resume_acknowledgement(const Json &unsigned_ack){
-    std::lock_guard lock(mutex_);
-    try{
-        require(unsigned_ack.is_object()&&!unsigned_ack.contains("proof"));auto response=unsigned_ack;response["proof"]=std::string(43,'A');
-        require(valid_pi_pair_document(response,"resume-ack")&&response["controller_id"]==self_);
-        const PiPairTlsIdentity identity{PiPairTlsPurpose::Retirement,response["pair_id"].get<std::string>(),response["authorization_generation"].get<std::string>(),{}};
-        const auto key=retirement_verifier(identity,true,response["target_id"].get<std::string>());require(key.has_value());
-        response["proof"]=mac(*key,unsigned_ack,"Wsprry-Pair/1/resume-ack/");require(valid_pi_pair_document(response,"resume-ack"));return response;
-    }catch(...){return {};}
-}
-std::optional<PiPairResumeOutcomeProof> PiPairHistory::resume_outcome_proof(const PiPairPrincipal &principal,const Json &response){
-    PiPairPolicyAdmission policy;if(!policy.allowed())return {};
-    std::unique_lock lock(mutex_,std::try_to_lock);if(!lock.owns_lock())return {};
-    try{
-        require(valid_pi_pair_document(response,"resume-ack")&&principal.identity().purpose==PiPairTlsPurpose::Management&&
-            principal.self_id()==self_&&response["target_id"]==self_&&response["controller_id"]==principal.peer_id());
-        verify_selection();const auto catalog=parse_pi_pair_catalog(store_->snapshot().catalog.bytes,self_);const auto &active=catalog["active"];
-        require(!active.is_null()&&active["state"]=="active"&&active["peer_id"]==principal.peer_id()&&
-            active["pair_id"]==principal.identity().pair_id&&active["authorization_generation"]==principal.identity().authorization_generation&&
-            active["current"]["epoch"]==principal.identity().epoch);
-        const PiPairTlsIdentity original{PiPairTlsPurpose::Retirement,response["pair_id"].get<std::string>(),response["authorization_generation"].get<std::string>(),{}};
-        const auto key=retirement_verifier(original,false,principal.peer_id());
-        require(key&&proof(*key,response,"Wsprry-Pair/1/resume-ack/"));return PiPairResumeOutcomeProof(this,principal,response);
-    }catch(...){return {};}
-}
-std::optional<PiPairMutationGuard> PiPairHistory::admit_resume_outcome(const PiPairResumeOutcomeProof &outcome){
-    try{
-        require(outcome.owner_==this&&std::chrono::steady_clock::now()<outcome.until_);
-        auto guard=admit_mutation(outcome.principal_);if(!guard)return {};
-        // The actual current pair is still checked by normal mutation
-        // admission. Recheck the old continuity key while that owner is locked.
-        const auto &response=outcome.document_;
-        require(valid_pi_pair_document(response,"resume-ack")&&response["target_id"]==self_&&response["controller_id"]==outcome.principal_.peer_id());
-        const PiPairTlsIdentity original{PiPairTlsPurpose::Retirement,response["pair_id"].get<std::string>(),response["authorization_generation"].get<std::string>(),{}};
-        const auto key=retirement_verifier(original,false,outcome.principal_.peer_id());
-        require(key&&proof(*key,response,"Wsprry-Pair/1/resume-ack/"));return guard;
     }catch(...){return {};}
 }
 } // namespace wsprrypi

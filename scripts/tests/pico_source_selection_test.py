@@ -39,11 +39,11 @@ def main():
                 shutil.copy2(original, target)
             elif target.is_file():
                 target.unlink()
-        endpoint = source / 'src/wtp/observation.cpp'
+        endpoint = source / 'src/rf/observation.cpp'
         original = endpoint.read_text()
         marker = 'STAGE1_EDITED_PICO_SOURCE_CONSUMED'
         endpoint.write_text(original + '\n#include <cstdio>\nnamespace { const bool source_probe = [] { std::fputs("' + marker + '\\n", stderr); return true; }(); }\n')
-        assert 'src/wtp/observation.cpp' in run(['git', '-C', str(source), 'status', '--short'])
+        assert 'src/rf/observation.cpp' in run(['git', '-C', str(source), 'status', '--short'])
         configure = ['cmake', '-S', str(root / 'src/tests/network'), '-B', str(build), f'-DPICO_SOURCE={source}', f'-DMBEDTLS_SOURCE={args.mbedtls_source.resolve()}']
         output = run(configure)
         assert str(source) in output

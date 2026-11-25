@@ -287,11 +287,11 @@ Emulation/cross-compilation alone is not native runtime or installation evidence
 - Prove target recurrence continues after controller/browser closure and reconnect,
   using #473's software targets and simulated target backends, never a simulated
   local controller output. Retired legacy assignments remain retired.
-- Run both canonical `wtp-network-loopback` and `wtp-usb-management-pair`
+- Run both canonical `pico-network-management-pair` and `pico-usb-management-pair`
   recipes from `.github/workflows/debian-non-hardware.yml`: network runtime,
   interoperability, and config interoperability; actual Pico `usb_management_driver`,
-  `wtp-usb-pair-client-build`, `wtp-usb-management-test`, and
-  `WsprryPi-UI/tests/wtp_usb_pair_test.js`. Additionally exercise the controller
+  `pico-usb-control-client-build`, `pico-usb-management-contract-test`, and
+  `WsprryPi-UI/tests/pico_usb_control_pair_test.js`. Additionally exercise the controller
   runtime through those production peers. Preserve crypto, serialization,
   framing/ACK, and journals. Select intended immutable Pico/dependency sources.
   A legacy client, old green CI, mock, failed, skipped, or timed-out required check

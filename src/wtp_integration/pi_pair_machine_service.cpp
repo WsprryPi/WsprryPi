@@ -55,8 +55,7 @@ PiPairHttpReply PiPairMachineService::handle(const PiPairPrincipal &principal,co
             return target_(principal,request,cancelled);
         }
         if(resource!="rotate/prepare"&&resource!="rotate/commit"){
-            if((resource!="authorities/register"&&resource!="resume"&&resource!="resume/ack")||!history_.management_authorization(principal))return denied();
-            if(request.method=="GET")return request.body.empty()?target_(principal,request,cancelled):denied(400,"invalid_shape");
+            if(resource!="authorities/register"||!history_.management_authorization(principal))return denied();
             auto mutation=connection.try_mutation(self_);if(!mutation)return denied(409,"management_busy");
             return target_(principal,request,cancelled);
         }

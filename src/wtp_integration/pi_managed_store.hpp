@@ -17,8 +17,6 @@ namespace wsprrypi {
 // responsibility. This class never starts work or changes execution ownership.
 class PiPairPrincipal;
 class PiPairRetiredProof;
-class PiPairResumeTargetProof;
-class PiPairResumeOutcomeProof;
 class PiPairMutationGuard;
 // Typed local crash-test checkpoints only; no operator or wire selector.
 enum class PiManagedWritePoint {BeforePrepare,Prepared,Committed,Published};
@@ -93,12 +91,6 @@ public:
     // Existing committed receipt for this exact disabled candidate, independent
     // of later metadata-only revisions. Contains no keys or configuration body.
     std::optional<nlohmann::json> disabled_snapshot();
-    // Freeze an explicit, currently authorized handback against an actual
-    // disabled receipt. No source permission is implied until its exact ACK.
-    void prepare_remote_resume(const Operation &,const nlohmann::json &captured,
-        const PiPairResumeTargetProof &,const nlohmann::json &wtp_binding,const PiPairMutationGuard &);
-    std::optional<nlohmann::json> remote_resume(const PiPairPrincipal &);
-    nlohmann::json confirm_remote_resume(const PiPairResumeOutcomeProof &,const PiPairMutationGuard &);
     bool handover_handoff(const nlohmann::json &request,const PiPairMutationGuard &);
     bool confirm_handover(const PiPairRetiredProof &);
 

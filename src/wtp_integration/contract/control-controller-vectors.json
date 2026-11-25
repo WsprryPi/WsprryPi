@@ -229,7 +229,7 @@
           {
             "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "product": "WsprryPico",
-            "name": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9",
+            "name": "ééééééééééééééééééééééééééééééééééééééééé",
             "profile_generation": "1",
             "connection_generation": "18446744073709551615"
           }
@@ -247,7 +247,7 @@
           {
             "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "product": "WsprryPico",
-            "name": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9",
+            "name": "éééééééééééééééééééééééééééééééééééééééé",
             "profile_generation": "1",
             "connection_generation": "18446744073709551615"
           }
@@ -724,7 +724,7 @@
         "action": "connect",
         "carrier": "consumer_station",
         "host": "pico.local",
-        "password": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9"
+        "password": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
       }
     },
     {
@@ -832,7 +832,7 @@
           {
             "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "product": "WsprryPico",
-            "name": "Pico\u0085A",
+            "name": "PicoA",
             "profile_generation": "1",
             "connection_generation": "18446744073709551615"
           }
@@ -3970,886 +3970,6 @@
               },
               "unknown": true
             }
-          },
-          "scheduling": {
-            "enabled": false,
-            "solar": {
-              "enabled": false,
-              "location": {
-                "source": "locator",
-                "locator": null
-              },
-              "day": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "night": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "morning": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "evening": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "name": "Pi retired missing WTP",
-      "family": "target-save",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-save",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "capability_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "operation_id": "dddddddddddddddddddddddddddddddd",
-        "expected_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "candidate": {
-          "configuration": {
-            "Operation": {
-              "LED Pin": -1,
-              "Amp Pin": -1,
-              "Web Port": 80,
-              "Socket Port": 8000,
-              "Shutdown Button": -1,
-              "Transmit": false,
-              "Use LED": false,
-              "Use Amp": false,
-              "Amp Pin Active High": false,
-              "Use Shutdown": false,
-              "Mode": "WSPR",
-              "Transmit Backend": "gpio",
-              "Enable on Boot": "Never"
-            },
-            "GPIO": {
-              "Transmit Pin": 4,
-              "Power Level": 7,
-              "RP1 Drive mA": 8,
-              "Frequency Residual PPM": 0,
-              "Manual PPM": 0,
-              "Use System Clock Frequency Estimate": false,
-              "Use Direct PPS Calibration": false
-            },
-            "Calibration": {
-              "PPM": 0
-            },
-            "Si5351": {
-              "Adapter Identity": "",
-              "I2C Address": "0x60",
-              "Reference Source": "crystal",
-              "TX Output": "CLK0",
-              "I2C Bus": 1,
-              "Reference Frequency": 25000000,
-              "Crystal Load Capacitance": 8,
-              "Power Level": 1
-            },
-            "WSPR": {
-              "Call Sign": "AA0NT",
-              "Grid Square": "EM18",
-              "Frequency": "20m",
-              "Frequency Profile": "existing_common",
-              "Planner Preference": "auto",
-              "TX Power": 20,
-              "Use Random Offset": false,
-              "Band Preferences": {}
-            },
-            "CW": {
-              "Message": "TEST",
-              "Fade In Ms": 0,
-              "Fade Out Ms": 0,
-              "Fade Slice Ms": 0,
-              "Start Minute": 0,
-              "Start Second": 0,
-              "Repeat Minutes": 10,
-              "Base Frequency": 14096900,
-              "Shift Hz": 500,
-              "Dot Seconds": 3,
-              "Intra Element Gap": 1,
-              "Inter Character Gap": 3,
-              "Inter Word Gap": 7,
-              "DFCW Intra Element Gap": 1,
-              "DFCW Inter Character Gap": 3,
-              "DFCW Inter Word Gap": 7,
-              "Fade Shape": "none"
-            },
-            "Band GPIO": {
-              "2200m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "630m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "160m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "80m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "60m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "40m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "30m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "20m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "17m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "15m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "12m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "10m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "8m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "6m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "5m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "4m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "2m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "1.25m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "70cm": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              }
-            },
-            "WTP": {}
-          },
-          "scheduling": {
-            "enabled": false,
-            "solar": {
-              "enabled": false,
-              "location": {
-                "source": "locator",
-                "locator": null
-              },
-              "day": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "night": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "morning": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "evening": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "name": "Pi retired extra WTP",
-      "family": "target-save",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-save",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "capability_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "operation_id": "dddddddddddddddddddddddddddddddd",
-        "expected_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "candidate": {
-          "configuration": {
-            "Operation": {
-              "LED Pin": -1,
-              "Amp Pin": -1,
-              "Web Port": 80,
-              "Socket Port": 8000,
-              "Shutdown Button": -1,
-              "Transmit": false,
-              "Use LED": false,
-              "Use Amp": false,
-              "Amp Pin Active High": false,
-              "Use Shutdown": false,
-              "Mode": "WSPR",
-              "Transmit Backend": "gpio",
-              "Enable on Boot": "Never"
-            },
-            "GPIO": {
-              "Transmit Pin": 4,
-              "Power Level": 7,
-              "RP1 Drive mA": 8,
-              "Frequency Residual PPM": 0,
-              "Manual PPM": 0,
-              "Use System Clock Frequency Estimate": false,
-              "Use Direct PPS Calibration": false
-            },
-            "Calibration": {
-              "PPM": 0
-            },
-            "Si5351": {
-              "Adapter Identity": "",
-              "I2C Address": "0x60",
-              "Reference Source": "crystal",
-              "TX Output": "CLK0",
-              "I2C Bus": 1,
-              "Reference Frequency": 25000000,
-              "Crystal Load Capacitance": 8,
-              "Power Level": 1
-            },
-            "WSPR": {
-              "Call Sign": "AA0NT",
-              "Grid Square": "EM18",
-              "Frequency": "20m",
-              "Frequency Profile": "existing_common",
-              "Planner Preference": "auto",
-              "TX Power": 20,
-              "Use Random Offset": false,
-              "Band Preferences": {}
-            },
-            "CW": {
-              "Message": "TEST",
-              "Fade In Ms": 0,
-              "Fade Out Ms": 0,
-              "Fade Slice Ms": 0,
-              "Start Minute": 0,
-              "Start Second": 0,
-              "Repeat Minutes": 10,
-              "Base Frequency": 14096900,
-              "Shift Hz": 500,
-              "Dot Seconds": 3,
-              "Intra Element Gap": 1,
-              "Inter Character Gap": 3,
-              "Inter Word Gap": 7,
-              "DFCW Intra Element Gap": 1,
-              "DFCW Inter Character Gap": 3,
-              "DFCW Inter Word Gap": 7,
-              "Fade Shape": "none"
-            },
-            "Band GPIO": {
-              "2200m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "630m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "160m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "80m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "60m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "40m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "30m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "20m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "17m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "15m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "12m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "10m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "8m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "6m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "5m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "4m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "2m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "1.25m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "70cm": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              }
-            },
-            "WTP": {}
-          },
-          "scheduling": {
-            "enabled": false,
-            "solar": {
-              "enabled": false,
-              "location": {
-                "source": "locator",
-                "locator": null
-              },
-              "day": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "night": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "morning": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "evening": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "name": "Pi retired missing WTP Server",
-      "family": "target-save",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-save",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "capability_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "operation_id": "dddddddddddddddddddddddddddddddd",
-        "expected_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "candidate": {
-          "configuration": {
-            "Operation": {
-              "LED Pin": -1,
-              "Amp Pin": -1,
-              "Web Port": 80,
-              "Socket Port": 8000,
-              "Shutdown Button": -1,
-              "Transmit": false,
-              "Use LED": false,
-              "Use Amp": false,
-              "Amp Pin Active High": false,
-              "Use Shutdown": false,
-              "Mode": "WSPR",
-              "Transmit Backend": "gpio",
-              "Enable on Boot": "Never"
-            },
-            "GPIO": {
-              "Transmit Pin": 4,
-              "Power Level": 7,
-              "RP1 Drive mA": 8,
-              "Frequency Residual PPM": 0,
-              "Manual PPM": 0,
-              "Use System Clock Frequency Estimate": false,
-              "Use Direct PPS Calibration": false
-            },
-            "Calibration": {
-              "PPM": 0
-            },
-            "Si5351": {
-              "Adapter Identity": "",
-              "I2C Address": "0x60",
-              "Reference Source": "crystal",
-              "TX Output": "CLK0",
-              "I2C Bus": 1,
-              "Reference Frequency": 25000000,
-              "Crystal Load Capacitance": 8,
-              "Power Level": 1
-            },
-            "WSPR": {
-              "Call Sign": "AA0NT",
-              "Grid Square": "EM18",
-              "Frequency": "20m",
-              "Frequency Profile": "existing_common",
-              "Planner Preference": "auto",
-              "TX Power": 20,
-              "Use Random Offset": false,
-              "Band Preferences": {}
-            },
-            "CW": {
-              "Message": "TEST",
-              "Fade In Ms": 0,
-              "Fade Out Ms": 0,
-              "Fade Slice Ms": 0,
-              "Start Minute": 0,
-              "Start Second": 0,
-              "Repeat Minutes": 10,
-              "Base Frequency": 14096900,
-              "Shift Hz": 500,
-              "Dot Seconds": 3,
-              "Intra Element Gap": 1,
-              "Inter Character Gap": 3,
-              "Inter Word Gap": 7,
-              "DFCW Intra Element Gap": 1,
-              "DFCW Inter Character Gap": 3,
-              "DFCW Inter Word Gap": 7,
-              "Fade Shape": "none"
-            },
-            "Band GPIO": {
-              "2200m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "630m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "160m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "80m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "60m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "40m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "30m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "20m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "17m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "15m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "12m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "10m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "8m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "6m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "5m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "4m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "2m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "1.25m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "70cm": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              }
-            },
-            "WTP Server": {}
-          },
-          "scheduling": {
-            "enabled": false,
-            "solar": {
-              "enabled": false,
-              "location": {
-                "source": "locator",
-                "locator": null
-              },
-              "day": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "night": {
-                "allow": false,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "morning": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              },
-              "evening": {
-                "enabled": false,
-                "lower_mdeg": -6000,
-                "upper_mdeg": 6000,
-                "wspr_override": null,
-                "cw_base_hz": null
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "name": "Pi retired extra WTP Server",
-      "family": "target-save",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-save",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "capability_revision": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-        "operation_id": "dddddddddddddddddddddddddddddddd",
-        "expected_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "candidate": {
-          "configuration": {
-            "Operation": {
-              "LED Pin": -1,
-              "Amp Pin": -1,
-              "Web Port": 80,
-              "Socket Port": 8000,
-              "Shutdown Button": -1,
-              "Transmit": false,
-              "Use LED": false,
-              "Use Amp": false,
-              "Amp Pin Active High": false,
-              "Use Shutdown": false,
-              "Mode": "WSPR",
-              "Transmit Backend": "gpio",
-              "Enable on Boot": "Never"
-            },
-            "GPIO": {
-              "Transmit Pin": 4,
-              "Power Level": 7,
-              "RP1 Drive mA": 8,
-              "Frequency Residual PPM": 0,
-              "Manual PPM": 0,
-              "Use System Clock Frequency Estimate": false,
-              "Use Direct PPS Calibration": false
-            },
-            "Calibration": {
-              "PPM": 0
-            },
-            "Si5351": {
-              "Adapter Identity": "",
-              "I2C Address": "0x60",
-              "Reference Source": "crystal",
-              "TX Output": "CLK0",
-              "I2C Bus": 1,
-              "Reference Frequency": 25000000,
-              "Crystal Load Capacitance": 8,
-              "Power Level": 1
-            },
-            "WSPR": {
-              "Call Sign": "AA0NT",
-              "Grid Square": "EM18",
-              "Frequency": "20m",
-              "Frequency Profile": "existing_common",
-              "Planner Preference": "auto",
-              "TX Power": 20,
-              "Use Random Offset": false,
-              "Band Preferences": {}
-            },
-            "CW": {
-              "Message": "TEST",
-              "Fade In Ms": 0,
-              "Fade Out Ms": 0,
-              "Fade Slice Ms": 0,
-              "Start Minute": 0,
-              "Start Second": 0,
-              "Repeat Minutes": 10,
-              "Base Frequency": 14096900,
-              "Shift Hz": 500,
-              "Dot Seconds": 3,
-              "Intra Element Gap": 1,
-              "Inter Character Gap": 3,
-              "Inter Word Gap": 7,
-              "DFCW Intra Element Gap": 1,
-              "DFCW Inter Character Gap": 3,
-              "DFCW Inter Word Gap": 7,
-              "Fade Shape": "none"
-            },
-            "Band GPIO": {
-              "2200m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "630m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "160m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "80m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "60m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "40m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "30m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "20m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "17m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "15m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "12m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "10m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "8m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "6m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "5m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "4m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "2m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "1.25m": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              },
-              "70cm": {
-                "GPIO": -1,
-                "Enabled": false,
-                "Active High": false
-              }
-            },
-            "WTP Server": {}
           },
           "scheduling": {
             "enabled": false,
@@ -10245,7 +9365,7 @@
               "Active High": false
             }
           },
-          "WTP": {
+          "Connection overrides": {
             "TLS CA File": "/private/path"
           }
         },
@@ -11745,7 +10865,7 @@
               "Active High": false
             }
           },
-          "WTP": {
+          "Connection overrides": {
             "TLS CA File": "/private/path"
           }
         }
@@ -11969,8 +11089,7 @@
         ],
         "retirements": [],
         "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": null
+        "staged_revision": null
       },
       "valid": true
     },
@@ -12341,8 +11460,7 @@
         ],
         "retirements": [],
         "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": null
+        "staged_revision": null
       },
       "valid": false
     },
@@ -12377,8 +11495,7 @@
             "state": "idle"
           }
         ],
-        "staged_revision": null,
-        "wtp_binding": null
+        "staged_revision": null
       },
       "valid": false
     },
@@ -14039,7 +13156,7 @@
       }
     },
     {
-      "name": "gateway WTP dispatch",
+      "name": "gateway rejects unregistered execution path",
       "family": "target-context",
       "valid": false,
       "value": {
@@ -14346,7 +13463,7 @@
             "bootstrap_port": 8080,
             "management_port": 31418,
             "suite": "SPAKE2+-P256-SHA256-HKDF-HMAC",
-            "control_schema_digest": "8ad68e8ceab231a41302eb1765ff176d1d9bf410547026483be6b52f3478f436"
+            "control_schema_digest": "5b239460ec4908a84e78d504b62a2f65bf81da847328ab355043715a7dee5d4f"
           }
         ]
       }
@@ -16090,174 +15207,9 @@
       }
     },
     {
-      "name": "P6216 qualified legacy binding including generation zero",
+      "name": "native migration readback binds authority generation",
       "family": "target-migration-read",
       "valid": true,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-migration",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "authority_generation": "1",
-        "transition_id": null,
-        "state": "unclassified",
-        "controllers": [
-          {
-            "controller_id": "cccccccccccccccccccccccccccccccc",
-            "assignment_id": "dddddddddddddddddddddddddddddddd",
-            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          }
-        ],
-        "retirements": [],
-        "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": "0",
-          "wtp_port": 31417,
-          "management_port": 31415
-        }
-      }
-    },
-    {
-      "name": "P6216 refuse generation overflow",
-      "family": "target-migration-read",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-migration",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "authority_generation": "1",
-        "transition_id": null,
-        "state": "unclassified",
-        "controllers": [
-          {
-            "controller_id": "cccccccccccccccccccccccccccccccc",
-            "assignment_id": "dddddddddddddddddddddddddddddddd",
-            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          }
-        ],
-        "retirements": [],
-        "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": "18446744073709551616",
-          "wtp_port": 31417,
-          "management_port": 31415
-        }
-      }
-    },
-    {
-      "name": "P6216 refuse numeric generation",
-      "family": "target-migration-read",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-migration",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "authority_generation": "1",
-        "transition_id": null,
-        "state": "unclassified",
-        "controllers": [
-          {
-            "controller_id": "cccccccccccccccccccccccccccccccc",
-            "assignment_id": "dddddddddddddddddddddddddddddddd",
-            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          }
-        ],
-        "retirements": [],
-        "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": 0,
-          "wtp_port": 31417,
-          "management_port": 31415
-        }
-      }
-    },
-    {
-      "name": "P6216 refuse zero WTP port",
-      "family": "target-migration-read",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-migration",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "authority_generation": "1",
-        "transition_id": null,
-        "state": "unclassified",
-        "controllers": [
-          {
-            "controller_id": "cccccccccccccccccccccccccccccccc",
-            "assignment_id": "dddddddddddddddddddddddddddddddd",
-            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          }
-        ],
-        "retirements": [],
-        "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": "0",
-          "wtp_port": 0,
-          "management_port": 31415
-        }
-      }
-    },
-    {
-      "name": "P6216 refuse HTTP port overflow",
-      "family": "target-migration-read",
-      "valid": false,
-      "value": {
-        "contract": "Wsprry-Control/1",
-        "schema": "target-migration",
-        "binding": {
-          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "profile_generation": "1",
-          "connection_generation": "2"
-        },
-        "authority_generation": "1",
-        "transition_id": null,
-        "state": "unclassified",
-        "controllers": [
-          {
-            "controller_id": "cccccccccccccccccccccccccccccccc",
-            "assignment_id": "dddddddddddddddddddddddddddddddd",
-            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-          }
-        ],
-        "retirements": [],
-        "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": "0",
-          "wtp_port": 31417,
-          "management_port": 65536
-        }
-      }
-    },
-    {
-      "name": "P6216 refuse missing legacy binding field",
-      "family": "target-migration-read",
-      "valid": false,
       "value": {
         "contract": "Wsprry-Control/1",
         "schema": "target-migration",
@@ -16283,7 +15235,7 @@
       }
     },
     {
-      "name": "P6216 refuse extra legacy locator",
+      "name": "native migration readback refuses authority generation overflow",
       "family": "target-migration-read",
       "valid": false,
       "value": {
@@ -16295,7 +15247,7 @@
           "profile_generation": "1",
           "connection_generation": "2"
         },
-        "authority_generation": "1",
+        "authority_generation": "18446744073709551616",
         "transition_id": null,
         "state": "unclassified",
         "controllers": [
@@ -16307,13 +15259,35 @@
         ],
         "retirements": [],
         "jobs": [],
-        "staged_revision": null,
-        "wtp_binding": {
-          "revocation_generation": "0",
-          "wtp_port": 31417,
-          "management_port": 31415,
-          "hostname": "arbitrary.example"
-        }
+        "staged_revision": null
+      }
+    },
+    {
+      "name": "native migration readback refuses numeric authority generation",
+      "family": "target-migration-read",
+      "valid": false,
+      "value": {
+        "contract": "Wsprry-Control/1",
+        "schema": "target-migration",
+        "binding": {
+          "device_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "boot_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "profile_generation": "1",
+          "connection_generation": "2"
+        },
+        "authority_generation": 0,
+        "transition_id": null,
+        "state": "unclassified",
+        "controllers": [
+          {
+            "controller_id": "cccccccccccccccccccccccccccccccc",
+            "assignment_id": "dddddddddddddddddddddddddddddddd",
+            "assignment_revision": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "retirements": [],
+        "jobs": [],
+        "staged_revision": null
       }
     }
   ],

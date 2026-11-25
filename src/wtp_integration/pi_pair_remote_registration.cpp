@@ -53,8 +53,7 @@ bool PiPairRemoteController::maintain(const std::string &selector,const std::fun
         if(!registration)return observe(selector,cancelled);
         const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(24);
         const auto bounded=[&]{return (cancelled&&cancelled())||std::chrono::steady_clock::now()>=deadline;};
-        const auto resumed=coordinate_resume(selector,bounded);
-        const auto ready=resumed==ResumeTurn::Ready?register_authority(selector,std::move(source),bounded):resumed==ResumeTurn::Advanced;
+        const auto ready=register_authority(selector,std::move(source),bounded);
         if(ready&&!bounded()){
             const auto history=history_();if(history){
                 const auto peers=parse_pi_pair_peers(history->snapshot().peers->bytes,self_);
@@ -75,58 +74,6 @@ bool PiPairRemoteController::maintain(const std::string &selector,const std::fun
         // otherwise verified management inventory. Retry has its own backoff.
         return true;
     }catch(...){return false;}
-}
-PiPairRemoteController::ResumeTurn PiPairRemoteController::coordinate_resume(const std::string &selector,const std::function<bool()> &cancelled){
-    if(restored_remote_authority_held())return ResumeTurn::Held;
-    try{
-        require(bool(cancelled)&&!cancelled());const auto history=history_();require(bool(history));
-        const auto selection=select(*history,selector);const auto state=entry(selector);
-        std::unique_lock serial(state->registration,std::try_to_lock);if(!serial.owns_lock())return ResumeTurn::Held;
-        {
-            std::unique_lock lock(state->publication,std::try_to_lock);if(!lock.owns_lock()||!(state->selection==selection))return ResumeTurn::Held;
-            bool native=false;for(const auto &target:state->targets)if(target["device_id"]==selection.target&&target["product"]=="WsprryPi")native=true;
-            if(!native)return ResumeTurn::Ready;
-        }
-        auto admission=PicoManagementJournal::target_admission(directory_,selection.target);if(!admission)return ResumeTurn::Held;
-        const auto issued=exchange(*history,selection,"/api/pair/v1/resume",cancelled);
-        require(issued.reply&&issued.principal&&!cancelled()&&select(*history,selector)==selection);
-        if(issued.reply->payload.status==404){
-            const auto absent=parse_pi_pair_document(issued.reply->payload.body,"result");
-            require(absent["pair_id"]==selection.identity.pair_id&&absent["state"]=="rejected"&&absent["code"]=="operation_unknown");
-            return ResumeTurn::Ready;
-        }
-        require(issued.reply->payload.status==200);const auto grant=parse_pi_pair_document(issued.reply->payload.body,"resume-grant");
-        require(grant["target_id"]==selection.target&&grant["controller_id"]==self_);
-        const auto digest=grant["grant_digest"].get<std::string>();
-        if(state->resume_selection&&*state->resume_selection==selection&&state->resume_confirmed==digest)return ResumeTurn::Ready;
-        const auto prefix="/api/control/v1/targets/"+selection.target+"/";
-        const auto migration=exchange(*history,selection,prefix+"migration",cancelled);
-        const auto settings=exchange(*history,selection,prefix+"settings",cancelled);
-        require(migration.reply&&migration.principal&&settings.reply&&settings.principal&&migration.reply->payload.status==200&&settings.reply->payload.status==200&&
-            !cancelled()&&select(*history,selector)==selection);
-        const auto proof=history->outgoing_resume_grant(selector,*settings.principal,grant,
-            strict_browser_json(migration.reply->payload.body,16),strict_browser_json(settings.reply->payload.body,16));
-        require(proof.has_value());const auto acknowledgement=wtp_fleet_resume(*proof,*history,cancelled);require(acknowledgement.has_value());
-        bool recorded=false;
-        const auto accepted=client_.exchange(test_?test_->endpoint:selection.endpoint,selection.target,
-            [&](const auto &identity){return history->outgoing_credential(selector,identity);},selection.identity,
-            [&](const auto &principal){try{
-                if(cancelled()||!(select(*history,selector)==selection))return false;
-                if(!recorded)recorded=history->record_outgoing_finished(selector,principal);
-                return recorded;
-            }catch(...){return false;}},"POST","/api/pair/v1/resume/ack",acknowledgement->dump(),{},cancelled,
-            [&](const auto &principal){return history->admit_outgoing_mutation(selector,selection.generation,principal,false);});
-        require(accepted.reply&&accepted.principal&&accepted.reply->payload.status==200&&!cancelled()&&select(*history,selector)==selection);
-        const auto receipt=parse_pi_pair_document(accepted.reply->payload.body,"operation");
-        const auto ack_digest=PiManagementJournal::digest(canonical_pi_management_json(*acknowledgement));
-        require(receipt["operation_id"]==grant["operation_id"]&&receipt["pair_id"]==selection.identity.pair_id&&
-            receipt["authorization_generation"]==selection.identity.authorization_generation&&receipt["state"]=="committed"&&
-            receipt["request_digest"]==ack_digest&&receipt["result_digest"]==ack_digest);
-        // This RAM hint only avoids another exact acknowledgement exchange.
-        // Restart recovers the durable source outcome and acknowledges again;
-        // it never consumes the grant or publishes source permission twice.
-        state->resume_selection=selection;state->resume_confirmed=digest;return ResumeTurn::Advanced;
-    }catch(...){return ResumeTurn::Held;}
 }
 bool PiPairRemoteController::register_authority(const std::string &selector,AuthoritySource source,const std::function<bool()> &cancelled){
     if(restored_remote_authority_held())return false;

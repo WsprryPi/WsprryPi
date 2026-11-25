@@ -332,8 +332,8 @@ int main()
             site_source.find("getJsonWithEndpointFallback(UI_IDENTITY_ENDPOINT)\n        .done(function (response) {\n            if (response && response.installed_ui_build_id) {\n                maybePromptForUiRefresh(response);") != std::string::npos &&
             site_source.find("// Start UI build polling from global script initialization as soon as site.js") != std::string::npos &&
             site_source.find("initUiBuildChangePolling();\ninitGithubUpdatePolling();\n\nfunction getPersistedTabStorageKey") != std::string::npos &&
-            site_source.find("initUiBuildChangePolling();\n    initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
-            site_source.find("initGithubUpdatePolling();\n    populateConfig();") != std::string::npos &&
+            site_source.find("initUiBuildChangePolling();\n    initGithubUpdatePolling();\n    let transmitterStarted") != std::string::npos &&
+            site_source.find("if (!window.ControllerMode || window.ControllerMode.transmitter)") != std::string::npos &&
             site_source.find("if (uiBuildPollTimer !== null)") != std::string::npos &&
             site_source.find("installedBuildId === dismissedUiRefreshBuildId") != std::string::npos &&
             site_source.find("maybePromptForUiRefresh(response);\n                checkForWsprryPiUpdate(response);") == std::string::npos &&
@@ -345,7 +345,7 @@ int main()
             web_server_source.find("j[\"wspr_display_branch\"] = get_exe_branch();") != std::string::npos &&
             web_server_source.find("j[\"wspr_exe_version\"] = get_exe_version();") != std::string::npos &&
             web_server_source.find("j[\"wspr_commit\"] = get_exe_commit();") != std::string::npos,
-        "site.js must poll the UI-owned installed identity independently while backend /version remains available only for service and update metadata");
+        "site.js must poll installed UI identity independently of the verified backend role and update metadata");
     require(
             makefile_source.find("BUILD_METADATA_HEADER := $(BUILD_METADATA_DIR)/build_metadata.hpp") != std::string::npos &&
             makefile_source.find("generate_build_metadata.py") != std::string::npos &&

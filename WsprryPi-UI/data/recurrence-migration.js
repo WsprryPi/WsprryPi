@@ -12,7 +12,6 @@
     const feedback=text=>{node('Feedback').textContent=text;};
     const identity=()=>Array.from(root.crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
     const canReconcile=()=>!!operation?.confirmed_pending&&current?.migration.state==='retiring'&&current.migration.jobs.some(job=>job.boot_id!==current.context.binding.boot_id);
-    const remoteOutput=()=>current?.settings.saved.configuration.Operation['Transmit Backend']==='wtp';
     const selectedAssignment=()=>current?.migration.controllers.find(row=>row.controller_id+'/'+row.assignment_id===node('Assignment').value);
     const allowedAssignment=row=>!!row&&row.controller_id===selected;
     function controls(){
@@ -20,7 +19,7 @@
         const state=current?.migration.state,cap=current?.context.capabilities.find(item=>item.resource==='migration');
         node('Target').disabled=busy;node('Assignment').disabled=!ready;
         const canMigrate=['legacy','rollback','retiring'].includes(state)||state==='staged'&&current.migration.controllers.some(row=>row.controller_id!==selected);
-        node('Review').disabled=!ready||!cap?.write||!canMigrate||remoteOutput();
+        node('Review').disabled=!ready||!cap?.write||!canMigrate;
         node('Review').textContent=state==='retiring'?'Review reconciliation':'Review migration';
         const restorable=['staged','native'].includes(state)&&!!current?.migration.controllers.length;
         node('Previous').hidden=!restorable;node('Rollback').hidden=!restorable;
@@ -39,12 +38,11 @@
         const messages={legacy:'Migration required; scheduling is held. Resolve ownership or output recovery, then review migration to save the device-owned schedule disabled.',
             rollback:'The selected previous controller may run its saved schedule. Local device-owned recurrence remains disabled.',
             retiring:'Prior controllers and accepted work are being reconciled. New recurring work is blocked until verified retirement.',
-            reconciling:'Restoration is unconfirmed. This device’s recurring schedules remain blocked while the previous controller confirms its saved result.',
+            reconciling:'Restoration is unconfirmed. Scheduling remains blocked. Review the saved result before changing scheduling ownership.',
             staged:'Migration completed; schedule disabled pending review.',native:'This device owns its recurring schedule.',
             unclassified:'Previous scheduling history cannot be verified. Migration remains unavailable.',held:'Scheduling history or outstanding work requires recovery.'};
         node('State').textContent=messages[current.migration.state]||'Scheduling authority requires review before a transition.';
-        if(remoteOutput())node('State').textContent='This Pi sends transmissions to another device. Retire its remote schedule and reconcile accepted work with WTP-capable software. Then configure the transmitting device’s own schedule; migration cannot turn this remote output into a local schedule.';
-        if(canReconcile()&&!remoteOutput())node('State').textContent='This device restarted during handover. Review current output and confirm reconciliation before completing migration.';
+        if(canReconcile())node('State').textContent='This device restarted during handover. Review current output and confirm reconciliation before completing migration.';
         const prior=states.get(selected)?.assignment||node('Assignment').value;node('Assignment').replaceChildren();
         const empty=root.document.createElement('option');empty.value='';empty.textContent='Choose a previous schedule';node('Assignment').append(empty);
         for(const row of current.migration.controllers){
@@ -60,14 +58,20 @@
     async function load(attempt=0){
         const device=selected;
         try{
-            const readiness=await client.readiness(),targets=await client.targets();
-            const pis=targets.targets.filter(target=>target.product==='WsprryPi');available=new Set(pis.map(target=>target.device_id));
-            if(!selected){selected=available.has(readiness.device_id)?readiness.device_id:pis[0]?.device_id||'';}
+            if(root.ControllerMode?.blocked)return;
+            const controller=root.ControllerMode?.active;
+            const [targets,hostId]=await Promise.all([client.targets(),controller
+                ? root.ControllerMode.deviceId : client.readiness().then(host=>host.device_id)]);
+            if(root.ControllerMode?.blocked)return;
+            const pis=targets.targets.filter(target=>target.product==='WsprryPi'&&(!controller||target.device_id!==hostId));
+            available=new Set(pis.map(target=>target.device_id));
+            if(!controller&&!selected)selected=available.has(hostId)?hostId:pis[0]?.device_id||'';
             node('Target').replaceChildren();
+            if(controller)node('Target').append(new Option('Choose a device',''));
             for(const target of pis){const option=root.document.createElement('option');option.value=target.device_id;option.textContent=target.name+' · '+target.device_id;option.disabled=states.size>=64&&!states.has(target.device_id);node('Target').append(option);}
             if(selected&&!available.has(selected)){const option=root.document.createElement('option');option.value=selected;option.textContent=(states.get(selected)?.current?.context.target.name||selected)+' · unavailable';node('Target').append(option);}
             node('Target').value=selected;
-            if(!selected){current=null;node('').hidden=true;return;}
+            if(!selected){current=null;node('').hidden=!controller||pis.length===0;render();return;}
             if(device&&selected!==device)throw Error('context_changed');
             if(!available.has(selected))throw Error('target_unavailable');
             const context=(await client.targetRequest(selected,'context')).data;
@@ -212,5 +216,7 @@
     node('Consent').addEventListener('change',controls);node('Confirm').addEventListener('click',()=>{void submit();});
     node('Cancel').addEventListener('click',()=>{review=null;node('Confirmation').hidden=true;controls();node('Review').focus();});
     node('Refresh').addEventListener('click',()=>{void refresh();});node('Retry').addEventListener('click',()=>{void check();});
-    root.addEventListener('pagehide',()=>root.clearTimeout(timer));void refresh();
+    root.addEventListener('pagehide',()=>root.clearTimeout(timer));
+    if(root.ControllerMode)root.addEventListener('wsprry-host-status',()=>{if(!busy&&!root.ControllerMode.blocked)void refresh();});
+    else void refresh();
 })(window);

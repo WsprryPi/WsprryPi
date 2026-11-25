@@ -191,16 +191,6 @@ PicoHttpResponse PiLocalManagementService::handle_pair(const BrowserRequest &req
             const auto receipt=store_.authority_operation(id,principal);
             return receipt?PicoHttpResponse{200,receipt->dump(),{}}:refuse(404,"operation_unknown");
         }
-        if(request.method=="GET"&&request.path=="/api/pair/v1/resume"&&request.body.empty()){
-            const auto grant=store_.remote_resume(principal);
-            return grant?PicoHttpResponse{200,grant->dump(),{}}:refuse(404,"operation_unknown");
-        }
-        if(request.method=="POST"&&request.path=="/api/pair/v1/resume/ack"){
-            const auto body=parse_pi_pair_document(request.body,"resume-ack");
-            const auto proof=history.resume_outcome_proof(principal,body);if(!proof)return refuse(403,"invalid_proof");
-            auto admission=history.admit_resume_outcome(*proof);if(!admission)return refuse(409,"busy");
-            return {200,store_.confirm_remote_resume(*proof,*admission).dump(),{}};
-        }
         if(request.method!="POST"||request.path!="/api/pair/v1/authorities/register")return refuse(404,"invalid_shape");
         const auto body=parse_pi_pair_document(request.body,"authority-register");
         if(body["target_id"]!=self_||body["controller_id"]!=principal.peer_id()||body["pair_id"]!=principal.identity().pair_id||
@@ -319,18 +309,12 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
         if(request.method=="GET"&&resource=="settings")
             return readback(document(settings_document(saved),"target-settings",revision));
         if(request.method=="GET"&&resource=="migration"){
-            const auto authority=store_.recurrence_authority();Json wtp_binding=nullptr,controllers=authority["controllers"];
+            const auto authority=store_.recurrence_authority();Json controllers=authority["controllers"];
             if(!store_.remote_handover())if(const auto plan=remote_migration_plan(authority,std::string(32,'0')))controllers=(*plan)["controllers"];
-            if(state->wtp_binding&&!state->authority.revocation_unavailable&&!state->authority.output_unknown){const auto &actual=*state->wtp_binding;
-                if(actual.revocation_generation==state->authority.revocation_generation&&actual.wtp_port&&actual.wtp_port<=65535&&
-                    actual.management_port&&actual.management_port<=65535)
-                    wtp_binding={{"revocation_generation",std::to_string(actual.revocation_generation)},
-                        {"wtp_port",actual.wtp_port},{"management_port",actual.management_port}};
-            }
             return readback(document({{"contract","Wsprry-Control/1"},{"schema","target-migration"},{"binding",bound},
                 {"authority_generation",authority["generation"]},{"transition_id",authority["transition_id"]},{"state",authority["state"]},
                 {"controllers",controllers},{"retirements",authority["retirements"]},{"jobs",authority["jobs"]},
-                {"staged_revision",authority["staged_revision"]},{"wtp_binding",wtp_binding}},"target-migration-read",revision));
+                {"staged_revision",authority["staged_revision"]}},"target-migration-read",revision));
         }
         if(request.method=="GET"&&resource=="status"){
             Json result{{"contract","Wsprry-Control/1"},{"schema","target-status"},{"binding",bound},{"revision",revision},
@@ -361,6 +345,7 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
         try{body=strict_browser_json(request.body,16);}catch(...){return refuse(400,"invalid_json");}
         if(!valid_controller_document(body,migration?(rollback?"target-migration-rollback":"target-migration"):stopping?"target-stop":enabling?"target-enable":disabling?"target-action":"target-save"))return refuse(400,"invalid_shape");
         if(body["binding"]["device_id"]!=self_)return refuse(409,"target_mismatch");
+        if(rollback&&body["resume_controller_id"]!=self_)return refuse(409,"unsupported_resource");
         if(request.revision.empty())return refuse(428,"revision_required");
         if(request.revision!="\""+body["expected_revision"].get<std::string>()+"\"")return refuse(412,"revision_conflict");
         const PiManagedStore::Operation operation{authorization.principal,authorization.generation,request.path,body};
@@ -429,24 +414,6 @@ PicoHttpResponse PiLocalManagementService::handle_authorized(const BrowserReques
                 std::optional<Json> job;if(!migration_idle(*current))job=Json{{"controller_id",self_},
                     {"job_id",current->output.job_id.value_or(WtpPiBootIdentity{}.new_boot_id())},{"boot_id",bound["boot_id"]},{"state","accepted"}};
                 auto admission=admit();store_.prepare_remote_migration(operation,authority,signed_requests,job);
-                const auto receipt=store_.replay(operation);return receipt?operation_document(*receipt):refuse(503,"recovery_required");
-            }
-            if(rollback&&body["resume_controller_id"]!=self_){
-                if(!authorization.history)return refuse(409,"authority_pending");
-                const auto proof=authorization.paired?authorization.history->incoming_resume_target(request,*authorization.paired):
-                    authorization.local?authorization.history->incoming_resume_target(request,*authorization.local):std::optional<PiPairResumeTargetProof>{};
-                if(!proof||saved["scheduling"]["enabled"]!=false||saved["configuration"]["Operation"]["Transmit"]!=false)return refuse(409,"authority_pending");
-                if(!state->reserve_configuration())return refuse(409,"authority_pending");
-                struct Reservation {std::function<void()> release;~Reservation(){release();}} reservation{state->release_configuration};
-                const auto current=observe();
-                if(!current||binding(*current)!=bound||!migration_idle(*current)||!current->wtp_binding||
-                    current->authority.revocation_unavailable||current->authority.output_unknown)return refuse(409,"authority_pending");
-                const auto &actual=*current->wtp_binding;
-                if(actual.revocation_generation!=current->authority.revocation_generation||!actual.wtp_port||!actual.management_port)return refuse(409,"authority_pending");
-                const Json actual_binding{{"revocation_generation",std::to_string(actual.revocation_generation)},
-                    {"wtp_port",actual.wtp_port},{"management_port",actual.management_port}};
-                auto admission=authorization.history->admit_resume_target(*proof);if(!admission)return refuse(409,"authority_pending");
-                store_.prepare_remote_resume(operation,authority,*proof,actual_binding,*admission);
                 const auto receipt=store_.replay(operation);return receipt?operation_document(*receipt):refuse(503,"recovery_required");
             }
             if(!local_migration_inventory(authority,self_))return refuse(409,"authority_pending");
