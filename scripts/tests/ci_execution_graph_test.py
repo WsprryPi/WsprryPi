@@ -247,15 +247,28 @@ class SourceIdentityTests(unittest.TestCase):
             self.assertEqual(reference(steps[checkout]['with']['ref']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
             for operation, before in (('require', True), ('verify', False)):
                 matches = [(i, s) for i, s in enumerate(steps) if operation in shlex.split(s.get('run', ''))]
-                self.assertEqual(len(matches), 1)
-                index, step = matches[0]
-                self.assertEqual(index < checkout, before)
-                self.assertEqual(reference(step['env']['PICO_SHA']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
-                expected = [operation, '$PICO_SHA']
-                if operation == 'verify': expected.append(steps[checkout]['with']['path'])
-                self.assertEqual(source_arguments(step), expected)
-                self.assertNotIn('if', step, 'admitted carrier source gates must be unconditional')
-                self.assertFalse(step.get('continue-on-error', False))
+                self.assertEqual(len(matches), 1 if operation == 'require' else 2)
+                for index, step in matches:
+                    self.assertEqual(index < checkout, before)
+                    self.assertEqual(reference(step['env']['PICO_SHA']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
+                    expected = [operation, '$PICO_SHA']
+                    if operation == 'verify': expected.append(steps[checkout]['with']['path'])
+                    self.assertEqual(source_arguments(step), expected)
+                    self.assertNotIn('if', step, 'admitted carrier source gates must be unconditional')
+                    self.assertFalse(step.get('continue-on-error', False))
+                if operation == 'verify':
+                    recorded = next(i for i, step in enumerate(steps) if step.get('name') == 'Record frozen pair source manifests')
+                    budget = next(i for i, step in enumerate(steps) if step.get('name') == 'Select bounded build budget')
+                    checked = next(i for i, step in enumerate(steps) if step.get('name') == 'Verify frozen pair sources after the complete recipe')
+                    final_recipe = 'Render network controls with mocked responses' if carrier == 'wtp-network-loopback' else 'Actual UI producer through production Pi and Pico USB handlers'
+                    recipe = next(i for i, step in enumerate(steps) if step.get('name') == final_recipe)
+                    self.assertLess(matches[0][0], recorded)
+                    self.assertLess(recorded, budget)
+                    self.assertLess(recipe, matches[1][0])
+                    self.assertLess(matches[1][0], checked)
+                    for step in (steps[recorded], steps[checked]):
+                        self.assertNotIn('if', step)
+                        self.assertFalse(step.get('continue-on-error', False))
             self.assertFalse(steps[checkout].get('continue-on-error', False))
         for name in ('wtp-network-loopback','wtp-usb-management-pair','strict-i2c-profile',
                      'ubuntu-gcc13-release','non-hardware-validation','linux-native-contracts'):

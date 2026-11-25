@@ -217,6 +217,14 @@ jobs:
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/network-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/network-reference/pico --check
+      - name: Record frozen pair source manifests
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} | tee "$RUNNER_TEMP/pi-pair-revision.before"
+          git -C src/build/network-reference/pico rev-parse HEAD HEAD^{tree}
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.before"
+          (cd src/build/network-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.before"
       - name: Read-only pinned Pico TLS dependency
         uses: actions/checkout@v7
         with:
@@ -280,6 +288,23 @@ jobs:
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
           node tests/pico_target_editor_state_browser_test.js
           node tests/recurrence_migration_browser_test.js
+      - name: Verify immutable Pico source after the complete recipe
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/network-reference/pico
+      - name: Verify frozen pair sources after the complete recipe
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/pi-pair-revision.after"
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.after"
+          (cd src/build/network-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.after"
+          for record in pi-pair-revision pi-pair-source pico-pair-source; do
+            test -s "$RUNNER_TEMP/$record.before"
+            cmp "$RUNNER_TEMP/$record.before" "$RUNNER_TEMP/$record.after"
+          done
+          sha256sum "$RUNNER_TEMP/"{pi,pico}-pair-source.{before,after}
+          echo "PASS: frozen Pi/Pico source manifests matched before and after the complete network recipe"
       - name: Retain failed network browser captures
         if: failure()
         uses: actions/upload-artifact@v7
@@ -330,6 +355,14 @@ jobs:
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/usb-reference/pico --check
+      - name: Record frozen pair source manifests
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} | tee "$RUNNER_TEMP/pi-pair-revision.before"
+          git -C src/build/usb-reference/pico rev-parse HEAD HEAD^{tree}
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.before"
+          (cd src/build/usb-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.before"
       - name: Select bounded build budget
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Build actual production Pico USB endpoint without SDK or network
@@ -344,6 +377,24 @@ jobs:
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
+
+      - name: Verify immutable Pico source after the complete recipe
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
+      - name: Verify frozen pair sources after the complete recipe
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/pi-pair-revision.after"
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.after"
+          (cd src/build/usb-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.after"
+          for record in pi-pair-revision pi-pair-source pico-pair-source; do
+            test -s "$RUNNER_TEMP/$record.before"
+            cmp "$RUNNER_TEMP/$record.before" "$RUNNER_TEMP/$record.after"
+          done
+          sha256sum "$RUNNER_TEMP/"{pi,pico}-pair-source.{before,after}
+          echo "PASS: frozen Pi/Pico source manifests matched before and after the complete usb recipe"
 
   strict-i2c-profile:
     needs: change_scope
