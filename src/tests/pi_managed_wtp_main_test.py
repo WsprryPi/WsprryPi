@@ -10,7 +10,7 @@ import tempfile
 import time
 from controller_only_test import free_port, request
 from software_backend_admission import backend_admission
-from software_web_service import start_software_web_service, stop_software_web_service
+from software_web_service import start_software_web_service, stop_software_web_service, wait_for_pairing_transport
 
 
 def read_managed(port, path, with_headers=False):
@@ -69,6 +69,7 @@ def main():
                     time.sleep(0.03)
                 status, body = request(port, "GET", "/api/control/v1/targets");assert status == 200
                 self_id = json.loads(body)["targets"][0]["device_id"]
+                wait_for_pairing_transport(request, port, self_id)
                 base = f"/api/control/v1/targets/{self_id}/"
                 status, body = read_managed(port, base + "context");assert status == 200;context = json.loads(body)
                 status, body, headers = read_managed(port, base + "settings", with_headers=True);assert status == 200;saved = json.loads(body)

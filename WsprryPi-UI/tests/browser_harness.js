@@ -328,4 +328,25 @@ async function finishFixture({ failure, client, browser, php, profile, cleanups 
     }
 }
 
-module.exports = { CdpClient, launchBrowser, finishFixture, browserBinary, createBrowserProfile, waitForPhp, closeServer, bounded, waitFor, getJson, getStatus, freePort, ...processFixture };
+// Reload acknowledgement does not establish replacement-document readiness.
+// Never let the old DOM satisfy a post-reload readiness predicate.
+async function reloadDocument(client) {
+    return bounded('Reload replacement document', 15000, async () => {
+        const previous = (await client.send('Page.getFrameTree')).frameTree.frame;
+        if (typeof previous.id !== 'string' || !previous.id || typeof previous.loaderId !== 'string' || !previous.loaderId) throw diagnostic('Reload', 'missing main-document identity');
+        await client.send('Page.setLifecycleEventsEnabled', { enabled: true });
+        let loaded = false;
+        const observe = event => {
+            if (event.method === 'Page.lifecycleEvent' && event.params?.name === 'DOMContentLoaded' &&
+                event.params.frameId === previous.id && typeof event.params.loaderId === 'string' &&
+                event.params.loaderId.length > 0 && event.params.loaderId !== previous.loaderId) loaded = true;
+        };
+        client.on('event', observe);
+        try {
+            await client.send('Page.reload');
+            await waitFor(() => loaded, 'Reloaded document DOM ready', 15000);
+        } finally { client.off('event', observe); }
+    });
+}
+
+module.exports = { CdpClient, launchBrowser, finishFixture, browserBinary, createBrowserProfile, waitForPhp, closeServer, bounded, waitFor, getJson, getStatus, freePort, reloadDocument, ...processFixture };

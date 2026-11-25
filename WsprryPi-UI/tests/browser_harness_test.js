@@ -318,3 +318,51 @@ test("disposing an enclosing stage cancels its pending CDP operation", async () 
         assert.equal(client.pending.size, 0);
     });
 });
+
+
+test("reload acknowledgement and old-document lifecycle cannot satisfy new-document readiness", async () => {
+    const { reloadDocument } = require('./browser_harness.js');
+    let acknowledge, release;
+    const acknowledged = new Promise(resolve => { acknowledge = resolve; });
+    await peer((socket, message) => {
+        const reply = result => socket.send(JSON.stringify({ id: message.id, result }));
+        const event = (frameId, loaderId) => socket.send(JSON.stringify({ method: 'Page.lifecycleEvent',
+            params: { name: 'DOMContentLoaded', frameId, loaderId } }));
+        if (message.method === 'Page.getFrameTree') reply({ frameTree: { frame: { id: 'main', loaderId: 'old' } } });
+        else if (message.method === 'Page.setLifecycleEventsEnabled') reply({});
+        else if (message.method === 'Page.reload') {
+            reply({});
+            event('main', 'old'); // Replayed current-document event is not a reload.
+            event('child', 'new'); // A subframe is not the main document.
+            event('main', undefined); // A missing document identity cannot admit readiness.
+            release = () => event('main', 'new');
+            acknowledge();
+        } else if (message.method === 'after-ack') reply({});
+    }, async client => {
+        let finished = false;
+        const pending = reloadDocument(client).then(() => { finished = true; });
+        const result = pending.then(() => null, error => error);
+        await client.send('after-ack');
+        await bounded('Reload acknowledgement observed', 3000, () => acknowledged);
+        // A second ordered wire roundtrip drains the acknowledgement and decoy events.
+        await client.send('after-ack');
+        try { assert.equal(finished, false, 'Only the replacement main document admits readiness'); }
+        finally { release?.(); await result; }
+        const error = await result; if (error) throw error;
+        assert.equal(finished, true);
+        assert.equal(client.listenerCount('event'), 0, 'Reload observer is removed after completion');
+    });
+});
+
+
+test("reload missing its replacement event times out within the owner budget and removes its observer", async () => {
+    const { reloadDocument } = require('./browser_harness.js');
+    await peer((socket, message) => socket.send(JSON.stringify({ id: message.id,
+        result: message.method === 'Page.getFrameTree' ? { frameTree: { frame: { id: 'main', loaderId: 'old' } } } : {} })), async client => {
+        await assert.rejects(bounded('Reload owner', 200, () => reloadDocument(client)), error => error.code === 'HARNESS_TIMEOUT');
+        // The enclosing budget aborts child waits; allow their finally handlers to settle.
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(client.listenerCount('event'), 0);
+        assert.equal(client.pending.size, 0);
+    });
+});
