@@ -12,10 +12,10 @@ async function main() {
         php = spawnFixtureChild("php", ["-S", `127.0.0.1:${port}`, "-t", "data", "tests/browser_fixture_router.php"], {cwd: ui});
         await waitForSpawn(php);await waitForPhp(php, base, "Operations PHP fixture");
         ({browser: chrome, client, page} = await launchBrowser({executable: process.env.CHROME_BIN || (process.platform === "darwin" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "chromium"), args: ["--headless", "--no-sandbox", "--disable-gpu", "--no-first-run", "--disable-background-networking", "about:blank"], profile, timeoutMs: 60000}));
-        await client.send("Page.navigate", {url: base}, 60000);
         const run = expression => client.evaluate(expression);
-        await waitFor(() => run("document.readyState === 'complete' && !!window.FleetOperation && !!window.FleetClient"), "Operations scripts");
-        await run(`(() => {
+        // The host-role check can start a Fleet read during page boot.
+        await client.send("Page.addScriptToEvaluateOnNewDocument", {source: `(() => {
+            const fixtureFetch=window.fetch.bind(window);
             window.__posts=[];window.__reads=0;window.__actions={};
             const schedule={mode:'tone',frequency_hz:14097100,duration_ms:1000,period_seconds:120,phase_seconds:0};
             const row=(c,name)=>({device_id:c.repeat(32),product:c==='a'?'WsprryPi':'WsprryPico',name,schedule:{...schedule},enabled:false,in_flight:false});
@@ -23,20 +23,23 @@ async function main() {
             window.__fleet={scope:'wsprrypi-wtp-fleet/1',maximum_outputs:32,controller_incarnation:'f'.repeat(32),publication_revision:'1',now_ms:'100000',replacement_pending:false,storage_error:'',assignments:[row('a','Long shared station name beside the laboratory amplifier'),row('b','Long shared station name beside the laboratory amplifier')],outputs:{['a'.repeat(32)]:observation('a'),['b'.repeat(32)]:observation('b')}};
             window.fetch=async(url,options={})=>{
                 const path=String(url);const reply=(value,status=200)=>({ok:status>=200&&status<300,status,headers:{get:()=> '"fleet-ui"'},json:async()=>structuredClone(value)});
-                if(window.__fleetUnavailable && path.includes('/host/fleet'))return reply({error:{code:'fleet_unavailable',message:'Invalid fleet assignment document'}},503);
-                if(path.includes('/host/fleet/actions'))return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,actions:Object.fromEntries(new URL(path,location.href).searchParams.get('ids').split(',').map(id=>[id,__actions[id]||{action_id:id,state:'unknown_or_expired'}]))});
                 if(!['GET','HEAD'].includes(options.method || 'GET')) {
                     __posts.push({path,method:options.method,body:options.body});
                     throw new Error('Retired Fleet execution must never submit a mutation');
                 }
+                if(window.__fleetUnavailable && path.includes('/host/fleet'))return reply({error:{code:'fleet_unavailable',message:'Invalid fleet assignment document'}},503);
+                if(path.includes('/host/fleet/actions'))return reply({controller_incarnation:__fleet.controller_incarnation,publication_revision:__fleet.publication_revision,actions:Object.fromEntries(new URL(path,location.href).searchParams.get('ids').split(',').map(id=>[id,__actions[id]||{action_id:id,state:'unknown_or_expired'}]))});
                 if(path.endsWith('/host/fleet/operations') || path.endsWith('/host/fleet')) {if(window.__churn){if(++window.__churnReads>3)throw new Error('Fixture stopped unbounded churn');return reply({...__fleet,controller_incarnation:(__churnReads%2?'a':'b').repeat(32)});}__reads++;__fleet.now_ms=String(BigInt(__fleet.now_ms)+1n);return reply(__fleet);}
-                return reply({});
+                return fixtureFetch(url,options);
             };
             window.__refresh=()=>FleetClient.refresh();
-        })()`);
+        })()`});
+        await client.send("Page.navigate", {url: base}, 60000);
+        await waitFor(() => run("document.readyState === 'complete' && !!window.FleetOperation && !!window.FleetClient"), "Operations scripts");
         await run("__refresh()");
         assert.equal(await run("document.getElementById('operationDevice').value"), "", "full load defaults to controller");
         assert.equal(await run("document.getElementById('operationDevice').options.length"), 3);
+        await waitFor(() => run("document.documentElement.dataset.hostRole === 'transmitter' && !document.getElementById('operationDevice').disabled"), "Verified host and enabled Fleet selector");
         await run("document.getElementById('operationDevice').value='a'.repeat(32)+':'+ 'a'.repeat(32);document.getElementById('operationDevice').dispatchEvent(new Event('change'))");
         assert.equal(await run("FleetOperation.remote()"), true);
         assert.equal(await run("document.getElementById('operationLocalView').inert"), true);
