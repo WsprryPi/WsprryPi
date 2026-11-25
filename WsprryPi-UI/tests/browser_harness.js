@@ -254,13 +254,17 @@ async function launchBrowser({ executable = browserBinary(), args = [], profile,
         ]);
         profiles.get(profile).child = browser;
         await processFixture.waitForSpawn(browser);
+        let endpointWithoutPage = false;
         const page = await bounded("browser usable target ready", timeoutMs, async () => {
             return waitFor(async () => {
                 if (browser.exitCode !== null || browser.signalCode !== null) throw diagnostic("browser early exit", processFixture.childDiagnostic(browser));
                 const portFile = path.join(profile, "DevToolsActivePort");
-                if (!fs.existsSync(portFile)) { stages.getStore().trace.lastObserved = processFixture.childDiagnostic(browser); return false; }
+                if (!fs.existsSync(portFile)) {
+                    if (!endpointWithoutPage) stages.getStore().trace.lastObserved = processFixture.childDiagnostic(browser);
+                    return false;
+                }
                 const [port, browserPath] = fs.readFileSync(portFile, "utf8").split("\n");
-                stages.getStore().trace.lastObserved = "DevTools discovery file observed";
+                if (!endpointWithoutPage) stages.getStore().trace.lastObserved = "DevTools discovery file observed";
                 if (!/^\d+$/.test(port) || +port < 1 || +port > 65535 || !/^\/devtools\/browser\/[a-f0-9-]{36}$/.test(browserPath || "")) return false;
                 const origin = `http://127.0.0.1:${port}`;
                 const version = await getJson(`${origin}/json/version`, { child: browser });
@@ -268,7 +272,11 @@ async function launchBrowser({ executable = browserBinary(), args = [], profile,
                 const pages = await getJson(`${origin}/json/list`, { child: browser });
                 if (!Array.isArray(pages)) throw diagnostic("browser target discovery", "expected page list");
                 const target = pages.find(item => item.type === "page" && typeof item.webSocketDebuggerUrl === "string");
-                if (!target) { stages.getStore().trace.lastObserved = "endpoint ready without a usable page"; return false; }
+                if (!target) {
+                    endpointWithoutPage = true;
+                    stages.getStore().trace.lastObserved = "endpoint ready without a usable page";
+                    return false;
+                }
                 const endpoint = new URL(target.webSocketDebuggerUrl);
                 if (endpoint.hostname !== "127.0.0.1" || endpoint.port !== port || !endpoint.pathname.startsWith("/devtools/page/")) throw diagnostic("browser target identity", "target is not owned loopback endpoint");
                 console.log(`Browser executable=${browser.spawnfile}; version=${version.Browser}; target=${target.id}`);

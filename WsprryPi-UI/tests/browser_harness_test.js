@@ -150,6 +150,10 @@ const profile=process.argv.find(a=>a.startsWith('--user-data-dir=')).split('=').
 const id='11111111-1111-1111-1111-111111111111', exists=n=>fs.existsSync(path.join(profile,n));
 const server=http.createServer((req,res)=>{
  res.setHeader('Content-Type','application/json');
+ if(req.url==='/json/version'&&process.argv.includes('--fixture-command-before-watch')&&exists('no-page-observed')){
+  fs.writeFileSync(path.join(profile,'probing-again'),'');
+  return;
+ }
  if(req.url==='/json/version')res.end(JSON.stringify({Browser:'Controlled fixture/1',webSocketDebuggerUrl:'ws://127.0.0.1:'+server.address().port+'/devtools/browser/'+id}));
  else {if(!exists('page'))fs.writeFileSync(path.join(profile,'no-page-observed'),'');res.end(JSON.stringify(exists('page')?[{id:'owned',type:'page',url:'about:blank',webSocketDebuggerUrl:'ws://127.0.0.1:'+server.address().port+'/devtools/page/owned'}]:[]));}
 });
@@ -204,6 +208,7 @@ server.listen(0,'127.0.0.1',()=>{
             fs.writeFileSync(path.join(noPageProfile, "endpoint"), "");
             await waitFor(() => fs.existsSync(path.join(noPageProfile, "spawned")), "watcher ready and existing command reconciled");
             await waitFor(() => fs.existsSync(path.join(noPageProfile, "no-page-observed")), "known absent usable target");
+            await waitFor(() => fs.existsSync(path.join(noPageProfile, "probing-again")), "next discovery probe held until timeout");
         });
         const refused = await noPage;
         assert.equal(refused.error?.cause?.code, "HARNESS_TIMEOUT");
