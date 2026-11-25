@@ -5,5 +5,7 @@ namespace wsprrypi::testing {
 // Set once before starting application threads or selecting any backend.
 // This only supplies transient options when the production CLI independently
 // selects simulation. No environment, INI, HTTP, or product CLI exposes it.
-void set_application_simulation_fixture(const WsprTransmitter::SimulatedRuntimeConfig &);
+void set_application_simulation_fixture(const WsprTransmitter::SimulatedRuntimeConfig &,
+                                        std::function<void()> owner_idle = {});
+void visit_application_simulation_idle();
 }

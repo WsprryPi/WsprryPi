@@ -167,6 +167,7 @@ public:
         virtual bool wait_for_slot(Clock::time_point start,
                                    const std::function<bool()> &interrupted) = 0;
         virtual Clock::time_point now() const noexcept = 0;
+        virtual void admission_complete() noexcept = 0;
     };
 
     struct SimulatedRuntimeConfig

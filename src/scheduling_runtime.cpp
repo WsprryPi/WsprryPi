@@ -29,6 +29,7 @@
 #include "rp1_route_bridge.hpp"
 #include "runtime_config_operations.hpp"
 #include "application_storage/application_state.hpp"
+#include "application_simulation_fixture.hpp"
 #include "signal_handler.hpp"
 #include "transmitter_runtime_bridge.hpp"
 #include "version.hpp"
@@ -1036,6 +1037,7 @@ bool wspr_loop()
                 wtp_pi_end_configuration();
                 (void)set_config(false);
             }
+            wsprrypi::testing::visit_application_simulation_idle();
             lk.lock();
         }
     }

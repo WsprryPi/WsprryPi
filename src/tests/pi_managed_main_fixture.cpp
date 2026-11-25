@@ -45,9 +45,18 @@ int main(int argc,char **argv){
         WsprTransmitter::SimulatedRuntimeConfig simulation;
         simulation.trace_path=std::string(argv[1])+".simulated-trace.json";
 #ifdef WSPRRYPI_NATIVE_RECURRENCE_FIXTURE
-        if(simulated)simulation.launch_clock=std::make_shared<wsprrypi::testing::SimulatedLaunchLatch>(argv[1]);
+        if (simulated)
+        {
+            auto launch = std::make_shared<wsprrypi::testing::SimulatedLaunchLatch>(argv[1]);
+            simulation.launch_clock = launch;
+            wsprrypi::testing::set_application_simulation_fixture(simulation, [launch] {
+                launch->release_at_owner_idle();
+            });
+        }
+#else
+        if (simulated)
+            wsprrypi::testing::set_application_simulation_fixture(simulation);
 #endif
-        if(simulated)wsprrypi::testing::set_application_simulation_fixture(simulation);
         webServer.bind_loopback_for_test();
     }catch(...){return 2;}
     return pi_managed_production_main(argc-1,argv+1);

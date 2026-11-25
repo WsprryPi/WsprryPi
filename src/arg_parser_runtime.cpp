@@ -26,11 +26,21 @@
 
 namespace {
 std::optional<WsprTransmitter::SimulatedRuntimeConfig> application_simulation_fixture;
+std::function<void()> application_simulation_idle;
 }
-void wsprrypi::testing::set_application_simulation_fixture(const WsprTransmitter::SimulatedRuntimeConfig &options){
+void wsprrypi::testing::set_application_simulation_fixture(
+    const WsprTransmitter::SimulatedRuntimeConfig &options, std::function<void()> owner_idle)
+{
     if(application_simulation_fixture||wsprTransmitter.hasSelectedBackend()||wtp_runtime_selected())
         throw std::logic_error("Simulation fixture must precede application runtime selection");
     application_simulation_fixture=options;
+    application_simulation_idle = std::move(owner_idle);
+}
+
+void wsprrypi::testing::visit_application_simulation_idle()
+{
+    if (application_simulation_idle)
+        application_simulation_idle();
 }
 
 void apply_runtime_config_side_effects()

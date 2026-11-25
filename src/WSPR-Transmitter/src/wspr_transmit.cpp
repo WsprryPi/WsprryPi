@@ -1887,6 +1887,8 @@ void WsprTransmitter::transmit()
                 : sleepUntilAbsTightInterruptible(CLOCK_REALTIME, start_rt, spin_ns_);
             if (!reached_slot)
             {
+                if (launch_clock)
+                    launch_clock->admission_complete();
                 {
                     std::ostringstream oss;
                     oss << "TX start aborted before window boundary.";
@@ -1937,9 +1939,14 @@ void WsprTransmitter::transmit()
         const auto launch_now = [launch_clock] {
             return launch_clock ? launch_clock->now() : std::chrono::system_clock::now();
         };
-        if(!scheduled_launch_.current(launch_now())||
-            (scheduled_launch_.bound()&&launch_now()-scheduled_launch_.start>std::chrono::milliseconds(50))){
-            refuseScheduledLaunch();return;
+        const bool admitted = scheduled_launch_.current(launch_now()) &&
+            (!scheduled_launch_.bound() || launch_now() - scheduled_launch_.start <= std::chrono::milliseconds(50));
+        if (launch_clock)
+            launch_clock->admission_complete();
+        if (!admitted)
+        {
+            refuseScheduledLaunch();
+            return;
         }
         state_.store(State::TRANSMITTING, std::memory_order_release);
         fire_transmit_cb(TransmissionCallbackEvent::STARTING, LogLevel::INFO, "", current_request_.actual_rf_frequency_hz);

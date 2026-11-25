@@ -194,6 +194,14 @@ def main():
                 output = read(base + 'status')['observed_output']
                 assert output['owner_id'] is None and output['job_id'] is None, output
 
+            def assert_completed(observed):
+                events = observed['events']
+                assert {'execution_start', 'complete'} <= {event['kind'] for event in events} and any(
+                    event['rf_on'] for event in events), {
+                        'trace': observed, 'progress': progress_record(), 'status': read(base + 'status'),
+                        'service_log': (root / 'service.log').read_text()[-12000:],
+                    }
+
             # A future slot is necessary for actual reservation. The test never
             # sleeps until that time, and each subsequent slot has a new identity.
             first_start = int(time.time()) + 180
@@ -204,7 +212,7 @@ def main():
             action('disable', 'target-action')
             assert read(base + 'status')['phase'] == 'draining'
             observed = release_occurrence(start_ns, previous_plan, 0)
-            assert any(event['kind'] == 'complete' for event in observed['events']), observed
+            assert_completed(observed)
             assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
             assert_output_inactive()
 
@@ -212,9 +220,7 @@ def main():
             # worker is already waiting, and no API read competes with launch.
             start_ns, previous_plan = stage_occurrence(first_start + 1)
             observed = release_occurrence(start_ns, previous_plan, 50_000_000)
-            assert any(event['kind'] == 'execution_start' for event in observed['events']), observed
-            assert any(event['kind'] == 'complete' for event in observed['events']), observed
-            assert any(event['rf_on'] for event in observed['events']), observed
+            assert_completed(observed)
             action('disable', 'target-action')
             assert_output_inactive()
 
