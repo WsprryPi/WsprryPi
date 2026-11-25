@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBrowser, waitFor, finishFixture, closeServer } = require('./browser_harness.js');
+const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBrowser, waitFor, finishFixture, closeServer, reloadDocument } = require('./browser_harness.js');
 (async () => {
     const backendPort = Number(process.argv[2]), directory = path.resolve(process.argv[3]);
     const controllerOnly = process.argv[4] === 'controller';
@@ -142,7 +142,7 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
         await waitFor(() => run("document.getElementById('recoveryStatus').textContent.includes('Restore verified')"), 'Restore completes after lost confirmation reply', 60000);
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1, 'Lost confirmation is not replayed');
-        await client.send('Page.reload');
+        await reloadDocument(client);
         await waitFor(() => run("document.getElementById('recoveryStatus')?.textContent.includes('Restore verified')"), 'Reload reads durable result', 20000);
         await waitFor(() => run("!document.getElementById('destinationRead').disabled"), 'Independent destination review remains reachable', 15000);
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1);
