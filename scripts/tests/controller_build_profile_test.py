@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only production Make admission and controller profile isolation checks."""
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -47,6 +48,11 @@ def main():
     ordinary = plan('BACKENDS=simulated', 'ANCILLARY_GPIO=0')
     assert ordinary.returncode == 0, ordinary.stderr
     assert 'MonitorFile' not in ordinary.stdout and '/monitorfile.cpp' not in ordinary.stdout
+    specification = importlib.util.spec_from_file_location('software_backend_admission', ROOT / 'src/tests/software_backend_admission.py')
+    admission = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(admission)
+    binaries = ROOT / 'src/build/bin'
+    shared_lock = admission.backend_admission_path(binaries / 'browser_session_backend_fixture')
     for arguments, goal, profile in (
         (('BUILD_PROFILE=controller',), 'controller-only-test', 'controller'),
         (('BACKENDS=simulated', 'ANCILLARY_GPIO=0'), 'sqlite-state-entry-test', 'simulated+ancillary-gpio0'),
@@ -55,6 +61,7 @@ def main():
         assert fixture.returncode == 0, fixture.stderr
         assert f'build/bin/profiles/{profile}/controller_only_production_fixture' in fixture.stdout
         assert 'build/bin/controller_only_production_fixture' not in fixture.stdout
+        assert admission.backend_admission_path(binaries / 'profiles' / profile / 'controller_only_production_fixture') == shared_lock
     print('PASS controller build admission, private objects/headers/artifacts/notices, and no physical GPIO link dependency')
 
 
