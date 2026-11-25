@@ -19,10 +19,12 @@ Remaining feature items:
 
 6. ✅ Implement the Fleet Operations device selector, per-device status and controls, required coordinated Pi/Pico changes, documentation, and validation. Follow the [implementation prompt](release_tools/Fleet%20Operations%20Implementation%20Prompt.md).
 
-7. ▧ Deliver controller-only installation and qualified Linux, macOS, and Windows host support. Track [WsprryPi issue #475](https://github.com/WsprryPi/WsprryPi/issues/475), read the [implementation plan](docs/development/controller-only-linux-plan.md), and follow the [implementation prompt](docs/development/issue-475-implementation-prompt.md).
+7. ⏳ Deliver controller-only installation and qualified Linux, macOS, and Windows host support. Track [WsprryPi issue #475](https://github.com/WsprryPi/WsprryPi/issues/475), read the [implementation plan](docs/development/controller-only-linux-plan.md), and follow the [implementation prompt](docs/development/issue-475-implementation-prompt.md).
 
 8. ✅ Implement SQLite persistence and the separate web service. Follow the [implementation prompt](docs/development/sqlite-web-service-implementation-prompt.md) and [storage/process contract](docs/development/sqlite-storage-contract.md). Local software validation is complete; operator-documentation follow-ups and live installation/Pi qualification remain recorded in the contract.
 
 9. ▧ Implement Wsprry-History collection and a product-neutral station observation interface for reception charts and confirmed-completion transmission history. Track [WsprryPi issue #477](https://github.com/WsprryPi/WsprryPi/issues/477) and follow the [implementation plan](docs/development/transmission-history-grafana-plan.md). Keep collection health and advisory calibration evidence separate; Wsprry-History is the sole initial consumer, and other consumers require separate scope and access authorization. Each implementation slice requires its own authorization.
 
-10. ▧ Verify and correct drive-current mappings across WsprryPi and WsprryPico, including direct GPIO, Si5351, RP1, necessary backend changes, and documentation. Track [WsprryPi issue #478](https://github.com/WsprryPi/WsprryPi/issues/478), read the [implementation plan](docs/development/legacy-gpio-drive-label-implementation-plan.md), and follow the [implementation prompt](docs/development/legacy-gpio-drive-label-implementation-prompt.md).
+10. ▧ Verify and correct drive-current mappings across WsprryPi and WsprryPico, including direct GPIO, Si5351, RP1, necessary backend changes, and documentation. Track [WsprryPi issue #478](https://github.com/WsprryPi/WsprryPi/issues/478) and follow the remaining [implementation plan](docs/development/legacy-gpio-drive-label-implementation-plan.md).
+
+11. ▧ Fix the 22 m direct test tone incorrectly requiring a band-selector GPIO. Track [WsprryPi issue #482](https://github.com/WsprryPi/WsprryPi/issues/482).
