@@ -222,4 +222,6 @@ The workflow sets `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passes an empty `SUDO` m
 
 Run the same checks locally from the repository root with the commands in `.github/workflows/debian-non-hardware.yml`. The workflow establishes software-contract evidence only; it is not physical-hardware or RF qualification.
 
+The production network and USB pair jobs record the effective Pi commit/tree and selected Pico revision, hash tracked Pi/Pico source files before their recipes, and compare fresh manifests after all recipe commands pass. Generated build output and private runtime state are outside these tracked-source manifests. The selected Pico must remain clean at the immutable input SHA; dependency pins remain explicit in the workflow.
+
 Focused physical-backend tests remain separate and must continue to pass. Simulator results demonstrate application and backend-contract behavior only; they do not qualify GPIO timing, I2C hardware, RF output, installation, services, or any physical transmitter.

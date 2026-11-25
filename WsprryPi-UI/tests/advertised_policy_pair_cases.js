@@ -17,6 +17,30 @@ module.exports=async call=>{
  const target=initial.body.target;
  const priorConfig=await get('configuration');
  assert.equal(priorConfig.status,200,JSON.stringify(priorConfig));
+ for (const [resource,pointer,value] of [
+   ['capabilities','/test_tone/available','true'],
+   ['capabilities','/test_tone/minimum_duration_ms',10],
+   ['capabilities','/test_tone/engines/si5351/drive_ma',[2,4,8,12]],
+   ['capabilities','/test_tone/maximum_duration_ms',120001],
+   ['capabilities','/test_tone/output_disable_timeout_ns','0'],
+   ['capabilities','/test_tone/extra',true],
+   ['capabilities','/contract','Wsprry-Control/2'],
+   ['management','/operations',null],
+   ['config','/config/station',{callsign:'',locator:'EM18',power_dbm:0}],
+   ['config','/config/wifi/password','unredacted-password'],
+   ['config','/unexpected',true]
+ ]) {
+  try {
+   await call({control:'corrupt',corruption:{resource,pointer,value}});
+   await refuse({method:'POST',path:prefix+'configuration',revision:priorConfig.etag,
+    body:JSON.stringify({contract:'Wsprry-Control/1',schema:'pico-settings',target,
+     operation:'save',config:{gpio_drive_ma:4}})});
+  } finally {await clear();}
+  const after=await get('configuration');
+  assert.equal(after.etag,priorConfig.etag);
+  assert.deepEqual(after.body.config,priorConfig.body.config);
+ }
+ console.log('Current capabilities and operations accepted; malformed capabilities, operations, and saved configurations refuse before writes');
  for(const [resource,pointer] of [
    ['capabilities','/configuration_updates/max_config_bytes'],
    ['management','/limits/config'],

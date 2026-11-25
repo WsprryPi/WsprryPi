@@ -61,6 +61,31 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         const partial=await request({method:"POST",path:"/api/control/v1/member/progress/update",body:JSON.stringify({contract:'Wsprry-Control/1',schema:"progress",target,request_id:"1".repeat(32),fields:{callsign:"AA0NT"}}),revision:progress.etag});
         assert.equal(partial.status,200,JSON.stringify(partial));assert.equal(partial.body.station_complete,false);
         const initial=await request({method:"GET",path:"/api/control/v1/member/configuration",body:""});assert.equal(initial.status,200,JSON.stringify(initial));assert.equal(initial.body.config,null);
+        const blankDrive=await request({method:'GET',path:'/api/control/v1/member/gpio-drive'});
+        assert.equal(blankDrive.status,200,JSON.stringify(blankDrive));
+        assert.equal(blankDrive.body.saved,null);
+        assert.equal(blankDrive.body.boot_active,12);
+        const firstDrive=await request({method:'PUT',path:'/api/control/v1/member/gpio-drive',revision:blankDrive.etag,
+            body:JSON.stringify({contract:'Wsprry-Control/1',schema:'gpio-drive',target,gpio_drive_ma:12})});
+        assert.equal(firstDrive.status,200,JSON.stringify(firstDrive));
+        assert.equal(firstDrive.body.saved,12);
+        assert.equal(firstDrive.body.pad_readback,null);
+        const blankSettings=await request({method:'GET',path:'/api/control/v1/member/configuration'});
+        assert.equal(blankSettings.status,200,JSON.stringify(blankSettings));
+        assert.deepEqual(blankSettings.body.config.station,{callsign:'',locator:'',power_dbm:0});
+        assert.equal(blankSettings.body.config.enabled,false);
+        assert.equal(blankSettings.body.application.station.station,null);
+        for (const config of [{station:{callsign:'K1ABC'},gpio_drive_ma:8},{enabled:true,gpio_drive_ma:8}]) {
+            const fresh=await request({method:'GET',path:'/api/control/v1/member/configuration'});
+            assert.equal(fresh.etag,blankSettings.etag);
+            const refused=await request({method:'POST',path:'/api/control/v1/member/configuration',revision:fresh.etag,
+                body:JSON.stringify({contract:'Wsprry-Control/1',schema:'pico-settings',target,operation:'save',config})});
+            assert.equal(refused.status,400,JSON.stringify(refused));
+            assert(refused.exchanges.every(exchange=>exchange.method==='GET'));
+        }
+        const unchanged=await request({method:'GET',path:'/api/control/v1/member/configuration'});
+        assert.equal(unchanged.etag,blankSettings.etag);
+        assert.deepEqual(unchanged.body.config,blankSettings.body.config);
         const reread=await request({method:"GET",path:"/api/control/v1/member/progress",body:""});
         const complete=await request({method:"POST",path:"/api/control/v1/member/progress/update",body:JSON.stringify({contract:'Wsprry-Control/1',schema:"progress",target,request_id:"2".repeat(32),fields:{locator:"EM18",power_dbm:20}}),revision:reread.etag});
         assert.equal(complete.status,200,JSON.stringify(complete));assert.equal(complete.body.station_complete,true);
@@ -135,14 +160,18 @@ const {driveCases}=require("./gpio_drive_pair_cases.js");
         assert.equal(driveDraft.status,200,JSON.stringify(driveDraft));assert.equal(driveDraft.body.fields.gpio_drive_ma,8);
         const applyDrive=await request({raw_resource:'progress/apply',method:'POST',revision:driveDraft.etag,
             body:JSON.stringify({contract:'Wsprry-Control/1',schema:'progress',target,application:{draft_revision:driveDraft.body.draft_revision,domain:'drive'}})});
-        assert.equal(applyDrive.status,200,JSON.stringify(applyDrive));assert.equal(applyDrive.body.config.gpio_drive_ma,8);
+        assert.equal(applyDrive.status,200,JSON.stringify(applyDrive));
+        assert.equal(applyDrive.body.schema,'progress');
+        assert.equal(applyDrive.body.draft_revision,driveDraft.body.draft_revision);
+        assert.equal(applyDrive.body.fields.gpio_drive_ma,8);
+        assert.equal((await request({raw_resource:'gpio-drive'})).body.saved,8);
         } else assert.equal(driveInitial.status,409,JSON.stringify(driveInitial));
         await require('./amplifier_timing_pair_cases.js')(request);
         await require('./amplifier_enable_pair_cases.js')(request);
         if(process.env.WSPRRYPI_PAIR_CAPTURE)require('node:fs').writeFileSync(process.env.WSPRRYPI_PAIR_CAPTURE,JSON.stringify((await request({method:'GET',path:'/api/control/v1/member/application'})).body,null,2));
         await require('./advertised_policy_pair_cases.js')(request);
   await require('./filter_selector_pair_cases.js')(request);
-  await require('./si5351_pair_cases.js')(request);
+  await require('./si5351_pair_cases.js')(request,{qualifiedReadback:true});
   await require('./gps_pair_cases.js')(request);
         // Removal is not a reset: unrelated station and schedules are retained.
         await b.click("load");b.element("wtp-usb-ssid").value="recreated-network";b.element("wtp-usb-password").value="different-synthetic-password";await b.click("wifi-save");

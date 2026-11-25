@@ -144,7 +144,7 @@ def main():
             elif isinstance(value,list):
                 for child in value:visit(child)
         visit(native[name])
-    for name in ['application','progress','gpio-drive','filter-selector-resource','amplifier-timing-resource',
+    for name in ['config-update','application','progress','gpio-drive','filter-selector-resource','amplifier-timing-resource',
                  'gps','si5351','gray-line','status','native-execution','schedule-stop-read','schedule-stop-request','udp-logging','udp-logging-capabilities','udp-logging-test','udp-logging-test-capabilities']:
         include_native(name)
     native_bytes=json.dumps(native,separators=(',',':'))

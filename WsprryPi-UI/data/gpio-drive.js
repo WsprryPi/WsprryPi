@@ -24,7 +24,7 @@
     function render() {
       read.disabled = busy || !available;
       select.disabled = busy || !available || !observed || !revision || !observed.storage_healthy || !!observed.application_error;
-      save.disabled = select.disabled || observed.saved === null || !edited || !allowedValues.includes(Number(select.value)) || draftTarget !== identity(observed);
+      save.disabled = select.disabled || !edited || !allowedValues.includes(Number(select.value)) || draftTarget !== identity(observed);
       discard.disabled = busy || !observed || !revision;
       if (saveDraft) saveDraft.disabled = select.disabled || !edited || !allowedValues.includes(Number(select.value)) || draftTarget !== identity(observed) || !progress;
       if (applyDraft) applyDraft.disabled = select.disabled || !progress || !allowedValues.includes(progress.fields.gpio_drive_ma) || !progress.apply_domains.drive || draftTarget !== identity(observed);
@@ -92,7 +92,7 @@
         if (ticket !== epoch) return;
         if (!result.revision || result.revision === match) throw new Error('Progress acknowledgement could not be verified.');
         if (!apply && (!validProgress(result.data,target) || result.data.request_id !== body.request_id || result.data.outcomes?.gpio_drive_ma !== 'saved' || result.data.fields.gpio_drive_ma !== value)) throw new Error('Drive progress save could not be verified.');
-        if (apply && !(validProgress(result.data,target) || result.data.config?.gpio_drive_ma === progress.fields.gpio_drive_ma)) throw new Error('Drive application acknowledgement could not be verified.');
+        if (apply && (!validProgress(result.data,target) || result.data.draft_revision !== progress.draft_revision || result.data.fields.gpio_drive_ma !== progress.fields.gpio_drive_ma)) throw new Error('Drive application acknowledgement could not be verified.');
         review = false; if (serial === sentSerial) edited = !apply;
         draftStatus.textContent = apply ? 'Saved drive progress applied. Read GPIO drive and explicitly restart to activate changed hardware.' : `Drive progress confirmed saved: ${value} mA. It has not been applied.`;
         afterSave(); refresh = true;
