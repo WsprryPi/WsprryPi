@@ -47,6 +47,14 @@ def main():
     ordinary = plan('BACKENDS=simulated', 'ANCILLARY_GPIO=0')
     assert ordinary.returncode == 0, ordinary.stderr
     assert 'MonitorFile' not in ordinary.stdout and '/monitorfile.cpp' not in ordinary.stdout
+    for arguments, goal, profile in (
+        (('BUILD_PROFILE=controller',), 'controller-only-test', 'controller'),
+        (('BACKENDS=simulated', 'ANCILLARY_GPIO=0'), 'sqlite-state-entry-test', 'simulated+ancillary-gpio0'),
+    ):
+        fixture = plan(*arguments, goal=goal)
+        assert fixture.returncode == 0, fixture.stderr
+        assert f'build/bin/profiles/{profile}/controller_only_production_fixture' in fixture.stdout
+        assert 'build/bin/controller_only_production_fixture' not in fixture.stdout
     print('PASS controller build admission, private objects/headers/artifacts/notices, and no physical GPIO link dependency')
 
 

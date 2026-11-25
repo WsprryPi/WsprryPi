@@ -716,8 +716,8 @@ jobs:
           npm run test:browser
           make -C ../src -j1 recovery-maintenance-browser-test recovery-maintenance-controller-browser-test SUDO=
           make -C ../src controller-only-test pico-management-target-test SUDO=
-          make -C ../src -j2 build/bin/controller_only_production_fixture BUILD_PROFILE=controller SUDO=
-          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/controller_only_production_fixture" node tests/controller_mode_browser_test.js
+          make -C ../src -j2 build/bin/profiles/controller/controller_only_production_fixture BUILD_PROFILE=controller SUDO=
+          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/profiles/controller/controller_only_production_fixture" node tests/controller_mode_browser_test.js
 
       - name: Read-only RP1-GPIO-CLK-DKMS stable reference
         uses: actions/checkout@v7

@@ -231,6 +231,7 @@ BIN_DIR         := build/bin
 PROFILE_BIN_DIR := $(BIN_DIR)/profiles/$(BACKEND_PROFILE_KEY)
 PROFILE_RELEASE_BIN := $(PROFILE_BIN_DIR)/$(OUT)
 PROFILE_DEBUG_BIN := $(PROFILE_BIN_DIR)/$(TEST_OUT)
+CONTROLLER_PRODUCTION_FIXTURE := $(PROFILE_BIN_DIR)/controller_only_production_fixture
 PROFILE_LINK_INPUTS := Makefile
 ifeq ($(BUILD_PROFILE),controller)
 PROFILE_LINK_INPUTS += ../scripts/controller_sources.mk
@@ -1657,9 +1658,9 @@ $(BIN_DIR)/controller_only_fixture: $(OBJ_DIR_DEBUG)/tests/controller_only_fixtu
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) $^ -o $@ $(LDFLAGS)
 
 .PHONY: controller-only-test
-controller-only-test: $(BIN_DIR)/controller_only_fixture $(BIN_DIR)/controller_only_production_fixture
+controller-only-test: $(BIN_DIR)/controller_only_fixture $(CONTROLLER_PRODUCTION_FIXTURE)
 	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_fixture
-	$(Q)python3 -B tests/controller_only_test.py --fixture $(BIN_DIR)/controller_only_production_fixture --production-main --private-state
+	$(Q)python3 -B tests/controller_only_test.py --fixture $(CONTROLLER_PRODUCTION_FIXTURE) --production-main --private-state
 
 wspr-band-catalog-test: $(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
 	$(Q)./$(BIN_DIR)/$(WSPR_BAND_CATALOG_TEST_OUT)
@@ -2211,8 +2212,8 @@ pico-target-controller-test: $(BIN_DIR)/pico_target_controller_test
 .PHONY: pi-private-network-persistence-test
 .PHONY: pi-managed-main-test
 .PHONY: sqlite-state-entry-test
-sqlite-state-entry-test: $(BIN_DIR)/controller_only_production_fixture
-	$(Q)python3 -B tests/sqlite_state_entry_test.py $(BIN_DIR)/controller_only_production_fixture
+sqlite-state-entry-test: $(CONTROLLER_PRODUCTION_FIXTURE)
+	$(Q)python3 -B tests/sqlite_state_entry_test.py $(CONTROLLER_PRODUCTION_FIXTURE)
 
 .PHONY: web-bootstrap-test
 $(BIN_DIR)/web_bootstrap_test: tests/web_bootstrap_test.cpp application_control/web_bootstrap.cpp application_control/web_bootstrap.hpp
@@ -2252,8 +2253,8 @@ local-control-transport-test: $(BIN_DIR)/local_control_transport_test
 $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp controller_instance_lock.hpp Singleton/src/installation_lock.hpp wtp_endpoint/runtime.hpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
-$(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
-	$(Q)mkdir -p $(BIN_DIR)
+$(CONTROLLER_PRODUCTION_FIXTURE): tests/controller_only_production_fixture.cpp tests/software_control_runtime.hpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS) $(PROFILE_LINK_INPUTS)
+	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 $(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
@@ -2267,7 +2268,7 @@ $(BIN_DIR)/scheduling_autonomy_fixture: tests/scheduling_autonomy_fixture.cpp ma
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$(filter-out main.cpp,$^)) -o $@ $(LDFLAGS)
 
-$(addprefix $(BIN_DIR)/,controller_only_production_fixture pi_managed_main_fixture native_recurrence_main_fixture pi_managed_wtp_main_fixture shared_setup_main_fixture scheduling_autonomy_fixture): tests/software_control_runtime.hpp
+$(addprefix $(BIN_DIR)/,pi_managed_main_fixture native_recurrence_main_fixture pi_managed_wtp_main_fixture shared_setup_main_fixture scheduling_autonomy_fixture): tests/software_control_runtime.hpp
 
 .PHONY: scheduling-autonomy-test
 scheduling-autonomy-test: $(BIN_DIR)/scheduling_autonomy_fixture
@@ -3074,8 +3075,8 @@ native-controller-owners-test: $(BIN_DIR)/native_controller_owners_test
 	$(Q)"$(BIN_DIR)/native_controller_owners_test"
 
 .PHONY: native-controller-identity-runtime-test
-native-controller-identity-runtime-test: $(BIN_DIR)/controller_only_production_fixture
-	$(Q)python3 -B tests/native_controller_identity_runtime_test.py "$(BIN_DIR)/controller_only_production_fixture"
+native-controller-identity-runtime-test: $(CONTROLLER_PRODUCTION_FIXTURE)
+	$(Q)python3 -B tests/native_controller_identity_runtime_test.py "$(CONTROLLER_PRODUCTION_FIXTURE)"
 
 .PHONY: application-monitor-boundary-test
 application-monitor-boundary-test: debug
