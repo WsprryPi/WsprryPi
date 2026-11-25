@@ -13,14 +13,19 @@ from software_backend_admission import backend_admission
 from software_web_service import start_software_web_service, stop_software_web_service, wait_for_pairing_transport
 
 
-def read_managed(port, path, with_headers=False):
+def request_managed(port, method, path, *args, **kwargs):
+    # These responses precede mutation admission. Reuse the exact operation
+    # and revision on admission refusal. Lost replies still fail the test.
+    refusals = {(409, "capacity"), (429, "capacity"), (429, "rate_limited")}
     deadline = time.monotonic() + 5
     while True:
-        result = request(port, "GET", path, with_headers=with_headers)
-        if result[0] == 200:
+        result = request(port, method, path, *args, **kwargs)
+        if result[0] not in (409, 429):
             return result
         value = json.loads(result[1])
-        assert result[0] in (409, 429) and value.get("schema") == "target-error" and value.get("error", {}).get("code") in ("capacity", "rate_limited"), result[:2]
+        code = (value.get("error") or {}).get("code")
+        if value.get("schema") != "target-error" or (result[0], code) not in refusals:
+            return result
         assert time.monotonic() < deadline, result[:2]
         time.sleep(0.1)
 
@@ -67,41 +72,51 @@ def main():
                     except OSError:pass
                     assert time.monotonic() < deadline, (root / "service.log").read_text()
                     time.sleep(0.03)
-                status, body = request(port, "GET", "/api/control/v1/targets");assert status == 200
+                status, body = request_managed(port, "GET", "/api/control/v1/targets")
+                assert status == 200, body
                 self_id = json.loads(body)["targets"][0]["device_id"]
                 wait_for_pairing_transport(request, port, self_id)
                 base = f"/api/control/v1/targets/{self_id}/"
-                status, body = read_managed(port, base + "context");assert status == 200;context = json.loads(body)
-                status, body, headers = read_managed(port, base + "settings", with_headers=True);assert status == 200;saved = json.loads(body)
-                status, body = read_managed(port, base + "status");assert status == 200
+                status, body = request_managed(port, "GET", base + "context")
+                assert status == 200, body
+                context = json.loads(body)
+                status, body, headers = request_managed(port, "GET", base + "settings", with_headers=True)
+                assert status == 200, body
+                saved = json.loads(body)
+                status, body = request_managed(port, "GET", base + "status")
+                assert status == 200, body
                 observed = json.loads(body)
                 assert observed["destination_id"] == self_id and observed["transmit_effective"] is False and observed["phase"] == "waiting" and observed["waiting_reason"] in ("disabled", "transmit_off"), observed
                 status, body = request(port, "GET", "/api/wtp");assert status == 200 and json.loads(body) == {"selected": False, "firmware_maintenance": False}
                 auth = {"Origin": f"http://127.0.0.1:{port}", "Content-Type": "application/json", "X-WsprryPico-Request": "1"}
-                status, _, session = request(port, "POST", "/api/control/v1/host/management-session",
+                status, body, session = request_managed(port, "POST", "/api/control/v1/host/management-session",
                     json.dumps({"contract": "Wsprry-Control/1", "schema": "controller-browser-session"}), auth, with_headers=True)
-                assert status == 200
+                assert status == 200, body
                 auth.update({"Cookie": session["Set-Cookie"].split(";")[0], "X-WsprryPi-CSRF": session["X-WsprryPi-CSRF"], "If-Match": headers["ETag"]})
                 candidate = saved["saved"];candidate["scheduling"]["solar"]["location"]["locator"] = "EM18AA12"
                 candidate["scheduling"]["solar"]["morning"].update({"enabled": True, "lower_mdeg": -7001, "upper_mdeg": 8002})
                 candidate["configuration"]["CW"]["Message"] = "DORMANT LEGACY EDIT"
                 command = json.dumps({"contract": "Wsprry-Control/1", "schema": "target-save", "binding": context["binding"],
                     "capability_revision": context["capability_revision"], "operation_id": "8" * 32, "expected_revision": saved["revision"], "candidate": candidate})
-                status, receipt = request(port, "PUT", base + "settings", command, auth)
+                status, receipt = request_managed(port, "PUT", base + "settings", command, auth)
                 assert status == 200 and json.loads(receipt)["state"] == "committed", receipt
-                assert request(port, "PUT", base + "settings", command, auth) == (200, receipt)
-                status, body = read_managed(port, base + "settings");assert status == 200
+                replay = request_managed(port, "PUT", base + "settings", command, auth)
+                assert replay == (200, receipt), replay
+                status, body = request_managed(port, "GET", base + "settings")
+                assert status == 200, body
                 assert json.loads(body)["saved"]["configuration"]["CW"]["Message"] == "DORMANT LEGACY EDIT"
                 snapshot = json.loads(body)
                 assert snapshot["saved"]["scheduling"] == candidate["scheduling"]
                 for cap in context["capabilities"]:
                     if cap["resource"] == "pi-scheduling":assert cap["activation"] == "next_occurrence" and cap["write"]
                 before = saved_bytes()
-                status, body, headers = read_managed(port, base + "settings", with_headers=True)
+                status, body, headers = request_managed(port, "GET", base + "settings", with_headers=True)
+                assert status == 200, body
                 auth["If-Match"] = headers["ETag"]
                 bad = json.loads(command);bad["expected_revision"] = json.loads(body)["revision"];bad["operation_id"] = "9" * 32
                 bad["candidate"]["configuration"]["unsupported-settings"] = {}
-                assert request(port, "PUT", base + "settings", json.dumps(bad), auth)[0] == 400
+                refused = request_managed(port, "PUT", base + "settings", json.dumps(bad), auth)
+                assert refused[0] == 400, refused
                 assert saved_bytes() == before
                 retained = json.loads(saved_bytes()["configuration"])
                 assert retained["schema"] == "local-settings/1" and not ini.exists()
@@ -109,7 +124,7 @@ def main():
                 assert retained["configuration"]["CW"]["Fade Shape"] == source["CW"]["Fade Shape"]
                 status, body = request(port, "POST", "/api/wtp/recover", json.dumps({"operation": "reconcile"}), auth)
                 assert status == 409 and json.loads(body)["ok"] is False, body
-                status, body = read_managed(port, "/api/control/v1/host/readiness")
+                status, body = request_managed(port, "GET", "/api/control/v1/host/readiness")
                 assert status == 200 and json.loads(body)["state"] == "ready", (status, body)
                 assert not Path(str(ledger) + ".simulated-trace.json").exists()
                 process.terminate();assert process.wait(timeout=10) == 0, (root / "service.log").read_text()

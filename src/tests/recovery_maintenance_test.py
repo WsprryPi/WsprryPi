@@ -76,6 +76,18 @@ def run(fixture, helper, fault_phase=None):
             finally:
                 for descriptor in descriptors:
                     os.close(descriptor)
+        def create_backup(phrase):
+            # LocalControl distinguishes pre-effect busy from unknown outcome.
+            # Only an explicit refusal can admit a fresh CLI backup request.
+            deadline = time.monotonic() + 5
+            while True:
+                created = cli(['backup'], [('--passphrase-fd', phrase), ('--confirmation-fd', phrase)])
+                if created.returncode == 0:
+                    return created.stdout
+                diagnostic, _, _ = created.stderr.partition('\n')
+                assert created.returncode == 2 and not created.stdout and diagnostic == '{"error":"busy","ok":false}', created.stderr
+                assert time.monotonic() < deadline, created.stderr
+                time.sleep(.05)
         help_result = cli(['help'])
         assert help_result.returncode == 0, help_result.stderr
         assert 'release --review-digest SHA256 [--local] [--remote]' in help_result.stdout
@@ -209,9 +221,7 @@ def run(fixture, helper, fault_phase=None):
             # operator admission uses a new request ID; unknown jobs never replay.
             for attempt in range(12):
                 if attempt == 0:
-                    created = cli(['backup'], [('--passphrase-fd', phrase), ('--confirmation-fd', phrase)])
-                    assert created.returncode == 0, created.stderr
-                    status, data = 200, created.stdout
+                    status, data = 200, create_backup(phrase)
                 else:
                     status, _, data = request('POST', '/api/recovery/jobs', {'kind': 'backup', 'request_id': f'{attempt+1:032x}',
                                                                          'passphrase': phrase, 'confirmation': phrase})
@@ -438,9 +448,7 @@ def run(fixture, helper, fault_phase=None):
                 # A restored installation, including inactive source evidence,
                 # must itself produce an archive accepted by the actual owners.
                 for attempt in range(12):
-                    created = cli(['backup'], [('--passphrase-fd', phrase), ('--confirmation-fd', phrase)])
-                    assert created.returncode == 0, created.stderr
-                    second = json.loads(created.stdout)
+                    second = json.loads(create_backup(phrase))
                     path = '/api/recovery/jobs/' + second['job_id']
                     second = wait_state(('ready', 'failed'))
                     if second['state'] == 'ready':
