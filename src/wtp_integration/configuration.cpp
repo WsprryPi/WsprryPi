@@ -19,6 +19,7 @@ PicoHttpResponse filter_selector_request(const PicoManagementExchange &, const s
     const std::string &, const std::string &);
 bool plan_shape(const Json &p);
 bool plan_valid(const Json &p);
+bool station_valid(const Json &j, bool extended);
 Json normalized_plan(Json plan, bool amplifier = true) {
   if (plan.is_object()) {
     if (!plan.contains("amplifier_active_high")) plan["amplifier_active_high"]=amplifier;
@@ -92,8 +93,19 @@ bool si_allocation(const Json &config, const Json &selectors = Json::array()) {
         !pins.insert(output["gp"].get<unsigned>()).second) return false;
   return true;
 }
+const Json &config_update_definitions() {
+  static const auto definitions=Json::parse(pico_management_response_definitions());
+  return definitions;
+}
+bool saved_config_document(Json value) {
+  if (!value.is_object()) return false;
+  const auto &definitions=config_update_definitions();
+  value["contract"]=control_contract;
+  return valid_closed_contract_document(value,definitions.at("config-update").at("$defs").at("read"),definitions);
+}
 bool shape(const Json &j, bool partial, bool redacted) {
   if (!partial && j.dump().size() > 4096) return false;
+  if (!partial && redacted && !saved_config_document(Json{{"config",j}})) return false;
   if (!(partial ? fields(j, {}, {"enabled", "station", "wifi", "schedules", "pins",
         "expires_utc_s", "allow_unqualified_frequency", "allow_non_amateur_frequency", "gpio_drive_ma", "si5351", "gps", "gray_line"}) && !j.empty()
       : fields(j, {"enabled", "station", "wifi", "schedules"}, {"pins",
@@ -196,7 +208,7 @@ bool supported_descriptor(const Json &value, std::string_view name) {
   for (const auto &[key,reference] : expected.items()) {
     if (!value.contains(key)) return false;
     const auto &actual=value[key];
-    if (!policies.contains(key)) { if (actual!=reference) return false; continue; }
+    if (!policies.contains(key)) { if (actual.dump()!=reference.dump()) return false; continue; }
     const auto &policy=policies[key];
     if (policy["type"]=="boolean") { if (!actual.is_boolean()) return false; }
     else if (policy["type"]=="integer") {
@@ -330,7 +342,7 @@ Json resource_value(Json value) {
 }
 Json control_document(const std::string &body) {
   auto value = strict_browser_json(body);
-  require(value.is_object() && value.value("contract", "") == "Wsprry-Control/1", "unsupported_control_contract", 409);
+  require(value.is_object() && value.contains("contract") && value["contract"] == control_contract, "unsupported_control_contract", 409);
   value.erase("contract");
   return value;
 }
@@ -341,6 +353,14 @@ bool capabilities_shape(const Json &caps) {
   auto document=caps;document["contract"]="Wsprry-Control/1";
   if (!valid_closed_contract_document(document,shape,definitions)) return false;
   const auto &execution=caps.at("execution");
+  if (caps.contains("test_tone")) {
+    const auto &tone=caps.at("test_tone");
+    const auto &expected=shape.at("properties").at("test_tone").at("properties").at("engines").at("const");
+    if (tone.at("engines").dump()!=expected.dump() ||
+        tone.at("output_disable_timeout_ns")!=execution.at("output_disable_timeout_ns") ||
+        tone.at("maximum_duration_ms")>std::stoull(execution.at("max_job_duration_ns").get<std::string>())/1'000'000)
+      return false;
+  }
   for (const auto &range:execution.at("frequency_ranges"))
     if (std::stoull(range.at("minimum_nhz").get<std::string>())>
         std::stoull(range.at("maximum_nhz").get<std::string>())) return false;
@@ -438,7 +458,7 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
     if (method == "POST") require(drive_policy_fields(input["config"],caps),"invalid_gpio_drive",400);
     auto original = read("config");
     auto configuration = parsed(original);
-    require(fields(configuration, {"config"}) && (configuration["config"].is_null() ||
+    require(saved_config_document(configuration) && (configuration["config"].is_null() ||
         shape(configuration["config"], false, true)) && etag(original.etag));
     if (!configuration["config"].is_null()) require(drive_policy_fields(configuration["config"],caps),"invalid_remote_resource");
     const auto status = parsed(read("status"));
@@ -522,6 +542,8 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
               caps["features"]["station_live_apply"] == true,
               "consumer_setup_identity_required",409);
       }
+      if (patch.contains("station") || patch.value("enabled",false))
+        require(proposed.contains("station") && station_valid(proposed["station"],true),"invalid_station",400);
       const std::string resource = "config/update", verb = "POST";
       Json candidate{{"contract","Wsprry-Control/1"},{"schema","config-update"},
           {"target",target},{"mode","merge"},{"config",patch}};
@@ -530,9 +552,11 @@ PicoHttpResponse pico_configuration_request(const PicoManagementExchange &exchan
       attempted = true;
       auto r = exchange(resource, verb, payload, revision); success(r);
       auto result = parsed(r);
-      require(result.contains("config") && shape(result["config"], false, true) &&
+      require(saved_config_document(result) && shape(result["config"], false, true) &&
           result["config"].dump().size() <= config_limit && etag(r.etag), "management_outcome_unknown");
       require(drive_policy_fields(result["config"],caps),"management_outcome_unknown");
+      if (patch.contains("gpio_drive_ma"))
+        require(result["config"]["gpio_drive_ma"]==patch["gpio_drive_ma"],"management_outcome_unknown");
       if (!expected_config_pins.is_null()) require(result["config"].at("pins").dump()==expected_config_pins.dump(),"management_outcome_unknown");
       if (patch.contains("gps")) require(patch["gps"].is_null()
           ? !result["config"].contains("gps")
@@ -821,7 +845,7 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
           polarity=old["fields"]["pins"].at("amplifier_active_high").get<bool>();
         else {
           const auto saved_response=read("config");const auto saved=parsed(saved_response);
-          require(fields(saved,{"config"}) && (saved["config"].is_null() || shape(saved["config"],false,true)),"invalid_remote_resource");
+          require(saved_config_document(saved) && (saved["config"].is_null() || shape(saved["config"],false,true)),"invalid_remote_resource");
           require(saved_response.etag==before.etag,"configuration_context_changed",409);
           if (!saved["config"].is_null()) polarity=saved["config"].at("pins").value("amplifier_active_high",true);
         }
@@ -830,10 +854,14 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
       if (!expected_pins.contains("indicator_active_high")) expected_pins["indicator_active_high"]=true;
       require(plan_valid(expected_pins),"invalid_pin_plan",400);
     }
+    const bool apply_drive=apply && input["application"]["domain"]=="drive";
     if (apply) {
       const auto domain=input["application"]["domain"].get<std::string>();
       require(input["application"]["draft_revision"]==old["draft_revision"] && old["apply_domains"][domain]==true,
           "invalid_progress_application",409);
+      if (apply_drive)
+        require(old["fields"].contains("gpio_drive_ma") && drive_policy_value(old["fields"]["gpio_drive_ma"],caps),
+                "invalid_progress_application",409);
       if (carrier != "usb_physical" &&
           (domain == "station" || domain == "network" || domain == "all")) {
         require(caps.contains("features") &&
@@ -900,6 +928,19 @@ PicoHttpResponse pico_progress_request(const PicoManagementExchange &exchange,
       else require(after==old && after_response.etag==revision,"management_outcome_unknown");
       return result;
     }
+    if (apply_drive) {
+      const auto acknowledged=progress_readback(result,target);
+      require(acknowledged==after,"management_outcome_unknown");
+      for (const auto key : {"draft_revision","fields","last_receipt","last_outcomes","applied_station",
+                            "profile_revision","schedule_enabled","schedule_suspended"})
+        require(after[key]==old[key],"management_outcome_unknown");
+      const auto drive_response=read("gpio-drive");
+      const auto drive=parsed(drive_response);
+      require(drive_response.etag==result.etag && drive_shape(drive,target) &&
+              drive_policy_observation(drive,caps) && drive["storage_healthy"]==true &&
+              drive["saved"]==old["fields"]["gpio_drive_ma"],"management_outcome_unknown");
+      return result;
+    }
     const auto applied=parsed(result);
     require(fields(applied,{"config"},{"reboot_required"}) && shape(applied["config"],false,true) &&
         (!applied.contains("reboot_required") || applied["reboot_required"].is_boolean()),"management_outcome_unknown");
@@ -923,11 +964,9 @@ PicoHttpResponse gpio_drive_progress_request(const PicoManagementExchange &excha
     const std::string &carrier, const std::string &generation) {
   if (method != "GET" && method != "PUT" && method != "POST")
     return {404, R"({"error":{"code":"not_found"}})", {}};
-  const auto result = pico_progress_request(exchange,device,boot,
+  return pico_progress_request(exchange,device,boot,
       method == "GET" ? "progress" : method == "PUT" ? "progress/update" : "progress/apply",
       method == "GET" ? "GET" : "POST",body,revision,carrier,generation);
-  if (method != "POST" || result.status != 200) return result;
-  return pico_progress_request(exchange,device,boot,"progress","GET",{}, {},carrier,generation);
 }
 
 bool valid_filter_settings(const Json &v) {
@@ -1127,7 +1166,7 @@ PicoHttpResponse gpio_drive_request(const PicoManagementExchange &exchange,
     if (method == "GET") return before;
     require(revision == before.etag,"revision_conflict",412);
     const auto observed = parsed(before);
-    require(observed["storage_healthy"] == true && observed["application_error"].is_null() && !observed["saved"].is_null(),"remote_busy_or_output_unresolved",409);
+    require(observed["storage_healthy"] == true && observed["application_error"].is_null(),"remote_busy_or_output_unresolved",409);
     const auto status_response = exchange("status","GET",{},{}); success(status_response);
     const auto state = parsed(status_response).at("job");
     require(state.at("boot_id") == boot && state.at("output_active") == false && state.at("owner_id").is_null() &&
@@ -1285,9 +1324,13 @@ PicoHttpResponse pico_resource_request(const PicoManagementExchange &exchange,
       if (value["physically_qualified"]==true) {
         const auto &p=caps["si5351"]["ordinary_profile"], &q=value["qualification"], &b=value["boot_active"];
         require(p["qualified"]==true && fields(q,{"profile_id","system_clock_hz","i2c_pair"}) &&
-            q["profile_id"]==p["id"] && q["system_clock_hz"]==p["system_clock_hz"] && q["i2c_pair"]==p["i2c_pair"] && !b.is_null(),"invalid_remote_resource");
-        for (const auto key:{"reference_hz","reference_source","crystal_load_pf","address","transmit_output","drive_ma","rf_gate_gp"})
+            q["profile_id"]==p["id"] && q["system_clock_hz"].is_number_integer() &&
+            q["system_clock_hz"]==p["system_clock_hz"] && q["i2c_pair"].is_number_integer() &&
+            q["i2c_pair"]==p["i2c_pair"] && !b.is_null(),"invalid_remote_resource");
+        for (const auto key:{"reference_hz","reference_source","crystal_load_pf","address","transmit_output","rf_gate_gp"})
           require(b[key]==p[key],"invalid_remote_resource");
+        const auto &drives=p["drive_ma"];
+        require(std::find(drives.begin(),drives.end(),b["drive_ma"])!=drives.end(),"invalid_remote_resource");
         require(b["loopback_output"].is_null() ? p["allow_none"]==true :
             b["loopback_output"]==p["loopback_output"] && b["loopback_input_gp"]==p["loopback_input_gp"],"invalid_remote_resource");
         require((value["execution_engine"]=="si5351" || value["execution_engine"]=="si5351-engineering") &&
@@ -1484,8 +1527,17 @@ bool pico_management_response_valid(const std::string &resource,const std::strin
             (void)progress_readback(response,target,resource=="progress/update"||(resource=="gpio-drive-progress"&&method=="PUT"));
             return true;
         }
-        if(resource=="progress/apply")return etag(response.etag)&&fields(value,{"config"},{"reboot_required"})&&shape(value["config"],false,true)&&
-            (!value.contains("reboot_required")||value["reboot_required"].is_boolean());
+        if(resource=="progress/apply"){
+            const auto input=control_document(request_body);
+            const auto &application=input.at("application");
+            require(fields(application,{"draft_revision","domain"}));
+            if(application["domain"]=="drive"){
+                const auto progress=progress_readback(response,target);
+                return progress["draft_revision"]==application["draft_revision"];
+            }
+            return etag(response.etag)&&fields(value,{"config"},{"reboot_required"})&&shape(value["config"],false,true)&&
+                (!value.contains("reboot_required")||value["reboot_required"].is_boolean());
+        }
         if(resource=="pins"){pin_choices(value);return true;}
         if(resource=="pins/validate"){
             const auto input=control_document(request_body),expected=review_plan(normalized_plan(input));

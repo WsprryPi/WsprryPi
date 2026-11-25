@@ -84,7 +84,7 @@ def make_goals(job):
             if words and words[0] == 'strace' and 'make' in words:
                 words = words[words.index('make'):]
             if words and words[0] == 'make':
-                goals += [word for word in words[1:] if (word.endswith('-test') or word == 'ci-build-budget') and '=' not in word]
+                goals += [word for word in words[1:] if (word.endswith('-test') or word in ('ci-build-budget', 'semantics-test-portable')) and '=' not in word]
     return collections.Counter(goals)
 
 
@@ -293,7 +293,7 @@ class SourceIdentityTests(unittest.TestCase):
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
         self.assertEqual(set(jobs), {'change_scope', 'macos-simulated-profile', 'macos-si5351-profile',
             'wtp-network-loopback', 'wtp-usb-management-pair', 'strict-i2c-profile',
-            'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components'})
+            'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components', 'linux-native-contracts'})
         self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
         self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
         for profile in ('macos-simulated-profile', 'macos-si5351-profile'):
@@ -313,29 +313,57 @@ class SourceIdentityTests(unittest.TestCase):
             self.assertEqual(reference(steps[checkout]['with']['ref']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
             for operation, before in (('require', True), ('verify', False)):
                 matches = [(i, s) for i, s in enumerate(steps) if operation in shlex.split(s.get('run', ''))]
-                self.assertEqual(len(matches), 1)
-                index, step = matches[0]
-                self.assertEqual(index < checkout, before)
-                self.assertEqual(reference(step['env']['PICO_SHA']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
-                expected = [operation, '$PICO_SHA']
-                if operation == 'verify': expected.append(steps[checkout]['with']['path'])
-                self.assertEqual(source_arguments(step), expected)
-                self.assertNotIn('if', step, 'admitted carrier source gates must be unconditional')
-                self.assertFalse(step.get('continue-on-error', False))
+                self.assertEqual(len(matches), 1 if operation == 'require' or carrier == 'macos-simulated-profile' else 2)
+                for index, step in matches:
+                    self.assertEqual(index < checkout, before)
+                    self.assertEqual(reference(step['env']['PICO_SHA']), ('needs', 'change_scope', 'outputs', 'pico_sha'))
+                    expected = [operation, '$PICO_SHA']
+                    if operation == 'verify': expected.append(steps[checkout]['with']['path'])
+                    self.assertEqual(source_arguments(step), expected)
+                    self.assertNotIn('if', step, 'admitted carrier source gates must be unconditional')
+                    self.assertFalse(step.get('continue-on-error', False))
+                if operation == 'verify' and carrier != 'macos-simulated-profile':
+                    recorded = next(i for i, step in enumerate(steps) if step.get('name') == 'Record frozen pair source manifests')
+                    budget = next(i for i, step in enumerate(steps) if step.get('name') == 'Select bounded build budget')
+                    checked = next(i for i, step in enumerate(steps) if step.get('name') == 'Verify frozen pair sources after the complete recipe')
+                    final_recipe = 'Render network controls with mocked responses' if carrier == 'wtp-network-loopback' else 'Actual UI producer through production Pi and Pico USB handlers'
+                    recipe = next(i for i, step in enumerate(steps) if step.get('name') == final_recipe)
+                    self.assertLess(matches[0][0], recorded)
+                    self.assertLess(recorded, budget)
+                    self.assertLess(recipe, matches[1][0])
+                    self.assertLess(matches[1][0], checked)
+                    for step in (steps[recorded], steps[checked]):
+                        self.assertNotIn('if', step)
+                        self.assertFalse(step.get('continue-on-error', False))
             self.assertFalse(steps[checkout].get('continue-on-error', False))
         for name in ('wtp-network-loopback','wtp-usb-management-pair','strict-i2c-profile',
-                     'ubuntu-gcc13-release','non-hardware-validation'):
+                     'ubuntu-gcc13-release','non-hardware-validation','linux-native-contracts'):
             self.assertEqual(make_goals(jobs[name])['ci-build-budget'],1,name)
         for name in ('macos-simulated-profile','macos-si5351-profile'):
             self.assertIn(shlex.split(jobs[name]['env']['MAKEFLAGS']),
                 [['-j2'],['-j','2'],['--jobs=2'],['--jobs','2']])
-        goals = make_goals(jobs['non-hardware-validation'])
-        for required in ('wtp-managed-output-test', 'wtp-fleet-test', 'wtp-production-cpp-test', 'wtp-api-cpp-test',
-                         'wtp-config-cpp-test', 'ci-focused-state-test', 'ci-network-policy-test',
-                         'ci-support-lifecycle-test', 'ci-installer-offline-test', 'php2shell-test'):
-            self.assertEqual(goals[required], 1, required)
+        semantics = jobs['non-hardware-validation']
+        native = jobs['linux-native-contracts']
+        for job in (semantics, native):
+            self.assertEqual(job['needs'], 'change_scope')
+            self.assertEqual(job['timeout-minutes'], 40)
+            self.assertEqual(job['env']['WSPRRYPI_DISABLE_HARDWARE_ACCESS'], '1')
+        self.assertEqual(native['if'], semantics['if'])
+        semantics_goals, native_goals = make_goals(semantics), make_goals(native)
+        for required in ('native-recurrence-test', 'wtp-managed-output-test', 'wtp-fleet-test',
+                         'wtp-production-cpp-test', 'wtp-api-cpp-test', 'wtp-config-cpp-test'):
+            self.assertEqual(native_goals[required], 1, required)
+            self.assertEqual(semantics_goals[required], 0, required)
+        for required in ('semantics-test', 'startup-quiesce-parent-test', 'ci-focused-state-test',
+                         'ci-network-policy-test', 'ci-support-lifecycle-test',
+                         'ci-installer-offline-test', 'php2shell-test'):
+            self.assertEqual(semantics_goals[required], 1, required)
+            self.assertEqual(native_goals[required], 0, required)
         for duplicate in ('wtp-production-test', 'wtp-api-test', 'wtp-config-test', 'legacy-tone-frequency-test', 'test-tone-lifecycle-test'):
-            self.assertEqual(goals[duplicate], 0, duplicate)
+            self.assertEqual(semantics_goals[duplicate] + native_goals[duplicate], 0, duplicate)
+        macos_goals = make_goals(jobs['macos-simulated-profile'])
+        self.assertEqual(macos_goals['semantics-test-portable'], 1)
+        self.assertEqual(macos_goals['native-recurrence-test'], 0)
         self.assertEqual(make_goals(jobs['wtp-network-loopback'])['wtp-tls-test'], 0)
         self.assertEqual(make_goals(jobs['wtp-network-loopback'])['wtp-network-runtime-test'], 1)
 

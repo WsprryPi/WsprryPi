@@ -526,6 +526,23 @@ def run(fixture, helper, fault_phase=None):
             assert manifest['source']['role'] == role and (decoded / 'application/state.sqlite3').is_file()
             print(('PASS recovery after worker death at ' + fault_phase + ': ' if fault_phase else 'PASS ') + 'actual backend/web/maintenance: existing-session admission, CSRF refusal, coherent encrypted backup, bounded download/range/retry, backend outage, worker restart, portable decryption, wrong-passphrase retry and nonmutating actual-owner preview, exact confirmation, preserved prior generation, inactive source evidence and verified held backend restart')
         finally:
+            if sys.exc_info()[0] is not None:
+                print('RECOVERY_PROCESS_EXITS', [child.poll() for child in processes], flush=True)
+                # Only allowlisted state/error fields, never archive/settings/secrets.
+                for record_path in sorted((Path(str(ledger) + '.maintenance') / 'jobs').glob('*/*.json')):
+                    if record_path.name not in ('job.json', 'validation-result.json'):
+                        continue
+                    try:
+                        if record_path.stat().st_size > 1048576:
+                            continue
+                        value = json.loads(record_path.read_text())
+                        if type(value) is not dict:
+                            continue
+                        safe = {key: value[key][:64] if type(value[key]) is str else None
+                                for key in ('job_id', 'state', 'error', 'phase') if key in value}
+                        print('RECOVERY_FAILURE', record_path.name, safe, flush=True)
+                    except (OSError, ValueError):
+                        pass
             try:
                 cleanup_connection = Connection(runtime, 'control')
                 try:

@@ -88,9 +88,12 @@ set(core
     application/config_update.cpp
     application/resources.cpp
     application/frequency_policy.cpp
+    application/test_tone.cpp
+    application/test_tone_review.cpp
     hardware/pins.cpp
     hardware/si5351_settings.cpp
     hardware/gps_settings.cpp
+    rf/frequency.cpp
     rf/si5351_plan.cpp
     rf/reference_measurement.cpp
     hardware/filter_settings.cpp
@@ -129,6 +132,7 @@ set(core
     network/management.cpp
     network/consumer_radio.cpp
     network/softap_api.cpp
+    network/test_tone.cpp
     encoding/wspr.cpp
     encoding/wspr_plan.cpp
     standalone/dry_run_engine.cpp
@@ -148,6 +152,7 @@ set(core
     usb/management_endpoint.cpp
     usb/time_exchange.cpp
     wtp/json.cpp
+    wtp/arm_admission.cpp
     wtp/observation.cpp
     wtp/inhibited_rf_engine.cpp
     wtp/job_service.cpp

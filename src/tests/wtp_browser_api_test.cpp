@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "wtp_integration/browser_api.hpp"
 #include "wtp_integration/browser_http.hpp"
+#include "wtp_integration/control_contract.hpp"
 #include "privileged_network_policy.hpp"
 #include <iostream>
 using namespace wsprrypi;
@@ -32,6 +33,25 @@ int main() {
         return PicoHttpResponse{412, R"({"error":{"code":"revision_conflict"}})", {}};
       }, [&](auto job) { ++mutations; CHECK(job == std::string(32, 'a')); return PicoHttpResponse{200, R"({"cleanup_ok":true})", {}}; });
     for (auto path : {"/api/control/v1/status", "/api/control/v1/capabilities"}) CHECK(api.handle({"GET", path, {}, {}, false}).status == 200);
+    CHECK(reads == 2 && mutations == 0 && management == 0);
+    for (const std::string_view operation : {"review","start","status","stop"}) {
+      const auto resource=std::string("test-tone/")+std::string(operation);
+      const auto method=operation=="status" ? "GET" : "POST";
+      CHECK(control_route(resource,method));
+      CHECK(!pi_management_route(resource,method));
+      CHECK(!pi_consumer_session_route(resource,method));
+      CHECK(!controller_pico_route(resource,method));
+      const auto body=operation=="status" ? "" : R"({"contract":"Wsprry-Control/1"})";
+      CHECK(api.handle({method,"/api/control/v1/member/"+resource,body,{},true}).status==404);
+    }
+    const auto tone_status="/api/control/v1/member/test-tone/status";
+    query.path=tone_status;
+    query.target=query.path+"?request_id="+std::string(32,'a');
+    query.params.clear();
+    query.params.emplace("request_id",std::string(32,'a'));
+    CHECK(!wtp_browser_http_request(query));
+    CHECK(!pi_management_route("test-tone/status?request_id="+std::string(32,'a'),"GET"));
+    CHECK(!pi_consumer_session_route("test-tone/status?request_id="+std::string(32,'a'),"GET"));
     CHECK(reads == 2 && mutations == 0 && management == 0);
     auto status = nlohmann::json::parse(api.handle({"GET", "/api/control/v1/status", {}, {}, false}).body);
     CHECK(status["host"]["start_utc_ns"] == "18446744073709551615");

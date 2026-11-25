@@ -6,8 +6,27 @@ const vectors=process.argv[3]||path.join(__dirname,'../../src/wtp_integration/co
 const root={module:{exports:{}}};vm.runInNewContext(fs.readFileSync(source,'utf8'),root);
 const control=root.module.exports;
 const samples=JSON.parse(fs.readFileSync(vectors,'utf8'));
-for(const item of samples.cases)
-    assert.equal(control.validControllerDocument(item.value,item.family),item.valid,item.name);
+const spec=JSON.parse(fs.readFileSync(path.join(path.dirname(vectors),'control-1.schema.json'),'utf8'));
+function canonical(value) {
+    if (Array.isArray(value)) return '['+value.map(canonical).join(',')+']';
+    if (value !== null && typeof value === 'object')
+        return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+canonical(value[key])).join(',')+'}';
+    return JSON.stringify(value);
+}
+const digest=require('node:crypto').createHash('sha256').update(canonical(spec)).digest('hex');
+const discovery=samples.cases.find(item=>item.name==='current bounded management discovery');
+const vectorDigest=discovery.value.discoveries[0].control_schema_digest;
+// Shared vectors retain a historical fixture digest. Bind those fixture rows
+// to the selected schema so each test still exercises its named condition.
+if (vectorDigest!==digest)
+    assert.equal(control.validControllerDocument(discovery.value,'pair-discovery'),false,'Superseded discovery digest must refuse');
+for (const item of samples.cases) {
+    const value=structuredClone(item.value);
+    if (item.family==='pair-discovery')
+        for (const row of value.discoveries ?? [])
+            if (row.control_schema_digest===vectorDigest) row.control_schema_digest=digest;
+    assert.equal(control.validControllerDocument(value,item.family),item.valid,item.name);
+}
 const piSave=samples.cases.find(item=>item.name==='Pi closed structural save');
 assert(piSave,'The current Pi structural save vector is required');
 for(const number of [NaN,Infinity,-Infinity]){

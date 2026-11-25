@@ -359,6 +359,14 @@ jobs:
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/network-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/network-reference/pico --check
+      - name: Record frozen pair source manifests
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} | tee "$RUNNER_TEMP/pi-pair-revision.before"
+          git -C src/build/network-reference/pico rev-parse HEAD HEAD^{tree}
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.before"
+          (cd src/build/network-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.before"
       - name: Read-only pinned Pico TLS dependency
         uses: actions/checkout@v7
         with:
@@ -422,6 +430,23 @@ jobs:
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
           node tests/pico_target_editor_state_browser_test.js
           node tests/recurrence_migration_browser_test.js
+      - name: Verify immutable Pico source after the complete recipe
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/network-reference/pico
+      - name: Verify frozen pair sources after the complete recipe
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/pi-pair-revision.after"
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.after"
+          (cd src/build/network-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.after"
+          for record in pi-pair-revision pi-pair-source pico-pair-source; do
+            test -s "$RUNNER_TEMP/$record.before"
+            cmp "$RUNNER_TEMP/$record.before" "$RUNNER_TEMP/$record.after"
+          done
+          sha256sum "$RUNNER_TEMP/"{pi,pico}-pair-source.{before,after}
+          echo "PASS: frozen Pi/Pico source manifests matched before and after the complete network recipe"
       - name: Retain failed network browser captures
         if: failure()
         uses: actions/upload-artifact@v7
@@ -472,6 +497,14 @@ jobs:
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
       - name: Verify shared contract and lifecycle against the selected Pico
         run: python3 scripts/generate_control_contract.py --source src/build/usb-reference/pico --check
+      - name: Record frozen pair source manifests
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} | tee "$RUNNER_TEMP/pi-pair-revision.before"
+          git -C src/build/usb-reference/pico rev-parse HEAD HEAD^{tree}
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.before"
+          (cd src/build/usb-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.before"
       - name: Select bounded build budget
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Build actual production Pico USB endpoint without SDK or network
@@ -486,6 +519,24 @@ jobs:
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/wtp_usb_pair_test.js src/build/wtp-network/wtp_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
+
+      - name: Verify immutable Pico source after the complete recipe
+        env:
+          PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
+        run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/usb-reference/pico
+      - name: Verify frozen pair sources after the complete recipe
+        run: |
+          set -euo pipefail
+          git diff --exit-code HEAD
+          git rev-parse HEAD HEAD^{tree} > "$RUNNER_TEMP/pi-pair-revision.after"
+          git ls-files -z | xargs -0 sha256sum -- > "$RUNNER_TEMP/pi-pair-source.after"
+          (cd src/build/usb-reference/pico && git ls-files -z | xargs -0 sha256sum) > "$RUNNER_TEMP/pico-pair-source.after"
+          for record in pi-pair-revision pi-pair-source pico-pair-source; do
+            test -s "$RUNNER_TEMP/$record.before"
+            cmp "$RUNNER_TEMP/$record.before" "$RUNNER_TEMP/$record.after"
+          done
+          sha256sum "$RUNNER_TEMP/"{pi,pico}-pair-source.{before,after}
+          echo "PASS: frozen Pi/Pico source manifests matched before and after the complete usb recipe"
 
   strict-i2c-profile:
     needs: change_scope
@@ -588,17 +639,17 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    # Cold native/contract builds and browser checks take about 20 minutes
-    # before the retained RP1, installer, support, and component stages begin.
+    # Keep the traced tests and final audit on the same runner.
     timeout-minutes: 40
     container: debian:trixie-slim
-    env:
+    env: &linux-validation-env
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
-    defaults:
+    defaults: &linux-validation-defaults
       run:
         shell: /usr/sbin/runuser -u wsprrypi-ci -- /bin/bash --noprofile --norc -e -o pipefail {0}
     steps:
-      - name: Install build and audit dependencies
+      - &install-linux-validation-dependencies
+        name: Install build and audit dependencies
         shell: bash
         run: |
           apt-get update
@@ -606,10 +657,12 @@ jobs:
             age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
             libsystemd-dev nodejs npm passwd php-cli pkg-config python3 shellcheck strace util-linux
 
-      - name: Check out source
+      - &checkout-linux-source
+        name: Check out source
         uses: actions/checkout@v7
 
-      - name: Select unprivileged checkout owner
+      - &select-linux-checkout-owner
+        name: Select unprivileged checkout owner
         shell: bash
         run: |
           # Recovery workers must execute below directories owned by their
@@ -618,11 +671,13 @@ jobs:
             --create-home --shell /bin/bash wsprrypi-ci
           chown -R wsprrypi-ci:wsprrypi-ci "$GITHUB_WORKSPACE"
 
-      - name: Trust parent checkout ownership
+      - &trust-linux-checkout-owner
+        name: Trust parent checkout ownership
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Select bounded build budget
+      - &select-linux-build-budget
+        name: Select bounded build budget
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Check bounded USB logging parser and policy
         working-directory: src
@@ -636,31 +691,6 @@ jobs:
           make build-metadata-regression-test build-metadata-make-regression-test SUDO=
           make debug SUDO=
 
-      - name: Run native execution, management, and retirement tests
-        working-directory: src
-        run: |
-          make wtp-protocol-test wtp-usb-test wtp-usb-management-test wtp-production-cpp-test native-recurrence-test SUDO=
-          make wtp-pi-authority-test wtp-pi-revocation-test \
-            wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
-            wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
-            wtp-fleet-test SUDO=
-          make wtp-retirement-config-test pi-managed-records-test pi-management-journal-test pi-management-anchor-test \
-            pi-config-persistence-coordinator-test pi-managed-store-test pi-management-service-test \
-            pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test \
-            pi-private-network-persistence-test pi-managed-main-test wtp-managed-output-test SUDO=
-          # The production pre-parse privilege gate intentionally rejects an
-          # unprivileged WTP invocation of a GPIO-capable executable. Exercise
-          # its actual-main software fixture with an explicit GPIO-free build.
-          make pi-managed-wtp-main-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= \
-            OBJ_DIR_DEBUG=build/managed-wtp-main-objects BIN_DIR=build/managed-wtp-main-bin
-
-      - name: Frequency and Test Tone contracts
-        working-directory: src
-        run: |
-          make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test SUDO=
-          make band-lookup-correlation-test wspr-band-catalog-test wspr-preset-catalog-response-test SUDO=
-          make -j2 wtp-network-unit-build SUDO=
-          make wspr-tone-regression-test qrss-execution-regression-test wtp-config-cpp-test wtp-api-cpp-test SUDO=
       - name: Run parent semantics and cleanup lifecycle tests
         working-directory: src
         run: |
@@ -814,3 +844,44 @@ jobs:
             /tmp/wsprrypi-installer.strace \
             /tmp/wsprrypi-simulator.strace \
             /tmp/wsprrypi-wspr-simulator.strace
+
+  linux-native-contracts:
+    needs: change_scope
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    container: debian:trixie-slim
+    env: *linux-validation-env
+    defaults: *linux-validation-defaults
+    steps:
+      - *install-linux-validation-dependencies
+      - *checkout-linux-source
+      - *select-linux-checkout-owner
+      - *trust-linux-checkout-owner
+      - *select-linux-build-budget
+
+      - name: Run native execution, management, and retirement tests
+        working-directory: src
+        run: |
+          make wtp-protocol-test wtp-usb-test wtp-usb-management-test wtp-production-cpp-test native-recurrence-test SUDO=
+          make wtp-pi-authority-test wtp-pi-revocation-test \
+            wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
+            wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
+            wtp-fleet-test SUDO=
+          make wtp-retirement-config-test pi-managed-records-test pi-management-journal-test pi-management-anchor-test \
+            pi-config-persistence-coordinator-test pi-managed-store-test pi-management-service-test \
+            pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test \
+            pi-private-network-persistence-test pi-managed-main-test wtp-managed-output-test SUDO=
+          # The production pre-parse privilege gate intentionally rejects an
+          # unprivileged WTP invocation of a GPIO-capable executable. Exercise
+          # its actual-main software fixture with an explicit GPIO-free build.
+          make pi-managed-wtp-main-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= \
+            OBJ_DIR_DEBUG=build/managed-wtp-main-objects BIN_DIR=build/managed-wtp-main-bin
+
+      - name: Frequency and Test Tone contracts
+        working-directory: src
+        run: |
+          make test-tone-request-test test-tone-frequency-plan-test test-tone-selector-plan-test test-tone-response-test SUDO=
+          make band-lookup-correlation-test wspr-band-catalog-test wspr-preset-catalog-response-test SUDO=
+          make -j2 wtp-network-unit-build SUDO=
+          make wspr-tone-regression-test qrss-execution-regression-test wtp-config-cpp-test wtp-api-cpp-test SUDO=

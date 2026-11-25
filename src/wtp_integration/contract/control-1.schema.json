@@ -417,6 +417,21 @@
         },
         {
             "$ref": "#/$defs/schedule-stop-read"
+        },
+        {
+            "$ref": "#/$defs/test-tone-review-request"
+        },
+        {
+            "$ref": "#/$defs/test-tone-start-request"
+        },
+        {
+            "$ref": "#/$defs/test-tone-stop-request"
+        },
+        {
+            "$ref": "#/$defs/test-tone-review-read"
+        },
+        {
+            "$ref": "#/$defs/test-tone-status"
         }
     ],
     "$defs": {
@@ -3944,6 +3959,200 @@
                         "mode",
                         "config"
                     ]
+                },
+                "saved": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "station": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/$defs/config-update/$defs/station"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                        "callsign",
+                                        "locator",
+                                        "power_dbm"
+                                    ],
+                                    "properties": {
+                                        "callsign": {
+                                            "const": ""
+                                        },
+                                        "locator": {
+                                            "const": ""
+                                        },
+                                        "power_dbm": {
+                                            "type": "integer",
+                                            "enum": [
+                                                0,
+                                                3,
+                                                7,
+                                                10,
+                                                13,
+                                                17,
+                                                20,
+                                                23,
+                                                27,
+                                                30,
+                                                33,
+                                                37,
+                                                40,
+                                                43,
+                                                47,
+                                                50,
+                                                53,
+                                                57,
+                                                60
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "wifi": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "ssid": {
+                                    "type": "string",
+                                    "maxLength": 32
+                                },
+                                "password": {
+                                    "type": "null"
+                                },
+                                "ntp_ipv4": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 253
+                                }
+                            },
+                            "required": [
+                                "ssid",
+                                "password"
+                            ]
+                        },
+                        "schedules": {
+                            "type": "array",
+                            "maxItems": 8,
+                            "items": {
+                                "$ref": "#/$defs/config-update/$defs/schedule"
+                            }
+                        },
+                        "expires_utc_s": {
+                            "type": "integer",
+                            "oneOf": [
+                                {
+                                    "const": 0
+                                },
+                                {
+                                    "minimum": 1735689600,
+                                    "maximum": 2147483647
+                                }
+                            ]
+                        },
+                        "pins": {
+                            "$ref": "#/$defs/config-update/$defs/pins"
+                        },
+                        "allow_unqualified_frequency": {
+                            "type": "boolean"
+                        },
+                        "allow_non_amateur_frequency": {
+                            "type": "boolean"
+                        },
+                        "gpio_drive_ma": {
+                            "type": "integer",
+                            "enum": [
+                                2,
+                                4,
+                                8,
+                                12
+                            ]
+                        },
+                        "si5351": {
+                            "anyOf": [
+                                {
+                                    "type": "null"
+                                },
+                                {
+                                    "$ref": "#/$defs/si5351-settings"
+                                }
+                            ]
+                        },
+                        "gps": {
+                            "anyOf": [
+                                {
+                                    "type": "null"
+                                },
+                                {
+                                    "$ref": "#/$defs/gps-settings"
+                                }
+                            ]
+                        },
+                        "gray_line": {
+                            "$ref": "#/$defs/gray-line-settings"
+                        }
+                    },
+                    "required": [
+                        "enabled",
+                        "station",
+                        "wifi",
+                        "schedules",
+                        "gpio_drive_ma"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "station": {
+                                        "properties": {
+                                            "callsign": {
+                                                "const": ""
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "enabled": {
+                                        "const": false
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                "read": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "contract",
+                        "config"
+                    ],
+                    "properties": {
+                        "contract": {
+                            "const": "Wsprry-Control/1"
+                        },
+                        "config": {
+                            "oneOf": [
+                                {
+                                    "type": "null"
+                                },
+                                {
+                                    "$ref": "#/$defs/config-update/$defs/saved"
+                                }
+                            ]
+                        },
+                        "reboot_required": {
+                            "type": "boolean"
+                        }
+                    }
                 }
             },
             "anyOf": [
@@ -6135,7 +6344,7 @@
                         },
                         "ordinary_profile": {
                             "const": {
-                                "id": "qrp-labs-rev6-25mhz-clk0-8ma",
+                                "id": "qrp-labs-rev6-25mhz-clk0",
                                 "qualified": true,
                                 "system_clock_hz": 138000000,
                                 "i2c_pair": 1,
@@ -6144,7 +6353,12 @@
                                 "reference_source": "external_xa",
                                 "crystal_load_pf": null,
                                 "transmit_output": 0,
-                                "drive_ma": 8,
+                                "drive_ma": [
+                                    2,
+                                    4,
+                                    6,
+                                    8
+                                ],
                                 "loopback_output": 2,
                                 "loopback_input_gp": 7,
                                 "allow_none": true,
@@ -6484,6 +6698,189 @@
                             }
                         }
                     }
+                },
+                "test_tone": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "schema",
+                        "review",
+                        "start",
+                        "status",
+                        "stop",
+                        "review_method",
+                        "start_method",
+                        "status_method",
+                        "stop_method",
+                        "carrier_units",
+                        "carrier_reference",
+                        "duration_units",
+                        "drive_activation",
+                        "terminal_capacity",
+                        "terminal_retention_ns",
+                        "status_selector",
+                        "start_revision",
+                        "stop_revision",
+                        "reauthentication",
+                        "available",
+                        "maximum_duration_ms",
+                        "output_disable_timeout_ns",
+                        "engines",
+                        "minimum_duration_ms",
+                        "active_engine"
+                    ],
+                    "properties": {
+                        "schema": {
+                            "const": "test-tone"
+                        },
+                        "review": {
+                            "const": "/api/control/v1/test-tone/review"
+                        },
+                        "start": {
+                            "const": "/api/control/v1/test-tone/start"
+                        },
+                        "status": {
+                            "const": "/api/control/v1/test-tone/status"
+                        },
+                        "stop": {
+                            "const": "/api/control/v1/test-tone/stop"
+                        },
+                        "review_method": {
+                            "const": "POST"
+                        },
+                        "start_method": {
+                            "const": "POST"
+                        },
+                        "status_method": {
+                            "const": "GET"
+                        },
+                        "stop_method": {
+                            "const": "POST"
+                        },
+                        "carrier_units": {
+                            "const": "Hz"
+                        },
+                        "carrier_reference": {
+                            "const": "absolute"
+                        },
+                        "duration_units": {
+                            "const": "ms"
+                        },
+                        "drive_activation": {
+                            "const": "restart"
+                        },
+                        "terminal_capacity": {
+                            "const": 8
+                        },
+                        "terminal_retention_ns": {
+                            "const": "3600000000000"
+                        },
+                        "status_selector": {
+                            "const": "device_boot_and_exactly_one_request_or_job"
+                        },
+                        "start_revision": {
+                            "const": "current_admission"
+                        },
+                        "stop_revision": {
+                            "const": "identified_job"
+                        },
+                        "reauthentication": {
+                            "const": "same_authority_generation"
+                        },
+                        "available": {
+                            "type": "boolean"
+                        },
+                        "maximum_duration_ms": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 120000
+                        },
+                        "output_disable_timeout_ns": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        "engines": {
+                            "const": {
+                                "pio-dma-gp2": {
+                                    "drive_ma": [
+                                        2,
+                                        4,
+                                        8,
+                                        12
+                                    ],
+                                    "minimum_duration_ms": 1,
+                                    "verification": "sdk_pad"
+                                },
+                                "si5351": {
+                                    "drive_ma": [
+                                        2,
+                                        4,
+                                        6,
+                                        8
+                                    ],
+                                    "minimum_duration_ms": 10,
+                                    "verification": "register_readback"
+                                }
+                            }
+                        },
+                        "minimum_duration_ms": {
+                            "enum": [
+                                0,
+                                1,
+                                10
+                            ]
+                        },
+                        "active_engine": {
+                            "enum": [
+                                "pio-dma-gp2",
+                                "si5351",
+                                null
+                            ]
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "available": {
+                                    "const": false
+                                },
+                                "active_engine": {
+                                    "type": "null"
+                                },
+                                "minimum_duration_ms": {
+                                    "const": 0
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "available": {
+                                    "const": true
+                                },
+                                "active_engine": {
+                                    "const": "pio-dma-gp2"
+                                },
+                                "minimum_duration_ms": {
+                                    "const": 1
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "available": {
+                                    "const": true
+                                },
+                                "active_engine": {
+                                    "const": "si5351"
+                                },
+                                "minimum_duration_ms": {
+                                    "const": 10
+                                }
+                            }
+                        }
+                    ]
                 }
             },
             "title": "Control/1 capabilities"
@@ -7124,8 +7521,8 @@
                     "properties": {
                         "GET": {
                             "type": "array",
-                            "minItems": 33,
-                            "maxItems": 33,
+                            "minItems": 34,
+                            "maxItems": 34,
                             "uniqueItems": true,
                             "items": {
                                 "enum": [
@@ -7161,7 +7558,8 @@
                                     "si5351",
                                     "gps",
                                     "gray-line",
-                                    "schedules/stop"
+                                    "schedules/stop",
+                                    "test-tone/status"
                                 ]
                             }
                         },
@@ -7194,8 +7592,8 @@
                         },
                         "POST": {
                             "type": "array",
-                            "minItems": 12,
-                            "maxItems": 12,
+                            "minItems": 15,
+                            "maxItems": 15,
                             "uniqueItems": true,
                             "items": {
                                 "enum": [
@@ -7210,7 +7608,10 @@
                                     "message-schedule/pause",
                                     "consumer/time/challenge",
                                     "consumer/time/submit",
-                                    "schedules/stop"
+                                    "schedules/stop",
+                                    "test-tone/review",
+                                    "test-tone/start",
+                                    "test-tone/stop"
                                 ]
                             }
                         }
@@ -8144,7 +8545,7 @@
                             ],
                             "properties": {
                                 "profile_id": {
-                                    "const": "qrp-labs-rev6-25mhz-clk0-8ma"
+                                    "const": "qrp-labs-rev6-25mhz-clk0"
                                 },
                                 "system_clock_hz": {
                                     "const": 138000000
@@ -8192,7 +8593,12 @@
                                         "const": 0
                                     },
                                     "drive_ma": {
-                                        "const": 8
+                                        "enum": [
+                                            2,
+                                            4,
+                                            6,
+                                            8
+                                        ]
                                     },
                                     "rf_gate_gp": {
                                         "const": null
@@ -15264,6 +15670,1488 @@
                     ]
                 }
             }
+        },
+        "test-tone-error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "code",
+                "message",
+                "retryable"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "message": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "retryable": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "test-tone-realization": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "requested_nhz",
+                "programmed_nhz",
+                "increment",
+                "nominal_sample_hz",
+                "quantization_bound_nhz",
+                "correction"
+            ],
+            "properties": {
+                "requested_nhz": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "programmed_nhz": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "increment": {
+                    "anyOf": [
+                        {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "nominal_sample_hz": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                132000000,
+                                138000000,
+                                150000000
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "quantization_bound_nhz": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "correction": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "ppb",
+                                "automatic",
+                                "generation",
+                                "observed_raw_ns",
+                                "uncertainty_ppb"
+                            ],
+                            "properties": {
+                                "ppb": {
+                                    "type": "integer",
+                                    "minimum": -100000,
+                                    "maximum": 100000
+                                },
+                                "automatic": {
+                                    "type": "boolean"
+                                },
+                                "generation": {
+                                    "type": "string",
+                                    "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                    "maxLength": 20,
+                                    "x-maximum": "18446744073709551615"
+                                },
+                                "observed_raw_ns": {
+                                    "type": "string",
+                                    "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                    "maxLength": 20,
+                                    "x-maximum": "18446744073709551615"
+                                },
+                                "uncertainty_ppb": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 4294967295
+                                }
+                            }
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            }
+        },
+        "test-tone-review-request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "contract",
+                "schema",
+                "target",
+                "tone"
+            ],
+            "properties": {
+                "contract": {
+                    "const": "Wsprry-Control/1"
+                },
+                "schema": {
+                    "const": "test-tone-review"
+                },
+                "target": {
+                    "$ref": "#/$defs/application/$defs/target"
+                },
+                "tone": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "carrier_hz",
+                        "duration_ms",
+                        "proposed_drive_ma",
+                        "engine"
+                    ],
+                    "properties": {
+                        "carrier_hz": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 18446744073
+                        },
+                        "duration_ms": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 120000
+                        },
+                        "proposed_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8,
+                                12
+                            ]
+                        },
+                        "engine": {
+                            "enum": [
+                                "pio-dma-gp2",
+                                "si5351"
+                            ]
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "pio-dma-gp2"
+                                },
+                                "proposed_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        8,
+                                        12
+                                    ]
+                                },
+                                "duration_ms": {
+                                    "minimum": 1
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "si5351"
+                                },
+                                "proposed_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        6,
+                                        8
+                                    ]
+                                },
+                                "duration_ms": {
+                                    "minimum": 10
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "test-tone-start-request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "contract",
+                "schema",
+                "target",
+                "request_id",
+                "tone"
+            ],
+            "properties": {
+                "contract": {
+                    "const": "Wsprry-Control/1"
+                },
+                "schema": {
+                    "const": "test-tone-start"
+                },
+                "target": {
+                    "$ref": "#/$defs/application/$defs/target"
+                },
+                "request_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                },
+                "tone": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "carrier_hz",
+                        "duration_ms",
+                        "expected_drive_ma",
+                        "engine"
+                    ],
+                    "properties": {
+                        "carrier_hz": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 18446744073
+                        },
+                        "duration_ms": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 120000
+                        },
+                        "expected_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8,
+                                12
+                            ]
+                        },
+                        "engine": {
+                            "enum": [
+                                "pio-dma-gp2",
+                                "si5351"
+                            ]
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "pio-dma-gp2"
+                                },
+                                "expected_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        8,
+                                        12
+                                    ]
+                                },
+                                "duration_ms": {
+                                    "minimum": 1
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "si5351"
+                                },
+                                "expected_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        6,
+                                        8
+                                    ]
+                                },
+                                "duration_ms": {
+                                    "minimum": 10
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "test-tone-stop-request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "contract",
+                "schema",
+                "target",
+                "job_id"
+            ],
+            "properties": {
+                "contract": {
+                    "const": "Wsprry-Control/1"
+                },
+                "schema": {
+                    "const": "test-tone-stop"
+                },
+                "target": {
+                    "$ref": "#/$defs/application/$defs/target"
+                },
+                "job_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                }
+            }
+        },
+        "test-tone-review-read": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "contract",
+                "schema",
+                "target",
+                "assessment_revision",
+                "admission",
+                "reasons",
+                "maximum_duration_ms",
+                "proposed_drive_ma",
+                "saved_drive_ma",
+                "boot_drive_ma",
+                "requires_restart",
+                "rf_pin",
+                "engine",
+                "realization",
+                "prospective_utc_ns",
+                "clock_error",
+                "clock_assumptions",
+                "execution_engine",
+                "transmit_output",
+                "reference_hz",
+                "profile_id",
+                "minimum_duration_ms"
+            ],
+            "properties": {
+                "contract": {
+                    "const": "Wsprry-Control/1"
+                },
+                "schema": {
+                    "const": "test-tone-review"
+                },
+                "target": {
+                    "$ref": "#/$defs/application/$defs/target"
+                },
+                "assessment_revision": {
+                    "type": "string",
+                    "maxLength": 80
+                },
+                "admission": {
+                    "enum": [
+                        "ready",
+                        "requires_restart",
+                        "refused"
+                    ]
+                },
+                "reasons": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                        "type": "string",
+                        "maxLength": 80
+                    }
+                },
+                "maximum_duration_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 120000
+                },
+                "proposed_drive_ma": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "saved_drive_ma": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8,
+                                12
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "boot_drive_ma": {
+                    "enum": [
+                        2,
+                        4,
+                        6,
+                        8,
+                        12
+                    ]
+                },
+                "requires_restart": {
+                    "type": "boolean"
+                },
+                "rf_pin": {
+                    "anyOf": [
+                        {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 29
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "engine": {
+                    "enum": [
+                        "pio-dma-gp2",
+                        "si5351"
+                    ]
+                },
+                "realization": {
+                    "$ref": "#/$defs/test-tone-realization"
+                },
+                "prospective_utc_ns": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "clock_error": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/test-tone-error"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "clock_assumptions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "state",
+                        "observed_monotonic_ns",
+                        "uncertainty_ns",
+                        "maximum_uncertainty_ns"
+                    ],
+                    "properties": {
+                        "state": {
+                            "enum": [
+                                "synchronized",
+                                "holdover",
+                                "unsynchronized"
+                            ]
+                        },
+                        "observed_monotonic_ns": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        "uncertainty_ns": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        "maximum_uncertainty_ns": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        }
+                    }
+                },
+                "execution_engine": {
+                    "enum": [
+                        "pio-dma-gp2",
+                        "si5351",
+                        "si5351-engineering",
+                        "si5351-inhibited",
+                        "inhibited-standalone-simulator"
+                    ]
+                },
+                "transmit_output": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                0,
+                                1,
+                                2
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "reference_hz": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                25000000,
+                                27000000
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "profile_id": {
+                    "anyOf": [
+                        {
+                            "const": "qrp-labs-rev6-25mhz-clk0"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "minimum_duration_ms": {
+                    "enum": [
+                        1,
+                        10
+                    ]
+                }
+            },
+            "oneOf": [
+                {
+                    "properties": {
+                        "engine": {
+                            "const": "pio-dma-gp2"
+                        },
+                        "transmit_output": {
+                            "type": "null"
+                        },
+                        "reference_hz": {
+                            "type": "null"
+                        },
+                        "profile_id": {
+                            "type": "null"
+                        },
+                        "boot_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                8,
+                                12
+                            ]
+                        },
+                        "realization": {
+                            "properties": {
+                                "nominal_sample_hz": {
+                                    "enum": [
+                                        132000000,
+                                        138000000,
+                                        150000000
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "engine": {
+                            "const": "si5351"
+                        },
+                        "rf_pin": {
+                            "type": "null"
+                        },
+                        "boot_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8
+                            ]
+                        },
+                        "realization": {
+                            "properties": {
+                                "nominal_sample_hz": {
+                                    "type": "null"
+                                },
+                                "increment": {
+                                    "type": "null"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "test-tone-record": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "request_id",
+                "job_id",
+                "phase",
+                "native_state",
+                "outcome",
+                "carrier_hz",
+                "duration_ms",
+                "engine",
+                "rf_pin",
+                "boot_drive_ma",
+                "admission_revision",
+                "control_revision",
+                "accepted_monotonic_ns",
+                "scheduled_utc_ns",
+                "scheduled_monotonic_ns",
+                "launch_monotonic_ns",
+                "ended_monotonic_ns",
+                "realization",
+                "pad_readback",
+                "output_inactive_confirmed",
+                "recovery_required",
+                "native_error",
+                "execution_engine",
+                "transmit_output",
+                "reference_hz",
+                "profile_id",
+                "synthesis_readback",
+                "inactivity_basis"
+            ],
+            "properties": {
+                "request_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                },
+                "job_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                },
+                "phase": {
+                    "enum": [
+                        "accepted",
+                        "running",
+                        "terminal"
+                    ]
+                },
+                "native_state": {
+                    "enum": [
+                        "loaded",
+                        "armed",
+                        "running",
+                        "complete",
+                        "aborted",
+                        "missed",
+                        "failed"
+                    ]
+                },
+                "outcome": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                "completed",
+                                "stopped",
+                                "missed",
+                                "failed"
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "carrier_hz": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 18446744073
+                },
+                "duration_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120000
+                },
+                "engine": {
+                    "enum": [
+                        "pio-dma-gp2",
+                        "si5351"
+                    ]
+                },
+                "rf_pin": {
+                    "anyOf": [
+                        {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 29
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "boot_drive_ma": {
+                    "enum": [
+                        2,
+                        4,
+                        6,
+                        8,
+                        12
+                    ]
+                },
+                "admission_revision": {
+                    "type": "string",
+                    "maxLength": 80
+                },
+                "control_revision": {
+                    "type": "string",
+                    "maxLength": 80
+                },
+                "accepted_monotonic_ns": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$",
+                    "maxLength": 20,
+                    "x-maximum": "18446744073709551615"
+                },
+                "scheduled_utc_ns": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "scheduled_monotonic_ns": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "launch_monotonic_ns": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "ended_monotonic_ns": {
+                    "anyOf": [
+                        {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                            "maxLength": 20,
+                            "x-maximum": "18446744073709551615"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "realization": {
+                    "$ref": "#/$defs/test-tone-realization"
+                },
+                "pad_readback": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "epoch",
+                                "observed_monotonic_ns",
+                                "drive_ma",
+                                "stage",
+                                "rf_pin"
+                            ],
+                            "properties": {
+                                "epoch": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "observed_monotonic_ns": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "drive_ma": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                2,
+                                                4,
+                                                8,
+                                                12
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "stage": {
+                                    "enum": [
+                                        "verified",
+                                        "failed",
+                                        "unavailable"
+                                    ]
+                                },
+                                "rf_pin": {
+                                    "anyOf": [
+                                        {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 29
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "output_inactive_confirmed": {
+                    "type": "boolean"
+                },
+                "recovery_required": {
+                    "type": "boolean"
+                },
+                "native_error": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/test-tone-error"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "execution_engine": {
+                    "enum": [
+                        "pio-dma-gp2",
+                        "si5351",
+                        "si5351-engineering",
+                        "si5351-inhibited",
+                        "inhibited-standalone-simulator"
+                    ]
+                },
+                "transmit_output": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                0,
+                                1,
+                                2
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "reference_hz": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                25000000,
+                                27000000
+                            ]
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "profile_id": {
+                    "anyOf": [
+                        {
+                            "const": "qrp-labs-rev6-25mhz-clk0"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "synthesis_readback": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "epoch",
+                                "observed_monotonic_ns",
+                                "transmit_output",
+                                "drive_ma",
+                                "reference_hz",
+                                "stage"
+                            ],
+                            "properties": {
+                                "epoch": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "observed_monotonic_ns": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "transmit_output": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                0,
+                                                1,
+                                                2
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "drive_ma": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                2,
+                                                4,
+                                                6,
+                                                8
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "reference_hz": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                25000000,
+                                                27000000
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "stage": {
+                                    "enum": [
+                                        "verified",
+                                        "failed",
+                                        "unavailable"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "inactivity_basis": {
+                    "enum": [
+                        "native_gpio_shutdown",
+                        "si5351_register_shutdown"
+                    ]
+                }
+            },
+            "oneOf": [
+                {
+                    "properties": {
+                        "engine": {
+                            "const": "pio-dma-gp2"
+                        },
+                        "transmit_output": {
+                            "type": "null"
+                        },
+                        "reference_hz": {
+                            "type": "null"
+                        },
+                        "profile_id": {
+                            "type": "null"
+                        },
+                        "boot_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                8,
+                                12
+                            ]
+                        },
+                        "pad_readback": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "epoch",
+                                "observed_monotonic_ns",
+                                "drive_ma",
+                                "stage",
+                                "rf_pin"
+                            ],
+                            "properties": {
+                                "epoch": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "observed_monotonic_ns": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "drive_ma": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                2,
+                                                4,
+                                                8,
+                                                12
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "stage": {
+                                    "enum": [
+                                        "verified",
+                                        "failed",
+                                        "unavailable"
+                                    ]
+                                },
+                                "rf_pin": {
+                                    "anyOf": [
+                                        {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 29
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "synthesis_readback": {
+                            "type": "null"
+                        },
+                        "inactivity_basis": {
+                            "const": "native_gpio_shutdown"
+                        },
+                        "realization": {
+                            "properties": {
+                                "nominal_sample_hz": {
+                                    "enum": [
+                                        132000000,
+                                        138000000,
+                                        150000000
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "engine": {
+                            "const": "si5351"
+                        },
+                        "rf_pin": {
+                            "type": "null"
+                        },
+                        "transmit_output": {
+                            "enum": [
+                                0,
+                                1,
+                                2
+                            ]
+                        },
+                        "reference_hz": {
+                            "enum": [
+                                25000000,
+                                27000000
+                            ]
+                        },
+                        "boot_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8
+                            ]
+                        },
+                        "pad_readback": {
+                            "type": "null"
+                        },
+                        "synthesis_readback": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "epoch",
+                                "observed_monotonic_ns",
+                                "transmit_output",
+                                "drive_ma",
+                                "reference_hz",
+                                "stage"
+                            ],
+                            "properties": {
+                                "epoch": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "observed_monotonic_ns": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^(0|[1-9][0-9]{0,19})$",
+                                            "maxLength": 20,
+                                            "x-maximum": "18446744073709551615"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "transmit_output": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                0,
+                                                1,
+                                                2
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "drive_ma": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                2,
+                                                4,
+                                                6,
+                                                8
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "reference_hz": {
+                                    "anyOf": [
+                                        {
+                                            "enum": [
+                                                25000000,
+                                                27000000
+                                            ]
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "stage": {
+                                    "enum": [
+                                        "verified",
+                                        "failed",
+                                        "unavailable"
+                                    ]
+                                }
+                            }
+                        },
+                        "inactivity_basis": {
+                            "const": "si5351_register_shutdown"
+                        },
+                        "realization": {
+                            "properties": {
+                                "nominal_sample_hz": {
+                                    "type": "null"
+                                },
+                                "increment": {
+                                    "type": "null"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "test-tone-status": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "contract",
+                "schema",
+                "target",
+                "receipt",
+                "job",
+                "observation_monotonic_ns",
+                "current"
+            ],
+            "properties": {
+                "contract": {
+                    "const": "Wsprry-Control/1"
+                },
+                "schema": {
+                    "const": "test-tone-status"
+                },
+                "target": {
+                    "$ref": "#/$defs/application/$defs/target"
+                },
+                "receipt": {
+                    "enum": [
+                        "known",
+                        "receipt_unavailable"
+                    ]
+                },
+                "job": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/test-tone-record"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "observation_monotonic_ns": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,19})$",
+                    "maxLength": 20,
+                    "x-maximum": "18446744073709551615"
+                },
+                "current": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "saved_drive_ma",
+                        "boot_drive_ma",
+                        "output_active",
+                        "owned",
+                        "native_state",
+                        "engine"
+                    ],
+                    "properties": {
+                        "saved_drive_ma": {
+                            "anyOf": [
+                                {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        6,
+                                        8,
+                                        12
+                                    ]
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "boot_drive_ma": {
+                            "enum": [
+                                2,
+                                4,
+                                6,
+                                8,
+                                12
+                            ]
+                        },
+                        "output_active": {
+                            "type": "boolean"
+                        },
+                        "owned": {
+                            "type": "boolean"
+                        },
+                        "native_state": {
+                            "enum": [
+                                "empty",
+                                "loaded",
+                                "armed",
+                                "running",
+                                "complete",
+                                "aborted",
+                                "missed",
+                                "failed"
+                            ]
+                        },
+                        "engine": {
+                            "enum": [
+                                "pio-dma-gp2",
+                                "si5351"
+                            ]
+                        }
+                    },
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "pio-dma-gp2"
+                                },
+                                "boot_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        8,
+                                        12
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "engine": {
+                                    "const": "si5351"
+                                },
+                                "boot_drive_ma": {
+                                    "enum": [
+                                        2,
+                                        4,
+                                        6,
+                                        8
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
         }
     },
     "management_routes": {
@@ -15300,7 +17188,8 @@
             "si5351",
             "gps",
             "gray-line",
-            "schedules/stop"
+            "schedules/stop",
+            "test-tone/status"
         ],
         "PUT": [
             "network",
@@ -15333,7 +17222,10 @@
             "message-schedule/pause",
             "consumer/time/challenge",
             "consumer/time/submit",
-            "schedules/stop"
+            "schedules/stop",
+            "test-tone/review",
+            "test-tone/start",
+            "test-tone/stop"
         ]
     },
     "request_limits": {
@@ -15360,7 +17252,10 @@
         "consumer/time/challenge": 512,
         "consumer/time/submit": 512,
         "gray-line": 2048,
-        "schedules/stop": 512
+        "schedules/stop": 512,
+        "test-tone/review": 768,
+        "test-tone/start": 768,
+        "test-tone/stop": 768
     },
     "resource_descriptors": {
         "gpio_drive": {
@@ -15574,7 +17469,7 @@
             "i2c_hz": 100000,
             "completion_control_timeout_ns": "8000000",
             "ordinary_profile": {
-                "id": "qrp-labs-rev6-25mhz-clk0-8ma",
+                "id": "qrp-labs-rev6-25mhz-clk0",
                 "qualified": true,
                 "system_clock_hz": 138000000,
                 "i2c_pair": 1,
@@ -15583,7 +17478,12 @@
                 "reference_source": "external_xa",
                 "crystal_load_pf": null,
                 "transmit_output": 0,
-                "drive_ma": 8,
+                "drive_ma": [
+                    2,
+                    4,
+                    6,
+                    8
+                ],
                 "loopback_output": 2,
                 "loopback_input_gp": 7,
                 "allow_none": true,
@@ -15751,6 +17651,49 @@
             "read": "/api/control/v1/schedules/stop",
             "path": "/api/control/v1/schedules/stop",
             "method": "POST"
+        },
+        "test_tone": {
+            "schema": "test-tone",
+            "review": "/api/control/v1/test-tone/review",
+            "start": "/api/control/v1/test-tone/start",
+            "status": "/api/control/v1/test-tone/status",
+            "stop": "/api/control/v1/test-tone/stop",
+            "review_method": "POST",
+            "start_method": "POST",
+            "status_method": "GET",
+            "stop_method": "POST",
+            "carrier_units": "Hz",
+            "carrier_reference": "absolute",
+            "duration_units": "ms",
+            "drive_activation": "restart",
+            "terminal_capacity": 8,
+            "terminal_retention_ns": "3600000000000",
+            "status_selector": "device_boot_and_exactly_one_request_or_job",
+            "start_revision": "current_admission",
+            "stop_revision": "identified_job",
+            "reauthentication": "same_authority_generation",
+            "engines": {
+                "pio-dma-gp2": {
+                    "drive_ma": [
+                        2,
+                        4,
+                        8,
+                        12
+                    ],
+                    "minimum_duration_ms": 1,
+                    "verification": "sdk_pad"
+                },
+                "si5351": {
+                    "drive_ma": [
+                        2,
+                        4,
+                        6,
+                        8
+                    ],
+                    "minimum_duration_ms": 10,
+                    "verification": "register_readback"
+                }
+            }
         }
     },
     "descriptor_runtime_fields": {
@@ -15767,6 +17710,35 @@
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]{0,19})$",
                 "maximumLength": 20
+            }
+        },
+        "test_tone": {
+            "available": {
+                "type": "boolean"
+            },
+            "maximum_duration_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 120000
+            },
+            "output_disable_timeout_ns": {
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]{0,19})$",
+                "maximumLength": 20
+            },
+            "minimum_duration_ms": {
+                "enum": [
+                    0,
+                    1,
+                    10
+                ]
+            },
+            "active_engine": {
+                "enum": [
+                    "pio-dma-gp2",
+                    "si5351",
+                    null
+                ]
             }
         }
     },

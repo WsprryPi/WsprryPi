@@ -1,7 +1,7 @@
 // Production coordinator, carrier crypto/framing, Pico handlers and journals.
 'use strict';
 const assert=require('node:assert/strict'),si=require('../data/si5351.js');
-module.exports=async request=>{
+module.exports=async (request,{qualifiedReadback=false}={})=>{
  const path='/api/control/v1/member/configuration',read=()=>request({method:'GET',path,body:''});
  const initial=await read();assert.equal(initial.status,200,JSON.stringify(initial));
  const target=initial.body.target,pins=initial.body.config.pins;
@@ -24,5 +24,33 @@ module.exports=async request=>{
  const zero={...settings,transmit_output:1,loopback_output:0};before=await read();const savedZero=await save({si5351:zero},before.etag);assert.equal(savedZero.status,200,JSON.stringify(savedZero));view=await get();assert.equal(view.body.saved.loopback_output,0);
  const none={...zero,loopback_output:null,loopback_input_gp:null};before=await read();assert.equal((await save({si5351:none},before.etag)).status,200);view=await get();assert.equal(view.body.saved.loopback_output,null);assert.equal(view.body.saved.loopback_input_gp,null);
  before=await read();const restore=await save({pins},before.etag);assert.equal(restore.status,200,JSON.stringify(restore));assert.deepEqual(restore.body.config.si5351,none);view=await get();assert.equal(view.status,200,JSON.stringify(view));assert(view.body.pending_restart,'A/B/A cannot clear restart interlock');
+ if (qualifiedReadback) {
+  // Exercise qualified readback validation with test-only peer response edits.
+  // The host fixture cannot boot a physical Si5351. Keep the real transport,
+  // descriptor, target, revision, and response validation in this check.
+  const profile=require('../data/control-contract.js').descriptors.si5351.ordinary_profile;
+  const qualification={profile_id:profile.id,system_clock_hz:profile.system_clock_hz,i2c_pair:profile.i2c_pair};
+  const qualified={...view.body,physically_qualified:true,qualification,execution_engine:'si5351',runtime:null};
+  const check=async readback=>{
+   await request({control:'corrupt',corruption:{resource:'si5351',pointer:'',value:readback}});
+   return get();
+  };
+  try {
+   for (const drive_ma of [2,4,6,8]) {
+    const readback=await check({...qualified,boot_active:{...settings,drive_ma}});
+    assert.equal(readback.status,200,JSON.stringify(readback));
+    assert(si.readback(readback.body,target));
+   }
+   for (const readback of [
+     {...qualified,boot_active:{...settings,drive_ma:12}},
+     {...qualified,boot_active:{...settings,address:97}},
+     {...qualified,boot_active:settings,qualification:{...qualification,profile_id:'qrp-labs-rev6-25mhz-clk0-8ma'}},
+     {...qualified,boot_active:settings,target:{...target,boot_id:'f'.repeat(32)}}
+   ]) {
+    assert.equal((await check(readback)).status,502);
+    assert(!si.readback(readback,target));
+   }
+  } finally {await request({control:'clear',corruption:null});}
+ }
  console.log('Si5351: atomic engine/settings, strict refusal before persistence, stale revision, None/CLK0, inactive retention and A/B/A through production pair');
 };

@@ -21,7 +21,7 @@ function lines(child){const queue=[],waiters=[];readline.createInterface({input:
   await require('./amplifier_enable_pair_cases.js')(call);
   if(carrier==='engineering')await require('./advertised_policy_pair_cases.js')(call);
   await require('./filter_selector_pair_cases.js')(call);
-  await require('./si5351_pair_cases.js')(call);
+  await require('./si5351_pair_cases.js')(call,{qualifiedReadback:carrier==='engineering'});
   await require('./gps_pair_cases.js')(call);
  }catch(error){primary=error;}finally{await finishChildren({failure:primary,children:[client,server]});}
 }})().catch(e=>{console.error(e);process.exitCode=1;});

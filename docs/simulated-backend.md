@@ -214,12 +214,14 @@ The portable target pins `BACKENDS=simulated ANCILLARY_GPIO=0`; caller-provided 
 
 ## Debian CI
 
-The `Debian non-hardware validation` workflow runs in a Debian Trixie container. It checks out the parent repository with its ordinary component trees, builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
+The non-hardware validation workflow runs two Debian Trixie container jobs, each with a 40-minute limit. `linux-native-contracts` runs native execution, management, retirement, frequency, and Test Tone contract tests. `non-hardware-validation` builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
 
 For consistent behavior with GNU and uutils `timeout`, the bounded WSPR helper uses foreground mode while keeping `timeout` as the direct supervisor of WsprryPi.
 
 The workflow sets `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passes an empty `SUDO` make variable, and rejects access to transmitter GPIO, MMIO, mailbox, DMA, I2C, or RP1 device paths. It does not run installation, service, test-tone, live qualification, or hardware targets.
 
 Run the same checks locally from the repository root with the commands in `.github/workflows/debian-non-hardware.yml`. The workflow establishes software-contract evidence only; it is not physical-hardware or RF qualification.
+
+The production network and USB pair jobs record the effective Pi commit/tree and selected Pico revision, hash tracked Pi/Pico source files before their recipes, and compare fresh manifests after all recipe commands pass. Generated build output and private runtime state are outside these tracked-source manifests. The selected Pico must remain clean at the immutable input SHA; dependency pins remain explicit in the workflow.
 
 Focused physical-backend tests remain separate and must continue to pass. Simulator results demonstrate application and backend-contract behavior only; they do not qualify GPIO timing, I2C hardware, RF output, installation, services, or any physical transmitter.

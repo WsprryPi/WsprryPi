@@ -112,6 +112,36 @@ struct Member {
     return pico_configuration_request([&](auto p, auto m, auto b, auto e) { return exchange(p,m,b,e); }, device, boot, "POST", body, etag);
   }
 };
+void test_tone_capability_checks() {
+  const auto base=Json::parse(control_descriptor("test_tone"));
+  for (const auto &[engine, minimum] : {std::pair{"pio-dma-gp2",1}, {"si5351",10}}) {
+    Member member;
+    auto tone=base;
+    tone.update({{"available",true},{"active_engine",engine},{"minimum_duration_ms",minimum},
+                 {"maximum_duration_ms",120000},{"output_disable_timeout_ns","50000000"}});
+    member.caps["test_tone"]=tone;
+    CHECK(pico_management_capabilities_valid(Json::parse(document(member.caps)),"usb_physical"));
+    for (const auto &[key,bad] : std::vector<std::pair<std::string,Json>>{
+        {"active_engine",nullptr},{"minimum_duration_ms",0},{"maximum_duration_ms",120001},
+        {"output_disable_timeout_ns","50000001"},{"available","true"},{"extra",true}}) {
+      member.caps["test_tone"]=tone;
+      member.caps["test_tone"][key]=bad;
+      CHECK(member.call().status==502 && member.mutations==0);
+    }
+    member.caps["test_tone"]=tone;
+    member.caps["test_tone"]["engines"][engine]["drive_ma"][0]=2.0;
+    CHECK(member.call().status==502 && member.mutations==0);
+    member.caps["test_tone"]=tone;
+    member.caps["test_tone"].erase("engines");
+    CHECK(member.call().status==502 && member.mutations==0);
+    // The engine can be available while a tightened native duration limit
+    // makes every request inadmissible. The descriptor grants no job authority.
+    tone["maximum_duration_ms"]=0;
+    member.caps["test_tone"]=tone;
+    member.caps["execution"]["max_job_duration_ns"]="999999";
+    CHECK(pico_management_capabilities_valid(Json::parse(document(member.caps)),"usb_physical"));
+  }
+}
 void configuration_limit_checks() {
   Member bounded;
   bounded.caps["configuration_updates"]["max_config_bytes"]=128;
@@ -266,7 +296,7 @@ void checks() {
   }
   Member initial; initial.config = nullptr;
   const auto initial_result=initial.call();if(initial_result.status!=400)std::cerr<<initial_result.status<<" "<<initial_result.body<<"\n";
-  CHECK(initial_result.status == 400 && initial.mutations == 1 && initial.config.is_null());
+  CHECK(initial_result.status == 400 && initial.mutations == 0 && initial.config.is_null());
   for (const auto placeholder : {"N0CALL", "<N0CALL>"}) {
     Member member;
     CHECK(member.call(Json{{"station", {{"callsign", placeholder}}}}).status == 400);
@@ -767,4 +797,4 @@ void http_boundaries() {
   CHECK(wtp_json_http_exchange(valid,[&]{return ++tick;},"",100,true).status==200);
 }
 } // namespace
-int main() { try { checks(); configuration_limit_checks(); advertised_policy_checks(); gps_resource_binding_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
+int main() { try { checks(); test_tone_capability_checks(); configuration_limit_checks(); advertised_policy_checks(); gps_resource_binding_checks(); config_pin_omission_checks(); sibling_document_checks(); progress_polarity_checks(); progress_checks(); usb_management_contract(); management_descriptor_matrix(); http_boundaries(); } catch (const std::exception &e) { std::cerr << e.what() << '\n'; return 1; } }
