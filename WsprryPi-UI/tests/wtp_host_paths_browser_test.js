@@ -12,27 +12,33 @@ async function main(){
         php=spawnFixtureChild(process.env.PHP_BIN||"php",["-S",`127.0.0.1:${port}`,"-t","data","tests/browser_fixture_router.php"],{cwd:ui});
         await waitForSpawn(php);await waitForPhp(php,url,"native path form fixture");
         ({browser,client}=await launchBrowser({executable:process.env.CHROME_BIN||(process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":"chromium"),args:["--headless","--no-sandbox","--disable-gpu","--no-first-run","--no-default-browser-check","--disable-background-networking","about:blank"],profile,timeoutMs:60000}));
-        await client.send("Page.enable");await client.send("Page.navigate",{url},60000);
         const evaluate=async expression=>{const r=await client.send("Runtime.evaluate",{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
-        await waitFor(()=>evaluate('document.readyState==="complete"&&!!window.WtpUi'),"native path controls loaded");
-        await evaluate(`(()=>{
-            const originalFetch=window.fetch;
-            configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
-            backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
+        await client.send("Page.addScriptToEvaluateOnNewDocument",{source:`(()=>{
+            const originalFetch=window.fetch.bind(window);
             window.__writes=[];window.__confirms=[];window.__refuse=false;
             window.__catalog={scope:'wsprrypi-wtp-catalog/1',profiles:[],active_id:'',active_unmatched:false};
             window.confirm=message=>{window.__confirms.push(message);return true;};
             window.fetch=async(url,options={})=>{
                 const resource=String(url),write=options.method&&options.method!=='GET';
-                if(resource.endsWith('/version'))return originalFetch(url,options);
+                const catalog=resource.endsWith('/host/devices');
+                if(!catalog&&!resource.endsWith('/host/discovery')){
+                    if(write)throw new Error('Unexpected fixture mutation: '+resource);
+                    return originalFetch(url,options);
+                }
                 if(write){window.__writes.push({url:resource,body:JSON.parse(options.body)});if(window.__refuse)return {ok:false,status:409,headers:{get:()=>''},json:async()=>({error:{code:'catalog_request_rejected',message:'The selected host refused this file reference.'}})};}
-                return {ok:true,status:200,headers:{get:()=> '"profiles-1"'},json:async()=>resource.endsWith('/host/devices')?window.__catalog:{available:false,candidates:[],reason:'Software fixture',usb:{available:true,candidates:[]}}};
+                return {ok:true,status:200,headers:{get:()=> '"profiles-1"'},json:async()=>catalog?window.__catalog:{available:false,candidates:[],reason:'Software fixture',usb:{available:true,candidates:[]}}};
             };
+        })()`});
+        await client.send("Page.navigate",{url},60000);
+        await waitFor(()=>evaluate('document.readyState==="complete"&&!!window.WtpUi&&window.ControllerMode?.transmitter'),"native path controls and verified host loaded");
+        await evaluate(`(()=>{
+            configAutosaveSuspended=true;clearPendingPopulateConfigRetry();clearWebSocketReconnectTimer();
+            backendCurrentlyConnected=true;websocketCurrentlyConnected=true;syncConnectionAlert();clearBackendStatus('runtime');clearConfigLoadFailureState();
             bootstrap.Tab.getOrCreateInstance(document.getElementById('transmitter-hardware-tab')).show();
             bootstrap.Tab.getOrCreateInstance(document.getElementById('fleet-tab')).show();
             window.dispatchEvent(new Event('pageshow'));
         })()`);
-        await waitFor(()=>evaluate("!document.getElementById('fleet-device').disabled"),"empty device catalog loaded");
+        await waitFor(()=>evaluate("WtpUi.catalogReady&&!document.getElementById('fleet-device').disabled"),"empty device catalog loaded");
         const set=async values=>evaluate(`(()=>{for(const [id,value]of Object.entries(${JSON.stringify(values)})){const e=document.getElementById(id);e.value=value;e.dispatchEvent(new Event('change',{bubbles:true}));}})()`);
         await evaluate("document.getElementById('fleet-add').click()");
         const usb=String.raw`\\?\usb#vid_cafe&pid_4012&mi_04#opaque-interface`;
