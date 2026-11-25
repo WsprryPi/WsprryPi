@@ -1869,13 +1869,23 @@ void WsprTransmitter::transmit()
         // Align to the scheduler-provided realtime boundary before starting TX.
         const std::int64_t start_rt_ns =
             scheduled_start_rt_ns_.load(std::memory_order_acquire);
+        auto *const launch_clock =
+            selected_backend_ == wsprrypi::BackendKind::SIMULATED && scheduled_launch_.bound()
+                ? selected_simulated_config_.launch_clock.get()
+                : nullptr;
         if (start_rt_ns != 0)
         {
             struct timespec start_rt{};
             start_rt.tv_sec = start_rt_ns / 1000000000LL;
             start_rt.tv_nsec = static_cast<long>(start_rt_ns % 1000000000LL);
 
-            if (!sleepUntilAbsTightInterruptible(CLOCK_REALTIME, start_rt, spin_ns_))
+            const auto interrupted = [this] {
+                return shouldStop() || soft_off_.load(std::memory_order_acquire);
+            };
+            const bool reached_slot = launch_clock
+                ? launch_clock->wait_for_slot(scheduled_launch_.start, interrupted) && !interrupted()
+                : sleepUntilAbsTightInterruptible(CLOCK_REALTIME, start_rt, spin_ns_);
+            if (!reached_slot)
             {
                 {
                     std::ostringstream oss;
@@ -1895,6 +1905,7 @@ void WsprTransmitter::transmit()
                 return;
             }
 
+            if (!launch_clock)
             {
                 struct timespec now_rt{};
                 clock_gettime(CLOCK_REALTIME, &now_rt);
@@ -1923,8 +1934,11 @@ void WsprTransmitter::transmit()
         }
 
         // Fire callback as close to the first symbol as possible.
-        if(!scheduled_launch_.current(std::chrono::system_clock::now())||
-            (scheduled_launch_.bound()&&std::chrono::system_clock::now()-scheduled_launch_.start>std::chrono::milliseconds(50))){
+        const auto launch_now = [launch_clock] {
+            return launch_clock ? launch_clock->now() : std::chrono::system_clock::now();
+        };
+        if(!scheduled_launch_.current(launch_now())||
+            (scheduled_launch_.bound()&&launch_now()-scheduled_launch_.start>std::chrono::milliseconds(50))){
             refuseScheduledLaunch();return;
         }
         state_.store(State::TRANSMITTING, std::memory_order_release);

@@ -3,6 +3,7 @@
 import argparse
 import copy
 import json
+import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -33,14 +34,15 @@ def main():
         root = Path(temporary)
         state, ledger = root / 'state', root / 'ledger'
         trace = Path(str(ledger) + '.simulated-trace.json')
+        launch_signals = Path(str(ledger) + '.simulated-launch')
         progress = state / 'generation-1/configuration.recurrence-progress.json'
         port = free_port()
         fixture = str(Path(args.fixture).resolve())
         initialized = subprocess.run([fixture, str(ledger), '--initialize-state', '--state-directory', str(state)],
                                      capture_output=True, text=True, timeout=15)
         assert initialized.returncode == 0, initialized.stderr
-        # Keep realtime start diagnostics in the captured failure log; hosted
-        # runners can refuse an occurrence at the strict launch boundary.
+        # The dedicated fixture supplies only the final launch samples. The
+        # application still selects, reserves, and accepts real future slots.
         command = [fixture, str(ledger), '--backend', 'simulated', '--state-directory', str(state),
             '--web-port', str(port), '--socket-port', str(port + 1),
             '--socket-loopback-only', '--socket-loopback-family', 'ipv4', '--debug-logging']
@@ -50,7 +52,7 @@ def main():
 
         def launch():
             nonlocal process, web
-            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "TZ": "UTC"})
             if web is None:
                 web = start_software_web_service([fixture,str(ledger)],ledger,log)
 
@@ -73,7 +75,7 @@ def main():
                     diagnostics = {'progress_path': str(progress), 'progress_exists': progress.exists()}
                     if progress.exists():
                         diagnostics['progress'] = json.loads(progress.read_text())
-                    if label == 'Durable accepted occurrence':
+                    if 'occurrence' in label:
                         diagnostics['status'] = read(base + 'status')
                         diagnostics['settings'] = read(base + 'settings')
                     raise AssertionError(label + '\n' + json.dumps(diagnostics, sort_keys=True) + '\n' +
@@ -137,124 +139,122 @@ def main():
             wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Normal startup after setup')
             self_id = read('/api/control/v1/targets')['targets'][0]['device_id']
             base = f'/api/control/v1/targets/{self_id}/'
-            context, saved = read(base + 'context'), read(base + 'settings')
-            # Test disable/drain separately from autonomous execution. Reads or
-            # writes can legitimately contend with the fail-closed launch guard;
-            # an occurrence disabled before launch is not an execution promise.
-            # Each autonomous attempt is a fresh future slot, never a replay.
-            repeat_minutes = 1
-            for launch_attempt in range(9):
-                if progress.exists():
-                    horizon = int(json.loads(progress.read_text())['record']['consumed_through_utc_ns']) / 1e9
-                    wait(lambda: time.time() > horizon, 'Consumed future slot passes before a new attempt',
-                         max(12, horizon - time.time() + 3))
+            def progress_record():
+                return json.loads(progress.read_text())['record']
+
+            def read_trace():
+                try:
+                    return json.loads(trace.read_text())
+                except (FileNotFoundError, json.JSONDecodeError):
+                    return None
+
+            def stage_occurrence(start_seconds):
                 context, saved = read(base + 'context'), read(base + 'settings')
                 candidate = copy.deepcopy(saved['saved'])
-                # Leave extra time to disable and observe draining on the first slot.
-                local = time.localtime(time.time() + (10 if launch_attempt == 0 else 5))
+                slot = time.gmtime(start_seconds)
                 candidate['configuration']['Operation'].update({'Mode': 'QRSS', 'Transmit': True, 'Enable on Boot': 'Follow'})
                 candidate['configuration']['CW'].update({'Message': 'E', 'Base Frequency': 14097000, 'Dot Seconds': .02,
-                    'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': repeat_minutes,
+                    'Start Minute': slot.tm_min, 'Start Second': slot.tm_sec, 'Repeat Minutes': 60,
                     'Fade Shape': 'none', 'Fade In Ms': 0, 'Fade Out Ms': 0, 'Fade Slice Ms': 5})
                 mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
-                    'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
-                assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
-                previous_trace = json.loads(trace.read_text()) if trace.exists() else None
-                previous_plan = previous_trace['plan_id'] if previous_trace else None
+                    'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16),
+                    'expected_revision': saved['revision'], 'candidate': candidate})
+                stored = read(base + 'settings')['saved']
+                assert stored['configuration']['Operation']['Transmit'] is True
+                assert stored['configuration']['Operation']['Enable on Boot'] == 'Follow'
+                assert stored['scheduling']['enabled'] is False
+                old_trace = read_trace()
                 action('enable', 'target-enable', True)
-                reserved = wait(lambda: progress.exists() and json.loads(progress.read_text())['record']['in_flight'], 'Durable accepted occurrence')
-                # Enable may cross the planned slot and reserve the next one.
-                slot_wait = max(0, int(reserved['last_start_ns']) / 1e9 - time.time())
-                assert slot_wait <= repeat_minutes * 60, reserved
-                if launch_attempt == 0:
-                    status = read(base + 'status')
-                    assert status['execution_owner'] == self_id and status['destination_id'] == self_id
-                    assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
-                else:
-                    # Observe private fixture files only until this occurrence
-                    # completes/refuses. No API lock can perturb its launch.
-                    def terminal():
-                        try:
-                            observed = json.loads(trace.read_text())
-                        except FileNotFoundError:
-                            observed = None
-                        except json.JSONDecodeError:
-                            return False
-                        record = json.loads(progress.read_text())['record']
-                        # Reservation advances the no-replay watermark before
-                        # launch. Completion additionally requires this exact
-                        # occurrence to leave the in-flight record; a different
-                        # future occurrence may already have replaced it.
-                        pending = record['in_flight']
-                        if (pending is None or pending['occurrence_id'] != reserved['occurrence_id']) and \
-                                int(record['consumed_through_utc_ns']) >= int(reserved['last_start_ns']):
-                            return {'trace': observed}
+                start_ns = str(start_seconds * 1_000_000_000)
+                waiting = launch_signals / (start_ns + '.waiting')
+                reserved = wait(lambda: progress.exists() and progress_record()['in_flight'], 'Durable occurrence reservation')
+                assert reserved['last_start_ns'] == start_ns, reserved
+                assert progress_record()['consumed_through_utc_ns'] == start_ns
+                wait(waiting.exists, 'Reserved occurrence reaches the launch boundary')
+                return start_ns, old_trace['plan_id'] if old_trace else None
+
+            def release_occurrence(start_ns, previous_plan, offset_ns):
+                release = launch_signals / (start_ns + '.release')
+                staged_sample = release.with_suffix('.tmp')
+                staged_sample.write_text(str(int(start_ns) + offset_ns))
+                staged_sample.replace(release)
+
+                def terminal():
+                    observed = read_trace()
+                    if not observed or observed['plan_id'] == previous_plan:
                         return False
-                    observed_trace = wait(terminal, 'Autonomous terminal occurrence', slot_wait + 10)['trace']
-                action('disable', 'target-action')
-                if launch_attempt == 0:
-                    assert read(base + 'status')['phase'] == 'draining'
-                else:
-                    # An enabled scheduler may already have accepted the next
-                    # future occurrence. Disable cannot abort it; explicit Stop
-                    # reconciles that work before the restart checks below.
-                    consumed_before_stop = json.loads(progress.read_text())['record']['consumed_through_utc_ns']
-                    action('stop', 'target-stop')
-                wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None,
-                     'Accepted message drains', slot_wait + 10 if launch_attempt == 0 else 10)
-                if launch_attempt == 0:
-                    assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
-                    assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == reserved['last_start_ns']
-                    output = read(base + 'status')['observed_output']
-                    assert output['owner_id'] is None and output['job_id'] is None, output
-                    continue
-                assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == consumed_before_stop
-                if observed_trace and observed_trace['plan_id'] != previous_plan and any(event['kind'] == 'complete' for event in observed_trace['events']):
-                    assert any(event['kind'] == 'execution_start' for event in observed_trace['events'])
-                    assert any(event['rf_on'] for event in observed_trace['events'])
-                    break
-                if observed_trace is None or observed_trace['plan_id'] == previous_plan:
-                    assert observed_trace == previous_trace, 'A refused preconfiguration slot cannot change prior trace evidence'
-                else:
-                    assert [event['kind'] for event in observed_trace['events']] == ['configure', 'configured', 'cleanup'], observed_trace
-                    assert not any(event['rf_on'] for event in observed_trace['events']), observed_trace
-                assert read(base + 'status')['phase'] == 'waiting'
-                assert launch_attempt < 8, {
-                    'trace': observed_trace, 'progress': json.loads(progress.read_text()),
-                    'status': read(base + 'status'), 'service_log': (root / 'service.log').read_text()[-12000:]}
-                print('Safe prelaunch refusal; testing a fresh future occurrence', launch_attempt + 1, flush=True)
+                    record = progress_record()
+                    if record['in_flight'] is None and record['consumed_through_utc_ns'] == start_ns and not release.exists():
+                        return observed
+                    return False
+
+                return wait(terminal, 'Released occurrence completes or refuses')
+
+            def assert_output_inactive():
+                output = read(base + 'status')['observed_output']
+                assert output['owner_id'] is None and output['job_id'] is None, output
+
+            # A future slot is necessary for actual reservation. The test never
+            # sleeps until that time, and each subsequent slot has a new identity.
+            first_start = int(time.time()) + 180
+            start_ns, previous_plan = stage_occurrence(first_start)
+            status = read(base + 'status')
+            assert status['execution_owner'] == self_id and status['destination_id'] == self_id
+            assert status['selected_frequencies_hz'] == ['14097000'] and status['active_revision']
+            action('disable', 'target-action')
+            assert read(base + 'status')['phase'] == 'draining'
+            observed = release_occurrence(start_ns, previous_plan, 0)
+            assert any(event['kind'] == 'complete' for event in observed['events']), observed
+            assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
+            assert_output_inactive()
+
+            # Exercise both sides of the existing 50 ms cutoff. The accepted
+            # worker is already waiting, and no API read competes with launch.
+            start_ns, previous_plan = stage_occurrence(first_start + 1)
+            observed = release_occurrence(start_ns, previous_plan, 50_000_000)
+            assert any(event['kind'] == 'execution_start' for event in observed['events']), observed
+            assert any(event['kind'] == 'complete' for event in observed['events']), observed
+            assert any(event['rf_on'] for event in observed['events']), observed
+            action('disable', 'target-action')
+            assert_output_inactive()
+
+            start_ns, previous_plan = stage_occurrence(first_start + 2)
+            observed = release_occurrence(start_ns, previous_plan, 50_001_000)
+            assert [event['kind'] for event in observed['events']] == ['configure', 'configured', 'cleanup'], observed
+            assert not any(event['rf_on'] for event in observed['events']), observed
+            action('disable', 'target-action')
+            assert_output_inactive()
+
+            start_ns, _ = stage_occurrence(first_start + 3)
+            action('disable', 'target-action')
+            action('stop', 'target-stop')
+            wait(lambda: progress_record()['in_flight'] is None, 'Stop reconciles the unreleased occurrence')
+            assert progress_record()['consumed_through_utc_ns'] == start_ns
+            assert not any(event['rf_on'] for event in read_trace()['events'])
+            assert_output_inactive()
+
             saved_progress = progress.read_bytes()
             stop()
             launch()
             wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Disabled restart')
             assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
-            time.sleep(1.2)
             assert progress.read_bytes() == saved_progress
-            assert not any(event['kind'] == 'execution_start' for event in json.loads(trace.read_text())['events'])
-            session()
-            # Freeze a future accepted occurrence, then lose the process before
-            # launch. Startup must reconcile and consume it, never replay it.
-            context, saved = read(base + 'context'), read(base + 'settings')
-            candidate = copy.deepcopy(saved['saved'])
-            consumed_through = int(json.loads(progress.read_text())['record']['consumed_through_utc_ns']) / 1e9
-            local = time.localtime(max(time.time(), consumed_through) + 8)
-            candidate['configuration']['Operation']['Transmit'] = True
-            candidate['configuration']['CW'].update({'Start Minute': local.tm_min, 'Start Second': local.tm_sec, 'Repeat Minutes': 60})
-            mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
-                'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision'], 'candidate': candidate})
-            action('enable', 'target-enable', True)
-            reserved = wait(lambda: (json.loads(progress.read_text())['record']['in_flight'] or None), 'Second durable reservation')
-            consumed = json.loads(progress.read_text())['record']['consumed_through_utc_ns']
-            assert int(consumed) == int(reserved['last_start_ns'])
+            assert not any(event['kind'] == 'execution_start' for event in read_trace()['events'])
+
+            # Lose a process after its exact worker reached the barrier but
+            # before release. Restart must reconcile the reservation once.
+            start_ns, _ = stage_occurrence(first_start + 4)
             stop(True)
+            waiting = launch_signals / (start_ns + '.waiting')
+            waiting.unlink()
             launch()
             wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Interrupted restart')
-            wait(lambda: json.loads(progress.read_text())['record']['in_flight'] is None, 'Positive startup reconciliation')
-            assert json.loads(progress.read_text())['record']['consumed_through_utc_ns'] == consumed
-            assert not any(event['kind'] == 'execution_start' for event in json.loads(trace.read_text())['events'])
-            session()
+            wait(lambda: progress_record()['in_flight'] is None, 'Positive startup reconciliation')
+            assert progress_record()['consumed_through_utc_ns'] == start_ns
+            assert not any(event['kind'] == 'execution_start' for event in read_trace()['events'])
             action('disable', 'target-action')
-            print('PASS: actual main protected native enable/disable, independent Transmit/boot, drain, autonomous output, restart retention, and interrupted-reservation no replay')
+            assert not waiting.exists(), 'Restart must not send the consumed occurrence back to the worker'
+            print('PASS: actual main protected native enable/disable, drain, deterministic on-time and late admission, Stop, and interrupted-reservation no replay')
         finally:
             stop_software_web_service(web)
             stop()

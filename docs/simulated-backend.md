@@ -129,6 +129,8 @@ Both configuration types default `virtual_time` to `true`.
 - `stopRequested()` and the backend's `stop()` state are checked before every event in both modes. Virtual-time cancellation is therefore observed between events. Real-time contexts can additionally interrupt an in-progress wait.
 - The application bridge implements interruptible waits with the transmitter stop condition. A direct test double decides how waiting and cancellation behave.
 
+The actual-main recurrence fixture waits for the durable reservation and the simulated worker's launch barrier before supplying a clock sample. The transmitter evaluates that sample with its ordinary scheduled-launch guard and 50 ms limit. This typed C++ fixture controls the final boundary for bound simulated work and has no application option or persisted setting.
+
 The checked-in CI and simulator contract tests cover virtual-time execution, injected cancellation, context stop observation, bounded successful real-time waiting, interruptible real-time cancellation, and repeated real-time execution. The real-time test uses deliberately broad elapsed-time bounds and a process timeout; it proves that waits occur and remain interruptible, but it does not measure scheduler precision or jitter. Real-time mode is available to C++ tests through the typed configuration, but it is not CLI-selectable and is not hardware, RF, scheduler, or timing qualification.
 
 ## Fault-injection reference

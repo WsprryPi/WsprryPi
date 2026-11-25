@@ -157,6 +157,18 @@ public:
         bool operator==(const Si5351RuntimeConfig &) const = default;
     };
 
+    // A test-owned clock for the final scheduled wait and admission samples.
+    // Only an explicitly configured simulator can use it.
+    class SimulatedLaunchClock
+    {
+    public:
+        using Clock = wsprrypi::ScheduledLaunch::Clock;
+        virtual ~SimulatedLaunchClock() = default;
+        virtual bool wait_for_slot(Clock::time_point start,
+                                   const std::function<bool()> &interrupted) = 0;
+        virtual Clock::time_point now() const noexcept = 0;
+    };
+
     struct SimulatedRuntimeConfig
     {
         bool virtual_time = true;
@@ -166,6 +178,7 @@ public:
         long cancel_event = -1;
         bool fail_cleanup = false;
         bool fail_startup_quiesce = false;
+        std::shared_ptr<SimulatedLaunchClock> launch_clock;
 
         bool operator==(const SimulatedRuntimeConfig &) const = default;
     };

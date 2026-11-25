@@ -5,6 +5,9 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "web_server.hpp"
 #include "application_simulation_fixture.hpp"
+#ifdef WSPRRYPI_NATIVE_RECURRENCE_FIXTURE
+#include "simulated_launch_latch.hpp"
+#endif
 #include <string_view>
 #ifdef __APPLE__
 #include <pthread/qos.h>
@@ -41,6 +44,9 @@ int main(int argc,char **argv){
         wsprrypi::testing::set_wtp_pi_private_state_path(argv[1]);
         WsprTransmitter::SimulatedRuntimeConfig simulation;
         simulation.trace_path=std::string(argv[1])+".simulated-trace.json";
+#ifdef WSPRRYPI_NATIVE_RECURRENCE_FIXTURE
+        if(simulated)simulation.launch_clock=std::make_shared<wsprrypi::testing::SimulatedLaunchLatch>(argv[1]);
+#endif
         if(simulated)wsprrypi::testing::set_application_simulation_fixture(simulation);
         webServer.bind_loopback_for_test();
     }catch(...){return 2;}

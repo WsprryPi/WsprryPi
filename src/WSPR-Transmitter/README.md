@@ -12,6 +12,8 @@ not interpret solar policy, storage records, or ownership.
 Run `make scheduled-launch-test BACKENDS=simulated SUDO=` in `src` for the standalone binding/guard
 contract; parent simulated execution tests cover the actual worker integration.
 
+An explicitly selected simulator may supply a typed launch clock for the worker's final scheduled wait and admission samples. The ordinary binding, authority guard, and 50 ms cutoff still determine whether execution can begin. See the [simulated backend guide](../../docs/simulated-backend.md#virtual-and-real-time-execution).
+
 `WSPR-Transmitter` is a C++20 component for generating WSPR (Weak Signal
 Propagation Reporter) RF transmissions with precise symbol timing.
 

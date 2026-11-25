@@ -1547,7 +1547,7 @@ semantics-test:
 	$(Q)$(MAKE) --no-print-directory semantics-test-full \
 		BACKENDS=$(DEFAULT_BACKENDS) ANCILLARY_GPIO=1
 
-semantics-test-full: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/pi_managed_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-full: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/native_recurrence_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-process-test si5351-inventory-isolation-test calibration-roundtrip-test i2c-bus-inventory-test i2c-bus-selection-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test rp1-web-backend-persistence-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(SEMANTICS_TEST_OUT) $(BIN_DIR)/$(CLEANUP_LIFECYCLE_TEST_OUT) $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	# Run deadline-sensitive launch checks after all parallel builds/tests finish.
 	$(Q)$(MAKE) --no-print-directory -j1 native-recurrence-test native-recurrence-main-test
 	$(Q)echo "Running runtime semantics tests."
@@ -1577,7 +1577,7 @@ semantics-test-portable:
 	$(Q)$(MAKE) --no-print-directory semantics-test-portable-profile \
 		BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-semantics-test-portable-profile: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/pi_managed_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
+semantics-test-portable-profile: solar-clock-test recurrence-progress-test $(BIN_DIR)/native_recurrence_test $(BIN_DIR)/native_recurrence_main_fixture scheduled-launch-test recurrence-authority-record-test solar-geometry-test solar-policy-test linux-i2c-identity-test linux-i2c-identity-config-test wspr-plan-placement-test test-tone-lifecycle-test si5351-inventory-isolation-test calibration-roundtrip-test idle-startup-policy-test i2c-bus-inventory-test i2c-bus-selection-test backend-capabilities-regression-test backend-capabilities-make-regression-test debug band-lookup-correlation-test chipset-offsets-test mailbox-memory-flag-test legacy-gpio-clock-model-test gpio-frequency-correction-test websocket-lifecycle-test web-server-network-lifecycle-test $(BIN_DIR)/$(UI_SOURCE_REGRESSION_TEST_OUT) $(BIN_DIR)/$(GPIO_BAND_POLICY_TEST_OUT)
 	# Run deadline-sensitive launch checks after all parallel builds/tests finish.
 	$(Q)$(MAKE) --no-print-directory -j1 native-recurrence-test native-recurrence-main-test
 	$(Q)echo "Running portable UI/source regression tests."
@@ -2258,13 +2258,16 @@ $(BIN_DIR)/controller_only_production_fixture: tests/controller_only_production_
 $(BIN_DIR)/pi_managed_main_fixture: tests/pi_managed_main_fixture.cpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
+$(BIN_DIR)/native_recurrence_main_fixture: tests/pi_managed_main_fixture.cpp tests/simulated_launch_latch.hpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests -DWSPRRYPI_NATIVE_RECURRENCE_FIXTURE $(filter %.cpp %.o,$^) -o $@ $(LDFLAGS)
 # Two isolated actual-main targets with independent identity and approved typed
 # clock-health fixtures; production identity itself is exercised elsewhere.
 $(BIN_DIR)/scheduling_autonomy_fixture: tests/scheduling_autonomy_fixture.cpp main.cpp $(filter-out %/wtp_endpoint/identity.o,$(SEMANTICS_TEST_DEPS))
 	$(Q)mkdir -p $(BIN_DIR)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Itests $(filter %.cpp %.o,$(filter-out main.cpp,$^)) -o $@ $(LDFLAGS)
 
-$(addprefix $(BIN_DIR)/,controller_only_production_fixture pi_managed_main_fixture pi_managed_wtp_main_fixture shared_setup_main_fixture scheduling_autonomy_fixture): tests/software_control_runtime.hpp
+$(addprefix $(BIN_DIR)/,controller_only_production_fixture pi_managed_main_fixture native_recurrence_main_fixture pi_managed_wtp_main_fixture shared_setup_main_fixture scheduling_autonomy_fixture): tests/software_control_runtime.hpp
 
 .PHONY: scheduling-autonomy-test
 scheduling-autonomy-test: $(BIN_DIR)/scheduling_autonomy_fixture
@@ -2895,8 +2898,8 @@ $(BIN_DIR)/native_recurrence_test: tests/native_recurrence_test.cpp $(SEMANTICS_
 native-recurrence-test: $(BIN_DIR)/native_recurrence_test
 	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 $(BIN_DIR)/native_recurrence_test
 .PHONY: native-recurrence-main-test
-native-recurrence-main-test: $(BIN_DIR)/pi_managed_main_fixture
-	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 tests/native_recurrence_main_test.py --fixture $(BIN_DIR)/pi_managed_main_fixture
+native-recurrence-main-test: $(BIN_DIR)/native_recurrence_main_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 tests/native_recurrence_main_test.py --fixture $(BIN_DIR)/native_recurrence_main_fixture
 .PHONY: recurrence-progress-test
 $(BIN_DIR)/recurrence_progress_test: tests/recurrence_progress_test.cpp recurrence_progress.cpp recurrence_progress.hpp wtp_integration/pi_management_journal.cpp wtp_integration/pi_management_journal.hpp
 	$(Q)mkdir -p $(BIN_DIR)
