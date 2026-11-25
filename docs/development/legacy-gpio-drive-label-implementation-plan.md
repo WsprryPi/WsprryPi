@@ -73,7 +73,7 @@ Retain the original boot-active nominal drive and saved state before changes. Ex
 
 The historical Pico run for implementation commit `b0edc0dd` passed 226 Pico host tests, the ordinary linked-image check, and the stack guard. A settings-preserving installation on Pico C was verified. [Pico PR CI](https://github.com/WsprryPi/WsprryPico/actions/runs/45426499466) · [Pico exact-source CI](https://github.com/WsprryPi/WsprryPico/actions/runs/45426556062)
 
-The HP adapter submitted all 56 points through USB Review with default permissions. The 14 ready and 42 restart-required results included all four drives at 144,490,500 Hz. At that carrier, 8 mA was ready and 2, 4, and 6 mA required restart. Review left settings and revision unchanged. This is Pico USB admission evidence. The local record is `/Users/lbussy/GitHub/WsprryPico/build/si5351-2m-handoffs/hp-56-review-evidence.json`.
+The HP adapter submitted all 56 points through USB Review with default permissions. The 14 ready and 42 restart-required results included all four drives at 144,490,500 Hz. At that carrier, 8 mA was ready and 2, 4, and 6 mA required restart. Review left settings and revision unchanged. These observations establish Pico USB admission for the reviewed points.
 
 The [historical 85-cell and 51-frame band/mode matrix](https://github.com/WsprryPi/WsprryPico/blob/8df9ea0565d819083dd9d884aced954d45ea54f9/engineering/development/si5351.md#conducted-mode-acceptance) records conducted results at 8 mA, including the 2 m point. Earlier Pico C HF checks used firmware built from `946dbb427be9e86376f1fd6f38d34a45a5065d35` and covered 10 ms completion, exact Stop of a running 120-second request, and full 120-second completion at 14,097,100 Hz for each of 2, 4, 6, and 8 mA. All 12 checks confirmed inactive output. The recorded final state was idle and unowned with 8 mA saved and boot-active, no restart pending, and both native schedules disabled. The capture record is `/Users/lbussy/GitHub/WsprryPico/build/si5351-test-tone-handoff-evidence.json`. Full band/mode qualification at 2, 4, and 6 mA, calibrated RF power, absolute timing, and an independent fault-proof cutoff remain open.
 
@@ -89,11 +89,10 @@ At `9ea181daf3cb38c531c96f3cf5bb697804af81d8`, [Pico CI](https://github.com/Wspr
 | Installed UF2 SHA-256 | `a9c1d9fc14fe27daececdb344a8abcc310d46552afbb7e1d5248fd8af09f0f85` |
 | Version / bundle provenance | `0.0.0-devel`; two pre-existing untracked prompts label the developer bundle dirty; tracked implementation sources match the pushed commit |
 | Shared USB installer | `ok=true`, `stage=complete`, `preserved=true`, `recovery_required=false`; verified after reboot |
-| Local exact installed-image bundle | `/Users/lbussy/GitHub/WsprryPico/build/station-independent/developer-bundle` |
-| USB-host exact installed-image bundle | `/home/pi/.local/share/wsprrypico-deploy/station-independent-drive-20261123/developer-bundle` |
+| USB-host installed-image bundle at deployment | `/home/pi/.local/share/wsprrypico-deploy/station-independent-drive-20261123/developer-bundle` |
 | Postboot state | `pio-dma-gp2`, GP2; saved 12 mA; boot-active 12 mA; SDK pad readback null before execution; output inactive and unowned |
 
-Saved configuration matched the preflight snapshot exactly, including complete existing station details. USB and network identities match. The listed bundles identify the historical direct-GPIO image. The boot ID is an observation and must be rediscovered before operations. These are delivered installation observations, not fresh live-device checks in this documentation task.
+Saved configuration matched the preflight snapshot exactly, including complete existing station details. USB and network identities matched. The recorded boot ID identifies that installation observation. Rediscover the boot ID before operations.
 
 The 52 postboot dry Reviews across 13 representative carriers and four drives yielded 13 ready and 39 requires_restart, with configuration and revision unchanged. These carriers are fixtures, not the approved HP campaign list. No tone Start, drive save, or meter operation was performed during deployment verification. These dry Reviews established no physical RF evidence.
 
