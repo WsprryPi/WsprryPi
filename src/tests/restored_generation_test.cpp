@@ -3,16 +3,23 @@
 #include "application_storage/generation_selection.hpp"
 #include "application_storage/application_state.hpp"
 #include "application_storage/migration_source.hpp"
+#include "application_control/local_transport.hpp"
+#include "application_recovery/destination_review.hpp"
 #include "application_recovery/restore_hold.hpp"
+#include "wtp_endpoint/runtime.hpp"
 #include "wtp_integration/pi_management_journal.hpp"
+#include "wtp_integration/pi_pair_owner.hpp"
 #include "scheduling_internal.hpp"
 #include "scheduling.hpp"
 #include "config_handler.hpp"
 #include "wtp_integration/pi_pair_policy_admission.hpp"
 #include "test_tone_request.hpp"
 #include "software_child_process.hpp"
+#include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -24,6 +31,38 @@ const std::string self(32,'a'),job(32,'b');
 void check(bool value,const char *message){if(!value)throw std::runtime_error(message);}
 void put(const std::string &path,const Json &value){std::ofstream output(path);output<<value.dump();output.close();check(bool(output)&&!::chmod(path.c_str(),0600),"Private selector publication fixture");}
 template<class F>void refuses(F action){bool refused=false;try{action();}catch(...){refused=true;}check(refused,"Expected generation/hold refusal");}
+
+void check_recovery_review_busy(const std::shared_ptr<SqliteStateStore> &database,const std::string &ledger){
+    ApplicationStateSelection selection(database);
+    testing::set_wtp_pi_private_state_path(ledger);
+    auto owner=prepare_pi_pair_owner(self);
+    const auto before=database->snapshot();
+    const auto holds=application_restore_hold_view();
+    std::promise<void> pinned,unpin;
+    auto ready=pinned.get_future();
+    auto released=unpin.get_future();
+    auto contender=std::async(std::launch::async,[&]{
+        bool entered=false;
+        try{
+            owner->with_backup_files([&](const auto &){entered=true;pinned.set_value();released.wait();});
+        }catch(...){
+            if(!entered)pinned.set_exception(std::current_exception());
+            else throw;
+        }
+    });
+    struct Unpin {std::promise<void> &signal;~Unpin(){signal.set_value();}} guard{unpin};
+    check(ready.wait_for(std::chrono::seconds(5))==std::future_status::ready,"Pairing owner pinned for recovery review");
+    ready.get();
+    const std::string boot(32,'c');
+    for(const auto &request:std::array<Json,2>{Json{{"action","read"}},
+            Json{{"action","release"},{"digest",std::string(64,'f')},{"release_local",true},{"release_remote",false}}}){
+        bool busy=false;
+        try{(void)recovery_destination_review(request,boot);}
+        catch(const LocalCommandRefused &error){busy=error.reason()==LocalRefusal::Busy;}
+        check(busy,"Recovery review and release report typed busy while pairing is pinned");
+        check(database->snapshot()==before&&application_restore_hold_view()==holds,"Busy recovery review leaves data and holds unchanged");
+    }
+}
 }
 int main(int argc,char *argv[]){
     try{
@@ -91,6 +130,7 @@ int main(int argc,char *argv[]){
         put(root+"/restore-hold.json",hold);
         database=open_application_state(root,self,StateRole::Controller);
         check(database->directory()==root+"/generation-2"&&database->snapshot()==before,"Only the selected complete generation opens");
+        check_recovery_review_busy(database,parent+"/review-ledger");
         database.reset();
         refuses([&]{open_application_state(root,std::string(32,'c'),StateRole::Controller);});
         refuses([&]{open_application_state(root,self,StateRole::Pi);});

@@ -690,10 +690,19 @@ class RecoveryJobs:
             job = self.read(job_id)
             directory = self.directory / job_id
             self.save(dict(self.read(job_id), phase='holding_output'))
-            try:
-                backend_command(self.config, 'prepare', job_id)
-            except BackendUnavailable:
-                pass  # Read the exact owner proof; never replay preparation.
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    backend_command(self.config, 'prepare', job_id)
+                    break
+                except RecoveryBusy:
+                    # A definite refusal precedes hold publication. The same
+                    # admission still binds the backend boot and preview.
+                    if time.monotonic() >= deadline:
+                        raise
+                    time.sleep(.1)
+                except BackendUnavailable:
+                    break  # Read the exact owner proof; never replay preparation.
             proof = self.stop_proof(job)
             archive.require(proof['state'] == 'held' and proof['error'] is None)
             # Re-observe immediately before a fixture signal. A cached PID is

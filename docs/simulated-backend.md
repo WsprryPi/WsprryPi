@@ -214,7 +214,7 @@ The portable target pins `BACKENDS=simulated ANCILLARY_GPIO=0`; caller-provided 
 
 ## Debian CI
 
-The `Debian non-hardware validation` workflow runs in a Debian Trixie container. It checks out the parent repository with its ordinary component trees, builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
+The non-hardware validation workflow runs two Debian Trixie container jobs, each with a 40-minute limit. `linux-native-contracts` runs native execution, management, retirement, frequency, and Test Tone contract tests. `non-hardware-validation` builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
 
 For consistent behavior with GNU and uutils `timeout`, the bounded WSPR helper uses foreground mode while keeping `timeout` as the direct supervisor of WsprryPi.
 
