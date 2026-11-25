@@ -1010,6 +1010,25 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
+    if (argc == 3 && std::string(argv[1]) == "--rp1-drive-cli-fixture")
+    {
+        set_raspberry_pi_generation_override_for_test(4);
+        init_config_json();
+        json_to_config();
+        config.use_ini = false;
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "--backend", "simulated", "--no-web",
+            "--rp1-gpio-drive-ma", argv[2], "AA0NT", "EM18", "20", "20m"};
+        auto parsed = argv_for(args);
+        if (!parse_command_line(static_cast<int>(parsed.size()), parsed.data()))
+        {
+            return EXIT_FAILURE;
+        }
+        std::cout << "RP1 drive parsed: " << config.rp1_gpio_drive_ma << '\n';
+        return EXIT_SUCCESS;
+    }
+
     if (const char *cli_check = std::getenv("DIAL_FREQUENCY_SEMANTICS_CLI_CHECK");
         cli_check != nullptr && std::string(cli_check) == "1")
     {

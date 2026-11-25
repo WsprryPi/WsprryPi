@@ -594,7 +594,7 @@ jobs:
               rp1-gpclk-backend-test rp1-gpclk-linux-provider-test \
               rp1-gpclk-development-policy-test rp1-gpclk-route-runtime-wiring-test \
               rp1-gpclk-route-service-test rp1-gpclk-transmit-backend-test \
-              rp1-gpclk-diagnostics-test rp1-release-acceptance-test SUDO=
+              rp1-gpclk-diagnostics-test rp1-release-acceptance-test rp1-drive-cli-test SUDO=
 
       - name: Execute focused state, network policy and support lifecycle obligations
         working-directory: src

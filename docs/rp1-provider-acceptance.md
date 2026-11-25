@@ -1,19 +1,21 @@
 # RP1 provider acceptance
 
-The maintainer tool `scripts/maintainer/accept_rp1_release.py` accepts a clean, authenticated RP1-GPIO-CLK-DKMS checkout and delegates artifact construction and independent validation to that provider's public tools. The product version comes from the provider's canonical header and public identity. There is no selected historical product version or release lock in the application acceptance policy.
+The maintainer tool `scripts/maintainer/accept_rp1_release.py` accepts a clean, authenticated RP1-GPIO-CLK-DKMS checkout and delegates artifact construction and independent validation to that provider's public tools. The product version comes from the provider's canonical header and public identity.
 
-Run in a Linux Debian packaging environment with the provider's build prerequisites:
+Run in a Linux Debian packaging environment with the provider's build prerequisites, a C++ compiler, and Node.js. For prepublication acceptance, identify the clean WsprryPi source supplying the proposed release UI and executable.
 
 ```sh
 python3 scripts/maintainer/accept_rp1_release.py \
   --provider-source /absolute/path/to/RP1-GPIO-CLK-DKMS \
+  --consumer-source /absolute/path/to/WsprryPi \
+  --release \
   --output /absolute/path/outside-git/acceptance
 ```
 
-The new output directory contains the build log, immutable asset fingerprints, provider validation result, and application consumer acceptance. Use `--candidate` to validate existing assets, `--release` to require release-profile metadata, and `--compare-retained` to require an identical retained candidate. These operations install nothing and grant no hardware, timing, GPIO, or RF qualification.
+Use `--candidate` for existing assets and `--compare-retained` to require byte identity with a retained candidate. With `--release`, the tool derives the drive choices from the selected Pi source and requires 2, 4, 8, and 12 mA in the UI, CLI, and independently validated provider capabilities for each of GPIO4 and GPIO20. The `rp1DriveSelection` record in `acceptance.json` identifies the Pi commit and tree, provider tag, package digest, and route results. Check those identities against the sources and package selected for release. Generic package validation can run without `--release`. Its result lacks the drive-selection record required for release acceptance.
 
-`--verify-publication` requests the provider's public `release-audit` capability and `verify-release` operation. `--release-tag` selects a specific published tag; otherwise the provider selects the latest eligible release, including prereleases. Every accepted asset must match the independently validated local candidate. Missing publication, unsupported interfaces, different sources/assets, malformed results, and failed provider commands stop acceptance. A release-profile build alone is not proof of publication or production eligibility.
+After provider publication, `--verify-publication` repeats the drive check and requests the provider's public `release-audit` operation for the tag pinned by the selected Pi installer. If supplied, `--release-tag` must match that pin. The verified published assets must match the same independently validated local candidate byte for byte. Missing drive evidence, unsupported settings, mismatched identities, and unavailable publication stop release acceptance. Offline checks establish software compatibility. Installation, GPIO, timing, and RF qualification require separate evidence.
 
 The normal installer source policy and cleanup behavior are described in [installation and ownership](rp1-gpclk-dkms-installation.md). The independently versioned UAPI and runtime/lifecycle interfaces must satisfy `config/rp1-provider-requirements.json`; product version numbers do not select a consumer implementation.
 
-Historical software metadata remains fixture data for qualification attribution. Provider package-parser rejection fixtures run in RP1-GPIO-CLK-DKMS's offline suite; the application's `make rp1-release-acceptance-test SUDO=` checks public delegation, consumer compatibility, source/asset stability, and truthful non-installing results. The actual cross-repository identity/runtime integration tests use an explicitly selected provider checkout. None of these tests authorizes installation or RF.
+Run `make -C src rp1-release-acceptance-test rp1-drive-cli-test rp1-gpclk-linux-provider-test SUDO=` for the release comparison, normal CLI option parsing in the hardware-free fixture, and adapter refusal against a provider that advertises only 2 mA.

@@ -273,6 +273,33 @@ void test_acquire_submit_state_stop_release()
         "release must expose closed local endpoint and cleared local lease");
 }
 
+void test_two_milliamp_provider_refuses_other_valid_options()
+{
+    Io io;
+    io.query.supported_drive_ma_mask = RP1_GPCLK_DRIVE_SUPPORT_2_MA;
+    std::strcpy(io.query.build_id, "1.0.1");
+    std::strcpy(io.snapshot.build_id, io.query.build_id);
+    std::strcpy(io.query.compatibility_id, "v1.0.1-rp1-gpio4");
+    std::strcpy(io.snapshot.compatibility_id, io.query.compatibility_id);
+    wsprrypi::Rp1GpclkLinuxProvider provider(io);
+    std::string error;
+    expect(provider.acquire(RP1_GPCLK_ROUTE_GPIO4, kRequired, error),
+        "a ready 2 mA-only provider must acquire");
+    for (const auto drive : {RP1_GPCLK_DRIVE_MA_4, RP1_GPCLK_DRIVE_MA_8, RP1_GPCLK_DRIVE_MA_12})
+    {
+        auto program = oneSecondProgram();
+        program.drive_ma = drive;
+        const auto ioctl_count = io.requests.size();
+        expect(!provider.submitEvents(program, error) &&
+            error.find("does not support the requested drive strength") != std::string::npos &&
+            io.requests.size() == ioctl_count && program.drive_ma == drive,
+            "unsupported drive must fail before ioctl without substituting 2 mA");
+    }
+    auto program = oneSecondProgram();
+    expect(provider.submitEvents(program, error) && io.events.drive_ma == RP1_GPCLK_DRIVE_MA_2,
+        "the provider must submit an explicitly selected 2 mA program");
+}
+
 void test_current_identity_pairs()
 {
     for (const auto route : {RP1_GPCLK_ROUTE_GPIO4, RP1_GPCLK_ROUTE_GPIO20}) {
@@ -394,6 +421,7 @@ int main()
 {
     test_query_and_readiness();
     test_acquire_submit_state_stop_release();
+    test_two_milliamp_provider_refuses_other_valid_options();
     test_current_identity_pairs();
     test_exact_route_version_and_state_rejections();
     test_fail_closed_acquire_and_snapshot();
