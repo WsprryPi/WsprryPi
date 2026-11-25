@@ -16,6 +16,10 @@
 #include "pi_recovery_runtime.hpp"
 #include <chrono>
 #include <thread>
+#include <array>
+#include <cerrno>
+#include <fcntl.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <filesystem>
@@ -49,6 +53,47 @@ int free_port(int excluded=0){
     }
     throw std::runtime_error("No available fixture port");
 }
+// This probe tests server-side stream bounds. A valid early rejection can
+// close while the uploader is still writing, so receive the reply independently
+// of upload completion instead of using the client's upload-first Put helper.
+std::string oversized_chunked_reply(int port){
+    const int fd=socket(AF_INET,SOCK_STREAM,0);check(fd>=0,"Chunked probe socket");
+    struct Close{int fd;~Close(){close(fd);}} close_socket{fd};
+#ifdef SO_NOSIGPIPE
+    const int yes=1;check(!setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof(yes)),"Chunked probe SIGPIPE protection");
+#endif
+    const auto status_flags=fcntl(fd,F_GETFL);
+    check(status_flags>=0&&!fcntl(fd,F_SETFL,status_flags|O_NONBLOCK),"Nonblocking chunked probe");
+    sockaddr_in address{};address.sin_family=AF_INET;address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);address.sin_port=htons(port);
+    check(!connect(fd,reinterpret_cast<sockaddr *>(&address),sizeof(address))||errno==EINPROGRESS,"Connect chunked probe");
+    const std::string wire="PUT /api/control/v1/host/configuration-recovery HTTP/1.1\r\nHost: 127.0.0.1:"+std::to_string(port)+
+        "\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n8001\r\n"+std::string(32769,'x')+"\r\n0\r\n\r\n";
+    std::size_t offset=0;std::string reply;
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(2);
+    while(std::chrono::steady_clock::now()<deadline){
+        const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(deadline-std::chrono::steady_clock::now()).count();
+        pollfd source{fd,static_cast<short>(POLLIN|(offset<wire.size()?POLLOUT:0)),0};
+        const auto ready=poll(&source,1,static_cast<int>(std::max<int64_t>(1,remaining)));
+        if(ready<0&&errno==EINTR)continue;
+        if(ready<=0)break;
+        if(source.revents&(POLLIN|POLLHUP|POLLERR)){
+            std::array<char,4096> bytes{};const auto count=recv(fd,bytes.data(),bytes.size(),0);
+            if(count>0){check(reply.size()+count<=4096,"Bounded chunked rejection reply");reply.append(bytes.data(),count);offset=wire.size();}
+            else if(!count||(errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR))break;
+        }
+        if((source.revents&POLLOUT)&&offset<wire.size()){
+#ifdef MSG_NOSIGNAL
+            constexpr int flags=MSG_NOSIGNAL;
+#else
+            constexpr int flags=0;
+#endif
+            const auto count=send(fd,wire.data()+offset,wire.size()-offset,flags);
+            if(count>0)offset+=count;
+            else if(!count||(errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR))offset=wire.size();
+        }
+    }
+    return reply;
+}
 void gateway(const nlohmann::json &valid,int port){
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
     while(!webServer.isListening()&&std::chrono::steady_clock::now()<deadline)std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -74,22 +119,11 @@ void gateway(const nlohmann::json &valid,int port){
     check(oversized&&oversized->status==413,"Oversized declared recovery input is rejected before buffering or mutation");
     const auto oversized_header=client.Get("/api/control/v1/host/readiness",{{"X-Fixture-Padding-A",std::string(4200,'x')},{"X-Fixture-Padding-B",std::string(4200,'x')}});
     check(oversized_header&&oversized_header->status==431,"Aggregate recovery headers are bounded before document access");
-    const std::string chunked_data(32769,'x');
-    // Rejection can precede the client's separately written chunk terminator.
-    // Keep this connection open for the response, then discard it: unread
-    // oversized input must never contaminate the following management request.
-    httplib::Client chunked_client("127.0.0.1",port);
-    chunked_client.set_keep_alive(true);chunked_client.set_read_timeout(2,0);chunked_client.set_write_timeout(2,0);
-    const auto chunked=chunked_client.Put("/api/control/v1/host/configuration-recovery",[&](std::size_t offset,httplib::DataSink &sink){
-        const auto size=std::min<std::size_t>(4096,chunked_data.size()-offset);
-        if(size&&!sink.write(chunked_data.data()+offset,size))return false;
-        if(offset+size==chunked_data.size())sink.done();
-        return true;
-    },"application/json");
-    if(!chunked)throw std::runtime_error("Unknown-length recovery response: "+httplib::to_string(chunked.error()));
-    if(chunked->status!=413)throw std::runtime_error("Unknown-length recovery status: "+std::to_string(chunked->status)+" "+chunked->body);
-    check(nlohmann::json::parse(chunked->body)["error"]["code"]=="payload_too_large","Chunked recovery refuses at the body bound before configuration handling");
-    chunked_client.stop();
+    const auto chunked=oversized_chunked_reply(port);
+    check(chunked.starts_with("HTTP/1.1 413 "),"Unknown-length recovery receives the actual 413 rejection");
+    const auto body=chunked.find("\r\n\r\n");check(body!=std::string::npos,"Complete chunked rejection headers");
+    check(nlohmann::json::parse(chunked.substr(body+4))["error"]["code"]=="payload_too_large",
+        "Chunked recovery refuses at the body bound before configuration handling");
     auto doc=nlohmann::json::parse(current->body);auto configuration=config_handler_serialization::saved_configuration_from_internal_json(valid);
     check(!configuration.contains("WTP")&&!configuration.contains("WTP Server"),"Recovery uses the current settings projection");
     const nlohmann::json command{{"contract","Wsprry-Control/1"},{"schema","configuration-recovery-save"},{"binding",doc["binding"]},

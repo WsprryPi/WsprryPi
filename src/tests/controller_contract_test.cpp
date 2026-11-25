@@ -3,14 +3,29 @@
 #include "wtp_integration/control_contract.hpp"
 #include "wtp_integration/pi_configuration_recovery.hpp"
 #include <fstream>
+#include <algorithm>
 #include <iostream>
 #include <limits>
 int main(int argc,char **argv) {
     if(argc!=2)return 2;
     try {
         std::ifstream source(argv[1]);nlohmann::json vectors;source>>vectors;unsigned count=0;
-        for(const auto &item:vectors.at("cases")) {
-            if(wsprrypi::valid_controller_document(item.at("value"),item.at("family").get<std::string>())!=item.at("valid").get<bool>())
+        const auto &cases=vectors.at("cases");
+        const auto discovery=std::find_if(cases.begin(),cases.end(),[](const auto &item){return item.at("name")=="current bounded management discovery";});
+        if(discovery==cases.end())throw std::runtime_error("Current discovery vector required");
+        const auto fixture_digest=discovery->at("value").at("discoveries").at(0).at("control_schema_digest").template get<std::string>();
+        const auto current_digest=std::string(wsprrypi::control_schema_sha256);
+        if(fixture_digest!=current_digest&&wsprrypi::valid_controller_document(discovery->at("value"),"pair-discovery"))
+            throw std::runtime_error("Superseded discovery digest must refuse");
+        for(const auto &item:cases) {
+            // Match the browser adapter: shared vectors contain a historical
+            // fixture reference, not an additional supported wire digest.
+            auto value=item.at("value");
+            if(item.at("family")=="pair-discovery"&&value.is_object()&&value.contains("discoveries")&&value["discoveries"].is_array())
+                for(auto &entry:value["discoveries"])
+                    if(entry.is_object()&&entry.contains("control_schema_digest")&&entry["control_schema_digest"]==fixture_digest)
+                        entry["control_schema_digest"]=current_digest;
+            if(wsprrypi::valid_controller_document(value,item.at("family").get<std::string>())!=item.at("valid").get<bool>())
                 throw std::runtime_error(item.at("name").get<std::string>());
             ++count;
         }
