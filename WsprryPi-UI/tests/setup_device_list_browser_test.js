@@ -17,7 +17,7 @@ const h = require('./browser_harness.js');
         await h.waitForPhp(php, `http://127.0.0.1:${port}/index.php?page=config`);
         ({browser, client, profile} = await h.launchBrowser({args: ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run']}));
         await client.send('Page.navigate', {url: `http://127.0.0.1:${port}/index.php?page=config`});
-        await h.waitFor(() => client.evaluate('!!window.SetupTargets'), 'Setup initialized');
+        await h.waitFor(() => client.evaluate("document.readyState === 'complete' && !!window.SetupTargets && window.ControllerMode?.transmitter"), 'Setup initialized on a verified host');
         // Keep the real Setup renderer and templates; isolate synthetic inventory
         // from application recovery and editor requests, all refused by this router.
         await client.evaluate(`

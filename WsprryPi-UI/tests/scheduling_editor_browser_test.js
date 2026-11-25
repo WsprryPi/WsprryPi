@@ -159,7 +159,7 @@ const sample=name=>structuredClone(vectors.find(item=>item.name===name).value);
   await finishFixture({client,browser,profile});client=browser=profile=null;
   profile=createBrowserProfile();({browser,client}=await launchBrowser({executable:process.env.CHROME_BIN||(process.platform==='darwin'?'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome':'chromium'),args:['--headless','--no-sandbox','--disable-gpu','--disable-background-networking','about:blank'],profile,timeoutMs:60000}));
   await client.send('Page.navigate',{url:`http://127.0.0.1:${proxy.address().port}/index.php?page=config`});
-  await waitFor(()=>run("document.readyState==='complete'&&window.ControllerMode&&!ControllerMode.active&&window.SetupTargets"),'local host mode');
+  await waitFor(()=>run("document.readyState==='complete'&&window.ControllerMode?.transmitter&&window.SetupTargets?.localSelected&&!document.getElementById('scheduling-tab').disabled"),'verified local host with Scheduling available');
   await run("document.getElementById('scheduling-tab').click()");
   await waitFor(()=>run("SchedulingEditor.state?.device==='"+device+"'&&!SchedulingEditor.state.paused&&!!document.querySelector('#schedule-fields fieldset')"),'local Scheduling same controls');
   assert.equal(await run("document.getElementById('schedule-identity').textContent.includes('local Pi')"),true);

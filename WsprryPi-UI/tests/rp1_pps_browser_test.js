@@ -23,7 +23,7 @@ async function main() {
   await waitForPhp(php, `http://127.0.0.1:${phpPort}/index.php?page=config`, 'PHP fixture');
   ({browser:chromium,client}=await launchBrowser({profile, args:['--headless','--no-sandbox','--disable-gpu']}));
   await client.send('Page.navigate',{url:`http://127.0.0.1:${phpPort}/index.php?page=config`});
-  await waitFor(()=>evaluate('document.readyState==="complete" && typeof buildConfigPayload==="function"'),'shipped setup');
+  await waitFor(()=>evaluate('document.readyState==="complete" && typeof configNetworkHandlersBound!=="undefined" && configNetworkHandlersBound && window.ControllerMode?.transmitter'),'shipped setup and control bindings');
   await evaluate(`
    // This isolated presentation fixture supplies fields below instead of an owning HTTP read.
    window.SetupTargets.localLoaded();globalThis.autosaveCalls=0;scheduleAutosave=()=>{autosaveCalls++};
