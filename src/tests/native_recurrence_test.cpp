@@ -103,6 +103,12 @@ void refused_committed_launch_and_file_fence(){
     assert(reserve_native_occurrence(plan,nlohmann::json{{"file","unchanged"}}));
     assert(accept_native_occurrence(plan,[]{}));
     ++ini_reload_generation;assert(native_launch_current(plan));
+    {
+        std::lock_guard lock(config_update_mutex());
+        std::thread contender([&]{assert(!native_launch_current(plan));});
+        contender.join();
+    }
+    assert(native_launch_current(plan));
     const auto replacement=config.ini_filename+".replacement";
     std::filesystem::copy_file(config.ini_filename,replacement);
     std::filesystem::rename(replacement,config.ini_filename);

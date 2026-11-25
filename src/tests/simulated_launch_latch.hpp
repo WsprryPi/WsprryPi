@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "config_handler.hpp"
 #include "wspr_transmit.hpp"
 
 #include <condition_variable>
@@ -8,6 +9,8 @@
 #include <fstream>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
+#include <utility>
 
 namespace wsprrypi::testing {
 
@@ -38,7 +41,22 @@ public:
         // wake here observes it even when the test supplies no clock sample.
         while (!released_ && !interrupted())
             ready_.wait_for(lock, milliseconds(5));
-        return released_ && !interrupted();
+        if (!released_ || interrupted())
+            return false;
+        lock.unlock();
+
+        // Background services can still hold configuration after the owner
+        // yields. Give this worker the real recursive lock through its guard
+        // so the staged test measures the specified sample and authority.
+        std::unique_lock configuration(config_update_mutex(), std::defer_lock);
+        while (!configuration.try_lock())
+        {
+            if (interrupted())
+                return false;
+            std::this_thread::yield();
+        }
+        launch_configuration_ = std::move(configuration);
+        return !interrupted();
     }
 
     void release_at_owner_idle()
@@ -67,6 +85,8 @@ public:
 
     void admission_complete() noexcept override
     {
+        if (launch_configuration_.owns_lock())
+            launch_configuration_.unlock();
         std::lock_guard lock(mutex_);
         pending_release_.clear();
         released_ = false;
@@ -78,6 +98,7 @@ private:
     std::filesystem::path pending_release_;
     std::mutex mutex_;
     std::condition_variable ready_;
+    std::unique_lock<std::recursive_mutex> launch_configuration_;
     bool released_ = false;
     // Published by the owner before the worker leaves its condition wait.
     Clock::time_point sample_{};

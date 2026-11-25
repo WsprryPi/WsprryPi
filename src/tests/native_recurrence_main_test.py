@@ -82,13 +82,19 @@ def main():
                                          (root / 'service.log').read_text()[-12000:])
                 time.sleep(.04)
 
-        def read(path):
+        def read(path, *, waiting_for_readiness=False):
             for attempt in range(20):
                 status, body = request(port, 'GET', path)
                 if status != 409 or json.loads(body).get('error', {}).get('code') != 'capacity':
                     return json.loads(body) if status == 200 else None
+                if waiting_for_readiness:
+                    return None
                 time.sleep(0.025)
             raise AssertionError(('read stayed busy', path, status, body))
+
+        def ready(state):
+            response = read('/api/control/v1/host/readiness', waiting_for_readiness=True)
+            return response and response['state'] == state
 
         def session():
             status, reply, values = request(port, 'POST', '/api/control/v1/host/management-session',
@@ -123,7 +129,7 @@ def main():
 
         try:
             launch()
-            wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'configuration_recovery', 'Initial setup readiness')
+            wait(lambda: ready('configuration_recovery'), 'Initial setup readiness')
             recovery = read('/api/control/v1/host/configuration-recovery')
             assert recovery['validation'] == 'initialization'
             session()
@@ -136,7 +142,7 @@ def main():
             mutate('/api/control/v1/host/configuration-recovery', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'configuration-recovery-save',
                 'binding': recovery['binding'], 'capability_revision': recovery['capability_revision'], 'operation_id': secrets.token_hex(16),
                 'expected_revision': recovery['revision'], 'configuration': candidate})
-            wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Normal startup after setup')
+            wait(lambda: ready('ready'), 'Normal startup after setup')
             self_id = read('/api/control/v1/targets')['targets'][0]['device_id']
             base = f'/api/control/v1/targets/{self_id}/'
             def progress_record():
@@ -242,7 +248,7 @@ def main():
             saved_progress = progress.read_bytes()
             stop()
             launch()
-            wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Disabled restart')
+            wait(lambda: ready('ready'), 'Disabled restart')
             assert read(base + 'settings')['saved']['scheduling']['enabled'] is False
             assert progress.read_bytes() == saved_progress
             assert not any(event['kind'] == 'execution_start' for event in read_trace()['events'])
@@ -254,7 +260,7 @@ def main():
             waiting = launch_signals / (start_ns + '.waiting')
             waiting.unlink()
             launch()
-            wait(lambda: (read('/api/control/v1/host/readiness') or {}).get('state') == 'ready', 'Interrupted restart')
+            wait(lambda: ready('ready'), 'Interrupted restart')
             wait(lambda: progress_record()['in_flight'] is None, 'Positive startup reconciliation')
             assert progress_record()['consumed_through_utc_ns'] == start_ns
             assert not any(event['kind'] == 'execution_start' for event in read_trace()['events'])
