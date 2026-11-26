@@ -10,17 +10,100 @@
 #include "wtp_pi_control.hpp"
 #include "wspr_transmit.hpp"
 #include "gpio_output.hpp"
+#include <algorithm>
 #include <cassert>
 #include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <future>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <cstdio>
+#include <pthread/qos.h>
+#include <system_error>
+#endif
 using namespace wsprrypi;
 namespace {
+#ifdef __APPLE__
+class MacRecurrenceLaunchClock final : public WsprTransmitter::SimulatedLaunchClock
+{
+public:
+    bool wait_for_slot(Clock::time_point slot, const std::function<bool()> &interrupted) override
+    {
+        // A long condition-variable timeout can be delivered late on a hosted
+        // Mac. Request low latency on this simulated worker and recheck the
+        // real clock after short waits. The production launch guard still owns
+        // the deadline and the authority check.
+        const int error = pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+        if (error)
+            throw std::system_error(error, std::generic_category(), "Recurrence fixture QoS");
+        slot_ = slot;
+        first_check_.reset();
+        constexpr auto poll_interval =
+            std::chrono::duration_cast<Clock::duration>(std::chrono::milliseconds(1));
+        while (!interrupted())
+        {
+            const auto sample = Clock::now();
+            const auto remaining = slot - sample;
+            if (remaining <= Clock::duration::zero())
+            {
+                wake_ = sample;
+                return true;
+            }
+            std::this_thread::sleep_for(std::min(remaining, poll_interval));
+        }
+        return false;
+    }
+
+    Clock::time_point now() const noexcept override
+    {
+        const auto sample = Clock::now();
+        if (!first_check_)
+            first_check_ = sample;
+        last_check_ = sample;
+        return sample;
+    }
+
+    void admission_complete() noexcept override
+    {
+        if (first_check_ && !ScheduledLaunch{slot_, {}}.current(last_check_))
+        {
+            const auto micros = [](Clock::duration duration) {
+                return static_cast<long long>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(duration).count());
+            };
+            std::fprintf(stderr,
+                         "Late simulated launch: wake %+lld us, first check %+lld us, last check %+lld us from slot\n",
+                         micros(wake_ - slot_), micros(*first_check_ - slot_),
+                         micros(last_check_ - slot_));
+        }
+    }
+
+private:
+    Clock::time_point slot_{};
+    Clock::time_point wake_{};
+    mutable std::optional<Clock::time_point> first_check_;
+    mutable Clock::time_point last_check_{};
+};
+#endif
+
+WsprTransmitter::SimulatedRuntimeConfig recurrence_simulation(
+    const std::string &trace_path, bool virtual_time = true)
+{
+    WsprTransmitter::SimulatedRuntimeConfig simulation;
+    simulation.trace_path = trace_path;
+    simulation.virtual_time = virtual_time;
+#ifdef __APPLE__
+    simulation.launch_clock = std::make_shared<MacRecurrenceLaunchClock>();
+#endif
+    return simulation;
+}
+
 std::uint64_t utc(){return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());}
 struct Fixture {
     std::string root,self=std::string(32,'a');NativeSolarSnapshot snapshot;
@@ -156,7 +239,7 @@ void state_matrix(){
 }
 bool real_message(bool virtual_time,bool reject,bool force_late=false){
     Fixture f;config.mode=ModeType::QRSS;config.qrss.message="E";config.qrss.frequency_hz=14097000;config.modulation_dot_seconds=config.qrss.dot_seconds=.02;resolve_backend_specific_config(config);
-    WsprTransmitter::SimulatedRuntimeConfig sim;sim.virtual_time=virtual_time;sim.trace_path=f.root+"/trace.json";
+    const auto sim=recurrence_simulation(f.root+"/trace.json",virtual_time);
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);
     set_scheduler_execution_suppressed_for_test(false);
     std::mutex mutex;std::condition_variable cv;bool done=false,started=false,terminal_current=false;std::string terminal;
@@ -232,7 +315,7 @@ void scheduled_override(ModeType mode){
     config.schedule_start_minute=local.tm_min;config.schedule_start_second=local.tm_sec;config.schedule_repeat_minutes=1;
     f.snapshot.policy.solar_enabled=true;f.snapshot.policy.locator="EM18";
     f.snapshot.policy.day.cw_base_nhz=f.snapshot.policy.night.cw_base_nhz=14'098'000'000'000'000ULL;
-    WsprTransmitter::SimulatedRuntimeConfig sim;sim.trace_path=f.root+"/override.json";
+    const auto sim=recurrence_simulation(f.root+"/override.json");
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);
     set_scheduler_execution_suppressed_for_test(false);
     std::mutex mutex;std::condition_variable cv;bool done=false;
@@ -252,7 +335,7 @@ void scheduled_override(ModeType mode){
 bool real_wspr(bool reject){
     Fixture f;config.callsign=config.wspr.callsign="AA0NT";config.grid_square=config.wspr.grid_square="EM18";
     config.wspr_planner_preference=config.wspr.planner_preference=WsprPlannerPreference::Auto;
-    WsprTransmitter::SimulatedRuntimeConfig sim;sim.trace_path=f.root+"/wspr.json";
+    const auto sim=recurrence_simulation(f.root+"/wspr.json");
     wsprTransmitter.selectBackend(BackendKind::SIMULATED,WsprTransmitter::Si5351RuntimeConfig{},sim);set_scheduler_execution_suppressed_for_test(false);
     std::mutex mutex;std::condition_variable cv;bool done=false,started=false,terminal_current=false;
     std::chrono::system_clock::time_point terminal_utc;std::string terminal;
