@@ -15,6 +15,11 @@ from software_web_service import start_software_web_service, stop_software_web_s
 
 
 _last_request = {}
+_temporarily_unavailable_reads = (
+    (409, 'capacity'),
+    (429, 'rate_limited'),
+    (503, 'authority_pending'),
+)
 
 def request(port, *args, **kwargs):
     # Honor the real protected API's ten-requests/second budget. This fixture
@@ -76,21 +81,36 @@ def main():
                     if progress.exists():
                         diagnostics['progress'] = json.loads(progress.read_text())
                     if 'occurrence' in label:
-                        diagnostics['status'] = read(base + 'status')
-                        diagnostics['settings'] = read(base + 'settings')
+                        for resource in ('status', 'settings'):
+                            try:
+                                status, body = request(port, 'GET', base + resource)
+                                diagnostics[resource] = [status, body[:1024].decode('utf-8', errors='replace')]
+                            except OSError as error:
+                                diagnostics[resource] = str(error)
                     raise AssertionError(label + '\n' + json.dumps(diagnostics, sort_keys=True) + '\n' +
                                          (root / 'service.log').read_text()[-12000:])
                 time.sleep(.04)
 
         def read(path, *, waiting_for_readiness=False):
-            for attempt in range(20):
+            # The owner may temporarily withhold a snapshot while it updates
+            # authority. Poll only explicit pre-effect refusals on these GETs.
+            deadline = time.monotonic() + 5
+            while True:
                 status, body = request(port, 'GET', path)
-                if status != 409 or json.loads(body).get('error', {}).get('code') != 'capacity':
-                    return json.loads(body) if status == 200 else None
-                if waiting_for_readiness:
+                if waiting_for_readiness and status != 200:
                     return None
-                time.sleep(0.025)
-            raise AssertionError(('read stayed busy', path, status, body))
+                try:
+                    document = json.loads(body)
+                except (json.JSONDecodeError, UnicodeError) as error:
+                    raise AssertionError((path, status, body[:1024])) from error
+                assert isinstance(document, dict) and document.get('contract') == 'Wsprry-Control/1', (
+                    path, status, body[:1024])
+                if status == 200:
+                    return document
+                detail = document.get('error')
+                assert (document.get('schema') == 'target-error' and isinstance(detail, dict)
+                        and (status, detail.get('code')) in _temporarily_unavailable_reads
+                        and time.monotonic() < deadline), (path, status, body[:1024])
 
         def ready(state):
             response = read('/api/control/v1/host/readiness', waiting_for_readiness=True)
@@ -117,14 +137,15 @@ def main():
                 time.sleep(.025)
             return json.loads(reply)
 
-        def action(resource, schema, digest=False):
-            context, saved = read(base + 'context'), read(base + 'settings')
-            body = {'contract': 'Wsprry-Control/1', 'schema': schema, 'binding': context['binding'],
-                'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': saved['revision']}
-            if digest:
-                body['candidate_digest'] = saved['candidate_digest']
+        def action(resource, schema, *, settings=None):
+            if settings is None:
+                settings = read(base + 'settings')
+            body = {'contract': 'Wsprry-Control/1', 'schema': schema, 'binding': settings['binding'],
+                'capability_revision': settings['capability_revision'], 'operation_id': secrets.token_hex(16), 'expected_revision': settings['revision']}
+            if resource == 'enable':
+                body['candidate_digest'] = settings['candidate_digest']
             if resource == 'stop':
-                body['observed_output'] = read(base + 'status')['observed_output']
+                body['observed_output'] = settings['observed_output']
             return mutate(base + resource, 'POST', body)
 
         try:
@@ -155,22 +176,22 @@ def main():
                     return None
 
             def stage_occurrence(start_seconds):
-                context, saved = read(base + 'context'), read(base + 'settings')
+                saved = read(base + 'settings')
                 candidate = copy.deepcopy(saved['saved'])
                 slot = time.gmtime(start_seconds)
                 candidate['configuration']['Operation'].update({'Mode': 'QRSS', 'Transmit': True, 'Enable on Boot': 'Follow'})
                 candidate['configuration']['CW'].update({'Message': 'E', 'Base Frequency': 14097000, 'Dot Seconds': .02,
                     'Start Minute': slot.tm_min, 'Start Second': slot.tm_sec, 'Repeat Minutes': 60,
                     'Fade Shape': 'none', 'Fade In Ms': 0, 'Fade Out Ms': 0, 'Fade Slice Ms': 5})
-                mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': context['binding'],
-                    'capability_revision': context['capability_revision'], 'operation_id': secrets.token_hex(16),
+                mutate(base + 'settings', 'PUT', {'contract': 'Wsprry-Control/1', 'schema': 'target-save', 'binding': saved['binding'],
+                    'capability_revision': saved['capability_revision'], 'operation_id': secrets.token_hex(16),
                     'expected_revision': saved['revision'], 'candidate': candidate})
-                stored = read(base + 'settings')['saved']
-                assert stored['configuration']['Operation']['Transmit'] is True
-                assert stored['configuration']['Operation']['Enable on Boot'] == 'Follow'
-                assert stored['scheduling']['enabled'] is False
+                stored = read(base + 'settings')
+                assert stored['saved']['configuration']['Operation']['Transmit'] is True
+                assert stored['saved']['configuration']['Operation']['Enable on Boot'] == 'Follow'
+                assert stored['saved']['scheduling']['enabled'] is False
                 old_trace = read_trace()
-                action('enable', 'target-enable', True)
+                action('enable', 'target-enable', settings=stored)
                 start_ns = str(start_seconds * 1_000_000_000)
                 waiting = launch_signals / (start_ns + '.waiting')
                 reserved = wait(lambda: progress.exists() and progress_record()['in_flight'], 'Durable occurrence reservation')
