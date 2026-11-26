@@ -357,7 +357,9 @@ LOCAL_CPP_SOURCES += $(if $(filter Linux,$(HOST_OS)),./machine_power_control_lin
 LOCAL_CPP_SOURCES += ./udp_logging/host.cpp
 ALL_SI5351_TRANSPORT_SOURCES := ./WSPR-Transmitter/src/si5351_transport_linux.cpp ./WSPR-Transmitter/src/si5351_transport_macos.cpp
 COMPONENT_CPP_SOURCES := $(shell find $(COMPONENT_SRCDIRS) -type f -name '*.cpp' ! -name '._*' ! -name 'main.cpp' 2>/dev/null)
-COMPONENT_CPP_SOURCES := $(filter-out $(ALL_SI5351_TRANSPORT_SOURCES),$(COMPONENT_CPP_SOURCES))
+COMPONENT_CPP_SOURCES := $(filter-out $(ALL_SI5351_TRANSPORT_SOURCES) \
+    ./WSPR-Transmitter/src/bcm2835_qualification_plan.cpp \
+    ./WSPR-Transmitter/src/bcm2835_qualification_hardware.cpp,$(COMPONENT_CPP_SOURCES))
 TRANSMITTER_SHARED_CPP_SOURCES := \
 	./WSPR-Transmitter/src/execution_plan_compiler.cpp \
 	./WSPR-Transmitter/src/rp1_gpclk_development_policy.cpp \
@@ -2845,7 +2847,8 @@ mcp2221a-transport-test:
 
 
 .PHONY: ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test ci-installer-offline-test
-ci-focused-state-test: sqlite-state-store-test persistent-configuration-test sqlite-catalog-test state-migration-test companion-files-test application-companion-capture-test sqlite-state-entry-test recovery-capture-backend-test recovery-age-unit-test recovery-archive-test recovery-publication-test restored-generation-test recovery-maintenance-test recovery-evidence-test recovery-destination-settings-test recovery-browser-admission-test recovery-jobs-test recovery-worker-process-test diagnostic-export-test browser-http-resource-test web-bootstrap-test local-control-transport-test local-event-feed-test database-configuration-runtime-test database-managed-startup-test database-fresh-startup-test controller-settings-test controller-retirement-storage-binding-test database-controller-runtime-test guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
+# The full semantics suite owns the shared state and recovery tests.
+ci-focused-state-test: guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
 ci-network-policy-test: support-request-guard-test privileged-network-policy-test backend-http-guard-test websocket-upgrade-guard-test privileged-network-transaction-test privileged-network-runtime-test privileged-network-admin-test
 ci-support-lifecycle-test: support-bundle-result-validator-test support-bundle-runtime-test support-bundle-download-file-test support-bundle-checksum-file-test support-bundle-archive-digest-test support-bundle-download-preparation-test support-bundle-job-directory-remover-test support-bundle-startup-cleanup-test
 ci-installer-offline-test: application-state-installer-test recovery-runtime-package-test support-bundle-runtime-installer-test pico-usb-installer-offline-test
@@ -3052,9 +3055,14 @@ recovery-evidence-test: $(BIN_DIR)/recovery_evidence_test
 
 # Serialize the actual-process matrix because fixtures reserve the same bounded
 # listener range. These checks never invoke installed services or hardware.
-.PHONY: recovery-integration-test
+RECOVERY_INTEGRATION_TESTS := recovery-state-owner-test recovery-worker-process-test recovery-native-owner-controller-test recovery-native-owner-move-test recovery-native-owner-crash-test recovery-maintenance-controller-test recovery-maintenance-move-test recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test recovery-maintenance-history-test recovery-maintenance-crash-test
+.PHONY: recovery-integration-test recovery-integration-after-portable-test
 recovery-integration-test:
-	$(Q)$(MAKE) --no-print-directory -j1 recovery-state-owner-test recovery-worker-process-test recovery-native-owner-controller-test recovery-native-owner-move-test recovery-native-owner-crash-test recovery-maintenance-controller-test recovery-maintenance-move-test recovery-maintenance-roundtrip-test recovery-maintenance-listener-override-test recovery-maintenance-history-test recovery-maintenance-crash-test
+	$(Q)$(MAKE) --no-print-directory -j1 $(RECOVERY_INTEGRATION_TESTS)
+
+# Portable semantics already exercises the generic recovery worker.
+recovery-integration-after-portable-test:
+	$(Q)$(MAKE) --no-print-directory -j1 $(filter-out recovery-worker-process-test,$(RECOVERY_INTEGRATION_TESTS))
 
 .PHONY: recovery-maintenance-controller-browser-test
 recovery-maintenance-controller-browser-test: $(BIN_DIR)/recovery_maintenance_fixture
@@ -3097,3 +3105,36 @@ $(BIN_DIR)/wtp_host_references_test: tests/wtp_host_references_test.cpp host_ref
 	$(Q)$(CXX) -std=c++20 -Wall -Wextra -Werror -UNDEBUG -I. $< -o $@
 wtp-host-reference-test: $(BIN_DIR)/wtp_host_references_test
 	$(Q)"$(BIN_DIR)/wtp_host_references_test"
+
+# The privileged bench owner is a separate Linux executable. It links only
+# pure planning, its scoped native adapter, and the mailbox dependency.
+GPIO_QUALIFICATION_COMPONENT = WSPR-Transmitter/src
+GPIO_QUALIFICATION_SOURCES = $(wildcard qualification/*.cpp) \
+    $(GPIO_QUALIFICATION_COMPONENT)/bcm2835_qualification_plan.cpp \
+    $(GPIO_QUALIFICATION_COMPONENT)/bcm2835_qualification_hardware.cpp \
+    $(GPIO_QUALIFICATION_COMPONENT)/gpio_frequency_plan.cpp \
+    $(GPIO_QUALIFICATION_COMPONENT)/legacy_gpio_clock_model.cpp \
+    system_clock_frequency_estimate.cpp Mailbox/src/mailbox.cpp Mailbox/src/mailbox_revision.cpp \
+    WTP-Server/src/sha256.cpp
+GPIO_QUALIFICATION_HEADERS = $(wildcard qualification/*.hpp) \
+    $(wildcard $(GPIO_QUALIFICATION_COMPONENT)/*qualification*.hpp) \
+    $(GPIO_QUALIFICATION_COMPONENT)/gpio_frequency_plan.hpp
+
+.PHONY: gpio-qualification-owner gpio-qualification-owner-test
+gpio-qualification-owner: $(BIN_DIR)/wsprrypi-gpio-qualification-owner
+
+$(BIN_DIR)/wsprrypi-gpio-qualification-owner: $(GPIO_QUALIFICATION_SOURCES) $(GPIO_QUALIFICATION_HEADERS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -std=c++20 -Wall -Wextra -Werror -O2 -pthread \
+		-I. -IWTP-Server/include -IChipset-Offsets/src -IMailbox/src -IPPM-Manager/src \
+		-DGPIO_QUALIFICATION_REVISION='"$(shell git rev-parse HEAD)"' $(GPIO_QUALIFICATION_SOURCES) -o $@
+
+$(BIN_DIR)/gpio_qualification_owner_fixture: $(GPIO_QUALIFICATION_SOURCES) $(GPIO_QUALIFICATION_HEADERS)
+	$(Q)mkdir -p $(BIN_DIR)
+	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -std=c++20 -Wall -Wextra -Werror -O2 -pthread \
+		-I. -IWTP-Server/include -IChipset-Offsets/src -IMailbox/src -IPPM-Manager/src \
+		-DGPIO_QUALIFICATION_TEST -DGPIO_QUALIFICATION_REVISION='"$(shell git rev-parse HEAD)"' \
+		$(GPIO_QUALIFICATION_SOURCES) -o $@
+
+gpio-qualification-owner-test: $(BIN_DIR)/gpio_qualification_owner_fixture
+	$(Q)WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 python3 -B tests/gpio_qualification_owner_test.py "$<"

@@ -4,10 +4,14 @@
 "use strict";
 const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm"), crypto = require("node:crypto");
 const {spawnFixtureChild, stopIsolatedProcess} = require("./browser_fixture_process.js"), readline = require("node:readline");
-const [driver, carrier, peer, credentials] = process.argv.slice(2);
-if (!credentials) throw new Error("Expected Fleet driver, network|usb, actual Pico driver, credentials directory");
+const [driver, ...peerArguments] = process.argv.slice(2);
+const [carrier, peer, credentials] = peerArguments;
+if (!driver || !peer || !((carrier === "usb" && [2, 3].includes(peerArguments.length))
+        || (carrier === "network" && credentials && peerArguments.length === 3))) {
+    throw new Error("Expected Fleet driver, network|usb, actual Pico driver, and credentials for network");
+}
 async function main() {
-    const child = spawnFixtureChild(driver, [carrier, peer, credentials], {detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"]});
+    const child = spawnFixtureChild(driver, peerArguments, {detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"]});
     const replies = [], waiters = [];let stderr = "", failed, ready, rejectReady, readySeen = false;
     child.stderr.on("data", data => {stderr = (stderr + data).slice(-8192);});
     const readyPromise = new Promise((resolve, reject) => {ready = resolve;rejectReady = reject;});

@@ -51,6 +51,39 @@ class HardwareAccessAuditTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertIn("Prohibited", result.stderr)
 
+    def test_relative_opens_and_resolved_descriptors(self):
+        attempts = (
+            'openat(3</dev>, "gpiochip0", O_RDWR) = -1 EACCES',
+            'openat2(AT_FDCWD</>, "dev/i2c-1", {flags=O_RDWR}, 24) = -1 ENOENT',
+            'openat(AT_FDCWD</dev>, "./mem", O_RDONLY) = -1 EACCES',
+            'openat2(AT_FDCWD</sys>, "class/gpio/export", {}, 24) = -1 EACCES',
+            'openat(4</sys/class>, "gpio/export", O_WRONLY) = -1 EACCES',
+            'openat(AT_FDCWD</sys/kernel>, "debug", O_RDONLY) = -1 EACCES',
+            'openat(AT_FDCWD</tmp>, "device-alias", O_RDONLY) = 3</dev/vcio>',
+            'creat("/dev/gpiomem4", 0600) = -1 EACCES',
+        )
+        trace = self.directory / "hardware.strace"
+        for attempt in attempts:
+            with self.subTest(attempt=attempt):
+                trace.write_text(attempt + "\n")
+                result = self.run_audit(self.clean, trace)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("Prohibited", result.stderr)
+
+    def test_relative_non_hardware_paths(self):
+        trace = self.directory / "ordinary.strace"
+        trace.write_text('openat(3</dev>, "null", O_RDWR) = 4</dev/null>\n'
+                         'openat(AT_FDCWD</tmp>, "gpiochip0", O_RDONLY) = -1 ENOENT\n')
+        self.assertEqual(self.run_audit(trace).returncode, 0)
+
+    def test_missing_trace_does_not_hide_a_prohibited_access(self):
+        trace = self.directory / "hardware.strace"
+        trace.write_text('openat(3</dev>, "gpiochip0", O_RDWR) = -1 EACCES\n')
+        result = self.run_audit(self.directory / "missing", trace)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Missing", result.stderr)
+        self.assertIn("Prohibited", result.stderr)
+
     def test_grep_read_error_is_not_success(self):
         # A deterministic grep error also works when the test runs as root;
         # chmod-based unreadability tests cannot establish that case there.

@@ -521,27 +521,6 @@ bool gpioHardwareProfileMatchesProcessor(
         detected_processor);
 }
 
-std::int64_t gpioDitherLowerClockCount(
-    double lower_ratio,
-    std::int64_t block_clocks,
-    std::int64_t clocks_scheduled,
-    std::int64_t lower_clocks_scheduled)
-{
-    if (!std::isfinite(lower_ratio) || lower_ratio < 0.0 || lower_ratio > 1.0 ||
-        block_clocks < 0 || clocks_scheduled < 0 || lower_clocks_scheduled < 0 ||
-        lower_clocks_scheduled > clocks_scheduled)
-    {
-        throw std::invalid_argument("Invalid GPIO divider-dither state.");
-    }
-
-    std::int64_t lower_clocks =
-        static_cast<std::int64_t>(std::llround(
-            lower_ratio * static_cast<double>(clocks_scheduled + block_clocks))) -
-        lower_clocks_scheduled;
-
-    return std::clamp(lower_clocks, std::int64_t{0}, block_clocks);
-}
-
 WsprRpiBackend::DMAConfig::DMAConfig()
     : plld_nominal_freq(500000000.0),
       plld_clock_frequency(plld_nominal_freq),
@@ -574,6 +553,7 @@ WsprRpiBackend::WsprRpiBackend(
     int startup_quiesce_gpio,
     std::optional<wsprrypi::LegacyGpioProcessorProfile> processor_profile)
     : owner_(owner),
+      uses_production_access_(!startup_quiesce_access),
       startup_quiesce_access_(
           startup_quiesce_access
               ? std::move(startup_quiesce_access)
@@ -963,6 +943,11 @@ wsprrypi::StartupQuiesceResult WsprRpiBackend::quiesce_fresh_process()
     {
         retain_error("Unsupported GPIO backend transmit pin for startup quiesce.");
         return {false, error};
+    }
+    if (uses_production_access_ && wsprrypi::bcm2835QualificationBoard())
+    {
+        try { qualification_lease_.acquire(); }
+        catch (const std::exception& failure) { return {false, failure.what()}; }
     }
     if (!startup_quiesce_access_->discoverPeripheralBase(peripheral_base, error))
     {
@@ -2855,6 +2840,8 @@ void WsprRpiBackend::create_dma_pages(
 
 void WsprRpiBackend::setup_dma()
 {
+    if (uses_production_access_ && wsprrypi::bcm2835QualificationBoard())
+        qualification_lease_.acquire();
     mailbox.open();
     get_plld();
 

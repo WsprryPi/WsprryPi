@@ -34,6 +34,8 @@ BIN_DIR		 	= build/bin
 # Find your project’s own .c/.cpp (this will pick up ./main.cpp or ./main.c):
 LOCAL_C_SOURCES   := $(shell find . -type f -name '*.c')
 LOCAL_CPP_SOURCES := $(shell find . -type f -name '*.cpp')
+LOCAL_CPP_SOURCES := $(filter-out ./bcm2835_qualification_plan.cpp \
+    ./bcm2835_qualification_hardware.cpp,$(LOCAL_CPP_SOURCES))
 SI5351_TEST_SOURCE := ./si5351_backend_harness.cpp
 SI5351_PLANNER_TEST_SOURCE := ./si5351_planner_test.cpp
 SI5351_TRANSITION_TEST_SOURCE := ./si5351_transition_test.cpp

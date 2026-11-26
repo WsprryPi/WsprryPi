@@ -59,3 +59,7 @@ An old controller response without correlation or revision evidence cannot prove
 The server retains incomplete WebSocket frames across TCP reads. Individual frames are limited to 64 KiB and queued input to 128 KiB or 1,024 frames; an exceeded limit closes that connection. Consecutive pending `get_tx_state` queries may be coalesced into one current observation. Other commands retain their arrival order, so End/STOP does not wait for a backlog of redundant status queries. A status query already in progress retains its provider-control deadline. Qualification clients should keep at most one status query outstanding and record both STOP send completion and the observed provider terminal state.
 
 A retired or held recurring scheduler is not restored when a manual Test Tone ends. Tone authorization and explicit one-shot requests retain their own guards; the recurrence fence neither grants manual output nor cancels it. Even an independently accepted Transmit change during cleanup cannot re-arm the retired WSPR scheduler through restoration. Direct manual-tone restoration remains a separate owner path.
+
+## Conducted BCM2835 drive qualification
+
+The [GPIO qualification owner](development/gpio-qualification-owner.md) provides a separate authenticated SSH contract for a fixed 80-point BCM2835 drive sweep. It binds one route through Review, reservation, active readback, and verified cleanup. The WebSocket commands described above retain their existing request and status contracts.

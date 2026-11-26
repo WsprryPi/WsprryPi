@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string_view>
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/wait.h>
@@ -50,15 +51,23 @@ struct Resolver: TlsResolver {
 std::string bytes(const std::string& path){std::ifstream file(path);return {std::istreambuf_iterator<char>(file),{}};}
 }
 int main(int argc,char** argv){
- if(argc!=4)return 2;
+ if(argc<3||argc>4)return 2;
+ const std::string_view carrier=argv[1];
+ if(carrier!="network"&&carrier!="usb")return 2;
+ const bool network=carrier=="network";
+ if(network&&(argc!=4||!argv[3][0]))return 2;
  signal(SIGPIPE,SIG_IGN);
  try{
-  const bool network=std::string(argv[1])=="network";Peer peer(argv[2],network);
+  Peer peer(argv[2],network);
   UsbManagementClient usb(peer,now,[](unsigned ms){std::this_thread::sleep_for(std::chrono::milliseconds(ms));});
   TlsStream tls(now,TlsStream::Access::LoopbackTest,std::make_unique<Resolver>());
-  const std::string credentials=argv[3];
-  TlsSelection selection{"wsprrypico-"+std::string(32,'a')+".local","",credentials+"/client-ca.crt",credentials+"/client.crt",credentials+"/client.key",18443};
-  auto keys=network?std::make_shared<TlsCredentials>(selection):nullptr;
+  TlsSelection selection{};
+  std::shared_ptr<TlsCredentials> keys;
+  if(network){
+   const std::string credentials=argv[3];
+   selection={"wsprrypico-"+std::string(32,'a')+".local","",credentials+"/client-ca.crt",credentials+"/client.crt",credentials+"/client.key",18443};
+   keys=std::make_shared<TlsCredentials>(selection);
+  }
   if(!network&&!usb.hello(std::string(32,'a')))throw std::runtime_error("Actual USB management hello");
   const auto read_peer=[&]{return network?pico_http_request(tls,selection,keys,now,"status","GET",{},{}):usb.request("/api/control/v1/status","GET");};
   const auto initial=read_peer();if(initial.status!=200)throw std::runtime_error("Actual management status");

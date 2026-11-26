@@ -66,9 +66,9 @@ docker run --rm \
   '
 ```
 
-These focused commands are an initial check. For complete acceptance, run the `linux-native-contracts` and `non-hardware-validation` jobs from the checked-in workflow in the copied checkout, including the syscall traces and final hardware-access audit in `non-hardware-validation`. Supply the exact pinned RP1 reference and explicitly selected Pico/Mbed TLS checkouts for the separate pair suites. Preserve logs outside a disposable container before removing it. Use no `--privileged` or device passthrough.
+These focused commands are an initial check. For complete acceptance, run `linux-native-contracts`, `non-hardware-validation`, `debian-installer-support`, and both `debian-browser-validation` jobs from the checked-in workflow in the copied checkout. Retain the syscall traces and the audit for each traced job. Supply the exact pinned RP1 reference to the installer and support job and the explicitly selected Pico/Mbed TLS checkouts to the network suites. Preserve logs outside a disposable container before removing it. Use no `--privileged` or device passthrough.
 
-For the Ubuntu compiler matrix, use `FROM ubuntu:24.04` in a separate image, retain the common build packages above, and omit Chromium, age, and `device-tree-compiler` when running only compiler/profile checks. Build and run with `--platform linux/amd64` when x86-64 is required; record emulation on an ARM host. In the isolated copy, use the exact `ubuntu-gcc13-release` workflow recipe, including:
+For the Ubuntu compiler matrix, use `FROM ubuntu:24.04` in a separate image, retain the common build packages above, and omit Chromium, age, and `device-tree-compiler` when running only compiler/profile checks. Build and run with `--platform linux/amd64` when x86-64 is required and record emulation on an ARM host. The `ubuntu-gcc13-release` workflow runs each of the six profiles in its own job. Use separate build directories or checkouts for parallel builds. The equivalent serial commands are:
 
 ```sh
 test "$(g++ -dumpversion | cut -d. -f1)" = 13

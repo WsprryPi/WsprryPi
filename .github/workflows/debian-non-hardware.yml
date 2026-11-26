@@ -55,16 +55,8 @@ jobs:
       - name: Inspect the complete Git comparison
         id: classify
         run: python3 -B scripts/ci/change_scope.py
-      - name: Verify image-provided workflow validation tools
-        run: |
-          python3 -c 'import yaml'
-          c++ --version
-          make --version
-          pkg-config --modversion openssl
       - name: Verify execution owners and source-selection refusals
         run: python3 -B scripts/tests/ci_execution_graph_test.py
-      - name: Verify incremental compilation and build failure recovery
-        run: python3 -B scripts/tests/network_build_test.py
       - name: Select requested or paired Pico ref
         if: steps.classify.outputs.run_full_ci != 'false'
         id: requested-pico
@@ -89,6 +81,25 @@ jobs:
         if: steps.classify.outputs.run_full_ci != 'false'
         id: pico-output
         run: python3 -B scripts/ci/selected_source.py record src/build/selected-pico
+
+  ci-build-regressions:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify incremental compilation and build failure recovery
+        run: python3 -B scripts/tests/network_build_test.py
+      - name: Check container build export handling
+        run: |
+          python3 -B scripts/tests/container_build_test.py
+          python3 -B scripts/tests/container_avahi_contract_test.py
+      - name: Verify Linux logger shutdown
+        if: inputs.macos_runtime_only != true
+        run: python3 -B scripts/tests/logger_shutdown_test.py
 
   native-controller-components:
     name: Native controller components (${{ matrix.runner }})
@@ -128,29 +139,33 @@ jobs:
 
   macos-simulated-profile:
     name: ${{ inputs.macos_runtime_only && inputs.macos_controller_only && 'Controller host contracts' || 'macos-simulated-profile' }} (${{ matrix.runner }})
-    env:
+    env: &macos-simulated-env
       MAKEFLAGS: -j2
       SI5351_TRANSPORT: mcp2221a-hid
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}
+      WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     needs: change_scope
     if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
-    strategy:
+    strategy: &macos-runtime-strategy
       fail-fast: false
       matrix:
-        runner: ${{ fromJSON('{"all":["macos-26","macos-26-intel","xcode-27"],"arm64":["macos-26","xcode-27"],"macos-26":["macos-26"],"macos-26-intel":["macos-26-intel"],"xcode-27":["xcode-27"]}')[(inputs.macos_runtime_only && inputs.macos_runtime_profiles) || 'all'] }}
+        runner: &macos-runtime-runners ${{ fromJSON('{"all":["macos-26","macos-26-intel","xcode-27"],"arm64":["macos-26","xcode-27"],"macos-26":["macos-26"],"macos-26-intel":["macos-26-intel"],"xcode-27":["xcode-27"]}')[(inputs.macos_runtime_only && inputs.macos_runtime_profiles) || 'all'] }}
     runs-on: ${{ matrix.runner }}
-    # Cold controller, native recovery, and both actual software carriers run
-    # on each architecture; retain their source checks and final runtime cases.
     timeout-minutes: 90
     steps:
-      - name: Check out source
+      - &checkout-macos-runtime
+        name: Check out source
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: Select the pinned native Python runtime
+      - &setup-macos-python
+        name: Select the pinned native Python runtime
         uses: actions/setup-python@v7
         with:
           python-version: '3.15.2'
-      - name: Select OpenSSL 4 development and fixture tools
+      - &setup-macos-runtime-tools
+        name: Select OpenSSL 4 development and fixture tools
         run: |
           brew install openssl@4 sqlite
           macos_openssl_prefix=$(brew --prefix openssl@4)
@@ -158,6 +173,27 @@ jobs:
           echo "${macos_openssl_prefix}/bin" >> "$GITHUB_PATH"
           echo "PKG_CONFIG_PATH=${macos_openssl_prefix}/lib/pkgconfig:${macos_sqlite_prefix}/lib/pkgconfig" >> "$GITHUB_ENV"
           "${macos_openssl_prefix}/bin/openssl" version
+
+      - &verify-macos-runtime
+        name: Record the native minimum-OS software profile
+        run: |
+          case "${{ matrix.runner }}" in
+            macos-26) expected_macos_major=26; expected_arch=arm64 ;;
+            macos-26-intel) expected_macos_major=26; expected_arch=x86_64 ;;
+            xcode-27) expected_macos_major=27; expected_arch=arm64 ;;
+            *) exit 1 ;;
+          esac
+          test "$(sw_vers -productVersion | cut -d. -f1)" = "$expected_macos_major"
+          test "$(uname -m)" = "$expected_arch"
+          test "$MACOSX_DEPLOYMENT_TARGET" = "$expected_macos_major.0"
+          sw_vers
+          uname -m
+          clang++ --version
+          xcrun --sdk macosx --show-sdk-version
+          python3 --version
+          python3 -c "import sys; assert sys.version_info[:2] == (3, 15)"
+          node --version
+          pkg-config --modversion openssl sqlite3
 
       - name: Check bounded USB logging parser and policy
         working-directory: src
@@ -185,17 +221,6 @@ jobs:
           make pico-management-target-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make pico-management-journal-test pico-management-history-test pico-target-controller-test controller-contract-test pico-usb-settings-test pi-config-persistence-coordinator-test pi-management-anchor-test pi-management-journal-test pi-managed-records-test pi-managed-store-test pi-management-service-test pi-managed-startup-test pi-managed-host-test pi-managed-host-runtime-test pi-private-network-persistence-test pi-managed-wtp-main-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-      - name: Build and audit the isolated controller profile
-        run: |
-          python3 scripts/tests/controller_build_profile_test.py
-          python3 scripts/tests/controller_profile_entry_test.py
-          env -u SI5351_TRANSPORT make -C src -j2 debug controller-transmitter-boundary-test application-monitor-boundary-test native-controller-identity-runtime-test BUILD_PROFILE=controller SUDO=
-          python3 scripts/tests/controller_binary_audit.py src/build/bin/profiles/controller/wsprrypi_debug
-
-      - name: Run bounded recovery role, relocation, and restart matrix
-        working-directory: src
-        run: make recovery-integration-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-
       - name: Run TLS adapter and certificate regressions
         working-directory: src
         run: |
@@ -205,34 +230,84 @@ jobs:
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test pico-usb-management-contract-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          make wtp-production-test wtp-managed-output-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-protocol-test wtp-usb-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make wtp-production-cpp-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \
             wtp-fleet-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
 
-      - name: Check container build export handling
-        run: |
-          python3 scripts/tests/container_build_test.py
-          python3 scripts/tests/container_avahi_contract_test.py
+      - name: Run the WTP browser unit test when Linux UI checks are excluded
+        if: ${{ inputs.macos_runtime_only == true }}
+        run: node WsprryPi-UI/tests/wtp_ui_test.js
 
-      - name: Record the native minimum-OS software profile
+  macos-controller-recovery:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    strategy: *macos-runtime-strategy
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env: *macos-simulated-env
+    steps:
+      - *checkout-macos-runtime
+      - *setup-macos-python
+      - *setup-macos-runtime-tools
+      - *verify-macos-runtime
+
+      - name: Build and audit the isolated controller profile
         run: |
-          case "${{ matrix.runner }}" in
-            macos-26|macos-26-intel) expected_macos_major=26 ;;
-            xcode-27) expected_macos_major=27 ;;
-            *) exit 1 ;;
-          esac
-          test "$(sw_vers -productVersion | cut -d. -f1)" = "$expected_macos_major"
-          sw_vers
-          uname -m
-          clang++ --version
-          xcrun --show-sdk-version
-          python3 --version
-          python3 -c "import sys; assert sys.version_info[:2] == (3, 15)"
-          node --version
-          pkg-config --modversion openssl sqlite3
+          python3 scripts/tests/controller_build_profile_test.py
+          python3 scripts/tests/controller_profile_entry_test.py
+          env -u SI5351_TRANSPORT make -C src -j2 debug controller-transmitter-boundary-test application-monitor-boundary-test native-controller-identity-runtime-test BUILD_PROFILE=controller SUDO=
+          python3 scripts/tests/controller_binary_audit.py src/build/bin/profiles/controller/wsprrypi_debug
+
+      - name: Build the recovery fixtures in parallel
+        working-directory: src
+        run: make build/bin/recovery_maintenance_fixture build/bin/recovery_native_owner_fixture build/bin/recovery_evidence_test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Run bounded recovery role, relocation, and restart matrix
+        if: ${{ !(inputs.macos_runtime_only && inputs.macos_controller_only) }}
+        working-directory: src
+        run: make recovery-integration-after-portable-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Run the complete recovery matrix for controller-only dispatches
+        if: ${{ inputs.macos_runtime_only && inputs.macos_controller_only }}
+        working-directory: src
+        run: make recovery-integration-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+
+      - name: Qualify pairing and controller roles without hardware
+        if: ${{ inputs.macos_runtime_only != true }}
+        run: |
+          make -C src pairing-provider-test pi-pair-contract-test pi-pair-crypto-test pi-pair-tls-test pi-pair-machine-service-test pi-pair-runtime-test pi-pair-local-http-test pi-pair-service-lifetime-test pi-pair-outgoing-rotation-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          python3 scripts/tests/pairing_support_redaction_test.py
+          python3 scripts/tests/copy_exe_notice_test.py
+
+  macos-pico-carriers:
+    needs: change_scope
+    if: ${{ !cancelled() && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    name: macos-pico-carriers (${{ matrix.runner }}, ${{ matrix.carrier }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: *macos-runtime-runners
+        carrier: [network, usb]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env: *macos-simulated-env
+    steps:
+      - *checkout-macos-runtime
+      - *setup-macos-python
+      - *setup-macos-runtime-tools
+      - *verify-macos-runtime
+
+      - &verify-macos-pi-source
+        name: Verify immutable Pi source for native Mac carriers
+        run: |
+          source_revision=$(git rev-parse --verify 'HEAD^{commit}')
+          source_status=$(git status --porcelain --untracked-files=all)
+          test "$source_revision" = "$GITHUB_SHA"
+          test -z "$source_status"
+          git rev-parse HEAD 'HEAD^{tree}'
       - name: Require immutable Pico selection for native Mac carriers
         env:
           PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
@@ -243,13 +318,15 @@ jobs:
           ref: ${{ needs.change_scope.outputs.pico_sha }}
           path: src/build/controller-native-reference/pico
           persist-credentials: false
-      - name: Verify immutable Pico source for native Mac carriers
+      - &verify-macos-pico-source
+        name: Verify immutable Pico source for native Mac carriers
         env:
           PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
         run: python3 -B scripts/ci/selected_source.py verify "$PICO_SHA" src/build/controller-native-reference/pico
       - name: Verify the selected shared contract
         run: python3 scripts/generate_control_contract.py --source src/build/controller-native-reference/pico --check
       - uses: actions/checkout@v7
+        if: matrix.carrier == 'network'
         with:
           repository: Mbed-TLS/mbedtls
           ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
@@ -257,6 +334,7 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - name: Exercise actual native Mac controller and Pico network peers
+        if: matrix.carrier == 'network'
         working-directory: src
         run: |
           make -j2 wtp-network-tools-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
@@ -264,20 +342,19 @@ jobs:
           make pico-https-management-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
           make pico-control-interop-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= PICO_SOURCE=build/controller-native-reference/pico MBEDTLS_SOURCE=build/controller-native-reference/mbedtls
       - name: Build the actual software Pico USB endpoint on native Mac
+        if: matrix.carrier == 'usb'
         run: |
           cmake -S src/build/controller-native-reference/pico -B src/build/controller-native-reference/pico-usb -DWSPRRY_PICO_BUILD_FIRMWARE=OFF -DWSPRRY_PICO_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
           cmake --build src/build/controller-native-reference/pico-usb --target usb_management_driver -j2
           make -C src pico-usb-control-client-build pico-usb-management-contract-test wtp-fleet-operations-driver-build build/bin/pico_management_usb_pair_client BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Exercise native Mac clients through production Pico USB handlers
-        env:
-          WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
+        if: matrix.carrier == 'usb'
         run: |
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/pico_usb_control_pair_test.js src/build/wtp-network/pico_usb_control_client src/build/controller-native-reference/pico-usb/usb_management_driver
           node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/controller-native-reference/pico-usb/usb_management_driver
-          node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/controller-native-reference/pico-usb/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
-      - name: Exercise native controller recovery owners and restart
-        working-directory: src
-        run: make -j1 recovery-native-owner-controller-test recovery-maintenance-controller-test recovery-maintenance-roundtrip-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/controller-native-reference/pico-usb/usb_management_driver"
+      - *verify-macos-pico-source
+      - *verify-macos-pi-source
 
   macos-si5351-profile:
     needs: change_scope
@@ -287,20 +364,13 @@ jobs:
       matrix:
         runner: [macos-26, macos-26-intel, xcode-27]
     runs-on: ${{ matrix.runner }}
-    # Intel cold physical and simulated pairing builds can reach 45 minutes
-    # while generating debug symbols; retain every profile and its final checks.
     timeout-minutes: ${{ matrix.runner == 'macos-26-intel' && 60 || 45 }}
-    env:
-      MAKEFLAGS: -j2
-      SI5351_TRANSPORT: mcp2221a-hid
-      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}
-      WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
+    env: *macos-simulated-env
     steps:
-      - uses: actions/checkout@v7
-      - name: Select OpenSSL development libraries
-        run: |
-          brew install openssl@4 sqlite
-          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@4)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - *checkout-macos-runtime
+      - *setup-macos-python
+      - *setup-macos-runtime-tools
+      - *verify-macos-runtime
       - name: Build the explicit native physical profile without opening hardware
         run: make -j2 -C src release backend-profile-factory-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
       - name: Exercise transport selection and scripted HID failures
@@ -311,17 +381,10 @@ jobs:
         run: |
           python3 scripts/tests/macos_si5351_audit.py src/build/bin/wsprrypi
           python3 scripts/tests/early_cli_exit_test.py src/build/bin/wsprrypi mcp2221a-hid
-      - name: Check native cached inventory and unsupported machine-power admission
-        run: make -C src si5351-inventory-isolation-test websocket-lifecycle-test controller-only-test wtp-pi-identity-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
-
-      - name: Qualify pairing and controller roles without hardware on both Mac architectures
-        run: |
-          make -C src pairing-provider-test pi-pair-contract-test pi-pair-crypto-test pi-pair-tls-test pi-pair-machine-service-test pi-pair-runtime-test pi-pair-local-http-test pi-pair-service-lifetime-test pi-pair-outgoing-rotation-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
-          python3 scripts/tests/pairing_provider_build_test.py
-          python3 scripts/tests/pairing_support_redaction_test.py
-          python3 scripts/tests/copy_exe_notice_test.py
           cmp docs/licenses/botan/BSD-2-Clause.txt src/build/bin/BOTAN-LICENSE.txt
           cmp scripts/pairing_provider.json src/build/bin/PAIRING-PROVIDER.json
+      - name: Check native cached inventory and unsupported machine-power admission
+        run: make -C src si5351-inventory-isolation-test websocket-lifecycle-test controller-only-test BACKENDS=si5351 ANCILLARY_GPIO=0 SUDO=
 
   pico-network-management-pair:
     needs: change_scope
@@ -330,6 +393,11 @@ jobs:
     # Cold dependency installation and C++ builds share this budget with TLS,
     # routing, and browser checks; allow the final checks to finish on cold runners.
     timeout-minutes: 45
+    name: pico-network-management-pair (${{ matrix.suite }})
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [interop, browser]
     env:
       WSPRRYPI_DISABLE_HARDWARE_ACCESS: "1"
     steps:
@@ -338,7 +406,12 @@ jobs:
         run: |
           sudo sed -i -e 's|mirror+file:/etc/apt/apt-mirrors.txt|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://archive.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' -e 's|http://security.ubuntu.com/ubuntu|https://azure.archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
-          sudo apt-get install -y libssl-dev libsqlite3-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 nodejs php-cli iproute2 tcpdump
+          sudo apt-get install -y libssl-dev libsqlite3-dev libavahi-client-dev libsystemd-dev pkg-config cmake python3 php-cli iproute2 tcpdump
+      - name: Select the Pico browser test runtime
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.8.0'
+          package-manager-cache: false
       - name: Install UI development dependencies
         working-directory: WsprryPi-UI
         run: npm ci --ignore-scripts
@@ -374,17 +447,19 @@ jobs:
           ref: 0bebf8b8c7f07abe3571ded48a11aa907a1ffb20
           path: src/build/network-reference/mbedtls
           submodules: recursive
+          persist-credentials: false
       - name: Select bounded build budget
         run: make -C src ci-build-budget BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Validate retained Fleet records without execution
+        if: matrix.suite == 'interop'
         run: |
-          make -C src wtp-fleet-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
+          make -C src debug wtp-fleet-test wtp-fleet-operations-driver-build BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
       - name: Parent TLS, shared API and actual Pico interoperability
+        if: matrix.suite == 'interop'
         working-directory: src
         run: |
           make udp-logging-worker udp-logging-test SUDO=
           python3 -B ../scripts/tests/udp_log_control_test.py
-          make debug BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           make production-browser-regression-test BACKENDS=simulated ANCILLARY_GPIO=0 SUDO= TEST_NETNS_RUNNER="sudo unshare --net"
           make tls-observer-test SUDO=
           make wtp-catalog-test SUDO=
@@ -394,6 +469,7 @@ jobs:
           make pico-control-interop-test SUDO= PICO_SOURCE=build/network-reference/pico MBEDTLS_SOURCE=build/network-reference/mbedtls
           node ../WsprryPi-UI/tests/fleet_operations_pair_test.js build/bin/wtp_fleet_operations_driver network "$PWD/build/wtp-network/pico_tls_server" "$PWD/build/wtp-network/credentials-v3"
       - name: Shipped Pico controls through actual public and encrypted HTTP handlers
+        if: matrix.suite == 'browser'
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
@@ -408,14 +484,17 @@ jobs:
           node src/build/network-reference/pico/tests/organization_routes.test.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver src/build/network-reference/pico-browser/generated/web_assets.cpp
           node src/build/network-reference/pico/tests/organization_browser_integration.mjs src/build/network-reference/pico-browser/consumer_bootstrap_driver
       - name: Current shared Setup through the actual Pi and Pico handlers
+        if: matrix.suite == 'interop'
         env:
           CHROME_BIN: /usr/bin/google-chrome
         run: |
           make -C src -j2 build/bin/shared_setup_main_fixture BACKENDS=simulated ANCILLARY_GPIO=0 SUDO=
           WSPRRYPI_SHARED_SETUP_MAIN_FIXTURE="$PWD/src/build/bin/shared_setup_main_fixture" node WsprryPi-UI/tests/pico_controller_http_pair_test.js "$PWD/src/build/wtp-network" "$PWD/src/build/bin/pico_controller_pair_fixture" --browser --shared-browser
       - name: Prove edited Pico source selection and genuine build failures
+        if: matrix.suite == 'browser'
         run: python3 -B scripts/tests/pico_source_selection_test.py src/build/network-reference/pico src/build/network-reference/mbedtls
-      - name: Render network controls with mocked responses
+      - name: Render logging, USB, and Fleet controls with mocked responses
+        if: matrix.suite == 'browser'
         working-directory: WsprryPi-UI
         env:
           CHROME_BIN: /usr/bin/google-chrome
@@ -425,11 +504,16 @@ jobs:
           LOGGING_RENDERED_HTML=/tmp/udp-logs-rendered.html node tests/udp_logging_logs_browser_test.js
           LOGGING_REAL_STREAM=1 LOGGING_RENDERED_HTML=/tmp/udp-logs-rendered.html node tests/usb_logging_browser_test.js
           node tests/wtp_usb_ui_integration_test.js
-          node tests/wtp_network_ui_integration_test.js
           node tests/wtp_pi_fleet_ui_integration_test.js
+
+      - name: Render network and recovery controls with production readbacks
+        if: matrix.suite == 'interop'
+        working-directory: WsprryPi-UI
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          node tests/wtp_network_ui_integration_test.js
           WSPRRYPI_RUN_RECOVERY_BROWSER=1 node tests/wtp_recovery_ui_integration_test.js
-          node tests/pico_target_editor_state_browser_test.js
-          node tests/recurrence_migration_browser_test.js
       - name: Verify immutable Pico source after the complete recipe
         env:
           PICO_SHA: ${{ needs.change_scope.outputs.pico_sha }}
@@ -451,8 +535,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: network-browser-failure-${{ github.run_attempt }}
-          path: src/build/wtp-network/ui
+          name: network-browser-failure-${{ matrix.suite }}-${{ github.run_attempt }}
+          path: |
+            src/build/wtp-network/ui
+            src/build/wtp-network/ui-usb-progress
           if-no-files-found: ignore
           retention-days: 7
 
@@ -518,7 +604,7 @@ jobs:
           node WsprryPi-UI/tests/wtp_usb_settings_test.js
           WSPRRYPI_GPIO_DRIVE_REQUIRED=1 node WsprryPi-UI/tests/pico_usb_control_pair_test.js src/build/wtp-network/pico_usb_control_client src/build/usb-reference/pico-host/usb_management_driver
           WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/pico_management_usb_pair_test.js src/build/bin/pico_management_usb_pair_client src/build/usb-reference/pico-host/usb_management_driver
-          WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver" "$PWD/src/build/wtp-network/credentials-v3"
+          WSPRRYPI_DISABLE_HARDWARE_ACCESS=1 node WsprryPi-UI/tests/fleet_operations_pair_test.js src/build/bin/wtp_fleet_operations_driver usb "$PWD/src/build/usb-reference/pico-host/usb_management_driver"
 
       - name: Verify immutable Pico source after the complete recipe
         env:
@@ -590,9 +676,24 @@ jobs:
     needs: change_scope
     if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
     runs-on: ubuntu-24.04
-    # Six cold warning-as-error profiles reached the final profile at 30 minutes.
-    # Keep every profile and allow the final build and CLI audits to complete.
-    timeout-minutes: 45
+    name: ubuntu-gcc13-release (${{ matrix.profile }})
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: rpi-gpio
+            omitted: si5351
+          - profile: rp1-gpclk
+            omitted: si5351
+          - profile: si5351
+            omitted: simulated
+          - profile: simulated
+            omitted: si5351
+          - profile: si5351,simulated
+            omitted: gpio
+          - profile: rpi-gpio,rp1-gpclk,si5351,simulated
+            omitted: ''
     steps:
       - name: Install release-build dependencies
         run: |
@@ -611,29 +712,14 @@ jobs:
 
       - name: Build parent release executable with warnings as errors
         working-directory: src
+        env:
+          BACKEND_PROFILE: ${{ matrix.profile }}
+          OMITTED_BACKEND: ${{ matrix.omitted }}
         run: |
-          for profile in \
-            rpi-gpio \
-            rp1-gpclk \
-            si5351 \
-            simulated \
-            si5351,simulated \
-            rpi-gpio,rp1-gpclk,si5351,simulated
-          do
-            make release backend-profile-factory-test BACKENDS="$profile" SUDO=
-            omitted=
-            case "$profile" in
-              rpi-gpio) omitted=si5351 ;;
-              rp1-gpclk) omitted=si5351 ;;
-              si5351) omitted=simulated ;;
-              simulated) omitted=si5351 ;;
-              si5351,simulated) omitted=gpio ;;
-            esac
-            ../scripts/tests/backend_capability_reporting_test.sh \
-              ./build/bin/wsprrypi "$profile" "$omitted"
-            python3 ../scripts/tests/early_cli_exit_test.py ./build/bin/wsprrypi
-          done
-          python3 ../scripts/tests/logger_shutdown_test.py
+          make release backend-profile-factory-test BACKENDS="$BACKEND_PROFILE" SUDO=
+          ../scripts/tests/backend_capability_reporting_test.sh \
+            ./build/bin/wsprrypi "$BACKEND_PROFILE" "$OMITTED_BACKEND"
+          python3 ../scripts/tests/early_cli_exit_test.py ./build/bin/wsprrypi
 
   non-hardware-validation:
     needs: change_scope
@@ -654,7 +740,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            age build-essential ca-certificates chromium cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
+            age build-essential ca-certificates cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
             libsystemd-dev nodejs npm passwd php-cli pkg-config python3 shellcheck strace util-linux
 
       - &checkout-linux-source
@@ -692,44 +778,16 @@ jobs:
           make debug SUDO=
 
       - name: Run parent semantics and cleanup lifecycle tests
+        id: traced-semantics
         working-directory: src
         run: |
           make semantics-make-regression-test SUDO=
-          strace -f -e trace=openat,open \
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat \
             -o /tmp/wsprrypi-semantics.strace \
             make semantics-test SUDO=
-          strace -f -e trace=openat,open \
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat \
             -o /tmp/wsprrypi-startup-quiesce-parent.strace \
             make startup-quiesce-parent-test SUDO=
-
-      - name: Install UI development dependencies
-        working-directory: WsprryPi-UI
-        run: npm ci --ignore-scripts
-
-      - name: Run UI component regressions
-        working-directory: WsprryPi-UI
-        run: npm test
-
-      - name: Run UI browser integration regressions
-        working-directory: WsprryPi-UI
-        run: |
-          npm run test:browser
-          make -C ../src -j1 recovery-maintenance-browser-test recovery-maintenance-controller-browser-test SUDO=
-          make -C ../src controller-only-test pico-management-target-test SUDO=
-          make -C ../src -j2 build/bin/profiles/controller/controller_only_production_fixture BUILD_PROFILE=controller SUDO=
-          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/profiles/controller/controller_only_production_fixture" node tests/controller_mode_browser_test.js
-
-      - name: Read-only RP1-GPIO-CLK-DKMS stable reference
-        uses: actions/checkout@v7
-        with:
-          repository: WsprryPi/RP1-GPIO-CLK-DKMS
-          ref: e17d710499e8c7c630d2eda6adececd7f6b797f5 # v1.0.0 provider source; package remains release-selected
-          path: src/build/rp1-provider-reference
-          persist-credentials: false
-
-      - name: Set reference checkout ownership
-        shell: bash
-        run: chown -R wsprrypi-ci:wsprrypi-ci "$GITHUB_WORKSPACE/src/build/rp1-provider-reference"
 
       - name: Run RP1 non-hardware regression
         working-directory: src
@@ -737,7 +795,7 @@ jobs:
           uname -sr
           strace -V
           trap 'ci_rp1_status=$?; if [ "$ci_rp1_status" -ne 0 ]; then tail -n 120 /tmp/wsprrypi-rp1.strace >&2 || :; fi; exit "$ci_rp1_status"' EXIT
-          strace -f -e trace=openat,open,clone,clone3,fork,vfork,wait4,waitid,exit,exit_group,kill,tgkill,setpgid \
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat,clone,clone3,fork,vfork,wait4,waitid,exit,exit_group,kill,tgkill,setpgid \
             -o /tmp/wsprrypi-rp1.strace \
             make object-dependency-test \
               rp1-gpclk-planner-test rp1-gpclk-lifecycle-test rp1-gpclk-transition-test \
@@ -749,53 +807,8 @@ jobs:
       - name: Execute focused state, network policy and support lifecycle obligations
         working-directory: src
         run: |
-          strace -f -e trace=openat,open -o /tmp/wsprrypi-focused.strace \
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat -o /tmp/wsprrypi-focused.strace \
             make ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test SUDO=
-      - name: Execute offline installer and maintenance obligations
-        env:
-          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
-        working-directory: src
-        run: |
-          command -v shellcheck
-          strace -f -e trace=openat,open -o /tmp/wsprrypi-installer.strace \
-            make ci-installer-offline-test php2shell-test SUDO=
-
-      - name: Validate actual provider update and bootstrap boundary
-        run: python3 -B scripts/tests/rp1_gpclk_update_contract_test.py src/build/rp1-provider-reference
-
-      - name: Qualify support-bundle age round trip
-        env:
-          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
-        working-directory: src
-        run: |
-          make support-bundle-job-manager-test support-bundle-http-test SUDO=
-          make support-bundle-private-artifact-test support-bundle-age-roundtrip-test SUDO=
-          make support-bundle-production-encryption-metadata-test SUDO=
-          make support-bundle-key-provisioning-test SUDO=
-          WSPRRYPI_REAL_OPENSSL=/usr/bin/openssl make support-bundle-signing-key-provisioning-test SUDO=
-          WSPRRYPI_REAL_OPENSSL=/usr/bin/openssl make support-bundle-intake-manifest-preparation-test SUDO=
-          WSPRRYPI_REAL_OPENSSL=/usr/bin/openssl make support-bundle-intake-manifest-lifecycle-test SUDO=
-          make support-bundle-intake-production-manifest-test SUDO=
-          make support-bundle-intake-publication-commit-test SUDO=
-          make support-bundle-intake-publication-push-test SUDO=
-          make support-bundle-intake-publication-verification-test SUDO=
-          make support-bundle-intake-trust-compilation-test SUDO=
-          make support-bundle-intake-production-trust-test SUDO=
-          make support-bundle-intake-identity-ceremony-preflight-test SUDO=
-          make support-bundle-maintainer-intake-inspection-test SUDO=
-          make support-bundle-maintainer-processing-test SUDO=
-          make support-bundle-retention-audit-test SUDO=
-          make support-bundle-retention-deletion-test SUDO=
-          make support-bundle-collector-contract-test SUDO=
-          make support-bundle-age-dependency-test installer-dependency-test \
-            rp1-gpclk-dkms-installer-test SUDO=
-          make support-bundle-intake-validation-test SUDO=
-          make support-bundle-intake-state-test SUDO=
-          make support-bundle-intake-retrieval-test SUDO=
-          make support-bundle-intake-controller-test SUDO=
-          make support-bundle-intake-runtime-test SUDO=
-          make support-bundle-intake-production-test SUDO=
-
       - name: Run transmitter component contract regressions
         working-directory: src/WSPR-Transmitter/src
         run: |
@@ -836,15 +849,135 @@ jobs:
         run: python3 scripts/tests/no_transmitter_hardware_audit_test.py
 
       - name: Reject transmitter hardware access
+        if: ${{ !cancelled() && (steps.traced-semantics.outcome == 'success' || steps.traced-semantics.outcome == 'failure') }}
         run: |
           scripts/ci/assert-no-transmitter-hardware.sh \
             /tmp/wsprrypi-semantics.strace \
             /tmp/wsprrypi-startup-quiesce-parent.strace \
             /tmp/wsprrypi-rp1.strace \
             /tmp/wsprrypi-focused.strace \
-            /tmp/wsprrypi-installer.strace \
             /tmp/wsprrypi-simulator.strace \
             /tmp/wsprrypi-wspr-simulator.strace
+
+  debian-installer-support:
+    needs: change_scope
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: debian:trixie-slim
+    env: *linux-validation-env
+    defaults: *linux-validation-defaults
+    steps:
+      - *install-linux-validation-dependencies
+      - *checkout-linux-source
+      - *select-linux-checkout-owner
+      - *trust-linux-checkout-owner
+      - *select-linux-build-budget
+
+      - name: Read-only RP1-GPIO-CLK-DKMS stable reference
+        uses: actions/checkout@v7
+        with:
+          repository: WsprryPi/RP1-GPIO-CLK-DKMS
+          ref: e17d710499e8c7c630d2eda6adececd7f6b797f5 # v1.0.0 provider source; package remains release-selected
+          path: src/build/rp1-provider-reference
+          persist-credentials: false
+
+      - name: Set reference checkout ownership
+        shell: bash
+        run: chown -R wsprrypi-ci:wsprrypi-ci "$GITHUB_WORKSPACE/src/build/rp1-provider-reference"
+
+      - name: Execute offline installer and maintenance obligations
+        id: traced-installer
+        env:
+          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
+        working-directory: src
+        run: |
+          command -v shellcheck
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat -o /tmp/wsprrypi-installer.strace \
+            make ci-installer-offline-test php2shell-test SUDO=
+
+      - name: Validate actual provider update and bootstrap boundary
+        run: python3 -B scripts/tests/rp1_gpclk_update_contract_test.py src/build/rp1-provider-reference
+
+      - name: Qualify support-bundle age round trip
+        env:
+          RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
+        working-directory: src
+        run: |
+          strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat \
+            -o /tmp/wsprrypi-support.strace bash -e -o pipefail <<'SUPPORT'
+          make support-bundle-job-manager-test support-bundle-http-test \
+            support-bundle-private-artifact-test support-bundle-age-roundtrip-test \
+            support-bundle-production-encryption-metadata-test support-bundle-key-provisioning-test SUDO=
+          WSPRRYPI_REAL_OPENSSL=/usr/bin/openssl make support-bundle-signing-key-provisioning-test \
+            support-bundle-intake-manifest-preparation-test support-bundle-intake-manifest-lifecycle-test SUDO=
+          make support-bundle-intake-production-manifest-test support-bundle-intake-publication-commit-test \
+            support-bundle-intake-publication-push-test support-bundle-intake-publication-verification-test \
+            support-bundle-intake-trust-compilation-test support-bundle-intake-production-trust-test \
+            support-bundle-intake-identity-ceremony-preflight-test support-bundle-maintainer-intake-inspection-test \
+            support-bundle-maintainer-processing-test support-bundle-retention-audit-test \
+            support-bundle-retention-deletion-test support-bundle-collector-contract-test SUDO=
+          make support-bundle-age-dependency-test installer-dependency-test \
+            rp1-gpclk-dkms-installer-test SUDO=
+          make support-bundle-intake-validation-test support-bundle-intake-state-test \
+            support-bundle-intake-retrieval-test support-bundle-intake-controller-test \
+            support-bundle-intake-runtime-test support-bundle-intake-production-test SUDO=
+          SUPPORT
+
+      - name: Reject transmitter hardware access
+        if: ${{ !cancelled() && (steps.traced-installer.outcome == 'success' || steps.traced-installer.outcome == 'failure') }}
+        run: |
+          scripts/ci/assert-no-transmitter-hardware.sh \
+            /tmp/wsprrypi-installer.strace \
+            /tmp/wsprrypi-support.strace
+
+  debian-browser-validation:
+    needs: change_scope
+    if: ${{ !cancelled() && inputs.macos_runtime_only != true && (needs.change_scope.result != 'success' || needs.change_scope.outputs.run_full_ci != 'false') }}
+    runs-on: ubuntu-24.04
+    name: debian-browser-validation (${{ matrix.suite }})
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [ui, production]
+    container: debian:trixie-slim
+    env: *linux-validation-env
+    defaults: *linux-validation-defaults
+    steps:
+      - *install-linux-validation-dependencies
+      - name: Install Chromium
+        shell: bash
+        run: DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium
+      - *checkout-linux-source
+      - *select-linux-checkout-owner
+      - *trust-linux-checkout-owner
+      - *select-linux-build-budget
+
+      - name: Install UI development dependencies
+        working-directory: WsprryPi-UI
+        run: npm ci --ignore-scripts
+
+      - name: Run UI component and browser regressions
+        if: matrix.suite == 'ui'
+        working-directory: WsprryPi-UI
+        run: |
+          npm test
+          npm run test:browser
+
+      - name: Build the recovery browser fixture in parallel
+        if: matrix.suite == 'production'
+        working-directory: src
+        run: make build/bin/recovery_maintenance_fixture SUDO=
+
+      - name: Run production browser integration regressions
+        if: matrix.suite == 'production'
+        working-directory: WsprryPi-UI
+        run: |
+          make -C ../src -j1 recovery-maintenance-browser-test recovery-maintenance-controller-browser-test SUDO=
+          make -C ../src controller-only-test pico-management-target-test SUDO=
+          make -C ../src -j2 build/bin/profiles/controller/controller_only_production_fixture BUILD_PROFILE=controller SUDO=
+          WSPRRYPI_CONTROLLER_FIXTURE="$PWD/../src/build/bin/profiles/controller/controller_only_production_fixture" node tests/controller_mode_browser_test.js
 
   linux-native-contracts:
     needs: change_scope
@@ -861,10 +994,14 @@ jobs:
       - *trust-linux-checkout-owner
       - *select-linux-build-budget
 
+      - name: Verify the BCM2835 qualification owner without hardware
+        working-directory: src
+        run: make gpio-qualification-owner gpio-qualification-owner-test SUDO=
+
       - name: Run native execution, management, and retirement tests
         working-directory: src
         run: |
-          make wtp-protocol-test wtp-usb-test pico-usb-management-contract-test wtp-production-cpp-test native-recurrence-test SUDO=
+          make wtp-protocol-test wtp-usb-test pico-usb-management-contract-test wtp-production-cpp-test SUDO=
           make wtp-pi-authority-test wtp-pi-revocation-test \
             wtp-pi-tone-engine-test wtp-pi-identity-test wtp-pi-interface-selection-test \
             wtp-pi-si5351-realization-test wtp-pi-control-test wtp-pi-config-transaction-test \

@@ -216,7 +216,7 @@ The portable target pins `BACKENDS=simulated ANCILLARY_GPIO=0`; caller-provided 
 
 ## Debian CI
 
-The non-hardware validation workflow runs two Debian Trixie container jobs, each with a 40-minute limit. `linux-native-contracts` runs native execution, management, retirement, frequency, and Test Tone contract tests. `non-hardware-validation` builds the parent debug executable, runs the semantics and cleanup lifecycle suite, exercises the RP1 test-double regression, runs the simulator/controller/startup/Si5351 contract tests, compares deterministic QRSS and complete WSPR virtual-time traces, and audits file access with `strace`.
+The Debian Trixie jobs run in parallel. `linux-native-contracts` covers native execution, management, retirement, frequency, and Test Tone contracts. `non-hardware-validation` covers parent semantics, both native recurrence checks, lifecycle, RP1 runtime contracts, and the virtual-time QRSS and WSPR traces. Both jobs have a 40-minute limit. `debian-installer-support` exercises the offline installer and support bundles using the pinned RP1 provider, with a 30-minute limit. Each traced job audits its own file opens and checks available traces even after a test fails. `debian-browser-validation` runs UI units and browser regressions in one job and the actual-main browser checks in another. Each has a 35-minute limit.
 
 For consistent behavior with GNU and uutils `timeout`, the bounded WSPR helper uses foreground mode while keeping `timeout` as the direct supervisor of WsprryPi.
 
@@ -224,6 +224,6 @@ The workflow sets `WSPRRYPI_DISABLE_HARDWARE_ACCESS=1`, passes an empty `SUDO` m
 
 Run the same checks locally from the repository root with the commands in `.github/workflows/debian-non-hardware.yml`. The workflow establishes software-contract evidence only; it is not physical-hardware or RF qualification.
 
-The production network and USB pair jobs record the effective Pi commit/tree and selected Pico revision, hash tracked Pi/Pico source files before their recipes, and compare fresh manifests after all recipe commands pass. Generated build output and private runtime state are outside these tracked-source manifests. The selected Pico must remain clean at the immutable input SHA; dependency pins remain explicit in the workflow.
+The Linux network interoperability, standalone Pico browser, and USB jobs record the effective Pi commit/tree and selected Pico revision. Each hashes tracked Pi/Pico sources before its recipe and compares fresh manifests after its tests pass. Browser tests that consume production network readbacks run with the integration job that generates those readbacks. The macOS network and USB jobs run independently on each selected runner type and verify their source checkouts after the carrier tests. The USB job builds its own software endpoint and client fixtures. Both platforms use the same immutable Pico revision selected by the workflow.
 
 Focused physical-backend tests remain separate and must continue to pass. Simulator results demonstrate application and backend-contract behavior only; they do not qualify GPIO timing, I2C hardware, RF output, installation, services, or any physical transmitter.

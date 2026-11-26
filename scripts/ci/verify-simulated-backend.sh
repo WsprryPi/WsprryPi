@@ -24,7 +24,7 @@ run_simulator
 cp "$trace" "$first"
 
 rm -f "$trace" /tmp/wsprrypi-simulator.strace
-strace -f -e trace=openat,open \
+strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat \
     -o /tmp/wsprrypi-simulator.strace \
     timeout --foreground --signal=TERM --kill-after=2s 10s "$binary" \
         --backend simulated \

@@ -92,15 +92,19 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("make -C src ci-change-scope-test", gate)
         self.assertIn("run: python3 -B scripts/ci/change_scope.py", gate)
         self.assertIn("run_full_ci: ${{ steps.classify.outputs.run_full_ci }}", gate)
+        self.assertIn("run: python3 -B scripts/tests/network_build_test.py", jobs["ci-build-regressions"])
+        self.assertNotIn("scripts/tests/network_build_test.py", gate)
         self.assertTrue(jobs)
         guard = ("if: ${{ !cancelled() && (needs.change_scope.result != 'success' || "
                  "needs.change_scope.outputs.run_full_ci != 'false') }}")
+        runtime_jobs = {"macos-simulated-profile", "macos-controller-recovery", "macos-pico-carriers",
+                        "ci-build-regressions"}
         for name, body in jobs.items():
             with self.subTest(job=name):
                 self.assertIn("    needs: change_scope\n", body)
                 # Explicit manual partial qualification skips unselected jobs;
                 # every selected job retains the fail-closed source guard.
-                expected = guard if name == "macos-simulated-profile" else guard.replace(
+                expected = guard if name in runtime_jobs else guard.replace(
                     "!cancelled()", "!cancelled() && inputs.macos_runtime_only != true")
                 self.assertIn(expected, body)
 

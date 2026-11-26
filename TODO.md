@@ -27,4 +27,4 @@ Remaining feature items:
 
 10. ▧ Verify and correct drive-current mappings across WsprryPi and WsprryPico, including direct GPIO, Si5351, RP1, necessary backend changes, and documentation. Track [WsprryPi issue #478](https://github.com/WsprryPi/WsprryPi/issues/478) and follow the remaining [implementation plan](docs/development/legacy-gpio-drive-label-implementation-plan.md).
 
-11. ▧ Fix the 22 m direct test tone incorrectly requiring a band-selector GPIO. Track [WsprryPi issue #482](https://github.com/WsprryPi/WsprryPi/issues/482), read the [implementation plan](docs/development/issue-482-direct-tone-selector-plan.md), and follow the [implementation prompt](docs/development/issue-482-direct-tone-selector-implementation-prompt.md).
+11. ✅ Allow an admitted 22 m direct CLI Test Tone without a band-selector GPIO. The existing frequency and backend policies still apply. See [WsprryPi issue #482](https://github.com/WsprryPi/WsprryPi/issues/482) and the [Test Tone frequency and selector rules](docs/band-and-wspr-presets.md).

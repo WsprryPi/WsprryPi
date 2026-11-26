@@ -28,7 +28,7 @@ run_with_timeout() {
             status=$?
         fi
     else
-        if strace -f -e trace=openat,open -o "$syscall_trace_path" \
+        if strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat -o "$syscall_trace_path" \
             timeout --foreground --signal=TERM --kill-after=2s "$wall_clock_limit" "$@"; then
             return 0
         else

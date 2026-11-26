@@ -22,4 +22,10 @@ GpioDividerTablePlan gpioPlanDividerTable(
     double source_hz,
     const WsprTransmissionPlan& plan);
 
+std::int64_t gpioDitherLowerClockCount(
+    double lower_ratio,
+    std::int64_t block_clocks,
+    std::int64_t clocks_scheduled,
+    std::int64_t lower_clocks_scheduled);
+
 #endif

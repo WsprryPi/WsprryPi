@@ -26,6 +26,7 @@
 #ifndef WSPR_TRANSMIT_BACKEND_RPI_HPP
 #define WSPR_TRANSMIT_BACKEND_RPI_HPP
 
+#include "bcm2835_qualification_lease.hpp"
 #include "gpio_frequency_plan.hpp"
 
 #include <array>
@@ -148,12 +149,6 @@ GpioRfClockPlan gpioPlanRfClock(
 bool gpioHardwareProfileMatchesProcessor(
     wsprrypi::HardwareProfile committed_profile,
     wsprrypi::LegacyGpioProcessorProfile detected_processor) noexcept;
-
-std::int64_t gpioDitherLowerClockCount(
-    double lower_ratio,
-    std::int64_t block_clocks,
-    std::int64_t clocks_scheduled,
-    std::int64_t lower_clocks_scheduled);
 
 /**
  * @class WsprRpiBackend
@@ -473,6 +468,8 @@ private:
     wsprrypi::ScheduledExecutionHooks execution_hooks_;
     std::vector<double> realized_event_frequencies_;
     std::optional<timespec> first_enable_time_;
+    const bool uses_production_access_;
+    wsprrypi::Bcm2835QualificationLease qualification_lease_;
     std::shared_ptr<IRpiStartupQuiesceAccess> startup_quiesce_access_;
 
     std::thread watchdog_thread_{};

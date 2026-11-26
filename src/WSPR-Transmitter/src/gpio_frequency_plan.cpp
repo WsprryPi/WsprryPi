@@ -3,6 +3,7 @@
 #include "gpio_frequency_plan.hpp"
 #include "legacy_gpio_clock_model.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -65,4 +66,25 @@ GpioDividerTablePlan gpioPlanDividerTable(
             throw std::out_of_range("GPIO tone divider pair crosses an integer boundary.");
     }
     return result;
+}
+
+std::int64_t gpioDitherLowerClockCount(
+    double lower_ratio,
+    std::int64_t block_clocks,
+    std::int64_t clocks_scheduled,
+    std::int64_t lower_clocks_scheduled)
+{
+    if (!std::isfinite(lower_ratio) || lower_ratio < 0.0 || lower_ratio > 1.0 ||
+        block_clocks < 0 || clocks_scheduled < 0 || lower_clocks_scheduled < 0 ||
+        lower_clocks_scheduled > clocks_scheduled)
+    {
+        throw std::invalid_argument("Invalid GPIO divider-dither state.");
+    }
+
+    std::int64_t lower_clocks =
+        static_cast<std::int64_t>(std::llround(
+            lower_ratio * static_cast<double>(clocks_scheduled + block_clocks))) -
+        lower_clocks_scheduled;
+
+    return std::clamp(lower_clocks, std::int64_t{0}, block_clocks);
 }
