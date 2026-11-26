@@ -6,11 +6,43 @@
 #include "wtp_endpoint/runtime.hpp"
 #include "web_server.hpp"
 #include "scheduling.hpp"
+#include "config_handler.hpp"
+#include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <mutex>
 #include <sys/stat.h>
+#include <thread>
 #include <unistd.h>
 #include <string_view>
 int pi_managed_production_main(int,char **);
+
+namespace {
+// Publish the acknowledgement only under the real configuration lock and
+// remove it after release so the browser can distinguish both transitions.
+void hold_review_lock(std::stop_token stop,const std::filesystem::path &directory,const std::string &operation){
+    using namespace std::chrono_literals;
+    const auto requested=directory/("review-"+operation+"-lock-requested"),held=directory/("review-"+operation+"-lock-held");
+    std::error_code ignored;
+    while(!stop.stop_requested()&&!std::filesystem::exists(requested,ignored))
+        std::this_thread::sleep_for(10ms);
+    {
+        std::unique_lock lock(config_update_mutex(),std::defer_lock);
+        while(!stop.stop_requested()&&std::filesystem::exists(requested,ignored)&&!lock.try_lock())
+            std::this_thread::sleep_for(10ms);
+        if(!lock.owns_lock())return;
+        std::ofstream marker(held);
+        if(!marker)return;
+        marker.close();
+        // The hold must expire even if the browser cannot run its cleanup.
+        const auto deadline=std::chrono::steady_clock::now()+25s;
+        while(!stop.stop_requested()&&std::filesystem::exists(requested,ignored)&&std::chrono::steady_clock::now()<deadline)
+            std::this_thread::sleep_for(10ms);
+    }
+    std::filesystem::remove(held,ignored);
+}
+}
+
 int main(int argc,char *argv[]){
     if(argc<7)return 2;
     const auto executable=std::filesystem::canonical(argv[0]);
@@ -25,10 +57,16 @@ int main(int argc,char *argv[]){
         (std::string_view(argv[index])=="--role"&&index+1<argc&&std::string_view(argv[index+1])=="controller")){
         paths.software_backend_command.push_back("--controller-only");break;
     }
-    bool controller=false;
+    bool controller=false,review_lock=false;
     for(int index=6;index<argc;++index)if(std::string_view(argv[index])=="--controller-only")controller=true;
     std::vector<char *> forwarded{argv[0]};
     for(int index=6;index<argc;++index){
+        if(std::string_view(argv[index])=="--fixture-review-lock"){
+            if(review_lock)return 2;
+            review_lock=true;
+            paths.software_backend_command.push_back(argv[index]);
+            continue;
+        }
         if(std::string_view(argv[index])=="--fixture-listener-override"){
             if(index+2>=argc)return 2;
             for(const auto *option:{"--web-port","--socket-port"}){
@@ -69,9 +107,10 @@ int main(int argc,char *argv[]){
 #ifdef WSPRRYPI_NATIVE_RECOVERY_OWNER_FIXTURE
     wsprrypi::testing::set_controller_installation_owner_home(home.string());
 #endif
-    bool early=false,simulated=false;
+    bool early=false,simulated=false,maintenance_worker=false;
     for(int index=6;index<argc;++index){
         const std::string_view option=argv[index];
+        if(option=="--maintenance-worker")maintenance_worker=true;
         if(option=="--web-service"||option=="--maintenance-worker"||option=="--maintenance"||option=="--diagnostic-export"||option=="--recovery-backend"||option=="--migrate-state"||option=="--check-state"||option=="--initialize-state")early=true;
         if(option=="--backend"){
             if(simulated||index+1>=argc||std::string_view(argv[++index])!="simulated")return 2;
@@ -79,6 +118,15 @@ int main(int argc,char *argv[]){
         }
     }
     if(!early&&!simulated)return 2;
+    if(review_lock&&early&&!maintenance_worker)return 2;
     webServer.bind_loopback_for_test();set_scheduler_execution_suppressed_for_test(true);
+    std::jthread contention;
+    if(review_lock&&!early){
+        const auto directory=std::filesystem::path(argv[1]).parent_path();
+        contention=std::jthread([directory](std::stop_token stop){
+            hold_review_lock(stop,directory,"read");
+            hold_review_lock(stop,directory,"release");
+        });
+    }
     return pi_managed_production_main(static_cast<int>(forwarded.size())-1,forwarded.data());
 }

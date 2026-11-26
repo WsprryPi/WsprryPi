@@ -190,7 +190,10 @@ def run(fixture, helper, fault_phase=None):
             backend = start('backend', ['--state-directory', str(state), '--runtime-directory', str(runtime), '--backend', 'simulated',
                                       '--socket-loopback-only', '--web-port', str(ports[0]), '--socket-port', str(ports[1]),
                                       '--socket-loopback-family', 'ipv4'] + (['--controller-only'] if controller else []))
-            maintenance = start('maintenance', maintenance_arguments + (['--fixture-fault-phase', fault_phase] if fault_phase and fault_phase != '--browser' else []) + ['--maintenance-worker', '--role', role])
+            maintenance = start('maintenance', maintenance_arguments
+                                + (['--fixture-fault-phase', fault_phase] if fault_phase and fault_phase != '--browser' else [])
+                                + (['--fixture-review-lock'] if browser_mode else [])
+                                + ['--maintenance-worker', '--role', role])
             web = start('web', ['--web-service', '--runtime-directory', str(runtime), '--listener-cache', str(listener_cache)])
             wait_services()
             if fault_phase == '--browser':
@@ -534,6 +537,9 @@ def run(fixture, helper, fault_phase=None):
             assert manifest['source']['role'] == role and (decoded / 'application/state.sqlite3').is_file()
             print(('PASS recovery after worker death at ' + fault_phase + ': ' if fault_phase else 'PASS ') + 'actual backend/web/maintenance: existing-session admission, CSRF refusal, coherent encrypted backup, bounded download/range/retry, backend outage, worker restart, portable decryption, wrong-passphrase retry and nonmutating actual-owner preview, exact confirmation, preserved prior generation, inactive source evidence and verified held backend restart')
         finally:
+            if browser_mode:
+                for operation in ('read', 'release'):
+                    (root / f'review-{operation}-lock-requested').unlink(missing_ok=True)
             if sys.exc_info()[0] is not None:
                 print('RECOVERY_PROCESS_EXITS', [child.poll() for child in processes], flush=True)
                 # Only allowlisted state/error fields, never archive/settings/secrets.

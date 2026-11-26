@@ -13,10 +13,13 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
     const basePath = '/wsprrypi';
     assert(Number.isInteger(backendPort) && backendPort >= 1024 && backendPort <= 49151);
     const ui = path.resolve(__dirname, '..');
+    const lockPath = (operation, state) => path.join(directory, `review-${operation}-lock-${state}`);
     const captures = fs.mkdtempSync(path.join(os.tmpdir(), 'wsprrypi-sqlite-maintenance-ui-'));
     const phpPort = await freePort();
     let php, proxy, browser, client, profile, failure, dropConfirm = true, failReadback = false;
     const mutations = [];
+    const reviewReads = [];
+    const reviewReleases = [];
     const timeline = [];
     let validationAttempt = 0, admittedAttempt = 0, observedJob;
     const record = value => { timeline.push({ ms: Math.round(performance.now()), ...value }); if (timeline.length > 40) timeline.shift(); };
@@ -25,6 +28,7 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         await waitForPhp(php, `http://127.0.0.1:${phpPort}/index.php?page=maintenance`, 'Maintenance templates');
         proxy = http.createServer((request, response) => {
             const route = request.url.startsWith(basePath + '/') ? request.url.slice(basePath.length) : request.url;
+            const reviewRoute = route === '/api/recovery/review';
             if (failReadback && request.method === 'GET' && route === '/api/recovery/jobs') {
                 response.writeHead(503, { 'Content-Type': 'application/json' });response.end(JSON.stringify({ error: 'backend_unavailable' }));return;
             }
@@ -41,7 +45,9 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
                     }); return;
                 }
                 if (request.method === 'POST' && route.endsWith('/validate') && incoming.statusCode === 200) admittedAttempt = validationAttempt;
-                if (api && route.startsWith('/api/recovery/jobs')) {
+                if (reviewRoute && request.method === 'GET') reviewReads.push(incoming.statusCode);
+                if (reviewRoute && request.method === 'POST') reviewReleases.push(incoming.statusCode);
+                if (api && (route.startsWith('/api/recovery/jobs') || reviewRoute)) {
                     record({ method: request.method, action: route.replace(/[a-f0-9]{32}/g, ':job'), status: incoming.statusCode });
                     if (request.method === 'GET' && route === '/api/recovery/jobs') {
                         let bytes = 0, chunks = [];
@@ -144,27 +150,94 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1, 'Lost confirmation is not replayed');
         await reloadDocument(client);
         await waitFor(() => run("document.getElementById('recoveryStatus')?.textContent.includes('Restore verified')"), 'Reload reads durable result', 20000);
-        await waitFor(() => run("!document.getElementById('destinationRead').disabled"), 'Independent destination review remains reachable', 15000);
+        const acquireConfigurationLock = async operation => {
+            assert(!fs.existsSync(lockPath(operation, 'held')), 'Configuration lock acknowledgement belongs to this request');
+            fs.writeFileSync(lockPath(operation, 'requested'), '', { flag: 'wx', mode: 0o600 });
+            await waitFor(() => fs.existsSync(lockPath(operation, 'held')), `Destination configuration lock acquired for ${operation}`, 5000);
+        };
+        const releaseConfigurationLock = async operation => {
+            fs.unlinkSync(lockPath(operation, 'requested'));
+            await waitFor(() => !fs.existsSync(lockPath(operation, 'held')), `Destination configuration lock released for ${operation}`, 5000);
+        };
+        const assertDestinationBusy = async () => {
+            assert.equal(await run("document.getElementById('destinationFeedback').textContent"),
+                'Another operation is active. Refresh results before trying again.');
+        };
+        const refreshResults = async () => {
+            await run("document.getElementById('recoveryRefresh').click()");
+            await settled();
+            assert.equal(await run("document.getElementById('recoveryActionFeedback').textContent"), 'Saved results refreshed.');
+        };
+        const readDestination = async () => {
+            if (!await run("!document.getElementById('destinationRead').disabled")) return false;
+            const attempt = reviewReads.length;
+            await run("document.getElementById('destinationRead').click()");
+            await settled();
+            assert.equal(reviewReads.length, attempt + 1, 'One destination read per click');
+            if (attempt === 0) assert.equal(reviewReads[attempt], 409, 'A held configuration lock refuses the destination read');
+            if (reviewReads[attempt] === 409) {
+                await assertDestinationBusy();
+                if (attempt === 0) {
+                    assert(await run("document.getElementById('destinationReview').hidden && document.getElementById('destinationRelease').disabled"),
+                        'The first busy read leaves destination holds unavailable');
+                    await releaseConfigurationLock('read');
+                }
+                await refreshResults();
+                return false;
+            }
+            assert.equal(reviewReads[attempt], 200, 'Destination read must succeed after any explicit busy replies');
+            assert(await run("!document.getElementById('destinationReview').hidden"), 'Successful read shows the current destination');
+            return true;
+        };
+        await acquireConfigurationLock('read');
+        await waitFor(readDestination, 'Destination review after an explicit busy reply', 15000);
         assert.equal(mutations.filter(item => item.endsWith('/confirm')).length, 1);
-        await run("document.getElementById('destinationRead').click()"); await settled();
-        assert(await run("!document.getElementById('destinationReview').hidden"));
+        assert.equal(mutations.filter(item => item === '/api/recovery/review').length, 0, 'Reading never releases holds');
         await capture('restored-review');
         if (controllerOnly) {
             assert(await run("document.getElementById('destinationLocalRow').hidden && document.getElementById('destinationLocal').disabled"), 'Controller role has no local-output resumption control');
-            await run("document.getElementById('destinationRemote').click();document.getElementById('destinationRelease').click()");await settled();
+        }
+        const hold = controllerOnly ? 'destinationRemote' : 'destinationLocal';
+        await acquireConfigurationLock('release');
+        await waitFor(async () => {
+            const attempt = reviewReleases.length;
+            assert(await run(`!document.getElementById('${hold}').disabled && !document.getElementById('${hold}').checked`),
+                'A fresh review confirms the chosen hold is still active');
+            await run(`document.getElementById('${hold}').click();document.getElementById('destinationRelease').click()`);
+            await settled();
+            assert.equal(reviewReleases.length, attempt + 1, 'One hold release per click');
+            if (attempt === 0) assert.equal(reviewReleases[attempt], 409, 'A held configuration lock refuses the hold release');
+            if (reviewReleases[attempt] === 409) {
+                await assertDestinationBusy();
+                if (attempt === 0) await releaseConfigurationLock('release');
+                // An explicit pre-effect refusal permits another operator attempt
+                // after a fresh review. An uncertain result must fail the fixture.
+                await refreshResults();
+                await waitFor(readDestination, 'Fresh destination review after a refused release', 15000);
+                return false;
+            }
+            assert.equal(reviewReleases[attempt], 200, 'Hold release must return a known successful result');
+            return true;
+        }, 'Hold release after an explicit busy reply', 15000);
+        if (controllerOnly) {
             assert(await run("document.getElementById('destinationFeedback').textContent.includes('unavailable in controller-only mode') && document.getElementById('destinationFeedback').textContent.includes('existing pairing and recovery checks apply')"));
         } else {
-            await run("document.getElementById('destinationLocal').click();document.getElementById('destinationRelease').click()"); await settled();
             assert(await run("document.getElementById('destinationFeedback').textContent.includes('stopped; use Start') && document.getElementById('destinationFeedback').textContent.includes('Remote authority: held')"));
         }
+        assert.equal(reviewReleases.filter(status => status === 200).length, 1, 'One hold release takes effect');
+        assert.equal(mutations.filter(item => item === '/api/recovery/review').length, reviewReleases.length, 'Every release has a known outcome');
         assert.equal(await run('document.activeElement.id'), 'destinationFeedback', 'Hold release returns focus to its outcome');
         assert.equal(await run(`JSON.stringify(localStorage).includes(${JSON.stringify(phrase)})||JSON.stringify(sessionStorage).includes(${JSON.stringify(phrase)})`), false, 'Passphrase is never persisted');
-        console.log('PASS actual Maintenance create/download/upload/wrong-passphrase/preview/keyboard-confirm/lost-reply/reload/destination-review; desktop/mobile light/dark captures: ' + captures);
+        console.log('PASS actual Maintenance create/download/upload/wrong-passphrase/preview/keyboard-confirm/lost-reply/reload/destination-review/hold-release, including real busy refusals; desktop/mobile light/dark captures: ' + captures);
     } catch (error) {
         failure = error;
         console.error('Recovery browser timeline:', JSON.stringify(timeline));
+        console.error('Destination review HTTP statuses:', JSON.stringify({ reads: reviewReads.slice(-8), releases: reviewReleases }));
         if (client) try { console.error(await client.evaluate("({status:document.getElementById('recoveryStatus')?.textContent,feedback:document.getElementById('recoveryActionFeedback')?.textContent,backup:document.getElementById('backupFeedback')?.textContent,upload:document.getElementById('restoreUploadFeedback')?.textContent,destination:document.getElementById('destinationFeedback')?.textContent})")); } catch (_) {}
     } finally {
-        await finishFixture({ failure, client, browser, php, profile, cleanups: [async () => { if (proxy) await closeServer(proxy); }] });
+        await finishFixture({ failure, client, browser, php, profile, cleanups: [
+            ...['read', 'release'].map(operation => () => fs.rmSync(lockPath(operation, 'requested'), { force: true })),
+            async () => { if (proxy) await closeServer(proxy); }
+        ] });
     }
 })().catch(error => { console.error(error); process.exitCode = 1; });
