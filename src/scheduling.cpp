@@ -314,12 +314,6 @@ GpioFrequencyCorrection select_and_publish_gpio_correction_for_config(
     return select_and_publish_gpio_correction(cfg);
 }
 
-BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
-    double source_frequency_hz,
-    const WsprFrequencyEntry &entry,
-    const ArgParserConfig &cfg,
-    int frequency_entry_index,
-    BandGPIOResolution *resolution_out);
 bool sync_configured_selector_gpio_idle_state(
     const ArgParserConfig &cfg,
     bool keep_initialized,
@@ -2279,7 +2273,8 @@ BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     const WsprFrequencyEntry &entry,
     const ArgParserConfig &cfg,
     int frequency_entry_index,
-    BandGPIOResolution *resolution_out)
+    BandGPIOResolution *resolution_out,
+    UnmatchedBandSelectorPolicy unmatched_band_policy)
 {
     band_gpio_prepare_call_counter_for_test.fetch_add(1U, std::memory_order_relaxed);
 
@@ -2323,6 +2318,19 @@ BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
                 " uses explicit GPIO ", entry.selector_gpio,
                 " without inferring an amateur band.");
             return apply_band_gpio_resolution(explicit_resolution);
+        }
+        if (unmatched_band_policy == UnmatchedBandSelectorPolicy::AllowInactive)
+        {
+            if (!stop_active_transmission_selectors())
+            {
+                active_band_gpio_prepare_status.store(
+                    BandGPIOPrepareStatus::Failed,
+                    std::memory_order_release);
+                return BandGPIOPrepareStatus::Failed;
+            }
+            if (resolution_out != nullptr)
+                resolution_out->band_known = false;
+            return BandGPIOPrepareStatus::Inactive;
         }
         llog.logS(
             WARN,
@@ -2580,7 +2588,8 @@ bool start_direct_tone_execution(
             entry,
             cfg,
             -1,
-            &selector_resolution);
+            &selector_resolution,
+            UnmatchedBandSelectorPolicy::AllowInactive);
     if (selector_status == BandGPIOPrepareStatus::Failed)
     {
         (void)stop_active_transmission_selectors();

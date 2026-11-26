@@ -67,9 +67,16 @@ extern double active_wspr_plan_dial_frequency;
 extern WsprFrequencyEntry active_wspr_plan_frequency_entry;
 extern bool active_wspr_plan_in_progress;
 
+enum class UnmatchedBandSelectorPolicy
+{
+    Reject,
+    AllowInactive
+};
+
 BandGPIOPrepareStatus prepare_band_gpio_for_frequency_or_log(
     double, const WsprFrequencyEntry &, const ArgParserConfig &, int = -1,
-    BandGPIOResolution * = nullptr);
+    BandGPIOResolution * = nullptr,
+    UnmatchedBandSelectorPolicy = UnmatchedBandSelectorPolicy::Reject);
 bool sync_configured_selector_gpio_idle_state(
     const ArgParserConfig &, bool, std::string * = nullptr);
 void commit_band_gpio_snapshot_to_request(

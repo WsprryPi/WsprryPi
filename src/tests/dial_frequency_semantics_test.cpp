@@ -9,7 +9,9 @@
 #include "execution_plan_compiler.hpp"
 #include "frequency_semantics.hpp"
 #include "gpio_band_policy.hpp"
+#include "gpio_frequency_plan.hpp"
 #include "gpio_output.hpp"
+#include "legacy_gpio_clock_model.hpp"
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
 #include "scheduling_rp1_test_support.hpp"
@@ -665,6 +667,248 @@ void test_explicit_tone_experimental_policy()
     clear_pi_generation_override_for_scope();
 }
 
+void require_direct_tone_not_committed(unsigned dispatches, const std::string &message)
+{
+    require(dispatches == 0 &&
+                current_transmission_request_for_test().actual_rf_frequency_hz == 0.0 &&
+                !current_controller_request_for_test().has_value() &&
+                committed_execution_route_for_test() == CommittedExecutionRouteForTest::NONE,
+            message);
+}
+
+void test_direct_cli_tone_parse_rejections(bool ancillary_gpio)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = ancillary_gpio
+        ? std::vector<std::pair<std::string, std::string>>{
+              {"13560000@17X", "GPIO suffix must be an integer"},
+              {"13560000@28H", "GPIO suffix must be between 0 and 27"}}
+        : std::vector<std::pair<std::string, std::string>>{
+              {"13560000@17H", "Ancillary GPIO is unavailable in this build"}};
+    for (const auto &[token, diagnostic] : cases)
+    {
+        clear_direct_tone_startup_request();
+        std::string error;
+        require(!set_direct_tone_startup_request(token, &error) &&
+                    !has_direct_tone_startup_request() &&
+                    error.find(diagnostic) != std::string::npos,
+                token + " must fail without creating a transient startup request");
+        require_cli_parse_rejected({"--test-tone", token, "--backend", "simulated"},
+                                   token + " must fail at the production CLI boundary");
+        require_direct_tone_not_committed(0, token + " must have no committed request");
+    }
+}
+
+void test_direct_cli_tone_selector()
+{
+    constexpr double outside_band_hz = 13560000.0;
+    set_raspberry_pi_generation_override_for_test(4);
+    set_scheduler_execution_suppressed_for_test(true);
+    GPIOOutput::setTestMode(true);
+    set_band_gpio_selector_for_test(true, true);
+
+    unsigned dispatches = 0;
+    TransmissionRequest dispatched_request;
+    std::vector<GPIOOutput::TestEvent> events_at_dispatch;
+    set_direct_tone_start_invoker_for_test([&] {
+        ++dispatches;
+        dispatched_request = current_transmission_request_for_test();
+        events_at_dispatch = GPIOOutput::testEvents();
+    });
+    const auto reset_case = [&] {
+        clear_direct_tone_startup_request();
+        reset_current_transmission_request_for_test();
+        reset_current_controller_request_for_test();
+        reset_committed_execution_route_for_test();
+        reset_band_gpio_prepare_call_count_for_test();
+        GPIOOutput::clearTestEvents();
+        dispatches = 0;
+        dispatched_request = {};
+        events_at_dispatch.clear();
+    };
+    const auto parse_tone = [&](const std::string &token, bool unqualified = true,
+                                bool non_amateur = true) {
+        reset_case();
+        init_config_json();
+        json_to_config();
+        reset_getopt_state();
+        std::vector<std::string> args = {
+            "wsprrypi", "--test-tone", token, "--backend", "gpio",
+            "--transmit-gpio", "4", "--no-web", "--no-led", "--no-shutdown", "--no-amp-pin"};
+        if (unqualified)
+            args.emplace_back("--allow-unqualified-frequency");
+        if (non_amateur)
+            args.emplace_back("--allow-non-amateur-frequency");
+        auto parsed = argv_for(args);
+        require(parse_command_line(static_cast<int>(parsed.size()), parsed.data()),
+                token + " must parse through the production CLI");
+    };
+    const auto start_tone = [&](const std::string &token, double expected_hz,
+                                int gpio = kSelectorGpioUnset, bool active_high = false,
+                                bool allow_fallback = false) {
+        std::string error;
+        const bool valid = validate_config_data_for_test(&error);
+        require(valid, token + " configuration must be admitted: " + error);
+        WsprFrequencyEntry entry;
+        double carrier = 0.0;
+        require(try_get_direct_tone_startup_request(entry, carrier) && carrier == expected_hz &&
+                    !entry.allow_band_gpio_fallback &&
+                    entry.selector_gpio == (allow_fallback ? kSelectorGpioUnset : gpio),
+                token + " must retain the production parser's carrier and selector policy");
+        // Direct CLI input disables fallback. Exercise the known-band fallback
+        // at the scheduler seam after checking the real parser output.
+        entry.allow_band_gpio_fallback = allow_fallback;
+        const bool started = start_direct_tone_execution_for_test(config, entry, carrier, &error);
+        require(started, token + " must reach dispatch: " + error);
+        require(dispatches == 1 && band_gpio_prepare_call_count_for_test() == 1 &&
+                    dispatched_request.mode == TransmissionMode::TONE &&
+                    dispatched_request.dial_frequency_hz == expected_hz &&
+                    dispatched_request.actual_rf_frequency_hz == expected_hz &&
+                    !dispatched_request.use_offset && dispatched_request.applied_offset_hz == 0.0 &&
+                    !current_controller_request_for_test().has_value() &&
+                    committed_execution_route_for_test() == CommittedExecutionRouteForTest::LEGACY,
+                token + " must commit one exact legacy Tone before dispatch");
+        require(dispatched_request.hasSelectorGPIO() == (gpio != kSelectorGpioUnset) &&
+                    dispatched_request.selector_gpio_config.gpio == gpio &&
+                    dispatched_request.selector_gpio_config.active_high == active_high,
+                token + " must commit the expected selector and polarity before dispatch");
+    };
+
+    parse_tone("13560000");
+    start_tone("13560000", outside_band_hz);
+    require(events_at_dispatch.empty(), "selector-free 13,560,000 Hz must issue no GPIO requests");
+#if WSPRRYPI_BACKEND_RPI_GPIO
+    const auto plan = makeLegacyGpioTransmissionPlan(dispatched_request);
+    const auto clock = wsprrypi::selectLegacyGpioClockForAdditionalCorrection(
+        wsprrypi::LegacyGpioProcessorProfile::Bcm2711,
+        plan.symbolFrequencyHz(0), plan.symbolFrequencyHz(3), plan.ppm);
+    require(plan.symbolFrequencyHz(0) == outside_band_hz && plan.tone_spacing_hz == 0.0 &&
+                gpioPlanDividerTable(clock.corrected_rate_hz, plan).applied_frequency_hz ==
+                    outside_band_hz,
+            "legacy BCM2711 clock preparation must preserve the requested 13,560,000 Hz");
+#endif
+
+    parse_tone("13.560MHz");
+    config.band_gpio[ham_band_index(HamBand::BAND_2200M)] = {23, true, true};
+    config.band_gpio[ham_band_index(HamBand::BAND_20M)] = {24, true, false};
+    config.use_offset = true;
+    config_to_json();
+    const auto saved_settings = jConfig;
+    start_tone("13.560MHz", outside_band_hz);
+    config_to_json();
+    require(events_at_dispatch.empty() && jConfig == saved_settings,
+            "unrelated band mappings must remain unselected and unchanged");
+
+    for (const bool high : {true, false})
+    {
+        const std::string token = high ? "13560000@17H" : "13560000@17L";
+        parse_tone(token);
+        start_tone(token, outside_band_hz, 17, high);
+        require(std::any_of(events_at_dispatch.begin(), events_at_dispatch.end(), [&](const auto &event) {
+                    return event.action == "request" && event.pin == 17 &&
+                        event.active_high == high && !event.logical_state;
+                }),
+                token + " must reserve the explicit selector inactive before dispatch");
+        require(restore_committed_band_gpio_selection_for_test(true) &&
+                    GPIOOutput::testLogicalStateForPin(17) == true,
+                token + " fixture must begin cleanup with an active explicit selector");
+        parse_tone("13560000");
+        start_tone("13560000", outside_band_hz);
+        require(std::any_of(events_at_dispatch.begin(), events_at_dispatch.end(), [](const auto &event) {
+                    return event.action == "release";
+                }) &&
+                    std::all_of(events_at_dispatch.begin(), events_at_dispatch.end(), [&](const auto &event) {
+                        return event.pin == 17 && event.active_high == high && !event.logical_state &&
+                            (event.action == "write" || event.action == "release");
+                    }) &&
+                    !GPIOOutput::testLogicalStateForPin(17).has_value(),
+                token + " must be deasserted and released before selector-free dispatch");
+    }
+
+    for (const auto &[unqualified, non_amateur] : {
+             std::pair{false, false}, std::pair{true, false}, std::pair{false, true}})
+    {
+        parse_tone("13560000", unqualified, non_amateur);
+        std::string error;
+        WsprFrequencyEntry entry;
+        double carrier = 0.0;
+        require(validate_config_data_for_test(&error),
+                "missing overrides must reach the existing scheduler policy gate");
+        require(try_get_direct_tone_startup_request(entry, carrier) &&
+                    !start_direct_tone_execution_for_test(config, entry, carrier, &error) &&
+                    error.find("Both --allow-unqualified-frequency and --allow-non-amateur-frequency") !=
+                        std::string::npos &&
+                    band_gpio_prepare_call_count_for_test() == 0 && GPIOOutput::testEvents().empty(),
+                "scheduler must also reject missing overrides before selector preparation");
+        require_direct_tone_not_committed(dispatches, "missing overrides must prevent commit and dispatch");
+    }
+
+    parse_tone("13560000@4H");
+    std::string error;
+    bool valid = validate_config_data_for_test(&error);
+    require(!valid && error.find("GPIO RF Output") != std::string::npos,
+            "configuration admission must reject explicit use of the RF pin: " + error);
+    require_direct_tone_not_committed(dispatches, "RF pin conflict must prevent commit and dispatch");
+    parse_tone("13560000@17L");
+    config.use_led = true;
+    config.led_pin = 17;
+    valid = validate_config_data_for_test(&error);
+    require(!valid && error.find("Transmit LED") != std::string::npos,
+            "configuration admission must reject explicit use of the LED pin: " + error);
+    require_direct_tone_not_committed(dispatches, "LED pin conflict must prevent commit and dispatch");
+
+    parse_tone("13560000@17H");
+    require(validate_config_data_for_test(&error), "explicit preparation failure fixture must admit CLI input");
+    WsprFrequencyEntry entry;
+    double carrier = 0.0;
+    require(try_get_direct_tone_startup_request(entry, carrier), "preparation failure fixture needs an entry");
+    // Inject a malformed resolved GPIO only at the scheduler seam, after CLI admission.
+    entry.selector_gpio = -2;
+    require(!start_direct_tone_execution_for_test(config, entry, carrier, &error) &&
+                error == "Unable to resolve or prepare the direct test-tone band selector." &&
+                band_gpio_prepare_call_count_for_test() == 1 &&
+                GPIOOutput::testEvents().empty(),
+            "explicit selector preparation errors must remain fatal");
+    require_direct_tone_not_committed(dispatches, "explicit preparation failure must prevent commit and dispatch");
+
+    parse_tone("13560000");
+    require(validate_config_data_for_test(&error) && try_get_direct_tone_startup_request(entry, carrier),
+            "startup inhibition fixture must admit CLI input");
+    set_startup_quiesce_invoker_for_test([] {
+        return wsprrypi::StartupQuiesceResult{false, "test quiesce failure"};
+    });
+    require(!run_startup_quiesce_gate_for_test(config), "fixture must inhibit startup");
+    require(!start_direct_tone_execution_for_test(config, entry, carrier, &error) &&
+                error.find("test quiesce failure") != std::string::npos &&
+                band_gpio_prepare_call_count_for_test() == 0 && GPIOOutput::testEvents().empty(),
+            "startup inhibition must precede selector preparation");
+    require_direct_tone_not_committed(dispatches, "startup inhibition must prevent commit and dispatch");
+    reset_startup_quiesce_for_test();
+    require(prepare_band_gpio_for_frequency_or_log(carrier, entry, config) == BandGPIOPrepareStatus::Failed,
+            "the shared selector helper must still refuse unmatched bands by default");
+
+    parse_tone("14095600");
+    config.band_gpio[ham_band_index(HamBand::BAND_20M)] = {24, true, false};
+    start_tone("14095600", 14095600.0);
+    require(events_at_dispatch.empty(), "known numeric CLI tone must keep configured fallback disabled");
+
+    parse_tone("20m");
+    config.band_gpio[ham_band_index(HamBand::BAND_20M)] = {24, true, false};
+    start_tone("20m", 14097100.0, 24, false, true);
+    stop_active_transmission_selectors_for_test();
+
+    parse_tone("60m:legacy@17H");
+    start_tone("60m:legacy@17H", 5288700.0, 17, true);
+    stop_active_transmission_selectors_for_test();
+
+    reset_case();
+    test_direct_cli_tone_parse_rejections(true);
+    reset_direct_tone_start_invoker_for_test();
+    set_band_gpio_selector_for_test(false, false);
+    GPIOOutput::setTestMode(false);
+    set_scheduler_execution_suppressed_for_test(false);
+    clear_pi_generation_override_for_scope();
+}
+
 } // namespace
 
 void test_idle_startup_overrides()
@@ -1047,6 +1291,23 @@ int main(int argc, char *argv[])
         test_explicit_tone_experimental_policy();
         std::cout << "Explicit tone experimental policy tests passed" << std::endl;
         return EXIT_SUCCESS;
+    }
+
+    if (argc == 2 && std::string(argv[1]) == "--direct-tone-selector-only")
+    {
+        if (WSPRRYPI_ANCILLARY_GPIO && WSPRRYPI_BACKEND_RPI_GPIO)
+            test_direct_cli_tone_selector();
+        else if (!WSPRRYPI_ANCILLARY_GPIO)
+            test_direct_cli_tone_parse_rejections(false);
+        else
+            return EXIT_FAILURE;
+        std::cout << "Direct CLI tone selector tests passed" << std::endl;
+        return EXIT_SUCCESS;
+    }
+    if (WSPRRYPI_ANCILLARY_GPIO && WSPRRYPI_BACKEND_RPI_GPIO)
+    {
+        test_direct_cli_tone_selector();
+        set_raspberry_pi_generation_override_for_test(4);
     }
 
     init_default_config();

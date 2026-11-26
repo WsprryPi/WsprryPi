@@ -432,18 +432,13 @@ static bool validate_pi_io_gpio_assignments(
         }
     }
 
-    for (const BandGPIOConfig &band_config : candidate.band_gpio)
+    const auto selector_pin_available = [&](int gpio)
     {
-        if (!band_config.enabled || band_config.gpio < 0)
-        {
-            continue;
-        }
-
-        if (gpio_rf_output_reserved && band_config.gpio == candidate.gpio_tx_pin)
+        if (gpio_rf_output_reserved && gpio == candidate.gpio_tx_pin)
         {
             if (error_message != nullptr)
             {
-                *error_message = "GPIO" + std::to_string(band_config.gpio) +
+                *error_message = "GPIO" + std::to_string(gpio) +
                                  " is reserved by GPIO RF Output.";
             }
             return false;
@@ -451,16 +446,36 @@ static bool validate_pi_io_gpio_assignments(
 
         for (const ReservedAssignment &reserved : reserved_assignments)
         {
-            if (band_config.gpio != reserved.gpio)
+            if (gpio != reserved.gpio)
             {
                 continue;
             }
 
             if (error_message != nullptr)
             {
-                *error_message = "GPIO" + std::to_string(band_config.gpio) +
+                *error_message = "GPIO" + std::to_string(gpio) +
                                  " is reserved by " + reserved.label + ".";
             }
+            return false;
+        }
+        return true;
+    };
+
+    for (const BandGPIOConfig &band_config : candidate.band_gpio)
+    {
+        if (band_config.enabled && band_config.gpio >= 0 &&
+            !selector_pin_available(band_config.gpio))
+        {
+            return false;
+        }
+    }
+
+    if (candidate.mode == ModeType::TONE && !candidate.use_ini &&
+        direct_tone_startup_request.has_value())
+    {
+        const int gpio = direct_tone_startup_request->entry.selector_gpio;
+        if (gpio != kSelectorGpioUnset && !selector_pin_available(gpio))
+        {
             return false;
         }
     }
