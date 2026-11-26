@@ -106,6 +106,11 @@ provider candidate, accept it in WsprryPi, integrate accepted changes in both
 repositories, freeze and publish the provider, adopt the published artifacts,
 and validate affected production integration before application release.
 Changed candidates require updated identities and affected requalification.
+Require the [drive-selection acceptance record](../docs/rp1-provider-acceptance.md)
+for both routes in the prepublication review and again for the package pinned by
+the selected Pi release. Verify the record's Pi commit and tree against the
+release UI and executable sources and its provider tag and package digest
+against the selected artifact.
 See the [published-release contract](../docs/rp1-gpclk-dkms-installation.md#published-releases)
 and [release evidence](4.0.0-Release-Evidence.md) for existing acceptance
 and its limits. Software tests do not establish physical or RF qualification.

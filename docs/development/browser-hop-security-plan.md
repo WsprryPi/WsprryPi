@@ -16,7 +16,7 @@ Non-goals: public Internet hosting, domain registration/ACME/cloud services, a g
 
 ## 2. Baselines and existing contracts
 
-The initial inspection used Pi `e9ebc68e2e3a0a3b359c966d26feabe55afe5080` on `codex/sqlite-web-service`; the checkout advanced to `f55f91f099555a1e697f13f988b429d50282585d` before drafting. Reinspect actual revisions and dirty state at execution. The generated companion provenance selects Pico `7c09ff0fb15bb421f9010fb6faa6868f61b7a1a4`, available in `../WsprryPico/build/issue473-phase62-candidate`; the primary Pico checkout is different. Planning hashes identify evidence, not permission to reset or substitute sources.
+The initial inspection used Pi `e9ebc68e2e3a0a3b359c966d26feabe55afe5080` on `codex/sqlite-web-service`. The checkout advanced to `f55f91f099555a1e697f13f988b429d50282585d` before drafting. The generated companion provenance selects Pico `7c09ff0fb15bb421f9010fb6faa6868f61b7a1a4`. To reproduce that baseline, run `git -C ../WsprryPico worktree add --detach /absolute/path/to/pico-baseline 7c09ff0fb15bb421f9010fb6faa6868f61b7a1a4` from the WsprryPi repository, replacing the absolute path with a fresh checkout location. Reinspect the current revisions and working-tree state before implementation.
 
 Pi currently serves the application through Apache on HTTP with same-origin API/WebSocket proxying. `WsprryPi-UI/data/site.js` derives HTTPS/WSS from page scheme but also constructs direct backend fallback URLs. `src/support_request_guard.cpp`, `src/backend_http_guard.cpp`, `src/websocket_upgrade_guard.cpp`, management browser sessions, and backend-owned local browser connections enforce independent request/session policies. A secure cookie selected from an Origin header alone is not proof of TLS termination.
 

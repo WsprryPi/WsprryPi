@@ -1338,6 +1338,10 @@ rp1-gpclk-diagnostics-test:
 rp1-release-acceptance-test:
 	$(Q)python3 ../scripts/tests/rp1_release_acceptance_test.py
 
+.PHONY: rp1-drive-cli-test
+rp1-drive-cli-test: $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
+	$(Q)python3 -B ../scripts/tests/rp1_drive_cli_test.py $(BIN_DIR)/$(SEMANTICS_TEST_OUT)
+
 clean:
 	$(Q)echo "Cleaning up build artifacts."
 	$(Q)$(SUDO) rm -rf build

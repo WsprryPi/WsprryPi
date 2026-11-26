@@ -38,6 +38,7 @@
 #include "wtp_server_settings.hpp"
 #include "band_gpio.hpp"
 #include "band_lookup.hpp"
+#include "rp1_gpio_drive_options.hpp"
 #include "wspr_ref_plan.hpp"
 #include "websocket_listener_config.hpp"
 
@@ -49,7 +50,6 @@
 
 inline constexpr int kTransmitGpioUnset = -1;
 inline constexpr int kDefaultTransmitGpio = 4;
-inline constexpr int kDefaultRp1GpioDriveMa = 2;
 inline constexpr std::array<int, 2> kSupportedTransmitGpio = {4, 20};
 inline constexpr int kSelectorGpioUnset = -1;
 inline constexpr double WSPR_AUDIO_OFFSET_HZ = 1500.0;
@@ -79,11 +79,6 @@ inline constexpr bool is_supported_transmit_gpio(int gpio) noexcept
 inline constexpr bool is_valid_selector_gpio(int gpio) noexcept
 {
     return gpio >= 0 && gpio <= 27;
-}
-
-inline constexpr bool is_supported_rp1_gpio_drive_ma(int drive_ma) noexcept
-{
-    return drive_ma == 2 || drive_ma == 4 || drive_ma == 8 || drive_ma == 12;
 }
 
 struct WsprFrequencyEntry
