@@ -257,21 +257,31 @@ def verified_source(client, channel, workflow, selected, head):
     source = selected['head_sha']
     run, attempt = selected['id'], selected['run_attempt']
     info = metadata(client,f'actions/runs/{run}/attempts/{attempt}')
-    require(info.get('id') == run and info.get('head_sha') == source and info.get('head_branch') == channel and
+    require(type(info.get('id')) is int and info['id'] == run and
+            info.get('head_sha') == source and info.get('head_branch') == channel and
             info.get('path') == workflow['path'] and info.get('workflow_id') == workflow['id'] and
             isinstance(info.get('repository'),dict) and info['repository'].get('full_name') == REPOSITORY and
             isinstance(info.get('head_repository'),dict) and info['head_repository'].get('full_name') == REPOSITORY and
-            info.get('run_attempt') == attempt and info.get('event') in ('push','workflow_dispatch') and
+            type(info.get('run_attempt')) is int and info['run_attempt'] == attempt and
+            info.get('event') in ('push','workflow_dispatch') and
             info.get('status') == 'completed' and info.get('conclusion') == 'success',
             'Installer CI has not completed successfully on canonical source')
     result = metadata(client,f'actions/runs/{run}/attempts/{attempt}/jobs?per_page=100')
     jobs = result['jobs']
-    require(isinstance(jobs,list) and all(isinstance(j,dict) for j in jobs) and result.get('total_count') == len(jobs) and len(jobs) == 2 and
-            {j.get('name') for j in jobs} == {'verify','publish'}, 'Unexpected installer verification jobs')
-    job = next(j for j in jobs if j['name'] == 'verify')
-    require(all(j.get('run_id') == run and j.get('head_sha') == source and j.get('run_attempt') == attempt and
-                j.get('status') == 'completed' and j.get('conclusion') in ('success','skipped') for j in jobs) and
-            job.get('conclusion') == 'success' and type(job.get('id')) is int and job['id'] > 0,
+    require(isinstance(jobs, list) and result.get('total_count') == len(jobs) and
+            all(isinstance(j, dict) and isinstance(j.get('name'), str) and
+                type(j.get('id')) is int and j['id'] > 0 for j in jobs), 'Unexpected installer verification jobs')
+    by_name = {j['name']: j for j in jobs}
+    split_jobs = ('host-tests', 'firmware-build', 'verify')
+    require(len(by_name) == len({j['id'] for j in jobs}) == len(jobs) and
+            set(by_name) in ({'verify', 'publish'}, set(split_jobs) | {'publish'}),
+            'Unexpected installer verification jobs')
+    job = by_name['verify']
+    require(all(type(j.get('run_id')) is int and j['run_id'] == run and j.get('head_sha') == source and
+                type(j.get('run_attempt')) is int and j['run_attempt'] == attempt and
+                j.get('status') == 'completed' and
+                j.get('conclusion') in (('success', 'skipped') if j['name'] == 'publish' else ('success',))
+                for j in jobs),
             'Installer source has no successful verification job')
     if source != head:
         # GitHub omits changed files after the first comparison page. Keep
@@ -291,10 +301,15 @@ def verified_source(client, channel, workflow, selected, head):
     except SyntaxError as error:
         raise Incompatible('Installer source needs an unsupported Python version') from error
     try:
+        layout = [ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and
+                  any(isinstance(t, ast.Name) and t.id == 'CI_VERIFICATION_JOBS' for t in n.targets)]
         versions = [ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and
                     any(isinstance(t,ast.Name) and t.id == 'INSTALLER_VERSION' for t in n.targets)]
     except (ValueError,TypeError) as error:
         raise Incompatible('Installer source has an incompatible version contract') from error
+    require(layout in ([], [split_jobs]) and
+            set(by_name) == (set(split_jobs) if layout else {'verify'}) | {'publish'},
+            'Installer source and verification job layout disagree')
     if len(versions) != 1 or not isinstance(versions[0],str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',versions[0]):
         raise Incompatible('Installer source has an incompatible version contract')
     minimum = (3,10)

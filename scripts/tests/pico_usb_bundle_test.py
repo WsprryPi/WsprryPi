@@ -241,6 +241,43 @@ class DistributionTests(unittest.TestCase):
                 return r
             net.mutate=mutate
             with self.subTest(mode=mode),self.assertRaises(bundle.Unavailable):bundle.published(net,'devel')
+
+    def test_split_ci_requires_both_successful_jobs_from_the_exact_attempt(self):
+        for mode in ('success', 'missing', 'trimmed', 'skipped', 'stale', 'boolean-attempt', 'boolean-run-attempt', 'wrong-source',
+                     'duplicate-id', 'legacy-marker'):
+            manifest, payload = fixture()
+            if mode != 'legacy-marker':
+                payload['usb_installer.py'] += b"\nCI_VERIFICATION_JOBS = ('host-tests', 'firmware-build', 'verify')\n"
+            net = Network(manifest, payload)
+            def mutate(record):
+                if mode == 'boolean-run-attempt' and 'workflow_id' in record:
+                    return {**record, 'run_attempt': True}
+                if 'jobs' not in record or mode == 'trimmed':
+                    return record
+                jobs = list(record['jobs'])
+                for index, name in enumerate(('host-tests', 'firmware-build'), 44):
+                    jobs.append({**jobs[0], 'name': name, 'id': index})
+                if mode == 'missing':
+                    jobs.pop()
+                if mode == 'skipped':
+                    jobs[-1]['conclusion'] = 'skipped'
+                if mode == 'stale':
+                    jobs[-1]['run_attempt'] += 1
+                if mode == 'boolean-attempt':
+                    jobs[-1]['run_attempt'] = True
+                if mode == 'wrong-source':
+                    jobs[-1]['head_sha'] = 'a' * 40
+                if mode == 'duplicate-id':
+                    jobs[-1]['id'] = jobs[-2]['id']
+                return {'total_count': len(jobs), 'jobs': jobs}
+            net.mutate = mutate
+            with self.subTest(mode=mode):
+                if mode == 'success':
+                    saved, _ = bundle.published(net, 'devel')
+                    self.assertEqual(saved['verify_job']['name'], 'verify')
+                else:
+                    with self.assertRaises(bundle.Unavailable):
+                        bundle.published(net, 'devel')
     def test_malformed_source_or_api_metadata_retains_checked_installer(self):
         identity=self.select()
         for field,value in [('content',7),('repository',[]),('head_repository',[]),('jobs',[1]),('workflow_runs',[1])]:
