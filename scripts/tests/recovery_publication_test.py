@@ -14,12 +14,35 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from application_recovery import archive
-from application_recovery.durable import canonical, directory_lock, publish_record, read_record
+from application_recovery.durable import canonical, directory_lock, move_no_replace, publish_record, read_record
 from application_recovery.publication import GenerationPublisher
 from application_recovery import publication
 
 
 class PublicationTest(unittest.TestCase):
+    def test_first_record_moves_without_link_and_refuses_late_competitor(self):
+        record = self.job / 'result.json'
+        expected = {'state': 'completed_held'}
+        with patch('application_recovery.durable.os.link', side_effect=AssertionError('Private record used a hard link')):
+            publish_record(record, expected, None)
+        self.assertEqual(record.stat().st_nlink, 1)
+        self.assertEqual(read_record(record)[0], expected)
+
+        late = self.job / 'late.json'
+        competitor = {'state': 'claimed'}
+
+        def claim_destination(source, destination):
+            with destination.open('xb') as target:
+                target.write(canonical(competitor))
+            destination.chmod(0o600)
+            return move_no_replace(source, destination)
+
+        with patch('application_recovery.durable.move_no_replace', claim_destination):
+            with self.assertRaises(FileExistsError):
+                publish_record(late, expected, None)
+        self.assertEqual(read_record(late)[0], competitor)
+        self.assertEqual(list(self.job.glob('.recovery-writing-*')), [])
+
     def test_native_source_provenance(self):
         for source in ('/var/lib/controller/settings.ini', r'C:\ProgramData\WsprryPi\source.ini', 'D:/private/source.ini'):
             self.assertTrue(publication.valid_provenance_namespace(source))

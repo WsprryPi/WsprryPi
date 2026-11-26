@@ -4,7 +4,6 @@
 The backend prepares/validates the complete candidate and durably holds output
 before this owner runs. A directory lock excludes every normal backend writer.
 """
-import ctypes
 from contextlib import contextmanager
 import errno
 import hashlib
@@ -15,7 +14,7 @@ import shutil
 import sys
 
 from . import archive
-from .durable import canonical, directory_lock, publish_record, read_record, sync_directory
+from .durable import canonical, directory_lock, move_no_replace, publish_record, read_record, sync_directory
 
 
 def decimal(value):
@@ -49,27 +48,6 @@ def hold(value, identity, role, generation, job_id):
     archive.require(value['schema'] == 'application-restore-hold/1' and value['identity'] == identity and value['role'] == role
                     and value['generation'] == generation and value['job_id'] == job_id and decimal(value['revision'])
                     and value['local_output'] is True and value['remote_authority'] is True and value['stage'] in ('maintenance', 'review'))
-
-
-def move_no_replace(source, destination, owner=None):
-    if sys.platform == 'win32':
-        archive.require(owner is not None)
-        return owner.move(source, destination)
-    library = ctypes.CDLL(None, use_errno=True)
-    if sys.platform == 'darwin':
-        operation = library.renamex_np
-        operation.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
-        result = operation(os.fsencode(source), os.fsencode(destination), 4)  # RENAME_EXCL
-    elif sys.platform == 'linux':
-        operation = library.renameat2
-        operation.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
-        result = operation(-100, os.fsencode(source), -100, os.fsencode(destination), 1)
-    else:
-        raise archive.RecoveryError('Generation publication is unsupported on this platform')
-    if result:
-        value = ctypes.get_errno()
-        raise OSError(value, 'Generation publication refused')
-
 
 
 @contextmanager

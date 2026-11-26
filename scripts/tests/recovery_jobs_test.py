@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Durable maintenance admission/upload/retention without production state."""
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import fcntl
 import json
 import os
@@ -19,6 +20,50 @@ from application_recovery.jobs import BackendUnavailable, RecoveryBusy, Recovery
 from application_recovery.state_owner import OwnerBusy, OwnerUnavailable
 
 class RecoveryJobsTest(unittest.TestCase):
+    def test_status_cannot_read_result_during_publication(self):
+        owner = self.owner
+        job = owner.new_job('c' * 32, 'restore')
+        job_id = job['job_id']
+        listeners = {'web_port': 8080, 'socket_port': 8081}
+        owner.save(dict(job, state='awaiting_backend', phase='starting_backend',
+                        preview={'listeners': {'restored_web_port': 8080, 'restored_socket_port': 8081}}))
+        directory = owner.directory / job_id
+        publish_record(directory / 'candidate-built.json', {'unresolved_definitions': []}, None)
+        owner.observe = mock.Mock(return_value={})
+        owner.verify_started = mock.Mock(return_value={'boot': 'b' * 32, 'listeners': listeners})
+        status = {'action': 'status', 'job_id': job_id}
+        self.assertIsNone(owner.command(status)['result'])
+
+        published, release = threading.Event(), threading.Event()
+
+        def pause_after_result(path, value, expected):
+            observation = publish_record(path, value, expected)
+            if path.name == 'result.json':
+                published.set()
+                self.assertTrue(release.wait(3), 'Result publication was not released')
+            return observation
+
+        with patch('application_recovery.jobs.proxy.reconcile'), patch('application_recovery.jobs.publish_record', pause_after_result), \
+                ThreadPoolExecutor(max_workers=1) as tasks:
+            finish = tasks.submit(owner.finish_published, job_id, {'generation': '2'})
+            try:
+                self.assertTrue(published.wait(3), 'Result did not reach the completion boundary')
+                if owner.lock.acquire(blocking=False):
+                    try:
+                        self.fail(f"Status entered before the completed job was published: {owner.command(status)['state']}")
+                    finally:
+                        owner.lock.release()
+            finally:
+                release.set()
+            finish.result(timeout=3)
+
+        observed = owner.command(status)
+        self.assertEqual(observed['state'], 'completed')
+        self.assertEqual(observed['result']['state'], 'completed_held')
+        self.assertEqual(observed['result']['generation'], '2')
+        self.assertEqual((directory / 'result.json').stat().st_nlink, 1)
+        self.assertIsNone(owner.registry['active'])
+
     def test_export_refusal_is_backend_unavailable_without_replay(self):
         relay = mock.Mock()
         relay.collect.side_effect = OwnerUnavailable('fixture export refusal')

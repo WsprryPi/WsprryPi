@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 """Private recovery records; callers serialize their fixed-root owner admission."""
 from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
@@ -47,6 +48,25 @@ def read_record(path):
         return None, None
 
 
+def move_no_replace(source, destination, owner=None):
+    if sys.platform == 'win32':
+        require(owner is not None)
+        return owner.move(source, destination)
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == 'darwin':
+        operation = library.renamex_np
+        operation.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+        result = operation(os.fsencode(source), os.fsencode(destination), 4)  # RENAME_EXCL
+    elif sys.platform == 'linux':
+        operation = library.renameat2
+        operation.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+        result = operation(-100, os.fsencode(source), -100, os.fsencode(destination), 1)  # RENAME_NOREPLACE
+    else:
+        raise RecoveryError('Exclusive recovery publication is unsupported on this platform')
+    if result:
+        raise OSError(ctypes.get_errno(), 'Exclusive recovery publication refused')
+
+
 def publish_record(path, value, expected):
     path = safe_parent(path)
     private_directory(path.parent)
@@ -66,9 +86,9 @@ def publish_record(path, value, expected):
             os.fsync(output.fileno())
         require(read_record(path)[1] == expected)
         if expected is None:
-            # New records never overwrite a name that appeared unexpectedly.
-            os.link(temporary, path, follow_symlinks=False)
-            os.unlink(temporary)
+            # The first publication must have one name even if the writer
+            # exits before syncing the directory.
+            move_no_replace(temporary, path)
         else:
             os.replace(temporary, path)
         sync_directory(path.parent)

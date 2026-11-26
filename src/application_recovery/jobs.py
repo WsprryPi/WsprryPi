@@ -743,11 +743,14 @@ class RecoveryJobs:
                       'web_port': observed['listeners']['web_port'], 'socket_port': observed['listeners']['socket_port'],
                       'saved_web_port': job['preview']['listeners']['restored_web_port'], 'saved_socket_port': job['preview']['listeners']['restored_socket_port'],
                       'unresolved_definitions': built['unresolved_definitions']}
-            publish_record(directory / 'result.json', result, None)
         else:
             archive.require(existing.get('schema') == 'recovery-result/1' and existing.get('job_id') == job_id
                             and existing.get('generation') == prepared['generation'] and existing.get('state') == 'completed_held')
         with self.lock:
+            # Readers reject hard-linked private records. Keep status and list
+            # outside the initial publication window and the job transition.
+            if existing is None:
+                publish_record(directory / 'result.json', result, None)
             self.save(dict(self.read(job_id), state='completed', error=None, phase='complete'))
             self.registry['active'] = None
             self.save_registry()

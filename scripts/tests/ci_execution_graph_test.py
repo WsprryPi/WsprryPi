@@ -541,6 +541,10 @@ class SourceIdentityTests(unittest.TestCase):
         logger = next(step for step in jobs['ci-build-regressions']['steps']
                       if step.get('name') == 'Verify Linux logger shutdown')
         self.assertEqual(logger['if'], 'inputs.macos_runtime_only != true')
+        install, test = logger['run'].splitlines()[-2:]
+        self.assertTrue(install.startswith('sudo apt-get install '))
+        self.assertTrue({'libsystemd-dev', 'pkg-config'}.issubset(install.split()))
+        self.assertEqual(test, 'python3 -B scripts/tests/logger_shutdown_test.py')
         self.assertNotIn('logger_shutdown_test.py', '\n'.join(step.get('run', '') for step in release['steps']))
 
     def test_debian_state_and_recovery_have_one_owner_and_keep_the_trace_audit(self):
@@ -549,16 +553,36 @@ class SourceIdentityTests(unittest.TestCase):
         focused = rule(makefile, 'ci-focused-state-test').split(':', 1)[1].split()
         self.assertTrue(set(shared).isdisjoint(focused))
         jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
+        installer = jobs['debian-installer-support']
+        steps = installer['steps']
+        prepare = next(step for step in steps if step.get('name') == 'Prepare writable installer build directory')
+        reference = next(step for step in steps if step.get('with', {}).get('path') == 'src/build/rp1-provider-reference')
+        self.assertIn('runuser -u wsprrypi-ci', installer['defaults']['run']['shell'])
+        self.assertNotIn('shell', prepare)
+        self.assertEqual(prepare['run'], 'mkdir -p src/build')
+        self.assertLess(steps.index(prepare), steps.index(reference))
+        for name in ('non-hardware-validation', 'debian-installer-support', 'debian-browser-validation',
+                     'linux-native-contracts'):
+            job = jobs[name]
+            setup = next(step for step in job['steps'] if step.get('name') == 'Install build and audit dependencies')
+            self.assertEqual(job['container'], 'debian:trixie-slim')
+            self.assertEqual(setup['shell'], 'bash')
+            self.assertIn('if [[ ! -s /etc/machine-id ]]; then', setup['run'])
+            self.assertIn("tr -d '-' </proc/sys/kernel/random/uuid >/etc/machine-id", setup['run'])
         trace_path = r'/tmp/wsprrypi-[\w-]+\.strace'
         trace_command = 'strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat'
-        for name, gate in (('non-hardware-validation', 'traced-semantics'),
-                           ('debian-installer-support', 'traced-installer')):
+        for name, gate, audit_name in (
+                ('non-hardware-validation', 'traced-semantics', 'Reject transmitter hardware access'),
+                ('debian-installer-support', 'traced-installer', 'Reject installer transmitter hardware access'),
+                ('debian-installer-support', 'traced-support', 'Reject support-bundle transmitter hardware access')):
             steps = jobs[name]['steps']
-            audit = next(step for step in steps if step.get('name') == 'Reject transmitter hardware access')
+            audit = next(step for step in steps if step.get('name') == audit_name)
             self.assertEqual(audit['if'], '${{ !cancelled() && (steps.' + gate +
                              ".outcome == 'success' || steps." + gate + ".outcome == 'failure') }}")
             self.assertFalse(audit.get('continue-on-error', False))
             producers = steps[:steps.index(audit)]
+            if name == 'debian-installer-support':
+                producers = [step for step in producers if step.get('id') == gate]
             traced = [step['run'] for step in producers if re.search(r'-o ' + trace_path, step.get('run', ''))]
             self.assertTrue(any(step.get('id') == gate and step.get('run') in traced for step in producers))
             emitted = set()

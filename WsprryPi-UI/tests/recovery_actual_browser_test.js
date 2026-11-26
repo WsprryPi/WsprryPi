@@ -66,7 +66,14 @@ const { freePort, spawnFixtureChild, waitForPhp, createBrowserProfile, launchBro
                 }
                 response.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(response);
             });
-            outgoing.on('error', () => { if (!response.headersSent) response.writeHead(503); response.end(); });
+            outgoing.on('error', () => {
+                if (response.destroyed) return;
+                if (!response.headersSent) response.writeHead(503);
+                response.end();
+            });
+            response.once('close', () => {
+                if (!response.writableFinished) outgoing.destroy();
+            });
             request.pipe(outgoing);
         });
         await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));

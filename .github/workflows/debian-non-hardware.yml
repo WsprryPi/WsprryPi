@@ -99,7 +99,10 @@ jobs:
           python3 -B scripts/tests/container_avahi_contract_test.py
       - name: Verify Linux logger shutdown
         if: inputs.macos_runtime_only != true
-        run: python3 -B scripts/tests/logger_shutdown_test.py
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libsystemd-dev pkg-config
+          python3 -B scripts/tests/logger_shutdown_test.py
 
   native-controller-components:
     name: Native controller components (${{ matrix.runner }})
@@ -742,6 +745,11 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             age build-essential ca-certificates cmake device-tree-compiler git libgpiod-dev libssl-dev libsqlite3-dev libavahi-client-dev \
             libsystemd-dev nodejs npm passwd php-cli pkg-config python3 shellcheck strace util-linux
+          # This disposable container does not boot systemd. Production-path
+          # identity tests need the machine ID that an installed system provides.
+          if [[ ! -s /etc/machine-id ]]; then
+            tr -d '-' </proc/sys/kernel/random/uuid >/etc/machine-id
+          fi
 
       - &checkout-linux-source
         name: Check out source
@@ -874,6 +882,9 @@ jobs:
       - *trust-linux-checkout-owner
       - *select-linux-build-budget
 
+      - name: Prepare writable installer build directory
+        run: mkdir -p src/build
+
       - name: Read-only RP1-GPIO-CLK-DKMS stable reference
         uses: actions/checkout@v7
         with:
@@ -896,10 +907,15 @@ jobs:
           strace --seccomp-bpf -f -y -e trace=open,openat,openat2,creat -o /tmp/wsprrypi-installer.strace \
             make ci-installer-offline-test php2shell-test SUDO=
 
+      - name: Reject installer transmitter hardware access
+        if: ${{ !cancelled() && (steps.traced-installer.outcome == 'success' || steps.traced-installer.outcome == 'failure') }}
+        run: scripts/ci/assert-no-transmitter-hardware.sh /tmp/wsprrypi-installer.strace
+
       - name: Validate actual provider update and bootstrap boundary
         run: python3 -B scripts/tests/rp1_gpclk_update_contract_test.py src/build/rp1-provider-reference
 
       - name: Qualify support-bundle age round trip
+        id: traced-support
         env:
           RP1_DKMS_SOURCE: ${{ github.workspace }}/src/build/rp1-provider-reference
         working-directory: src
@@ -924,12 +940,9 @@ jobs:
             support-bundle-intake-runtime-test support-bundle-intake-production-test SUDO=
           SUPPORT
 
-      - name: Reject transmitter hardware access
-        if: ${{ !cancelled() && (steps.traced-installer.outcome == 'success' || steps.traced-installer.outcome == 'failure') }}
-        run: |
-          scripts/ci/assert-no-transmitter-hardware.sh \
-            /tmp/wsprrypi-installer.strace \
-            /tmp/wsprrypi-support.strace
+      - name: Reject support-bundle transmitter hardware access
+        if: ${{ !cancelled() && (steps.traced-support.outcome == 'success' || steps.traced-support.outcome == 'failure') }}
+        run: scripts/ci/assert-no-transmitter-hardware.sh /tmp/wsprrypi-support.strace
 
   debian-browser-validation:
     needs: change_scope
