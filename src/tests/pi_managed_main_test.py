@@ -16,14 +16,18 @@ from software_web_service import start_software_web_service, stop_software_web_s
 _last_request = {}
 
 
-def request(port, method, path, body=None, headers=None, with_revision=False, with_headers=False):
+def request(port, method, path, body=None, headers=None, with_revision=False, with_headers=False,
+            *, wait_for_target_snapshot=False):
     # The production service deliberately refuses admission rather than waiting
     # for its gates. Exercise the requested operation once a gate is available,
     # keeping every byte, identity, revision, and operation ID unchanged. This
-    # fixture never retries a lost response or any other refusal.
+    # fixture never retries a lost response. Local snapshot probes that require
+    # success also wait for a rate slot or a current authority observation.
     captured_headers = dict(headers) if headers is not None else None
-    capacity = {"contract": "Wsprry-Control/1", "schema": "target-error",
-                "error": {"code": "capacity", "retryable": False}}
+    temporary = {409: "capacity"}
+    if wait_for_target_snapshot:
+        assert method == "GET", (method, path)
+        temporary.update({429: "rate_limited", 503: "authority_pending"})
     deadline = time.monotonic() + 5
     while True:
         # Setup and negative probes share the production ten-request/second
@@ -34,15 +38,35 @@ def request(port, method, path, body=None, headers=None, with_revision=False, wi
         _last_request[port] = time.monotonic()
         result = raw_request(port, method, path, body, captured_headers,
                              with_revision=with_revision, with_headers=with_headers)
-        if result[0] != 409:
+        status, response = result[:2]
+        code = temporary.get(status)
+        if code is None:
             return result
+        refusal = {"contract": "Wsprry-Control/1", "schema": "target-error",
+                   "error": {"code": code, "retryable": False}}
         try:
-            if json.loads(result[1]) != capacity:
+            document = json.loads(response)
+            if document != refusal or document["error"]["retryable"] is not False:
                 return result
-        except ValueError:
+        except (json.JSONDecodeError, UnicodeError):
             return result
-        assert time.monotonic() < deadline, (method, path, result)
+        assert time.monotonic() < deadline, (method, path, status, response[:1024])
         time.sleep(.025)
+
+
+def read_target_snapshot(port, device_id, resource):
+    path = f"/api/control/v1/targets/{device_id}/{resource}"
+    status, body = request(port, "GET", path, wait_for_target_snapshot=True)
+    assert status == 200, (path, status, body[:1024])
+    try:
+        document = json.loads(body)
+    except (json.JSONDecodeError, UnicodeError) as error:
+        raise AssertionError((path, status, body[:1024])) from error
+    assert (isinstance(document, dict) and document.get("contract") == "Wsprry-Control/1"
+            and document.get("schema") == f"target-{resource}"
+            and isinstance(document.get("binding"), dict)
+            and document["binding"].get("device_id") == device_id), (path, status, body[:1024])
+    return document
 
 
 def main():
@@ -250,17 +274,10 @@ def main():
                     assert len(targets) == 1 and targets[0]["product"] == "WsprryPi"
                     self_id = targets[0]["device_id"]
                     wait_for_pairing_transport(request, port, self_id, context)
-                    for resource, schema in (("context", "target-context"), ("settings", "target-settings"), ("status", "target-status")):
-                        status, body = request(port, "GET", f"/api/control/v1/targets/{self_id}/{resource}")
-                        assert status == 200 and json.loads(body)["schema"] == schema, body
-                        assert json.loads(body)["binding"]["device_id"] == self_id
-                    status, context_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/context")
-                    assert status == 200
-                    stop_context = json.loads(context_body)
+                    stop_context = read_target_snapshot(port, self_id, "context")
+                    stop_settings = read_target_snapshot(port, self_id, "settings")
+                    read_target_snapshot(port, self_id, "status")
                     assert any(cap["resource"] == "stop" and cap["write"] for cap in stop_context["capabilities"])
-                    status, settings_body = request(port, "GET", f"/api/control/v1/targets/{self_id}/settings")
-                    assert status == 200
-                    stop_settings = json.loads(settings_body)
                     # Deferred cross-target Pi management must not route to
                     # this host, even with a valid local browser session and
                     # an otherwise complete candidate/revision.
@@ -274,9 +291,9 @@ def main():
                         return result
                     before_remote = protected_files()
                     remote_base = f"/api/control/v1/targets/{remote_id}/"
-                    remote_binding = {**stop_context["binding"], "device_id": remote_id}
+                    remote_binding = {**stop_settings["binding"], "device_id": remote_id}
                     remote_save = json.dumps({"contract": "Wsprry-Control/1", "schema": "target-save",
-                        "binding": remote_binding, "capability_revision": stop_context["capability_revision"],
+                        "binding": remote_binding, "capability_revision": stop_settings["capability_revision"],
                         "operation_id": "7" * 32, "expected_revision": stop_settings["revision"],
                         "candidate": stop_settings["saved"]})
                     remote_headers = {**context, "If-Match": '"' + stop_settings["revision"] + '"'}
@@ -286,7 +303,7 @@ def main():
                     status, body = request(port, "PUT", remote_base + "settings", remote_save, remote_headers)
                     assert status == 404 and json.loads(body)["schema"] == "target-error", body
                     remote_stop = json.dumps({"contract": "Wsprry-Control/1", "schema": "target-stop",
-                        "binding": remote_binding, "capability_revision": stop_context["capability_revision"],
+                        "binding": remote_binding, "capability_revision": stop_settings["capability_revision"],
                         "operation_id": "8" * 32, "expected_revision": stop_settings["revision"],
                         "observed_output": stop_settings["observed_output"]})
                     status, body = request(port, "POST", remote_base + "stop", remote_stop, remote_headers)
@@ -295,7 +312,7 @@ def main():
                         assert request(port, "POST", "/api/pair/v1/" + action, "{}", remote_headers)[0] == 404
                     assert protected_files() == before_remote, "Deferred remote Pi requests must not mutate host configuration/history"
                     stop_command = json.dumps({"contract": "Wsprry-Control/1", "schema": "target-stop",
-                        "binding": stop_context["binding"], "capability_revision": stop_context["capability_revision"],
+                        "binding": stop_settings["binding"], "capability_revision": stop_settings["capability_revision"],
                         "operation_id": "9" * 32, "expected_revision": stop_settings["revision"],
                         "observed_output": stop_settings["observed_output"]})
                     stop_headers = {**context, "If-Match": '"' + stop_settings["revision"] + '"'}
