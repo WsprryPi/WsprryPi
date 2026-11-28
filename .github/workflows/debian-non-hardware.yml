@@ -139,6 +139,17 @@ jobs:
           cmake -S src/tests/native_windows -B "${{ runner.temp }}/wsprrypi-native-windows"
           cmake --build "${{ runner.temp }}/wsprrypi-native-windows" --config Debug --parallel 2
           ctest --test-dir "${{ runner.temp }}/wsprrypi-native-windows" -C Debug --output-on-failure
+      - name: Select Python for native installer checks
+        if: runner.os != 'Linux'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Check native controller bundle and proxy contracts
+        if: runner.os != 'Linux'
+        run: python -B scripts/tests/controller_native_bundle_test.py
+      - name: Check macOS installer dispatch and service definitions
+        if: runner.os == 'macOS'
+        run: python -B scripts/tests/controller_install_test.py
 
   macos-simulated-profile:
     name: ${{ inputs.macos_runtime_only && inputs.macos_controller_only && 'Controller host contracts' || 'macos-simulated-profile' }} (${{ matrix.runner }})

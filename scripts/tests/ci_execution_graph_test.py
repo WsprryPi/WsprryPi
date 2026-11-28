@@ -347,6 +347,14 @@ class SourceIdentityTests(unittest.TestCase):
             'ci-build-regressions'})
         self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'xcode-27'])
         self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'xcode-27', 'windows-2025'])
+        native_steps = {step['name']: step for step in jobs['native-controller-components']['steps'] if 'name' in step}
+        for name, condition, script in (
+                ('Check native controller bundle and proxy contracts', "runner.os != 'Linux'", 'controller_native_bundle_test.py'),
+                ('Check macOS installer dispatch and service definitions', "runner.os == 'macOS'", 'controller_install_test.py')):
+            step = native_steps[name]
+            self.assertEqual(step['if'], condition)
+            self.assertEqual(shlex.split(step['run']), ['python', '-B', f'scripts/tests/{script}'])
+            self.assertFalse(step.get('continue-on-error', False))
         for profile in (*MACOS_RUNTIME_JOBS, 'macos-si5351-profile'):
             self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], "${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}")
             self.assertEqual(jobs[profile]['env']['WSPRRYPI_DISABLE_HARDWARE_ACCESS'], '1')
