@@ -15,6 +15,7 @@ namespace config_handler_deserialization
 {
 void default_band_gpio_config(
     std::array<BandGPIOConfig, HAM_BAND_COUNT> &band_gpio);
+void validate_drive_settings_patch(const nlohmann::json &patch);
 void deserialize_json_to_runtime_config(
     const nlohmann::json &source,
     ArgParserConfig &target);

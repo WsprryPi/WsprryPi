@@ -150,6 +150,15 @@ bool gpioHardwareProfileMatchesProcessor(
     wsprrypi::HardwareProfile committed_profile,
     wsprrypi::LegacyGpioProcessorProfile detected_processor) noexcept;
 
+// GPIO4 and GPIO20 share the GPIO 0–27 pad bank. Only DRIVE changes.
+constexpr std::optional<std::uint32_t> gpioPadDriveWord(
+    std::uint32_t current, int code) noexcept
+{
+    if (code < 0 || code > 7) return std::nullopt;
+    // Preserve SLEW and HYST, zero the reserved bits, and supply the write password.
+    return 0x5a000000u | (current & 0x18u) | static_cast<std::uint32_t>(code);
+}
+
 /**
  * @class WsprRpiBackend
  * @brief Raspberry Pi implementation of the generic transmission backend.

@@ -103,6 +103,43 @@ async function captureRp1DriveScreenshot(client, outputPath, theme) {
     fs.writeFileSync(outputPath, screenshot.data, "base64");
 }
 
+async function captureLegacyDrive(client, outputPath, theme, generation) {
+    const state = await client.evaluate(`(() => {
+        document.documentElement.setAttribute("data-bs-theme", ${JSON.stringify(theme)});
+        Object.assign(window.WSPRRYPI_PLATFORM, {
+            raspberryPiGeneration: ${generation},
+            gpioClockTransmissionSupported: true,
+            rp1GpioOperatorVisible: false,
+            legacyDriveIdentityCurrent: true,
+        });
+        document.querySelectorAll(".modal.show").forEach(modal => {
+            bootstrap.Modal.getInstance(modal)?.hide();
+            modal.classList.remove("show");
+            modal.style.display = "none";
+        });
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
+        document.body.classList.remove("modal-open");
+        suspendConfigAutosave(true);
+        document.getElementById("transmit_backend").checked = false;
+        initializeRp1RouteUi();
+        clickTransmitBackend();
+        setTxPin(4);
+        const tab = document.getElementById("transmitter-hardware-tab");
+        bootstrap.Tab.getOrCreateInstance(tab).show();
+        const range = document.getElementById("gpio-power-range");
+        populateDriveLevel(range.id, 7, renderGpioPowerLabel);
+        range.scrollIntoView({block: "center"});
+        return {value: range.getAttribute("aria-valuetext"), visible: range.checkVisibility()};
+    })()`);
+    assert.deepEqual(state, {
+        value: generation === 4 ? "8 mA" : "Level 7, Nominal drive unavailable",
+        visible: true,
+    });
+    await client.settleRendering();
+    const screenshot = await client.send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(outputPath, screenshot.data, "base64");
+}
+
 async function captureRp1QualificationScreenshot(client, outputPath, theme) {
     const rendered = await client.send("Runtime.evaluate", {
         returnByValue: true,
@@ -1000,6 +1037,65 @@ async function browserTest() {
         "Pi 4 GPIO must hide the RP1-only drive selector");
     equal(buildConfigPayload().GPIO["RP1 Drive mA"], 8,
         "Pi 4 operation must preserve the inactive RP1 selection");
+
+    const legacyDrive = field("gpio-power-range");
+    const oldCurrents = [2, 4, 6, 8, 10, 12, 14, 16];
+    const bcm2711Currents = [1, 2, 3, 4, 5, 6, 7, 8];
+    const legacyDbm = ["3.0", "6.0", "7.8", "9.0", "10.0", "10.8", "11.5", "12.0"];
+    const driveCheck = (first, detail = "") => {
+        const visible = [...field("gpio-power-range-value").childNodes]
+            .map(node => node.nodeName === "BR" ? ", " : node.textContent).join("");
+        const expected = detail ? first + ", " + detail : first;
+        equal(visible, expected, "Legacy GPIO visible current");
+        equal(legacyDrive.getAttribute("aria-valuetext"), expected, "Legacy GPIO spoken current");
+    };
+    const dirtyBeforeDriveRefresh = configAutosaveDirty;
+    const timerBeforeDriveRefresh = configAutosaveTimer;
+    const patchesBeforeDriveRefresh = patches.length;
+    for (const [code, current] of bcm2711Currents.entries()) {
+        populateDriveLevel(legacyDrive.id, code, renderGpioPowerLabel);
+        driveCheck(current + " mA");
+        equal(buildConfigPayload().GPIO["Power Level"], code, "BCM2711 code round trip");
+    }
+    for (const generation of [1, 2, 3]) {
+        window.WSPRRYPI_PLATFORM.raspberryPiGeneration = generation;
+        for (const [code, current] of oldCurrents.entries()) {
+            populateDriveLevel(legacyDrive.id, code, renderGpioPowerLabel);
+            driveCheck(current + " mA", legacyDbm[code] + " dBm");
+            equal(buildConfigPayload().GPIO["Power Level"], code, "Earlier-model code round trip");
+        }
+    }
+    for (const generation of [undefined, null, "4", 4.5, -1]) {
+        window.WSPRRYPI_PLATFORM.raspberryPiGeneration = generation;
+        renderGpioPowerLabel();
+        driveCheck("Level 7", "Nominal drive unavailable");
+    }
+    window.WSPRRYPI_PLATFORM.raspberryPiGeneration = 4;
+    renderGpioPowerLabel();
+    driveCheck("8 mA");
+    invalidateLegacyDriveIdentity();
+    driveCheck("Level 7", "Nominal drive unavailable");
+    delete window.WSPRRYPI_PLATFORM.legacyDriveIdentityCurrent;
+    renderGpioPowerLabel();
+    driveCheck("8 mA");
+    for (const invalid of [undefined, null, "", false, -1, 8, 4.5, "4", "4x", [], [4]]) {
+        populateDriveLevel(legacyDrive.id, invalid, renderGpioPowerLabel);
+        driveCheck("Invalid level");
+        equal(buildConfigPayload().GPIO["Power Level"], null, "Malformed level cannot serialize as a valid code");
+        equal(legacyDrive.value, "7", "Malformed level cannot move the range");
+        ok(!validateTransmitterHardwareFields(), "Malformed range blocks configuration save");
+    }
+    populateDriveLevel(legacyDrive.id, 7, renderGpioPowerLabel);
+    for (const [index, current] of [2, 4, 6, 8].entries()) {
+        populateDriveLevel("si5351-power-range", index + 1, renderSi5351PowerLabel);
+        equal(field("si5351-power-range").getAttribute("aria-valuetext"), current + " mA", "Si5351 accessible current");
+        equal(buildConfigPayload().Si5351["Power Level"], index + 1, "Si5351 code round trip");
+    }
+    populateDriveLevel("si5351-power-range", 1, renderSi5351PowerLabel);
+    equal(configAutosaveDirty, dirtyBeforeDriveRefresh, "Drive rendering preserves dirty state");
+    equal(configAutosaveTimer, timerBeforeDriveRefresh, "Drive rendering preserves pending timer");
+    equal(patches.length, patchesBeforeDriveRefresh, "Drive rendering performs no saves");
+
     populateRp1GpioDrive(6);
     syncGpioDriveControls();
     equal(field("rp1-gpio-drive-group").hidden, false,
@@ -1289,6 +1385,12 @@ async function main() {
                 deviceScaleFactor: 1,
                 mobile: false,
             });
+            for (const theme of ["light", "dark"]) {
+                for (const generation of [4, -1]) {
+                    await captureLegacyDrive(client, path.join(screenshotDir,
+                        `Legacy_Drive_${generation}_Desktop_${theme}.png`), theme, generation);
+                }
+            }
             await captureConflictScreenshot(
                 client,
                 path.join(screenshotDir, "GPIO_RF_Conflict.png"),
@@ -1329,6 +1431,12 @@ async function main() {
                 deviceScaleFactor: 1,
                 mobile: true,
             });
+            for (const theme of ["light", "dark"]) {
+                for (const generation of [4, -1]) {
+                    await captureLegacyDrive(client, path.join(screenshotDir,
+                        `Legacy_Drive_${generation}_Mobile_${theme}.png`), theme, generation);
+                }
+            }
             await captureConflictScreenshot(
                 client,
                 path.join(screenshotDir, "GPIO_PPM_Mobile.png"),

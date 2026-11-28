@@ -865,9 +865,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                 max="7"
                                                 step="1"
                                                 value="7" />
-                                            <label for="gpio-power-range" class="form-label small mb-0 config-range-control__value">
-                                                <span id="gpio-power-range-value" class="small" aria-live="polite" aria-atomic="true"></span>
-                                            </label>
+                                            <span id="gpio-power-range-value" class="small config-range-control__value"></span>
                                         </div>
                                         <div class="form-text mt-2">
                                             Used by Raspberry Pi 1 through 4. This value is preserved but is not used by RP1.
@@ -1002,9 +1000,7 @@ $bandGpioBands = ['2200m', '630m', '160m', '80m', '60m', '40m', '30m', '20m', '1
                                                 max="4"
                                                 step="1"
                                                 value="1" />
-                                            <label for="si5351-power-range" class="form-label small mb-0 config-range-control__value">
-                                                <span id="si5351-power-range-value" class="small" aria-live="polite" aria-atomic="true"></span>
-                                            </label>
+                                            <span id="si5351-power-range-value" class="small config-range-control__value"></span>
                                         </div>
                                     </div>
                                 </div>

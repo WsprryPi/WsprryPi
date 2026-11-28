@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "arg_parser.hpp"
 #include "config_handler.hpp"
+#include "config_handler_deserialization.hpp"
 #include "config_handler_serialization.hpp"
 #include "scheduling.hpp"
 #include "scheduling_internal.hpp"
@@ -35,6 +36,70 @@ Request request(const char *operation,RequestBody body,char id){
     const std::string text(1,id);const auto digest=sha256(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t *>(text.data()),text.size()));
     return {"WTP/1",std::string(32,'7'),std::string(32,id),"local-network",operation,digest,std::move(body)};
 }
+
+void check_drive_contract(const Json &settings, const std::string &ini)
+{
+    for (const auto &[model, expected] : {
+             std::pair{"Raspberry Pi Model A Plus Rev 1.1", 1},
+             {"Raspberry Pi Model B Rev 2.0", 1},
+             {"Raspberry Pi Zero W Rev 1.1", 1},
+             {"Raspberry Pi 2 Model B Rev 1.2", 2},
+             {"Raspberry Pi 3 Model B Plus Rev 1.3", 3},
+             {"Raspberry Pi Zero 2 W Rev 1.0", 3},
+             {"Raspberry Pi 4 Model B Rev 1.5", 4},
+             {"Raspberry Pi 400 Rev 1.0", 4},
+             {"Raspberry Pi Compute Module 4 Rev 1.1", 4},
+             {"Raspberry Pi 5 Model B Rev 1.0", 5},
+             {"Raspberry Pi 500+ Rev 1.0", 5},
+             {"Raspberry Pi Compute Module 5 Rev 1.0", 5},
+             {"Other Raspberry Pi 4 Model B", -1},
+             {"Raspberry Pi 4junk", -1},
+             {"Raspberry Pi prototype Rev 5.0", -1},
+             {"Raspberry Pi 999999999999999999999999", -1}}) {
+        check(raspberry_pi_generation_from_identity(model, {}) == expected,
+              "Model resolves an exact board family without reading revision digits");
+    }
+    for (const auto &[cpu, expected] : {
+             std::pair{"BCM2835", 1}, {"BCM2836", 2}, {"BCM2837", 3},
+             {"BCM2711", 4}, {"BCM2838", 4}, {"BCM2712", 5},
+             {"prefix BCM2711", -1}, {"BCM2712x", -1}}) {
+        check(raspberry_pi_generation_from_identity("", cpu) == expected,
+              "Processor fallback requires a recognized whole identifier");
+    }
+    const auto roundtrip = [&](const char *section, const char *key,
+                               std::initializer_list<int> legal,
+                               int fallback, std::initializer_list<Json> illegal) {
+        auto candidate = settings;
+        for (int selected : legal) {
+            candidate[section][key] = selected;
+            ArgParserConfig parsed;
+            config_handler_deserialization::deserialize_json_to_runtime_config(candidate, parsed);
+            config_handler_serialization::serialize_runtime_config_to_json(parsed, candidate);
+            check(candidate[section][key] == selected, "Drive value survives runtime round trip");
+        }
+        candidate[section].erase(key);
+        ArgParserConfig parsed;
+        config_handler_deserialization::deserialize_json_to_runtime_config(candidate, parsed);
+        config_handler_serialization::serialize_runtime_config_to_json(parsed, candidate);
+        check(candidate[section][key] == fallback, "Older saved settings retain their missing-field default");
+
+        const auto before = bytes(ini);
+        const auto state = jConfig;
+        for (const auto &bad : illegal) {
+            bool refused = false;
+            try { patch_all_from_web({{section, {{key, bad}}}}); }
+            catch (const std::exception &) { refused = true; }
+            check(refused && bytes(ini) == before && jConfig == state,
+                  "Malformed drive PATCH is refused before publication");
+        }
+    };
+    roundtrip("GPIO", "Power Level", {0, 1, 2, 3, 4, 5, 6, 7}, 7,
+              {-1, 8, 12, 4.5, "4", nullptr, 4294967300ULL});
+    roundtrip("GPIO", "RP1 Drive mA", {2, 4, 8, 12}, 2,
+              {0, 1, 3, 6, 10, 13, 4.5, "4", nullptr, 4294967300ULL});
+    roundtrip("Si5351", "Power Level", {1, 2, 3, 4}, 1,
+              {0, 5, 6, 8, 3.5, "3", nullptr, 4294967299ULL});
+}
 }
 int main(){
  try{
@@ -47,6 +112,7 @@ int main(){
   {std::ofstream output(ini);output<<"; local Pi fixture\n[Security]\nPrivileged Network Safety = enforced\n";}
   check(!chmod(ini.c_str(),0600),"Private INI");iniFile.set_filename(ini);iniFile.set_raw_passthrough_keys({{"Security","Privileged Network Safety"}});json_to_ini();
   patch_all_from_web({{"WSPR",{{"Grid Square","EM18"},{"Call Sign","AA0NT"}}}});
+  check_drive_contract(jConfig, ini);
   WtpCatalog catalog(ini+".wtp-devices.json");PiManagedStore store(ini,self,catalog.pi_management_anchor(self,{}));store.recover();store.initialize(jConfig);
   set_config_persistence_owner([&](const auto &internal,const auto &persist){store.persist(internal,persist);},
       [&](const auto &internal){store.validate_snapshot(internal);},[&](const auto &internal,const auto &image){store.persist_stock(internal,image);});

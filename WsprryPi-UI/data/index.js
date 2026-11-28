@@ -509,8 +509,8 @@ function restorePersistedConfigDraft() {
     populateGpioManualPpm(Number(gpio["Manual PPM"] ?? 0));
     $("#ppm").val(Number(calibration.PPM)).trigger("change");
 
-    $("#gpio-power-range").val(Number(gpio["Power Level"])).trigger("input");
-    populateRp1GpioDrive(gpio["RP1 Drive mA"] ?? 2);
+    populateDriveLevel("gpio-power-range", gpio["Power Level"], renderGpioPowerLabel);
+    populateRp1GpioDrive(Object.hasOwn(gpio, "RP1 Drive mA") ? gpio["RP1 Drive mA"] : 2);
     populateI2cBuses(si5351["I2C Bus"], si5351["Adapter Identity"] || "");
     refreshSi5351Addresses(
         selectedI2cBusValue(),
@@ -521,7 +521,7 @@ function restorePersistedConfigDraft() {
     $("#si5351_crystal_load_capacitance")
         .val(String(si5351["Crystal Load Capacitance"] || 10))
         .trigger("change");
-    $("#si5351-power-range").val(Number(si5351["Power Level"])).trigger("input");
+    populateDriveLevel("si5351-power-range", si5351["Power Level"], renderSi5351PowerLabel);
 
     validatePage();
     configAutosaveDirty = true;
@@ -622,7 +622,10 @@ function bindIndexActions() {
         .on('click.pin', '[aria-labelledby="ledDropdownButton"] .dropdown-item, [aria-labelledby="shutdownDropdownButton"] .dropdown-item, [aria-labelledby="ampDropdownButton"] .dropdown-item', selectPin);
 
     // Bind the transmit power slider
-    $("#gpio-power-range").on("input", updateGpioPowerLabel);
+    $("#gpio-power-range").on("input", function () {
+        delete this.dataset.invalidDriveLevel;
+        renderGpioPowerLabel();
+    });
     $("#rp1_gpio_drive_ma").on("change", function () {
         if (supportedRp1GpioDrive(this.value)) {
             this.removeAttribute("data-invalid-source-value");
@@ -631,7 +634,10 @@ function bindIndexActions() {
         validateRp1GpioDrive();
         scheduleAutosave();
     });
-    $("#si5351-power-range").on("input", updateSi5351PowerLabel);
+    $("#si5351-power-range").on("input", function () {
+        delete this.dataset.invalidDriveLevel;
+        renderSi5351PowerLabel();
+    });
     $("#si5351_reference_source").on("change", syncSi5351ReferenceControls);
 
     // Bind clicks on buttons/switches for resetting tooltips
@@ -2026,7 +2032,7 @@ function transmitBackendForUi(backend) {
 
 function isRp1GpioPlatform() {
     const platform = window.WSPRRYPI_PLATFORM || {};
-    return Number(platform.raspberryPiGeneration) === 5;
+    return platform.raspberryPiGeneration === 5;
 }
 
 function rp1GpioOperatorVisible() {
@@ -2044,7 +2050,9 @@ function gpioBackendOperatorActive() {
 }
 
 function supportedRp1GpioDrive(value) {
-    return [2, 4, 8, 12].includes(Number(value));
+    return typeof value === "string"
+        ? ["2", "4", "8", "12"].includes(value)
+        : [2, 4, 8, 12].includes(value);
 }
 
 function populateRp1GpioDrive(value) {
@@ -2053,9 +2061,8 @@ function populateRp1GpioDrive(value) {
         return;
     }
 
-    const parsed = Number(value);
-    if (supportedRp1GpioDrive(parsed)) {
-        field.value = String(parsed);
+    if (Number.isInteger(value) && supportedRp1GpioDrive(value)) {
+        field.value = String(value);
         field.removeAttribute("data-invalid-source-value");
     } else {
         field.value = "";
@@ -2884,51 +2891,63 @@ function initializeRp1RouteUi() {
 
 window.isRp1RouteStatusModalActive=()=>!!(rp1RouteUi && rp1RouteUi.progressActive);
 
-// GPIO transmit power slider update
-function updateGpioPowerLabel() {
-    var val = this.value;
-    var rangeValues = {
-        0: ["2mA", "3.0dBm"],
-        1: ["4mA", "6.0dBm"],
-        2: ["6mA", "7.8dBm"],
-        3: ["8mA", "9.0dBm"],
-        4: ["10mA", "10.0dBm"],
-        5: ["12mA", "10.8dBm"],
-        6: ["14mA", "11.5dBm"],
-        7: ["16mA", "12.0dBm"],
-    };
-    var label = rangeValues[val] || [String(val)];
-    var labelElement = document.getElementById("gpio-power-range-value");
-
-    if (!labelElement) {
-        return;
-    }
-
-    labelElement.replaceChildren();
-    label.forEach((part, index) => {
-        if (index > 0) {
-            labelElement.appendChild(document.createElement("br"));
-        }
-        labelElement.appendChild(document.createTextNode(part));
-    });
+function parseDriveLevel(value, field) {
+    return Number.isInteger(value) && value >= Number(field.min) && value <= Number(field.max)
+        ? value : null;
 }
 
-function updateSi5351PowerLabel() {
-    var val = this.value;
-    var rangeValues = {
-        1: "2mA",
-        2: "4mA",
-        3: "6mA",
-        4: "8mA",
-    };
-    var label = rangeValues[val] || val;
-    var labelElement = document.getElementById("si5351-power-range-value");
+function readDriveLevel(field) {
+    return !field || field.dataset.invalidDriveLevel
+        ? null : parseDriveLevel(field.valueAsNumber, field);
+}
 
-    if (!labelElement) {
-        return;
+function populateDriveLevel(id, savedLevel, render) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    const level = parseDriveLevel(savedLevel, field);
+    // A native range input would silently clamp malformed settings on assignment.
+    if (level === null) {
+        field.dataset.invalidDriveLevel = "true";
+    } else {
+        delete field.dataset.invalidDriveLevel;
+        field.value = String(level);
     }
+    render();
+}
 
-    labelElement.textContent = label;
+function displayDriveLevel(field, value, detail = "") {
+    const label = document.getElementById(field.id + "-value");
+    const accessible = detail ? value + ", " + detail : value;
+    if (field.getAttribute("aria-valuetext") === accessible) return;
+    field.setAttribute("aria-valuetext", accessible);
+    label.textContent = value;
+    if (detail) label.append(document.createElement("br"), detail);
+}
+
+function renderGpioPowerLabel() {
+    const field = document.getElementById("gpio-power-range");
+    if (!field) return;
+    const code = readDriveLevel(field);
+    const platform = window.WSPRRYPI_PLATFORM;
+    const generation = platform?.legacyDriveIdentityCurrent === false
+        ? null : platform?.raspberryPiGeneration;
+    if (code === null) {
+        displayDriveLevel(field, "Invalid level");
+    } else if (generation === 4) {
+        displayDriveLevel(field, `${code + 1} mA`);
+    } else if ([1, 2, 3].includes(generation)) {
+        const estimates = ["3.0", "6.0", "7.8", "9.0", "10.0", "10.8", "11.5", "12.0"];
+        displayDriveLevel(field, `${2 * (code + 1)} mA`, `${estimates[code]} dBm`);
+    } else {
+        displayDriveLevel(field, `Level ${code}`, "Nominal drive unavailable");
+    }
+}
+
+function renderSi5351PowerLabel() {
+    const field = document.getElementById("si5351-power-range");
+    if (!field) return;
+    const level = readDriveLevel(field);
+    displayDriveLevel(field, level === null ? "Invalid level" : `${2 * level} mA`);
 }
 
 function syncSi5351ReferenceControls() {
@@ -4242,11 +4261,8 @@ function validateTransmitterHardwareFields() {
         setFieldValidationState(manualPpmField, true);
     }
 
-    const gpioPower = normalizeIntegerInputValue("#gpio-power-range", 7);
-    const rp1GpioDrive = normalizeIntegerInputValue("#rp1_gpio_drive_ma", 2);
     const si5351Bus = selectedI2cBusValue();
     const si5351Reference = normalizeIntegerInputValue("#si5351_reference_frequency", 27000000);
-    const si5351Power = normalizeIntegerInputValue("#si5351-power-range", 1);
     const si5351ReferenceSource = String($("#si5351_reference_source").val() || "external_tcxo");
     const si5351CrystalLoad = normalizeIntegerInputValue("#si5351_crystal_load_capacitance", 10);
 
@@ -4269,17 +4285,10 @@ function validateTransmitterHardwareFields() {
     }
 
     const gpioPowerField = document.getElementById("gpio-power-range");
-    const legacyGpioActive = backend === "gpio" && !isRp1GpioPlatform();
-    const gpioPowerValid = gpioPower >= 0 && gpioPower <= 7;
-    setFieldValidationState(
-        gpioPowerField,
-        !legacyGpioActive || gpioPowerValid
-    );
-    if (legacyGpioActive && !gpioPowerValid) {
+    const gpioPowerValid = readDriveLevel(gpioPowerField) !== null;
+    setFieldValidationState(gpioPowerField, gpioPowerValid);
+    if (!gpioPowerValid) {
         invalidCount++;
-    } else if (!legacyGpioActive && gpioPowerField) {
-        gpioPowerField.setCustomValidity("");
-        clearFieldValidationState(gpioPowerField);
     }
 
     if (!validateRp1GpioDrive()) {
@@ -4309,16 +4318,10 @@ function validateTransmitterHardwareFields() {
     }
 
     const si5351PowerField = document.getElementById("si5351-power-range");
-    const si5351PowerValid = si5351Power >= 1 && si5351Power <= 4;
-    setFieldValidationState(
-        si5351PowerField,
-        !(backend === "si5351") || si5351PowerValid
-    );
-    if (backend === "si5351" && !si5351PowerValid) {
+    const si5351PowerValid = readDriveLevel(si5351PowerField) !== null;
+    setFieldValidationState(si5351PowerField, si5351PowerValid);
+    if (!si5351PowerValid) {
         invalidCount++;
-    } else if (backend !== "si5351" && si5351PowerField) {
-        si5351PowerField.setCustomValidity("");
-        clearFieldValidationState(si5351PowerField);
     }
 
     const sourceValid = ["external_tcxo", "crystal"].includes(si5351ReferenceSource);
@@ -4510,17 +4513,16 @@ function buildConfigPayload(options = {}) {
         gpio_tx_pin = persistedRp1Pin;
     }
 
-    const raw = $("#gpio-power-range").val();
-    let transmit_power = parseInt(raw, 10);
-    if (!(transmit_power >= 0 && transmit_power <= 7)) {
-        transmit_power = 7;
-    }
-    let rp1_gpio_drive_ma = parseInt($("#rp1_gpio_drive_ma").val(), 10);
-    if (!supportedRp1GpioDrive(rp1_gpio_drive_ma)) {
-        const invalidSource = $("#rp1_gpio_drive_ma").attr("data-invalid-source-value");
-        rp1_gpio_drive_ma = invalidSource === undefined
-            ? 2
-            : parseInt(invalidSource, 10);
+    const transmit_power = readDriveLevel(document.getElementById("gpio-power-range"));
+    const rp1Field = document.getElementById("rp1_gpio_drive_ma");
+    let rp1_gpio_drive_ma = null;
+    if (supportedRp1GpioDrive(rp1Field?.value)) {
+        rp1_gpio_drive_ma = Number(rp1Field.value);
+    } else if (rp1Field?.hasAttribute("data-invalid-source-value")) {
+        const invalid = Number(rp1Field.getAttribute("data-invalid-source-value"));
+        if (Number.isInteger(invalid) && !supportedRp1GpioDrive(invalid)) {
+            rp1_gpio_drive_ma = invalid;
+        }
     }
 
     const si5351_i2c_bus = selectedI2cBusValue();
@@ -4534,10 +4536,7 @@ function buildConfigPayload(options = {}) {
         si5351_reference_frequency = 27000000;
     }
 
-    let si5351_power_level = parseInt($("#si5351-power-range").val(), 10);
-    if (!(si5351_power_level >= 1 && si5351_power_level <= 4)) {
-        si5351_power_level = 1;
-    }
+    const si5351_power_level = readDriveLevel(document.getElementById("si5351-power-range"));
     let si5351_reference_source = String($("#si5351_reference_source").val() || "external_tcxo");
     if (!["external_tcxo", "crystal"].includes(si5351_reference_source)) {
         si5351_reference_source = "external_tcxo";
@@ -5433,8 +5432,7 @@ function setOfflineDefaults() {
     setTransmitFromBackend(false);
     setTransmitBackendSelection(resolveSupportedTransmitBackend("gpio"));
     setTxPin(4);
-    $("#gpio-power-range").val(7);
-    updateGpioPowerLabel.call(document.getElementById("gpio-power-range"));
+    populateDriveLevel("gpio-power-range", 7, renderGpioPowerLabel);
     populateRp1GpioDrive(2);
     $("#use_system_clock_frequency_estimate").prop("checked", true);
     $("#use_direct_pps_calibration").prop("checked", false);
@@ -5445,8 +5443,7 @@ function setOfflineDefaults() {
     $("#si5351_reference_frequency").val(27000000);
     $("#si5351_reference_source").val("external_tcxo").trigger("change");
     $("#si5351_crystal_load_capacitance").val("10");
-    $("#si5351-power-range").val(1);
-    updateSi5351PowerLabel.call(document.getElementById("si5351-power-range"));
+    populateDriveLevel("si5351-power-range", 1, renderSi5351PowerLabel);
     clickTransmitBackend();
     $("#use_led").prop("checked", false);
     $("#use_shutdown").prop("checked", false);

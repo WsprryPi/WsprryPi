@@ -3727,58 +3727,35 @@ bool parse_command_line(int argc, char *argv[])
             }
             break;
         }
-        case 'd': // Power Level 0-7
+        case 'd': // Legacy backend-specific power option
         {
             try
             {
-                int power = std::stoi(optarg);
+                const int power = parse_integer_option(optarg, "--power_level");
                 if (config.transmit_backend == TransmitBackendKind::SI5351)
                 {
                     if (power < 1 || power > 4)
-                    {
-                        config.si5351_power_level = 1;
-                    }
-                    else
-                    {
-                        config.si5351_power_level = power;
-                    }
+                        print_usage("Invalid Si5351 power level. Expected 1 through 4.", EXIT_FAILURE);
+                    config.si5351_power_level = power;
                 }
                 else if (config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
                 {
-                    config.rp1_gpio_drive_ma =
-                        is_supported_rp1_gpio_drive_ma(power)
-                            ? power
-                            : kDefaultRp1GpioDriveMa;
-                }
-                else if (power < 0 or power > 7)
-                {
-                    config.gpio_power_level = 7;
+                    if (!is_supported_rp1_gpio_drive_ma(power))
+                        print_usage("Invalid RP1 GPIO drive. Expected 2, 4, 8, or 12 mA.", EXIT_FAILURE);
+                    config.rp1_gpio_drive_ma = power;
                 }
                 else
                 {
+                    if (power < 0 || power > 7)
+                        print_usage("Invalid GPIO power level. Expected 0 through 7.", EXIT_FAILURE);
                     config.gpio_power_level = power;
                 }
                 resolve_backend_specific_config(config);
                 explicit_power_level = true;
             }
-            catch (const std::exception &)
+            catch (const std::exception &error)
             {
-                if (config.transmit_backend == TransmitBackendKind::SI5351)
-                {
-                    llog.logE(WARN, "Invalid Si5351 power level, defaulting to 1.");
-                    config.si5351_power_level = 1;
-                }
-                else if (config.transmit_backend == TransmitBackendKind::RP1_GPCLK)
-                {
-                    llog.logE(WARN, "Invalid RP1 GPIO drive, defaulting to 2 mA.");
-                    config.rp1_gpio_drive_ma = kDefaultRp1GpioDriveMa;
-                }
-                else
-                {
-                    llog.logE(WARN, "Invalid GPIO power level, defaulting to 7.");
-                    config.gpio_power_level = 7;
-                }
-                resolve_backend_specific_config(config);
+                print_usage(error.what(), EXIT_FAILURE);
             }
             break;
         }

@@ -2579,6 +2579,7 @@ static std::string patch_all_from_web_revision_impl(const nlohmann::json &j, con
         config_file_stamp(config.ini_filename) == interactive_enable_file_stamp;
     if (interactive && j != nlohmann::json{{"Operation", {{"Transmit", true}}}})
         throw std::runtime_error("Interactive Enable only changes local output enable");
+    config_handler_deserialization::validate_drive_settings_patch(j);
     nlohmann::json candidate_public_json =
         config_handler_serialization::public_config_from_internal_json(jConfig);
     candidate_public_json.merge_patch(j);

@@ -642,6 +642,12 @@ wsprrypi::BackendCompileResult WsprRpiBackend::configure(
         return result;
     }
 
+    if (!gpioPadDriveWord(0, inputs.power_level))
+    {
+        result.error = "Invalid GPIO drive code. Expected 0 through 7.";
+        return result;
+    }
+
     if (!platform_supports_gpio_clock_transmission(&result.error))
     {
         return result;
@@ -1370,6 +1376,8 @@ void WsprRpiBackend::prepareTransmission()
 WsprTransmissionConfigureResult WsprRpiBackend::configureTransmission(
     const WsprTransmissionPlan &plan)
 {
+    if (!gpioPadDriveWord(0, plan.power_level))
+        throw std::invalid_argument("Invalid GPIO drive code. Expected 0 through 7.");
     return setup_dma_freq_table(plan);
 }
 
@@ -2357,12 +2365,15 @@ void WsprRpiBackend::disable_clock()
 
 void WsprRpiBackend::transmit_on(const WsprTransmissionPlan &plan)
 {
+    if (!gpioPadDriveWord(0, plan.power_level))
+        throw std::invalid_argument("Invalid GPIO drive code. Expected 0 through 7.");
     if (execution_hooks_.admit_output_enable &&
         !execution_hooks_.admit_output_enable())
         throw std::runtime_error("Scheduled GPIO output enable was not admitted.");
     configure_transmit_gpio(plan.tx_gpio);
 
-    access_bus_address(PADS_GPIO_0_27_BUS) = 0x5a000018 + plan.power_level;
+    auto &pads = access_bus_address(PADS_GPIO_0_27_BUS);
+    pads = *gpioPadDriveWord(pads, plan.power_level);
 
     const auto source = static_cast<std::uint32_t>(dma_config_.gpclk_source);
     struct GPCTL setupword = {source, 0, 0, 0, 0, 3, 0x5A};

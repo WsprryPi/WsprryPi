@@ -1647,14 +1647,31 @@ function createOperationConfigSnapshot({
     };
 }
 
+let legacyDriveIdentityEpoch = 0;
+
+function invalidateLegacyDriveIdentity() {
+    ++legacyDriveIdentityEpoch;
+    if (window.WSPRRYPI_PLATFORM) {
+        window.WSPRRYPI_PLATFORM.legacyDriveIdentityCurrent = false;
+    }
+    if (isConfigView()) renderGpioPowerLabel();
+}
+
 function populateConfig(callback = null) {
     if (window.ControllerMode && !window.ControllerMode.transmitter) return;
     if (populateConfigRunning) return;
     populateConfigRunning = true;
+    const requestIdentityEpoch = legacyDriveIdentityEpoch;
+    let refreshIdentity = false;
 
     getJsonWithEndpointFallback(SETTINGS_ENDPOINT)
         .done(function (configJson, textStatus, xhr) {
-            if (window.ConfigurationRecovery?.normalResponse()) return;
+            if (window.ConfigurationRecovery?.normalResponse()) {
+                invalidateLegacyDriveIdentity();
+                return;
+            }
+            refreshIdentity = requestIdentityEpoch !== legacyDriveIdentityEpoch;
+            if (refreshIdentity) return;
             window.WtpUi?.setHostRevision(xhr?.getResponseHeader?.("ETag"));
             try {
                 if (!configJson || typeof configJson !== "object") {
@@ -1681,30 +1698,16 @@ function populateConfig(callback = null) {
 
                 window.WSPRRYPI_PLATFORM = {
                     model: getConfigValue(platform, "Platform", "Model", ""),
-                    raspberryPiGeneration: getConfigIntValue(
-                        platform,
-                        "Platform",
-                        "Raspberry Pi Generation",
-                        -1
-                    ),
-                    gpioClockTransmissionSupported: getConfigBoolValue(
-                        platform,
-                        "Platform",
-                        "GPIO Clock Transmission Supported",
-                        true
-                    ),
+                    raspberryPiGeneration: Number.isInteger(platform["Raspberry Pi Generation"])
+                        ? platform["Raspberry Pi Generation"] : -1,
+                    gpioClockTransmissionSupported: platform["GPIO Clock Transmission Supported"] === true,
                     gpioClockTransmissionError: getConfigValue(
                         platform,
                         "Platform",
                         "GPIO Clock Transmission Error",
                         ""
                     ),
-                    rp1GpioOperatorVisible: getConfigBoolValue(
-                        platform,
-                        "Platform",
-                        "RP1 GPIO Operator Visible",
-                        false
-                    ),
+                    rp1GpioOperatorVisible: platform["RP1 GPIO Operator Visible"] === true,
                     si5351Transport: platform["Si5351 Transport"],
                     si5351Adapters: platform["Si5351 Adapters"],
                     si5351AdapterDiscoveryError: platform["Si5351 Adapter Discovery Error"],
@@ -1884,18 +1887,7 @@ function populateConfig(callback = null) {
                     "Use Random Offset",
                     true
                 );
-                let power_level = getConfigIntValue(
-                    gpio,
-                    "GPIO",
-                    "Power Level",
-                    7
-                );
-                let rp1GpioDriveMa = getConfigIntValue(
-                    gpio,
-                    "GPIO",
-                    "RP1 Drive mA",
-                    2
-                );
+                const rp1GpioDriveMa = Object.hasOwn(gpio, "RP1 Drive mA") ? gpio["RP1 Drive mA"] : 2;
                 let si5351I2cBus = getConfigIntValue(
                     si5351,
                     "Si5351",
@@ -1926,12 +1918,6 @@ function populateConfig(callback = null) {
                 if (![6, 8, 10].includes(si5351CrystalLoadCapacitance)) {
                     si5351CrystalLoadCapacitance = 10;
                 }
-                let si5351PowerLevel = getConfigIntValue(
-                    si5351,
-                    "Si5351",
-                    "Power Level",
-                    1
-                );
                 let use_shutdown = getConfigBoolValue(
                     operation,
                     "Operation",
@@ -1993,7 +1979,10 @@ function populateConfig(callback = null) {
 
                 // A selected remote editor cannot consume or overwrite the
                 // local draft retained when its autosave timer was suspended.
-                if (isConfigView() && window.SetupTargets?.retainingLocalDraft) return;
+                if (isConfigView() && window.SetupTargets?.retainingLocalDraft) {
+                    renderGpioPowerLabel();
+                    return;
+                }
                 // If we are on the config page
                 if (isConfigView()) {
                     if (typeof suspendConfigAutosave === "function") {
@@ -2110,7 +2099,7 @@ function populateConfig(callback = null) {
                     populateGpioManualPpm(gpio_manual_ppm);
                     $("#ppm").val(ppm).trigger("change");
 
-                    $("#gpio-power-range").val(power_level).trigger("input");
+                    populateDriveLevel("gpio-power-range", gpio["Power Level"], renderGpioPowerLabel);
                     if (typeof populateRp1GpioDrive === "function") {
                         populateRp1GpioDrive(rp1GpioDriveMa);
                     }
@@ -2135,7 +2124,7 @@ function populateConfig(callback = null) {
                     $("#si5351_crystal_load_capacitance")
                         .val(String(si5351CrystalLoadCapacitance))
                         .trigger("change");
-                    $("#si5351-power-range").val(si5351PowerLevel).trigger("input");
+                    populateDriveLevel("si5351-power-range", si5351["Power Level"], renderSi5351PowerLabel);
 
                     if (selectedTransmitBackend() === "si5351" &&
                         typeof refreshSi5351Addresses === "function") {
@@ -2202,6 +2191,7 @@ function populateConfig(callback = null) {
                     callback();
                 }
             } catch (error) {
+                invalidateLegacyDriveIdentity();
                 if (isConfigView() &&
                     typeof suspendConfigAutosave === "function") {
                     suspendConfigAutosave(false);
@@ -2220,6 +2210,7 @@ function populateConfig(callback = null) {
             }
         })
         .fail(function (jqXHR, textStatus, errorThrown) {
+            invalidateLegacyDriveIdentity();
             if (jqXHR.status === 409 && window.ConfigurationRecovery?.accept(jqXHR.responseJSON)) {
                 backendCurrentlyConnected = true;
                 backendConnectedOnce = true;
@@ -2250,6 +2241,7 @@ function populateConfig(callback = null) {
         })
         .always(function () {
             populateConfigRunning = false;
+            if (refreshIdentity && websocketCurrentlyConnected) populateConfig(callback);
         });
 }
 
@@ -4156,6 +4148,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
         communicationInterrupted = true;
         reloadAfterReconnectPending = true;
         websocketCurrentlyConnected = false;
+        invalidateLegacyDriveIdentity();
         if (ws === socket) {
             invalidateWsprBandCatalogAuthorization(
                 "WSPR band catalog unavailable while reconnecting. Test Tone Start is disabled."
@@ -4202,6 +4195,7 @@ function connectWebSocket(endpoint, reconnectDelay = 5000, attemptIndex = 0) {
         communicationInterrupted = true;
         reloadAfterReconnectPending = true;
         websocketCurrentlyConnected = false;
+        invalidateLegacyDriveIdentity();
         setConnectionState("disconnected");
         syncConnectionAlert();
 

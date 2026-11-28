@@ -1088,6 +1088,20 @@ int main()
     test_si5351_quiesce_failures_close_handles();
     test_si5351_dry_run_avoids_i2c();
 #ifndef SI5351_ONLY_STARTUP_TEST
+    const std::uint32_t drive_words[] = {
+        0x5a000000, 0x5a000001, 0x5a000002, 0x5a000003,
+        0x5a000004, 0x5a000005, 0x5a000006, 0x5a000007};
+    for (int code = 0; code < 8; ++code)
+    {
+        expect(gpioPadDriveWord(0xffe00007, code) == drive_words[code],
+               "Drive write must clear reserved bits and retain zero SLEW/HYST");
+        expect(gpioPadDriveWord(0x10, code) == (drive_words[code] | 0x10u),
+               "Drive write must retain SLEW independently");
+        expect(gpioPadDriveWord(0x08, code) == (drive_words[code] | 0x08u),
+               "Drive write must retain HYST independently");
+    }
+    expect(!gpioPadDriveWord(0x18, -1) && !gpioPadDriveWord(0x18, 8),
+           "Invalid legacy codes must not produce pad writes");
     test_gpio_ppm_sign_and_bounds();
     test_gpio_rf_clock_planning_and_divider_bounds();
     test_gpio_continuous_tone_fractional_dither();

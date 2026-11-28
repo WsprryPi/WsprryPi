@@ -1308,14 +1308,21 @@ void WsprTransmitter::dumpParameters()
     oss.str("");
     oss.clear();
 
-    oss << "GPIO Power:        "
-        << std::fixed
-        << std::setprecision(1)
-        << convert_mw_dbm(getOutputPowerMilliwatts(current_request_.power_level))
-        << " dBm";
-    log_line(oss.str());
-    oss.str("");
-    oss.clear();
+    if (rpi_backend_ != nullptr &&
+        current_request_.power_level >= 0 && current_request_.power_level <= 7)
+    {
+        oss << "GPIO Drive Code:   " << current_request_.power_level;
+        if (current_request_.hardware_profile == wsprrypi::HardwareProfile::BCM2835 ||
+            current_request_.hardware_profile == wsprrypi::HardwareProfile::BCM2836_BCM2837)
+        {
+            oss << " (" << std::fixed << std::setprecision(1)
+                << convert_mw_dbm(getOutputPowerMilliwatts(current_request_.power_level))
+                << " dBm estimated)";
+        }
+        log_line(oss.str());
+        oss.str("");
+        oss.clear();
+    }
 
     oss << "Transmit GPIO:     "
         << current_request_.tx_gpio;

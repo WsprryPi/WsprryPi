@@ -1,6 +1,6 @@
 # Pico GPIO drive strength
 
-The selected Pico supports 2, 4, 8, or 12 mA nominal direct RF GPIO drive, with 12 mA as the fresh-install default, only when its current Control/1 descriptor is advertised. Use Read GPIO drive in member hardware, select a value, Save GPIO drive, then explicitly restart the Pico through its supported management workflow. Saved, boot selection, and verified physical pad readback are separate observations. An unavailable or unreachable member never displays an observed default.
+The selected Pico supports 2, 4, 8, or 12 mA nominal direct RF GPIO drive, with 12 mA as the fresh-install default, only when its current Control/1 descriptor is advertised. An existing stored configuration without `gpio_drive_ma` decodes to 4 mA. Use **Read GPIO drive** in member hardware, select a value, choose **Save GPIO drive**, then explicitly restart the Pico through its supported management workflow. The saved selection, immutable boot selection, and cached SDK pad readback are separate observations. An unavailable or unreachable member never displays an observed default. WSPR reported power is set independently.
 
 This electrical setting does not adjust WSPR reported power or any Pi local BCM/RP1/Si5351 setting. Actual RF power depends on load and frequency. Other pins and native execution semantics are unchanged. USB needs no Pico Wi-Fi. Network management requires the existing authenticated Consumer-Radio or engineering carrier. External WTP execution is retired.
 

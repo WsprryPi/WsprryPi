@@ -163,6 +163,30 @@ int parse_strict_integer_config_value(
     return config_handler_serialization::config_serialization_integer(source, context);
 }
 
+int parse_drive_setting(const nlohmann::json &value,
+                        const std::string &setting, int minimum, int maximum)
+{
+    // Check the full JSON value before narrowing to the stored integer.
+    if (value.is_number_integer() &&
+        !(value.is_number_unsigned() &&
+          value.get<std::uint64_t>() > static_cast<std::uint64_t>(maximum)))
+    {
+        const auto level = value.get<std::int64_t>();
+        if (level >= minimum && level <= maximum) return static_cast<int>(level);
+    }
+    throw std::runtime_error(setting + " must be a whole number from " +
+                             std::to_string(minimum) + " through " +
+                             std::to_string(maximum) + ".");
+}
+
+int parse_rp1_drive_setting(const nlohmann::json &value)
+{
+    const int drive = parse_drive_setting(value, "GPIO.RP1 Drive mA", 2, 12);
+    if (!is_supported_rp1_gpio_drive_ma(drive))
+        throw std::runtime_error("GPIO.RP1 Drive mA must be 2, 4, 8, or 12.");
+    return drive;
+}
+
 double parse_manual_ppm_value(
     const nlohmann::json &source,
     const std::string &context)
@@ -535,6 +559,28 @@ std::string parse_cw_message_value(const nlohmann::json &value)
 
 } // namespace
 
+void validate_drive_settings_patch(const nlohmann::json &patch)
+{
+    // Validate before merge-patch can delete null fields or platform policy
+    // can discard a GPIO section the current host does not expose.
+    if (patch.contains("GPIO"))
+    {
+        const auto &gpio = patch.at("GPIO");
+        if (!gpio.is_object()) throw std::runtime_error("GPIO must be an object.");
+        if (gpio.contains("Power Level"))
+            parse_drive_setting(gpio.at("Power Level"), "GPIO.Power Level", 0, 7);
+        if (gpio.contains("RP1 Drive mA"))
+            parse_rp1_drive_setting(gpio.at("RP1 Drive mA"));
+    }
+    if (patch.contains("Si5351"))
+    {
+        const auto &si5351 = patch.at("Si5351");
+        if (!si5351.is_object()) throw std::runtime_error("Si5351 must be an object.");
+        if (si5351.contains("Power Level"))
+            parse_drive_setting(si5351.at("Power Level"), "Si5351.Power Level", 1, 4);
+    }
+}
+
 void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserConfig &target)
 {
     default_band_gpio_config(target.band_gpio);
@@ -574,17 +620,12 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
     }
     target.gpio_power_level =
         gpio.contains("Power Level")
-            ? gpio.at("Power Level").get<int>()
+            ? parse_drive_setting(gpio.at("Power Level"), "GPIO.Power Level", 0, 7)
             : 7;
     target.rp1_gpio_drive_ma =
         gpio.contains("RP1 Drive mA")
-            ? gpio.at("RP1 Drive mA").get<int>()
+            ? parse_rp1_drive_setting(gpio.at("RP1 Drive mA"))
             : kDefaultRp1GpioDriveMa;
-    if (!is_supported_rp1_gpio_drive_ma(target.rp1_gpio_drive_ma))
-    {
-        throw std::runtime_error(
-            "GPIO.RP1 Drive mA must be 2, 4, 8, or 12.");
-    }
     target.gpio_use_system_clock_frequency_estimate =
         gpio.contains("Use System Clock Frequency Estimate")
             ? gpio.at("Use System Clock Frequency Estimate").get<bool>()
@@ -632,7 +673,7 @@ void deserialize_json_to_runtime_config(const nlohmann::json &source, ArgParserC
             : kDefaultSi5351TxOutput;
     target.si5351_power_level =
         si5351.contains("Power Level")
-            ? si5351.at("Power Level").get<int>()
+            ? parse_drive_setting(si5351.at("Power Level"), "Si5351.Power Level", 1, 4)
             : 1;
     target.si5351_ppm = parse_manual_ppm_value(
         source.at("Calibration").at("PPM"),

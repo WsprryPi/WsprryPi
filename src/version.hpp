@@ -30,6 +30,7 @@
 #define VERSION_H
 
 #include <string>
+#include <string_view>
 
 /**
  * @brief Retrieves the project name.
@@ -140,6 +141,8 @@ extern std::string get_debug_state();
  * ```
  */
 extern std::string get_pi_model();
+int raspberry_pi_generation_from_identity(
+    const std::string &model, std::string_view processor);
 int get_raspberry_pi_generation();
 void set_hardware_platform_detection_enabled(bool enabled) noexcept;
 bool platform_supports_gpio_clock_transmission(

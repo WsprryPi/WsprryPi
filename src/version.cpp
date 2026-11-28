@@ -44,7 +44,9 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <optional>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -61,66 +63,22 @@ namespace
     bool g_hardware_platform_detection_enabled = true;
     std::optional<bool> g_rp1_gpclk_provider_available_override;
 
-    std::optional<int> parse_generation_from_pi_model(
-        const std::string &model)
+    int generation_from_pi_model(const std::string &model)
     {
-        const std::size_t pi_pos = model.find("Raspberry Pi");
-        if (pi_pos == std::string::npos)
+        // The revision suffix is optional and never identifies the board.
+        static const std::regex patterns[] = {
+            std::regex(R"(Raspberry Pi (Model [AB](\+| Plus)?|Zero( W)?|Compute Module( 1)?)( Rev [0-9]+\.[0-9]+)?)"),
+            std::regex(R"(Raspberry Pi 2 Model B( Rev [0-9]+\.[0-9]+)?)"),
+            std::regex(R"(Raspberry Pi (3 Model [AB](\+| Plus)?|Zero 2 W|Compute Module 3(\+| Plus)?)( Rev [0-9]+\.[0-9]+)?)"),
+            std::regex(R"(Raspberry Pi (4 Model B|400|Compute Module 4S?)( Rev [0-9]+\.[0-9]+)?)"),
+            std::regex(R"(Raspberry Pi (5( Model B)?|500\+?|Compute Module 5)( Rev [0-9]+\.[0-9]+)?)"),
+        };
+        for (std::size_t index = 0; index < std::size(patterns); ++index)
         {
-            return std::nullopt;
+            if (std::regex_match(model, patterns[index]))
+                return static_cast<int>(index) + 1;
         }
-
-        for (std::size_t i = pi_pos; i < model.size(); ++i)
-        {
-            if (!std::isdigit(static_cast<unsigned char>(model[i])))
-            {
-                continue;
-            }
-
-            std::size_t end = i;
-            while (end < model.size() &&
-                   std::isdigit(static_cast<unsigned char>(model[end])))
-            {
-                ++end;
-            }
-
-            int generation = std::stoi(model.substr(i, end - i));
-            if (generation >= 100 && generation % 100 == 0)
-            {
-                generation /= 100;
-            }
-            return generation;
-        }
-
-        return std::nullopt;
-    }
-
-    std::optional<int> parse_generation_from_processor_string(
-        const std::string &processor)
-    {
-        if (processor.find("BCM2712") != std::string::npos)
-        {
-            return 5;
-        }
-        if (processor.find("BCM2711") != std::string::npos ||
-            processor.find("BCM2838") != std::string::npos)
-        {
-            return 4;
-        }
-        if (processor.find("BCM2837") != std::string::npos)
-        {
-            return 3;
-        }
-        if (processor.find("BCM2836") != std::string::npos)
-        {
-            return 2;
-        }
-        if (processor.find("BCM2835") != std::string::npos)
-        {
-            return 1;
-        }
-
-        return std::nullopt;
+        return -1;
     }
 }
 
@@ -389,67 +347,33 @@ const ProcessorMapping processorMappings[] = {
     {"BCM2836", 1}, ///< Raspberry Pi 2 series
     {"BCM2837", 2}, ///< Raspberry Pi 3 series
     {"BCM2838", 3}, ///< Raspberry Pi 4 and Pi 400 series (alias)
-    {"BCM2711", 3}  ///< Raspberry Pi 4 and Pi 400 series
+    {"BCM2711", 3}, ///< Raspberry Pi 4 and Pi 400 series
+    {"BCM2712", 4}  ///< Raspberry Pi RP1 hosts
 };
 
-/**
- * @brief Retrieves the processor type as a string.
- *
- * This function reads the `/sys/firmware/devicetree/base/compatible` file to
- * determine the processor type of the Raspberry Pi. It extracts the CPU model
- * (such as "BCM2835", "BCM2711") from the device tree and returns it as an
- * uppercase string.
- *
- * @return std::string The detected processor type, such as "BCM2835",
- *         "BCM2711", etc. If the processor type cannot be determined,
- *         it returns "Unknown CPU".
- *
- * @details The function reads the first line of the compatible file, searches
- *          for the "bcm" keyword, replaces commas with spaces for readability,
- *          and converts the result to uppercase for consistency.
- *
- * @throws None This function does not throw exceptions but returns an error
- *         message if the file cannot be read.
- */
+// A device-tree compatible property is a NUL-delimited list of identifiers.
 std::string get_processor_string()
 {
-    static std::string cpuModel; ///< Static variable to cache the result
-
-    // Open the device tree compatible file
-    std::ifstream dtCompatible("/sys/firmware/devicetree/base/compatible");
-    if (!dtCompatible.is_open())
+    std::ifstream compatible_file("/sys/firmware/devicetree/base/compatible",
+                                  std::ios::binary);
+    if (!compatible_file)
     {
         llog.logE(ERROR, "Failed to open /sys/firmware/devicetree/base/compatible.");
-        return "Unknown CPU"; ///< Return a default value if the file cannot be opened
+        return "Unknown CPU";
     }
 
-    // Read the first line from the file
-    std::getline(dtCompatible, cpuModel);
-    dtCompatible.close();
-
-    // Find the start of the "bcm" string in the line
-    size_t start = cpuModel.find("bcm");
-    if (start != std::string::npos)
+    std::string compatible;
+    while (std::getline(compatible_file, compatible, '\0'))
     {
-        // Extract the relevant portion of the string
-        cpuModel = cpuModel.substr(start);
-
-        // Replace commas with spaces for better readability
-        for (char &c : cpuModel)
+        if (!compatible.starts_with("brcm,bcm")) continue;
+        std::string processor = compatible.substr(5);
+        std::transform(processor.begin(), processor.end(), processor.begin(),
+            [](unsigned char byte) { return static_cast<char>(std::toupper(byte)); });
+        for (const auto &mapping : processorMappings)
         {
-            if (c == ',')
-            {
-                c = ' ';
-            }
+            if (processor == mapping.type) return processor;
         }
-
-        // Convert the result to uppercase for consistency
-        std::transform(cpuModel.begin(), cpuModel.end(), cpuModel.begin(), ::toupper);
-
-        return cpuModel; ///< Return the formatted CPU model
     }
-
-    // If "bcm" was not found, return an unknown CPU message
     return "Unknown CPU Model";
 }
 
@@ -544,6 +468,18 @@ std::string get_pi_model()
     return model;
 }
 
+int raspberry_pi_generation_from_identity(
+    const std::string &model, std::string_view processor)
+{
+    const int generation = generation_from_pi_model(model);
+    if (generation != -1) return generation;
+    for (const auto &mapping : processorMappings)
+    {
+        if (processor == mapping.type) return mapping.value + 1;
+    }
+    return -1;
+}
+
 int get_raspberry_pi_generation()
 {
     // An explicit typed fixture identity requires no hardware discovery. Keep
@@ -556,21 +492,12 @@ int get_raspberry_pi_generation()
     if (!g_hardware_platform_detection_enabled)
         return -1;
 
-    if (const auto model_generation =
-            parse_generation_from_pi_model(get_pi_model());
-        model_generation.has_value())
-    {
-        return *model_generation;
-    }
-
-    if (const auto processor_generation =
-            parse_generation_from_processor_string(get_processor_string());
-        processor_generation.has_value())
-    {
-        return *processor_generation;
-    }
-
-    return -1;
+    static const int generation = [] {
+        const int model = raspberry_pi_generation_from_identity(get_pi_model(), {});
+        return model != -1 ? model
+            : raspberry_pi_generation_from_identity({}, get_processor_string());
+    }();
+    return generation;
 }
 
 void set_hardware_platform_detection_enabled(bool enabled) noexcept
