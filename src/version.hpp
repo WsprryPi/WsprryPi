@@ -174,6 +174,7 @@ std::string get_os_version_name();
  * @example Example output: "MyProject version 1.2.3 (main)."
  */
 extern std::string get_version_string();
+const char *controller_build_identity() noexcept;
 
 /**
  * @brief Constructs a formatted plain version string for the project.

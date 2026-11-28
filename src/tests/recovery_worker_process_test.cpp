@@ -56,6 +56,7 @@ int main(int argc,char **argv){try{
     }
     const std::string startup=
         "import json,sys\n"
+        "assert sys.dont_write_bytecode\n"
         "assert json.loads(sys.stdin.buffer.readline()) == {'action':'list.summary'}\n"
         "print(json.dumps({'ok':True,'value':{'schema':'recovery-job-list/1','active':None,'jobs':[]}}),flush=True)\n";
     for(const auto &value:std::vector<nlohmann::json>{

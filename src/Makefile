@@ -2256,7 +2256,7 @@ $(BIN_DIR)/local_control_transport_test: tests/local_control_transport_test.cpp 
 local-control-transport-test: $(BIN_DIR)/local_control_transport_test
 	$(Q)"$(BIN_DIR)/local_control_transport_test"
 .PHONY: pi-managed-wtp-main-test
-$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp controller_instance_lock.hpp Singleton/src/installation_lock.hpp wtp_endpoint/runtime.hpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
+$(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o: main.cpp controller_instance_lock.hpp Singleton/src/installation_lock.hpp wtp_endpoint/runtime.hpp application_control/web_service.hpp application_recovery/maintenance_service.hpp $(BUILD_METADATA_HEADER) $(BACKEND_CAPABILITIES_HEADER)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CXX_DEBUG_FLAGS) -Dmain=pi_managed_production_main -MF $(@:.o=.d) -c $< -o $@
 $(CONTROLLER_PRODUCTION_FIXTURE): tests/controller_only_production_fixture.cpp tests/software_control_runtime.hpp $(OBJ_DIR_DEBUG)/tests/pi_managed_production_main.o $(SEMANTICS_TEST_DEPS) $(PROFILE_LINK_INPUTS)
@@ -2846,13 +2846,18 @@ mcp2221a-transport-test:
 	$(MAKE) -C WSPR-Transmitter/src mcp2221a-transport-test SI5351_TRANSPORT=$(SI5351_TRANSPORT)
 
 
-.PHONY: ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test ci-installer-offline-test
+.PHONY: ci-focused-state-test ci-network-policy-test ci-support-lifecycle-test ci-installer-offline-test controller-binary-test
 # The full semantics suite owns the shared state and recovery tests.
 ci-focused-state-test: guarded-mode-change-persistence-test band-gpio-default-convergence-test band-gpio-rotation-test selector-shutdown-cleanup-test monitor-file-regression-test gpio-line-resolver-test non-wspr-repeat-policy-test
 ci-network-policy-test: support-request-guard-test privileged-network-policy-test backend-http-guard-test websocket-upgrade-guard-test privileged-network-transaction-test privileged-network-runtime-test privileged-network-admin-test
 ci-support-lifecycle-test: support-bundle-result-validator-test support-bundle-runtime-test support-bundle-download-file-test support-bundle-checksum-file-test support-bundle-archive-digest-test support-bundle-download-preparation-test support-bundle-job-directory-remover-test support-bundle-startup-cleanup-test
-ci-installer-offline-test: application-state-installer-test recovery-runtime-package-test support-bundle-runtime-installer-test pico-usb-installer-offline-test
+ci-installer-offline-test: application-state-installer-test recovery-runtime-package-test support-bundle-runtime-installer-test pico-usb-installer-offline-test controller-binary-test
 	$(Q)python3 -B ../scripts/tests/apache_privileged_network_policy_renderer_test.py
+
+controller-binary-test:
+	$(Q)python3 -B ../scripts/tests/controller_binary_test.py
+	$(Q)python3 -B ../scripts/tests/controller_install_test.py
+	$(Q)python3 -B ../scripts/tests/controller_native_bundle_test.py
 
 .PHONY: application-state-installer-test
 application-state-installer-test:

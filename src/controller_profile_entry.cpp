@@ -15,7 +15,8 @@ std::optional<int> controller_profile_entry(int argc, char *argv[]) {
         if (option == "--controller-only") controller = true;
         if (option == "--web-service" || option == "--settings" || option == "--maintenance" ||
             option == "--diagnostic-export" || option == "--recovery-backend" ||
-            option == "--export-recovery-age-helper" || option == "--export-udp-logging-worker") ++commands;
+            option == "--export-recovery-age-helper" || option == "--export-udp-logging-worker" ||
+            option == "--storage-format") ++commands;
         if (option == "--maintenance-worker") { maintenance_worker = true; ++commands; }
     }
     const auto refused = [] {
@@ -45,11 +46,16 @@ std::optional<int> controller_profile_entry(int argc, char *argv[]) {
             std::cout << get_version_string() << "\nBuild profile: controller\nCompiled backends: none\nAncillary GPIO: disabled\n";
             return 0;
         }
+        if (option == "--artifact-identity") {
+            std::cout << controller_build_identity() << '\n';
+            return 0;
+        }
         if (option == "--list-backends") { std::cout << '\n'; return 0; }
     }
     for (int index = 1; index < argc; ++index) {
         const std::string_view option(argv[index]);
-        if (option == "--help" || option == "-h" || option == "--version" || option == "-v" || option == "--list-backends") return refused();
+        if (option == "--help" || option == "-h" || option == "--version" || option == "-v" ||
+            option == "--artifact-identity" || option == "--list-backends") return refused();
     }
     if (!controller) return refused();
 #else

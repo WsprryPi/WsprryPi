@@ -642,6 +642,7 @@ int main(int argc,char *argv[]){
     }catch(...){std::cerr<<"Native command line could not be read.\n";return EXIT_FAILURE;}
 #endif
 #ifdef _WIN32
+    if(const auto result=wsprrypi::windows_frontend_service_entry(argc,argv))return *result;
     if(const auto result=wsprrypi::windows_controller_service_entry(argc,argv,[](const std::vector<std::string> &arguments){
         auto values=arguments;std::vector<char *> pointers;for(auto &value:values)pointers.push_back(value.data());pointers.push_back(nullptr);
         return application_main(static_cast<int>(values.size()),pointers.data());

@@ -2,7 +2,10 @@
 """Fixed backend service lifecycle; the browser never supplies a PID or command."""
 import os
 from pathlib import Path
+import plistlib
+import re
 import signal
+import stat
 import sys
 if sys.platform != 'win32':
     import fcntl
@@ -11,13 +14,20 @@ import time
 from . import archive
 
 
+MAC_LABEL = 'org.wsprrypi.controller'
+MAC_TARGET = 'system/' + MAC_LABEL
+MAC_PLIST = Path('/Library/LaunchDaemons') / (MAC_LABEL + '.plist')
+MAC_BACKEND = '/Library/Application Support/WsprryPi/Program/bin/wsprrypi'
+MAC_STATE = '/Library/Application Support/WsprryPi/Controller/application-state'
+MAC_RUNTIME = '/Library/Application Support/WsprryPi/Run/Backend'
+MAC_LOGS = '/Library/Logs/WsprryPi'
+
+
 def validate(value):
-    archive.require(type(value) is dict and value.get('kind') in ('systemd', 'windows_service', 'software_fixture'))
-    if sys.platform == 'win32':
-        archive.require(value['kind'] in ('windows_service', 'software_fixture'))
-    else:
-        archive.require(value['kind'] != 'windows_service')
-    if value['kind'] in ('systemd', 'windows_service'):
+    native = {'win32': 'windows_service', 'darwin': 'launchd', 'linux': 'systemd'}.get(sys.platform)
+    archive.require(type(value) is dict and value.get('kind') in (native, 'software_fixture')
+                    and value.get('kind') is not None)
+    if value['kind'] != 'software_fixture':
         archive.closed(value, ('kind',))
     else:
         archive.closed(value, ('kind', 'start_command', 'crash_after_phase') if 'crash_after_phase' in value else ('kind', 'start_command'))
@@ -29,6 +39,49 @@ def validate(value):
                         and all(type(item) is str and '\0' not in item and len(item) <= 4096 for item in command)
                         and '--backend' in command and command[command.index('--backend') + 1:command.index('--backend') + 2] == ['simulated'])
     return value
+
+
+def launchd_child(*args):
+    return subprocess.run(['/bin/launchctl', *args], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, timeout=60, check=True, text=True,
+                          env={'PATH': '/usr/bin:/bin', 'LANG': 'C', 'LC_ALL': 'C'}).stdout
+
+
+def mac_backend_arguments():
+    return [MAC_BACKEND, '--controller-only', '--state-directory', MAC_STATE,
+            '--runtime-directory', MAC_RUNTIME, '--socket-loopback-only']
+
+
+def mac_service_definition(label, arguments, username, group, directory, logs):
+    return {
+        'Label': label, 'ProgramArguments': arguments,
+        'UserName': username, 'GroupName': group,
+        'WorkingDirectory': directory,
+        'StandardOutPath': f'{MAC_LOGS}/{logs}/service.log',
+        'StandardErrorPath': f'{MAC_LOGS}/{logs}/service-error.log',
+        'RunAtLoad': True, 'KeepAlive': {'SuccessfulExit': False},
+        'ThrottleInterval': 5, 'ExitTimeOut': 30, 'Umask': 0o077,
+    }
+
+
+def mac_backend_definition():
+    return mac_service_definition(MAC_LABEL, mac_backend_arguments(), '_wsprrypi', '_wsprrypiweb',
+                                  str(Path(MAC_STATE).parent), 'Controller')
+
+
+def admit_launchd_plist():
+    for path in MAC_PLIST.parents:
+        info = path.lstat()
+        archive.require(stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022)
+    descriptor = os.open(MAC_PLIST, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        archive.require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
+                        and not info.st_mode & 0o022 and 0 < info.st_size <= 65536)
+        raw = stream.read(65537)
+        archive.require(len(raw) == info.st_size and archive.observation(info) ==
+                        archive.observation(os.fstat(stream.fileno())))
+    archive.require(plistlib.loads(raw) == mac_backend_definition())
 
 
 def root_available(root):
@@ -64,6 +117,13 @@ class BackendLifecycle:
     def stop(self, observed_pid):
         if self.config['kind'] == 'windows_service':
             self.native_service.stop(observed_pid)
+        elif self.config['kind'] == 'launchd':
+            archive.require(os.geteuid() == 0 and type(observed_pid) is int and observed_pid > 1)
+            admit_launchd_plist()
+            job = launchd_child('print', MAC_TARGET)
+            pid = re.findall(r'^\s*pid = (\d+)\s*$', job, re.MULTILINE)
+            archive.require(pid == [str(observed_pid)])
+            launchd_child('bootout', MAC_TARGET)
         elif self.config['kind'] == 'systemd':
             # No shell, caller-selected unit, arbitrary arguments, or remote
             # transport. The installed maintenance role is explicitly root.
@@ -97,6 +157,10 @@ class BackendLifecycle:
             else:
                 archive.require(state == self.native_service.STOPPED)
             self.native_service.start()
+        elif self.config['kind'] == 'launchd':
+            archive.require(os.geteuid() == 0 and self.available())
+            admit_launchd_plist()
+            launchd_child('bootstrap', 'system', str(MAC_PLIST))
         elif self.config['kind'] == 'systemd':
             archive.require(os.geteuid() == 0)
             result = subprocess.run(['/usr/bin/systemctl', 'start', 'wsprrypi.service'], stdin=subprocess.DEVNULL,

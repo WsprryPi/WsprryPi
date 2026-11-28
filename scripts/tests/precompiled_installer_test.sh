@@ -10,7 +10,13 @@ fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 logI() { :; }; logE() { :; }; logW() { :; }
 expect_failure() { if "$@"; then echo "Expected failure: $*" >&2; exit 1; fi; }
-contains_pkg() { printf '%s\n' "${RESOLVED_APT_PACKAGES[@]}" | grep -Fxq -- "$1"; }
+contains_pkg() {
+    local package
+    for package in "${RESOLVED_APT_PACKAGES[@]}"; do
+        [[ "$package" == "$1" ]] && return 0
+    done
+    return 1
+}
 # These publication fixtures use opaque old/new markers. The real executable
 # probe is covered by application_state_install_shell_test.py.
 publication_storage_compatible=true

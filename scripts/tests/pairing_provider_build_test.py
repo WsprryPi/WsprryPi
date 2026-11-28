@@ -45,6 +45,15 @@ class ProviderBuildTest(unittest.TestCase):
                 BUILD.verified_archive(self.root, {"sha256": expected})
             network.assert_not_called()
 
+    def test_macos_deployment_targets_have_distinct_provider_builds(self):
+        with patch.object(BUILD.platform, "system", return_value="Darwin"), \
+             patch.object(BUILD.subprocess, "check_output", return_value="clang fixture"):
+            with patch.dict(os.environ, {"MACOSX_DEPLOYMENT_TARGET": "26.0"}):
+                tahoe = BUILD.build_key({}, "clang++", "arm64")
+            with patch.dict(os.environ, {"MACOSX_DEPLOYMENT_TARGET": "27.0"}):
+                newer = BUILD.build_key({}, "clang++", "arm64")
+        self.assertNotEqual(tahoe, newer)
+
     def test_provider_cannot_inherit_parent_git_revision(self):
         # A real nested archive tree must not discover the enclosing repository.
         subprocess.run(["git", "init", "-q", str(self.root)], check=True)

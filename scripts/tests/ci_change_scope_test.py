@@ -115,8 +115,8 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("${{ inputs.macos_runtime_only }}", group)
         self.assertIn("${{ inputs.macos_runtime_profiles }}", group)
         self.assertIn("${{ inputs.macos_controller_only }}", group)
-        self.assertNotEqual(group.replace("${{ inputs.macos_runtime_profiles }}", "arm64"),
-                            group.replace("${{ inputs.macos_runtime_profiles }}", "macos-26-intel"))
+        self.assertNotEqual(group.replace("${{ inputs.macos_runtime_profiles }}", "macos-26"),
+                            group.replace("${{ inputs.macos_runtime_profiles }}", "xcode-27"))
         self.assertNotEqual(group.replace("${{ github.sha }}", "1"*40),
                             group.replace("${{ github.sha }}", "2"*40))
 

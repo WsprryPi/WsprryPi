@@ -179,7 +179,7 @@ private:
         try{
             auto options=options_;options.channel=LocalChannel::Http;
             const bool maintenance=operation->name.starts_with("recovery.")&&operation->name!="recovery.session";
-            if(maintenance){options=maintenance_control_options(true);options.channel=LocalChannel::Http;}
+            if(maintenance){options=maintenance_control_options(MaintenancePeer::Browser);options.channel=LocalChannel::Http;}
             auto resource=std::make_shared<RemoteHttpResource>(options,maintenance?std::string{}:boot(),request,*operation);
             response.status=resource->metadata()["status"].get<int>();
             // The backend deliberately captures the full pinned resource. This
@@ -263,6 +263,11 @@ struct Signals {
 };
 }
 std::optional<int> web_service_main(int argc,char *argv[]){
+    return web_service_main(argc,argv,{},{});
+}
+
+std::optional<int> web_service_main(int argc,char *argv[],const std::function<bool()> &stop_requested,
+                                   const std::function<void()> &ready){
     bool selected=false;for(int index=1;index<argc;++index)if(std::string_view(argv[index]).starts_with("--web-service"))selected=true;
     if(!selected)return {};
     try{
@@ -294,12 +299,16 @@ std::optional<int> web_service_main(int argc,char *argv[]){
         if(help){std::cout<<"wsprrypi --web-service [--runtime-directory <absolute directory>] [--listener-cache <absolute file>]\n"
             <<"Runs browser HTTP and WebSocket listeners through the local backend. No database, hardware, or identity initialization.\n";return 0;}
         const auto options=web_control_options(runtime);Signals signals;Json bootstrap;
-        while(!stopped&&bootstrap.is_null()){
+        const auto stop_now=[&]{return stopped||(stop_requested&&stop_requested());};
+        const auto startup_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(45);
+        while(!stop_now()&&bootstrap.is_null()){
+            require(!ready||std::chrono::steady_clock::now()<startup_deadline);
             try{LocalControlConnection connection(options);bootstrap=value(connection.request({LocalOperation::WebBootstrap,Json::object()}));require(valid_web_bootstrap(bootstrap)&&bootstrap["boot"]==connection.boot());}
             catch(...){bootstrap=nullptr;try{bootstrap=read_web_bootstrap_cache(cache);}catch(...){std::this_thread::sleep_for(std::chrono::milliseconds(100));}}
         }
-        if(stopped)return 0;
+        if(stop_now())return 0;
         auto service=std::make_unique<WebService>(options);service->start(bootstrap);
+        if(ready)ready();
         bool listeners_ready=true;
         std::unique_ptr<WebService> retained;
         const auto retention_cache=cache+".recovery.web-listeners.json";
@@ -315,7 +324,7 @@ std::optional<int> web_service_main(int argc,char *argv[]){
         std::string event_boot;std::uint64_t cursor=0;
         auto heartbeat=std::chrono::steady_clock::time_point{};
         std::cout<<"WsprryPi browser service "<<get_exe_version()<<" source="<<get_exe_commit()<<" dirty="<<get_exe_build_dirty()<<" listening; backend state remains private.\n"<<std::flush;
-        while(!stopped){
+        while(!stop_now()){
             const auto now=std::chrono::steady_clock::now();
             if(now>=heartbeat){
                 heartbeat=now+std::chrono::seconds(1);

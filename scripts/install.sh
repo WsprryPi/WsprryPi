@@ -47,6 +47,23 @@ IFS=$'\n\t'
 #
 # -----------------------------------------------------------------------------
 
+# Dispatch the native controller before the Pi installer needs Bash 4 features.
+if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+    if [[ "${1:-}" == "--controller-only" ]]; then
+        shift
+        controller_script_directory=$(dirname -- "${BASH_SOURCE[0]}")
+        controller_entry=controller_linux.py
+        if [[ "$(uname -s)" == Darwin ]]; then
+            controller_entry=controller_macos.py
+        fi
+        if [[ ! -f "$controller_script_directory/$controller_entry" ]]; then
+            printf '%s\n' 'The controller installer requires the local WsprryPi checkout.' >&2
+            exit 1
+        fi
+        exec /usr/bin/python3 -B "$controller_script_directory/$controller_entry" "$@"
+    fi
+fi
+
 declare DEFAULT_REPO_BRANCH="main"
 declare DEFAULT_SEM_VER="3.2.0"
 
@@ -10431,6 +10448,11 @@ _main() {
         esac
     done
 
+    if [[ -e /var/lib/wsprrypi-controller-install || -L /var/lib/wsprrypi-controller-install ]]; then
+        printf '%s\n' 'This host retains a controller installation. Use the explicit controller installer.' >&2
+        return 1
+    fi
+
     # Check and set up the environment
     handle_execution_context "$debug" # Get execution context and set environment variables
     process_args "$@" "$debug" || return $? # Parse command-line arguments
@@ -10556,6 +10578,12 @@ main() {
 #          statistics to the user.
 # -----------------------------------------------------------------------------
 if [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then
+    for installer_argument in "$@"; do
+        if [[ "$installer_argument" == "--controller-only" ]]; then
+            printf '%s\n' 'Supply --controller-only as the first installer argument.' >&2
+            exit 1
+        fi
+    done
     trap egress EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM

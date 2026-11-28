@@ -243,8 +243,8 @@ class SourceIdentityTests(unittest.TestCase):
         self.assertIsNotNone(match, 'full dispatch must ignore partial profile selection')
         mapping = json.loads(match[1])
         self.assertEqual(set(profiles['options']), set(mapping))
-        self.assertEqual(mapping['all'], ['macos-26', 'macos-26-intel', 'xcode-27'])
-        self.assertEqual(mapping['arm64'], ['macos-26', 'xcode-27'])
+        self.assertEqual(mapping['all'], ['macos-26', 'xcode-27'])
+        self.assertEqual(mapping['arm64'], mapping['all'])
         for runner in mapping['all']:
             self.assertEqual(mapping[runner], [runner])
         self.assertIsNone(mapping.get('self-hosted'))
@@ -345,8 +345,8 @@ class SourceIdentityTests(unittest.TestCase):
             'ubuntu-gcc13-release', 'non-hardware-validation', 'native-controller-components',
             'linux-native-contracts', 'debian-browser-validation', 'debian-installer-support',
             'ci-build-regressions'})
-        self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'macos-26-intel', 'xcode-27'])
-        self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'macos-26-intel', 'xcode-27', 'windows-2025'])
+        self.assertEqual(jobs['macos-si5351-profile']['strategy']['matrix']['runner'], ['macos-26', 'xcode-27'])
+        self.assertEqual(jobs['native-controller-components']['strategy']['matrix']['runner'], ['ubuntu-24.04', 'macos-26', 'xcode-27', 'windows-2025'])
         for profile in (*MACOS_RUNTIME_JOBS, 'macos-si5351-profile'):
             self.assertEqual(jobs[profile]['env']['MACOSX_DEPLOYMENT_TARGET'], "${{ matrix.runner == 'xcode-27' && '27.0' || '26.0' }}")
             self.assertEqual(jobs[profile]['env']['WSPRRYPI_DISABLE_HARDWARE_ACCESS'], '1')

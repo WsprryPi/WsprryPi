@@ -64,6 +64,12 @@ endforeach()
 target_link_libraries(native_controller_runtime_objects PUBLIC "${NATIVE_BOTAN_LIBRARY}" "${NATIVE_OPENSSL_SSL}"
     "${NATIVE_OPENSSL_CRYPTO}" "${NATIVE_SQLITE_LIBRARY}" setupapi cfgmgr32 advapi32 ws2_32 bcrypt shell32 ole32 uuid
     iphlpapi crypt32 mincore psapi dnsapi)
+
+add_executable(wsprrypi_controller EXCLUDE_FROM_ALL "${controller_src}/main.cpp" "${controller_src}/native_windows_controller.manifest")
+set_target_properties(wsprrypi_controller PROPERTIES OUTPUT_NAME wsprrypi)
+target_link_libraries(wsprrypi_controller PRIVATE native_controller_runtime_objects)
+target_compile_options(wsprrypi_controller PRIVATE /W3 /WX /permissive- /utf-8)
+
 add_executable(pico_controller_pair_fixture EXCLUDE_FROM_ALL ../pico_controller_pair_fixture.cpp "${controller_src}/native_windows_controller.manifest")
 target_link_libraries(pico_controller_pair_fixture PRIVATE native_controller_runtime_objects)
 target_compile_options(pico_controller_pair_fixture PRIVATE /W4 /WX /permissive- /utf-8 /UNDEBUG)

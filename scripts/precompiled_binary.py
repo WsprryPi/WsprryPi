@@ -35,11 +35,11 @@ def host_target():
 def elf_header(binary, cpu):
     with Path(binary).open('rb') as stream:
         data = stream.read(64)
-    bits = 1 if cpu == 'armv6' else 2
+    bits, expected_machine = {'armv6': (1, 40), 'aarch64': (2, 183), 'amd64': (2, 62)}[cpu]
     if len(data) < 64 or data[:4] != b'\x7fELF' or data[4:6] != bytes([bits, 1]):
         raise ValueError(f'executable is not a little-endian {cpu} ELF file')
     kind, machine = struct.unpack_from('<HH', data, 16)
-    if kind not in (2, 3) or machine != (40 if bits == 1 else 183):
+    if kind not in (2, 3) or machine != expected_machine:
         raise ValueError('executable has the wrong ELF machine or type')
     if bits == 1 and not struct.unpack_from('<I', data, 36)[0] & 0x400:
         raise ValueError('ARM executable does not declare the hard-float ABI')

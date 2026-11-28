@@ -25,7 +25,8 @@ def main():
                       '/rp1_pps_calibration.o', '/rp1_gpclk_route_service.o',
                       '/job_service.o', '/tone_engine.o', '/thread_affinity.o', '/monitorfile.o', '/ppm_manager.o', '/support_bundle_'):
         assert forbidden not in link_map, forbidden
-    for options, expected in ((['--help'], 0), (['--version'], 0), (['--list-backends'], 0), ([], 2)):
+    for options, expected in ((['--help'], 0), (['--version'], 0), (['--list-backends'], 0),
+                              (['--storage-format'], 0), ([], 2)):
         result = subprocess.run([str(binary), *options], capture_output=True, text=True, timeout=5)
         assert result.returncode == expected, (options, result)
         if options == ['--version']:
@@ -34,6 +35,8 @@ def main():
             assert 'Ancillary GPIO: disabled' in result.stdout
         if options == ['--list-backends']:
             assert result.stdout == '\n'
+        if options == ['--storage-format']:
+            assert result.stdout == 'application-state/1\n'
     print('PASS production controller link map, forbidden runtime symbols, zero-output metadata, and safe early CLI')
 
 

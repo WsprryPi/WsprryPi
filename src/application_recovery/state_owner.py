@@ -77,6 +77,19 @@ def peer_uid(channel):
     raise archive.RecoveryError('Native recovery owner transport is unavailable')
 
 
+def has_no_supplementary_groups(primary_gid):
+    if sys.platform != 'darwin':
+        return not os.getgroups()
+    # Darwin Python reports Directory Services membership. The unsuffixed libc
+    # entry point reports the process credential and includes its primary GID.
+    getgroups = ctypes.CDLL(None, use_errno=True).getgroups
+    getgroups.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.c_uint))
+    getgroups.restype = ctypes.c_int
+    groups = (ctypes.c_uint * 2)()
+    count = getgroups(len(groups), groups)
+    return count == 0 or (count == 1 and groups[0] == primary_gid)
+
+
 class Wire:
     def __init__(self, channel, timeout=600):
         self.channel = channel
@@ -355,7 +368,7 @@ def validate_context(value, maintenance_uid, owner_home):
         status = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
         archive.require(all(int(status[name].strip(), 16) == 0 for name in ('CapEff', 'CapPrm', 'CapAmb')))
     if maintenance_uid == 0:
-        archive.require(not os.getgroups())
+        archive.require(has_no_supplementary_groups(owner['gid']))
     return value
 
 
@@ -669,7 +682,7 @@ class StateOwner:
         replied = False
         try:
             credentials = {'user': owner['uid'], 'group': owner['gid'], 'extra_groups': []} if os.geteuid() == 0 else {}
-            process = subprocess.Popen([sys.executable, '-I', str(self.worker), '--serve', str(child.fileno())],
+            process = subprocess.Popen([sys.executable, '-I', '-B', str(self.worker), '--serve', str(child.fileno())],
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
                 pass_fds=(child.fileno(),), env={'PATH': '/usr/bin:/bin', 'LANG': 'C'}, **credentials)
             child.close()

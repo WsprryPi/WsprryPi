@@ -267,7 +267,8 @@ print("release v4.0.0-beta.1 "+"a"*64 if result=="release" else "build")
         )
         environment.update(values)
         source = INSTALLER.read_text(encoding="utf-8")
-        entry_point = '\nif [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then'
+        entry_point = ('\nif [[ -z "${BASH_SOURCE[0]:-}" || "${BASH_SOURCE[0]}" == "$0" ]]; then\n'
+                       '    for installer_argument in "$@"; do')
         self.assertEqual(source.count(entry_point), 1)
         return run_fixture_shell('getent() { printf "fixture:x:1:1::%s:/bin/sh\\n" "$USER_HOME"; }\n'
             + source.replace(entry_point, "\n" + FIXTURE + entry_point), cwd=self.root, env=environment,

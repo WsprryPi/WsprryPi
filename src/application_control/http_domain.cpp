@@ -103,7 +103,7 @@ public:
             }
             try{
                 require(request.body=="{}");
-                const auto reply=local_control_request(maintenance_control_options(),{LocalOperation::RecoverySessionIssue,
+                const auto reply=local_control_request(maintenance_control_options(MaintenancePeer::BackendSessionIssuer),{LocalOperation::RecoverySessionIssue,
                     {{"host",request.get_header_value("Host")},{"secure",request.get_header_value("Origin").starts_with("https://")}}});
                 require(reply.at("ok")==true);const auto lease=reply.at("value");
                 require(lease.is_object()&&lease.size()==3&&lease.value("schema",nlohmann::json(nullptr))=="recovery-browser-admission/1"&&

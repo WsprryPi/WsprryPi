@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "web_presence.hpp"
+#include "backend_capabilities.hpp"
 #include "config_handler.hpp"
 #include "scheduling.hpp"
 #include "web_server.hpp"
@@ -23,7 +24,7 @@ void prepare_backend_web_bootstrap(std::shared_ptr<SqliteStateStore> database,co
         {"role",database->role()==StateRole::Pi?"pi":"controller"},{"boot",boot},
         {"web_port",config.web_port},{"socket_port",config.socket_port},
         {"http_enabled",web_server_start_enabled(config)},{"websocket_enabled",websocket_server_start_enabled(config)},
-        {"http_loopback_only",webServer.loopback_fixture()},{"socket_loopback_only",config.socket_loopback_only},
+        {"http_loopback_only",WSPRRYPI_CONTROLLER_ONLY || webServer.loopback_fixture()},{"socket_loopback_only",config.socket_loopback_only},
         {"socket_loopback_family",config.socket_loopback_family==WebSocketLoopbackFamily::IPv4?"ipv4":config.socket_loopback_family==WebSocketLoopbackFamily::IPv6?"ipv6":"auto"}};
 }
 nlohmann::json web_service_bootstrap(std::shared_ptr<SqliteStateStore> database,const std::string &boot){

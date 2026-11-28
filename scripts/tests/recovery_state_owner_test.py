@@ -11,13 +11,33 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
 from application_recovery import archive
+from application_recovery import state_owner
 from application_recovery.durable import publish_record, read_record, directory_lock
 from application_recovery.state_owner import StateOwner, OwnerBusy, connection_lost, operation_timeout
 from application_recovery.jobs import backend_command, BackendUnavailable
+
+
+class OwnerCredentialTest(unittest.TestCase):
+    def test_darwin_requires_the_kernel_group_list_to_contain_only_the_primary_group(self):
+        def query(size, buffer):
+            self.assertEqual(size, 2)
+            buffer[0] = 499
+            buffer[1] = 80
+            return count
+
+        with patch.object(state_owner.sys, 'platform', 'darwin'), \
+                patch.object(state_owner.ctypes, 'CDLL') as library, \
+                patch.object(state_owner.os, 'getgroups', return_value=[499, 12, 61, 100]) as directory_groups:
+            library.return_value.getgroups.side_effect = query
+            for count, primary, allowed in ((1, 499, True), (1, 498, False), (2, 499, False), (-1, 499, False)):
+                with self.subTest(count=count, primary=primary):
+                    self.assertEqual(state_owner.has_no_supplementary_groups(primary), allowed)
+            directory_groups.assert_not_called()
 
 
 @unittest.skipIf(os.geteuid() == 0, 'unprivileged helper tests do not substitute for authorized multi-UID qualification')

@@ -1,7 +1,7 @@
 <?php
 // Hardware-free browser fixture only. Never execute application, privileged,
 // spot-proxy or journal handlers, and never allow direct-port fallback.
-$root = realpath(__DIR__ . '/../data');
+$root = realpath(getenv('WSPRRYPI_TEST_UI_DOCUMENT_ROOT') ?: __DIR__ . '/../data');
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $prefixed = getenv('WSPRRYPI_UI_FIXTURE_PREFIX') === '/wsprrypi' && str_starts_with($path, '/wsprrypi/');
 if ($prefixed) {
