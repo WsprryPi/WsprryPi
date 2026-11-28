@@ -182,12 +182,14 @@ class Tests(unittest.TestCase):
         self.assertEqual(observer.ui_choices(removed,script),{2,4,8})
         drift=header.replace('{2, 4, 8, 12}', '{2, 4, 8, 16}')
         self.assertEqual(observer.cli_choices(drift),{2,4,8,16})
-        client_drift=script.replace('[2, 4, 8, 12].includes(Number(value))',
-                                    '[2, 4, 8].includes(Number(value))')
+        string_choices = '["2", "4", "8", "12"].includes(value)'
+        self.assertEqual(script.count(string_choices), 1)
+        client_drift = script.replace(string_choices, '["2", "4", "8"].includes(value)')
         with self.assertRaisesRegex(A.client.ContractError,'rejects displayed drive choices 12'):
             observer.ui_choices(markup,client_drift)
-        client_drift=script.replace('const valid = supportedRp1GpioDrive(field.value);',
-                                    'const valid = Number(field.value) === 2;')
+        validation_call = 'const valid = supportedRp1GpioDrive(field.value);'
+        self.assertEqual(script.count(validation_call), 1)
+        client_drift = script.replace(validation_call, 'const valid = Number(field.value) === 2;')
         with self.assertRaisesRegex(A.client.ContractError,'rejects displayed drive choices 4, 8, 12'):
             observer.ui_choices(markup,client_drift)
         with self.assertRaisesRegex(A.client.ContractError,'expected one complete'):
