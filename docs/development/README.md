@@ -95,7 +95,7 @@ The [storage and process contract](sqlite-storage-contract.md) describes authori
 
 ## Work and cleanup
 
-The [shared Pi/Pico transmission history and Grafana plan](transmission-history-grafana-plan.md) proposes reception charts, retained transmission observations, and conservative spot association. It records implementation slices, acceptance criteria, source limitations, and unresolved decisions; it does not describe implemented behavior or authorize deployment.
+The [shared Pi/Pico transmission history and Grafana plan](https://github.com/WsprryPi/Wsprry-History/blob/main/docs/development/transmission-history-grafana-plan.md) proposes reception charts, retained transmission observations, and conservative spot association. It records implementation slices, acceptance criteria, source limitations, and unresolved decisions; it does not describe implemented behavior or authorize deployment.
 
 The [release punchlist](../../release_tools/Release%20Punchlist.md) is the selected work authority. Beta 1 preparation retains its exact candidate identities, artifacts and unfinished acceptance gates; a later source commit does not replace that candidate or establish release readiness.
 
