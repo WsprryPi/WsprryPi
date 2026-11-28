@@ -6,6 +6,8 @@ home replaced by an empty task-owned directory and /run hidden. No fixture
 identity, hardware suppression, installed service, or transmitter peer is used.
 """
 import argparse
+import errno
+import fcntl
 import hashlib
 import http.client
 import json
@@ -16,8 +18,36 @@ import pwd
 import re
 import signal
 import socket
+import struct
 import subprocess
 import time
+
+
+SIOCGIFFLAGS = 0x8913
+IFF_UP = 0x1
+
+
+def require_loopback_only():
+    # Linux can expose default tunnel interfaces in a fresh namespace. Require
+    # every non-loopback interface to be down, even if it has no address.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        active = set()
+        for _, name in socket.if_nameindex():
+            interface = struct.pack('16s24x', os.fsencode(name))
+            flags = struct.unpack_from('H', fcntl.ioctl(probe, SIOCGIFFLAGS, interface), 16)[0]
+            if flags & IFF_UP:
+                active.add(name)
+    assert active == {'lo'}, f'An isolated loopback-only namespace is required: {sorted(active)}'
+
+
+def occupy_listener(port, prefer_ipv6):
+    if prefer_ipv6:
+        try:
+            return socket.create_server(('::1', port), family=socket.AF_INET6)
+        except OSError as error:
+            if error.errno not in (errno.EAFNOSUPPORT, errno.EPROTONOSUPPORT, errno.EADDRNOTAVAIL):
+                raise
+    return socket.create_server(('127.0.0.1', port))
 
 
 def main():
@@ -28,11 +58,11 @@ def main():
     parser.add_argument('--host-network-namespace', required=True)
     args = parser.parse_args()
     binary, tracer = args.binary.resolve(strict=True), args.strace.resolve(strict=True)
-    assert platform.system() == 'Linux' and platform.machine() == 'x86_64'
+    assert platform.system() == 'Linux' and platform.machine() in ('x86_64', 'aarch64')
     assert os.geteuid() != 0, 'The application gate must run unprivileged'
     credentials = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
     assert int(credentials['CapEff'].strip(), 16) == 0 and credentials['NoNewPrivs'].strip() == '1'
-    assert {name for _, name in socket.if_nameindex()} == {'lo'}, 'An isolated network namespace is required'
+    require_loopback_only()
     # PID 1's namespace link is privileged on the native host. The launcher
     # verifies the separation before dropping privileges and supplies that ID.
     assert re.fullmatch(r'net:\[\d+\]', args.host_network_namespace)
@@ -50,7 +80,7 @@ def main():
     def traced(name, arguments):
         trace = root / (name + '.strace')
         traces.append(trace)
-        return [str(tracer), '-f', '-qq', '-e',
+        return [str(tracer), '-f', '--kill-on-exit', '-qq', '-e',
                 'trace=%file,%network,%process,sched_setscheduler,sched_setparam,sched_setattr',
                 '-o', str(trace), str(binary), *arguments]
 
@@ -104,13 +134,25 @@ def main():
             output.close()
 
     identity = None
+    cache = root / 'listeners.json'
+    web_arguments = ['--web-service', '--runtime-directory', str(runtime), '--listener-cache', str(cache)]
     for cycle in range(2):
         backend = start(f'backend-{cycle}', ['--controller-only', '--state-directory', str(state),
                         '--runtime-directory', str(runtime), '--socket-loopback-only',
                         '--web-port', '22000', '--socket-port', '22001'])
-        web = start(f'web-{cycle}', ['--web-service', '--runtime-directory', str(runtime),
-                    '--listener-cache', str(root / 'listeners.json')])
+        web = None
         try:
+            if cycle == 0:
+                for listener, port in (('http', 22000), ('websocket', 22001)):
+                    case = f'{listener}-port-conflict'
+                    with occupy_listener(port, listener == 'websocket'):
+                        command(case, web_arguments, 2)
+                        assert 'Browser service failed' in (root / f'{case}.log').read_text()
+                        assert any('bind(' in line and 'EADDRINUSE' in line
+                                   for line in (root / f'{case}.strace').read_text().splitlines()), case
+                        assert not cache.exists(), f'{listener} conflict published a listener cache'
+                        assert backend[0].poll() is None, f'{listener} conflict stopped the backend'
+            web = start(f'web-{cycle}', web_arguments)
             deadline = time.monotonic() + 30
             while True:
                 assert backend[0].poll() is None and web[0].poll() is None, 'Production process exited before readiness'
@@ -146,15 +188,21 @@ def main():
             (root / f'version-{cycle}.json').write_text(json.dumps(version, indent=2) + '\n')
         finally:
             try:
-                stop(web)
+                if web is not None:
+                    stop(web)
             finally:
                 stop(backend)
     forbidden = re.compile(r'/dev/(?:mem|gpiomem[^" ]*|vcio|i2c-[^" ]*|gpiochip[^" ]*|pio[0-9]+|rp1[^" ]*)|'
                            r'/proc/device-tree|/sys/firmware/devicetree|/proc/cpuinfo|'
                            r'sched_(?:setscheduler|setparam|setattr)\(')
     for trace in traces:
-        matches = [line for line in trace.read_text().splitlines() if forbidden.search(line)]
+        lines = trace.read_text().splitlines()
+        matches = [line for line in lines if forbidden.search(line)]
         assert not matches, (trace, matches)
+        foreign_exec = [line for line in lines if re.search(r'\bexecve(?:at)?\(', line)
+                        and f'execve("{binary}",' not in line]
+        assert not foreign_exec, (trace, foreign_exec)
+    require_loopback_only()
     result = {'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
               'platform': platform.platform(), 'uid': os.geteuid(), 'gid': os.getegid(),
               'effective_capabilities': credentials['CapEff'].strip(), 'no_new_privileges': True,
