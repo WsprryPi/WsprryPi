@@ -73,7 +73,8 @@ def release_version(value: str) -> str:
     return value
 
 
-def metadata(repo_root: Path, project: str, executable: str, version_override: str | None = None) -> str:
+def metadata(repo_root: Path, project: str, executable: str, version_override: str | None = None,
+             controller: bool = False) -> str:
     if version_override is not None:
         release_version(version_override)
     git(repo_root, "rev-parse", "--is-inside-work-tree")
@@ -129,6 +130,9 @@ def metadata(repo_root: Path, project: str, executable: str, version_override: s
         "MAKE_EXE": executable,
         "MAKE_PRJ": project,
     }
+    if controller:
+        from controller_source import fingerprint
+        values['MAKE_CONTROLLER_INPUTS'] = fingerprint(repo_root)
     lines = [
         "#pragma once",
         "",
@@ -178,19 +182,20 @@ def main() -> int:
     parser.add_argument("--project", required=True)
     parser.add_argument("--executable", required=True)
     parser.add_argument("--release-version", help="explicit candidate SemVer; always retains commit attribution")
+    parser.add_argument("--controller", action="store_true", help="bind controller build inputs to the executable identity")
     parser.add_argument(
         "--check", action="store_true",
         help="check generated content without writing (0=current, 3=stale)",
     )
     args = parser.parse_args()
     try:
-        content = metadata(args.repo_root.resolve(), args.project, args.executable, args.release_version)
+        content = metadata(args.repo_root.resolve(), args.project, args.executable, args.release_version, args.controller)
         if args.check:
             current = matches_existing(args.output, content)
             print(f"build metadata {'current' if current else 'stale'}: {args.output}")
             return 0 if current else 3
         changed = replace_if_changed(args.output, content)
-    except (MetadataError, OSError) as error:
+    except (MetadataError, OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"build metadata generation failed: {error}", file=sys.stderr)
         return 1
     print(f"build metadata {'updated' if changed else 'unchanged'}: {args.output}")

@@ -15,6 +15,8 @@ inline constexpr wchar_t name[]=L"WsprryPiController";
 inline constexpr wchar_t account[]=L"NT SERVICE\\WsprryPiController";
 inline constexpr wchar_t dispatch[]=L"--native-controller-service";
 inline constexpr wchar_t helper[]=L"--recovery-owner-helper";
+inline constexpr wchar_t initialize[]=L"--initialize-controller-state";
+inline constexpr wchar_t inspect_state[]=L"--inspect-controller-state";
 inline bool equal(std::wstring_view a,std::wstring_view b){
     windows_file::require(a.size()<=32768&&b.size()<=32768);
     return ::CompareStringOrdinal(a.data(),static_cast<int>(a.size()),b.data(),static_cast<int>(b.size()),TRUE)==CSTR_EQUAL;
@@ -25,13 +27,14 @@ inline void unprivileged(){
     windows_file::require(::CreateWellKnownSid(WinBuiltinAdministratorsSid,nullptr,bytes.data(),&length)&&
         ::CheckTokenMembership(nullptr,bytes.data(),&administrator)&&!administrator);
 }
-enum class Mode {Controller,RecoveryOwner};
+enum class Mode {Controller,RecoveryOwner,Initialize,Inspect};
 struct Invocation {Mode mode;std::wstring nonce;};
-// SCM supplies argv[0] itself. No path, command, account, or service name can
-// be selected through the one fixed owner-helper start operation.
+// SCM supplies argv[0]. Both special modes use fixed installer or recovery inputs.
 inline Invocation invocation(std::span<const std::wstring> arguments){
     windows_file::require(!arguments.empty()&&equal(arguments[0],name));
     if(arguments.size()==1)return {Mode::Controller,{}};
+    if(arguments.size()==2&&arguments[1]==initialize)return {Mode::Initialize,{}};
+    if(arguments.size()==2&&arguments[1]==inspect_state)return {Mode::Inspect,{}};
     windows_file::require(arguments.size()==3&&arguments[1]==helper&&nonce(arguments[2]));
     return {Mode::RecoveryOwner,arguments[2]};
 }

@@ -342,7 +342,8 @@ Json resource_value(Json value) {
 }
 Json control_document(const std::string &body) {
   auto value = strict_browser_json(body);
-  require(value.is_object() && value.contains("contract") && value["contract"] == control_contract, "unsupported_control_contract", 409);
+  require(value.is_object() && value.contains("contract") && value["contract"].is_string() &&
+      value["contract"].get_ref<const std::string &>() == control_contract, "unsupported_control_contract", 409);
   value.erase("contract");
   return value;
 }

@@ -735,8 +735,12 @@ class RecoveryJobs:
                     self.lifecycle.start()
             self.save(dict(self.read(job_id), state='awaiting_backend', phase='verifying_backend'))
             observed = self.verify_started(job_id, prepared)
-            if self.config['lifecycle']['kind'] == 'systemd':
+            kind = self.config['lifecycle']['kind']
+            if kind == 'systemd':
                 proxy.reconcile(directory, observed['listeners']['web_port'], observed['listeners']['socket_port'])
+            elif kind in ('launchd', 'windows_service'):
+                proxy.reconcile_native(directory, observed['listeners']['web_port'], observed['listeners']['socket_port'],
+                                       kind, self.root, self.config['backend_command'][0])
             built, _ = read_record(directory / 'candidate-built.json')
             result = {'schema': 'recovery-result/1', 'job_id': job_id, 'state': 'completed_held', 'generation': prepared['generation'],
                       'backend_boot': observed['boot'], 'local_output_held': True, 'remote_authority_held': True,

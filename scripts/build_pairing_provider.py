@@ -38,10 +38,13 @@ def vendor_environment(source):
 def build_key(pin, compiler, cpu):
     toolchain = subprocess.check_output([compiler, "--version"], text=True, timeout=10)
     operating_system = Path("/etc/os-release")
+    host = platform.system()
     inputs = {"pin": pin, "recipe": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               "compiler": compiler, "toolchain": toolchain, "cpu": cpu,
-              "host": platform.system(), "machine": platform.machine(),
+              "host": host, "machine": platform.machine(),
               "os_release": operating_system.read_text() if operating_system.exists() else platform.mac_ver()[0]}
+    if host == "Darwin":
+        inputs["deployment_target"] = os.environ.get("MACOSX_DEPLOYMENT_TARGET", "")
     return hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()[:24]
 
 

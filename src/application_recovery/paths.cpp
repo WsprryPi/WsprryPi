@@ -28,7 +28,21 @@ RecoveryPaths recovery_paths(){
     std::array<char,4096> executable{};const auto count=::readlink("/proc/self/exe",executable.data(),executable.size());
     if(count>0&&static_cast<std::size_t>(count)<executable.size()){
         const std::string path(executable.data(),static_cast<std::size_t>(count));
+#if WSPRRYPI_CONTROLLER_ONLY
+        // Recovery rejects symlink ancestors. Select the helper alongside the
+        // running image in its immutable installer slot, not the active alias.
+        const std::filesystem::path image(path);
+        const auto bin = image.parent_path();
+        const auto slot = bin.parent_path();
+        const auto digest = slot.filename().string();
+        if (image.filename() == "wsprrypi" && bin.filename() == "bin" &&
+            slot.parent_path() == "/usr/local/lib/wsprrypi-controller" && digest.size() == 64 &&
+            digest.find_first_not_of("0123456789abcdef") == std::string::npos) {
+            value.age = (bin / "recovery-age").string();
+        }
+#else
         if(path=="/usr/local/bin/wsprrypi"||path=="/usr/local/bin/wsprrypi_debug")value.backend_command={path};
+#endif
     }
 #endif
 #if WSPRRYPI_CONTROLLER_ONLY

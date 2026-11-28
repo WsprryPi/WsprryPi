@@ -109,7 +109,9 @@ def embed(binary, destination):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--compiler', required=True)
+    target_args = parser.add_mutually_exclusive_group(required=True)
+    target_args.add_argument('--compiler')
+    target_args.add_argument('--windows-amd64', action='store_true', help='Build the pinned Windows helper from a POSIX build host')
     parser.add_argument('--go', help='Explicit already-verified pinned Go executable')
     parser.add_argument('--embed', type=Path, help='Generate the executable image header')
     parser.add_argument('--test', action='store_true', help='Run native helper unit tests')
@@ -126,10 +128,10 @@ def main():
 
 def build(args, root):
     provider = json.loads(PROVIDER.read_text())
-    system, arch = target(args.compiler)
+    system, arch = ('windows', 'amd64') if args.windows_amd64 else target(args.compiler)
     destination = root / f'{system}-{arch}'
     destination.mkdir(exist_ok=True)
-    output = destination / 'recovery-age'
+    output = destination / ('recovery-age.exe' if system == 'windows' else 'recovery-age')
     inputs = {path.name: digest(path) for path in sorted(SOURCE.iterdir()) if path.name in ('go.mod', 'go.sum') or (path.suffix == '.go' and not path.name.endswith('_test.go'))}
     identity = {'provider': provider, 'inputs': inputs, 'target': [system, arch, '6' if arch == 'arm' else '']}
     record = destination / 'build.json'

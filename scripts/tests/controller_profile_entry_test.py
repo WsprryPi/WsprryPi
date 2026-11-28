@@ -19,6 +19,7 @@ def main():
         source = directory / 'entry.cpp'
         source.write_text('#include "controller_profile_entry.hpp"\n#include <string>\n'
                           'std::string get_version_string(){return "test version";}\n'
+                          'const char *controller_build_identity() noexcept{return "fixture identity";}\n'
                           'int main(int argc,char **argv){return controller_profile_entry(argc,argv).value_or(123);}\n')
         binary = directory / 'entry'
         subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), '-std=c++20', '-Wall', '-Wextra', '-Werror',
@@ -36,12 +37,14 @@ def main():
             run(arguments, 2)
         for arguments in (['--controller-only'], ['--controller-only', '--state-directory', '/private/state'],
                           ['--initialize-state', '--controller-only'], ['--settings', '--help'],
-                          ['--maintenance', 'help'], ['--web-service'], ['--maintenance-worker', '--role', 'controller']):
+                          ['--maintenance', 'help'], ['--storage-format'], ['--web-service'],
+                          ['--maintenance-worker', '--role', 'controller']):
             run(arguments, 123)
         for arguments in (['--help'], ['--controller-only', '--help'], ['--version', '--controller-only']):
             result = run(arguments, 0)
             assert 'Build profile: controller' in result.stdout
         assert run(['--list-backends'], 0).stdout == '\n'
+        assert run(['--artifact-identity'], 0).stdout == 'fixture identity\n'
         # The ordinary transmitter profile retains its existing parser/CLI owner.
         subprocess.run(['python3', str(ROOT / 'scripts/generate_backend_capabilities.py'),
                         '--profile', 'transmitter', '--backends', 'simulated', '--ancillary-gpio', '0',

@@ -15,7 +15,7 @@ step; do not interpret this prompt as unrestricted implementation authority.
 An explicit authorization for multiple slices permits only those slices, in order,
 with each predecessor gate satisfied before its dependent work starts.
 
-The intended outcome is one controller runtime, without a local transmitter, with native installation, unprivileged services, private state, truthful UI, and qualified Linux/macOS/Windows host support. Windows qualification covers x64 on the user-selected Windows 11 build 26300/MSVC 19.51 baseline; native Windows ARM64 is outside the selected scope. Linux ARM64 and both macOS architectures remain selected, with macOS 26 on Intel and Apple silicon and macOS 27 on Apple silicon selected for support and software qualification through CI. macOS 15 is outside the selected support scope. Build only the adapters and host plumbing required to operate accepted #473 functions. Do not add radio modes, management resources/carriers, recurrence evaluators, pairing methods, firmware updaters, login systems, public hosting, or a Setup redesign.
+The intended outcome is one controller runtime with native installation, unprivileged services, private state, a role-appropriate UI, and qualified Linux, macOS, and Windows host support. The controller has no local transmitter. The selected profiles are Ubuntu 26.04 arm64, macOS 27 on Apple silicon, and Windows 11 x64 build 26300 with MSVC 19.51. Build only the adapters and host plumbing required to operate accepted #473 functions. Do not add radio modes, management resources/carriers, recurrence evaluators, pairing methods, firmware updaters, login systems, public hosting, or a Setup redesign.
 
 This execution does not authorize staging, commits, pushes, PRs, issue comments,
 publication, signing-credential access, or deployment unless the invoking request
@@ -91,7 +91,7 @@ Produce a bounded requirement-to-source/test/documentation map. For Linux first,
 then macOS and Windows, select exact OS/runtime/toolchain/CPU baselines, native
 runners, network/USB claims, dependency and browser-hosting choices, service
 identities, configuration/state/log/temp paths, ACLs, and artifact ABI checks.
-Include Linux amd64 first and inspect the plan's other CPU profiles independently.
+Use Ubuntu 26.04 arm64 as the Linux qualification profile and inspect each selected macOS and Windows CPU profile independently.
 Record unavailable runners as outstanding; do not quietly narrow the outcome.
 For explicitly authorized slice 0, save the reviewed manifest and subsequent
 evidence pointers in `docs/development/issue-475-platform-matrix.md`, linking it
@@ -157,6 +157,8 @@ manifests. Use an explicit local candidate-artifact input for prepublication tes
 do not download a latest-channel Pi binary as fallback. Dispatch explicit Linux
 controller installation before hardware checks; retain ordinary Pi installation.
 Use native macOS/Windows entry points sharing declarative contracts.
+
+Ubuntu 26.04 arm64 is the selected native Linux controller qualification platform. The Ubuntu 26.04 installer and bundle use the distribution's glibc 2.43 and PHP 8.5 baseline. Earlier Ubuntu 24.04 evidence applies to the earlier archives.
 
 Provision only the required configuration, private state, dedicated unprivileged service account, native service, browser hosting/proxy, and narrow device permissions. Preserve accepted network guards. Test effective identity and ACLs, not just unit file contents. No broad sudo, root/admin backend or browser runtime, world-writable devices, or access to unrelated interactive-user secrets. Keep any required privileged maintenance lifecycle in its separate narrow native adapter. Preserve configuration, pairing, identity, journals, and reinstall ownership; refuse conflicting roles/unsafe paths.
 

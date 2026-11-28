@@ -71,7 +71,7 @@ The CI rollback regression and its imported helper remain at `wtp-reply-routing-
 
 ## CI ownership, synchronization and build reuse
 
-The non-hardware workflow retains nine expanded contexts: scope admission, the simulated macOS profile, native Si5351 ARM and Intel profiles, strict Linux I2C, six sequential GCC release profiles, Debian full validation, and the production network and USB software pairs. Platform, capability and carrier contexts provide different evidence; a portable or mocked subset does not replace the full profile or either actual pair.
+The non-hardware workflow runs scope admission, simulated macOS and native Si5351 checks on Apple silicon, strict Linux I2C, GCC release builds, Debian full validation, and the production network and USB software pairs. Each platform, capability, and carrier check provides evidence for its own test configuration.
 
 The scope job resolves the selected Pico revision once. Both carrier jobs require and verify that immutable revision before building. The default companion is the committed Pico revision in the vendored control contract's provenance. Regenerate the vendored contract from the committed Pico candidate when updating the pair. Manual dispatch accepts an explicit `pico_ref` override. The network job also checks out its pinned Mbed TLS dependency, and Debian verifies the pinned RP1 provider. Missing, malformed, or mismatched source selections fail without substituting another checkout.
 

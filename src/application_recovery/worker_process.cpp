@@ -111,6 +111,9 @@ RecoveryWorkerProcess::RecoveryWorkerProcess(const RecoveryPaths &paths,const st
     require(!paths.backend_command.empty());safe_program(paths.backend_command.front(),true);
     if(paths.backend_owner){require(role=="controller");safe_program(paths.backend_owner->worker,false);}
     const auto python=std::filesystem::canonical(paths.python).string(),worker=std::filesystem::canonical(paths.worker).string();
+    // Native installations can select a retained release through a managed
+    // alias. The crypto worker admits only physical, trusted ancestors.
+    const auto age=role=="controller"?std::filesystem::canonical(paths.age).string():paths.age;
     for(const auto *module:{"__init__.py","archive.py","durable.py","jobs.py","publication.py","evidence.py","lifecycle.py","proxy.py","private_acl.py","state_owner.py"})
         safe_program((std::filesystem::path(worker).parent_path()/module).string(),false);
     Descriptor child_input,parent_input,parent_output,child_output,child_config,parent_config;
@@ -130,20 +133,27 @@ RecoveryWorkerProcess::RecoveryWorkerProcess(const RecoveryPaths &paths,const st
     flags|=POSIX_SPAWN_CLOEXEC_DEFAULT;
 #endif
     require(!::posix_spawnattr_setflags(&attributes,flags)&&!::posix_spawnattr_setpgroup(&attributes,0));
-    std::array<char *,5> argv{const_cast<char *>(python.c_str()),const_cast<char *>("-I"),const_cast<char *>(worker.c_str()),const_cast<char *>("--serve"),nullptr};
+    // The privileged worker must leave the verified release slot unchanged.
+    std::array<char *,6> argv{const_cast<char *>(python.c_str()),const_cast<char *>("-I"),const_cast<char *>("-B"),
+        const_cast<char *>(worker.c_str()),const_cast<char *>("--serve"),nullptr};
     char path[]="PATH=/usr/bin:/bin",lang[]="LANG=C";char *environment[]{path,lang,nullptr};
     const auto error=::posix_spawn(&impl_->child,python.c_str(),&actions,&attributes,argv.data(),environment);
     if(error){impl_->child=-1;throw LocalControlError(LocalControlError::Code::Unavailable);}
     require(!::close(child_input.release())&&!::close(child_output.release())&&!::close(child_config.release()));
     impl_->input=parent_input.release();impl_->output=parent_output.release();
     require(!::fcntl(impl_->input,F_SETFL,O_NONBLOCK)&&!::fcntl(impl_->output,F_SETFL,O_NONBLOCK));
-    auto lifecycle=paths.software_backend_command.empty()?Json{{"kind","systemd"}}:
+#ifdef __APPLE__
+    const auto native_lifecycle="launchd";
+#else
+    const auto native_lifecycle="systemd";
+#endif
+    auto lifecycle=paths.software_backend_command.empty()?Json{{"kind",native_lifecycle}}:
         Json{{"kind","software_fixture"},{"start_command",paths.software_backend_command}};
     if(!paths.software_worker_fault_phase.empty())lifecycle["crash_after_phase"]=paths.software_worker_fault_phase;
     const auto owner=paths.backend_owner?Json{{"uid",paths.backend_owner->uid},{"gid",paths.backend_owner->gid},
         {"home",paths.backend_owner->home},{"root",paths.backend_owner->root},{"worker",paths.backend_owner->worker}}:Json(nullptr);
     const auto config=Json{{"backend_owner",owner},{"lifecycle",lifecycle},{"root",paths.root},{"application_root",paths.application_root},{"backend_command",paths.backend_command},
-        {"backend_runtime",paths.backend_runtime},{"age",paths.age},{"identity",identity},{"role",role}};
+        {"backend_runtime",paths.backend_runtime},{"age",age},{"identity",identity},{"role",role}};
     const auto frame=recovery_worker_protocol::configuration_frame(config);
     try{
         require(!::fcntl(parent_config.value,F_SETFL,O_NONBLOCK));send_bytes(parent_config.value,frame,std::chrono::steady_clock::now()+std::chrono::seconds(5));

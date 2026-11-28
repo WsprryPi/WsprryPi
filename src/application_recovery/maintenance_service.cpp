@@ -38,20 +38,24 @@ void stop(int){stopping=1;}
 #endif
 void require(bool value){if(!value)throw LocalCommandRefused(LocalRefusal::InvalidRequest);}
 }
-LocalTransportOptions maintenance_control_options(bool browser){
+LocalTransportOptions maintenance_control_options(MaintenancePeer peer){
     const auto paths=recovery_paths();
 #ifdef _WIN32
-    (void)browser;
+    (void)peer;
     if(testing::application_control_runtime_fixture_selected())return {paths.runtime,windows_file::current_sid(),L"",LocalChannel::Control,{},false};
     const auto owners=native_windows_controller_owners();
     return {paths.runtime,owners.maintenance.sid,owners.web.sid,LocalChannel::Control,owners.backend.sid,true};
 #else
+    const bool browser=peer==MaintenancePeer::Browser;
 
 #if WSPRRYPI_CONTROLLER_ONLY
     if(!testing::application_control_runtime_fixture_selected())if(const auto owners=native_controller_owners()){
-        if(::geteuid()!=0&&(!browser||::geteuid()!=owners->web.uid))
+        const bool issuer=peer==MaintenancePeer::BackendSessionIssuer;
+        const auto self=::geteuid();
+        if(self!=0&&!(browser&&self==owners->web.uid)&&!(issuer&&self==owners->backend.uid))
             throw LocalControlError(LocalControlError::Code::Unauthorized);
-        return {paths.runtime,uid_t{0},owners->web.uid,owners->web.gid};
+        return {paths.runtime,uid_t{0},owners->web.uid,owners->web.gid,LocalChannel::Control,
+                issuer?std::optional<uid_t>{owners->backend.uid}:std::nullopt};
     }
 #endif
     const auto user=::getpwnam("www-data");const auto self=::geteuid();
@@ -60,6 +64,11 @@ LocalTransportOptions maintenance_control_options(bool browser){
 #endif
 }
 std::optional<int> maintenance_service_main(int argc,char *argv[]){
+    return maintenance_service_main(argc,argv,{},{});
+}
+
+std::optional<int> maintenance_service_main(int argc,char *argv[],const std::function<bool()> &stop_requested,
+                                           const std::function<void()> &ready){
     bool selected=false;for(int index=1;index<argc;++index)if(std::string_view(argv[index])=="--maintenance-worker")selected=true;
     if(!selected)return {};
     try{
@@ -99,16 +108,20 @@ std::optional<int> maintenance_service_main(int argc,char *argv[]){
         struct Lock {int descriptor;~Lock(){if(descriptor>=0)::close(descriptor);}} root_lock{lock};
         require(lock>=0&&!::flock(lock,LOCK_EX|LOCK_NB));
 #endif
+        if(stop_requested&&stop_requested())return 0;
         RecoveryWorkerProcess worker(paths,wtp_pi_device_id(),role);
         RecoveryBrowserAdmission admission(paths.root,wtp_pi_device_id(),SupportRequestGuard::discover_local_networks);
         RecoveryMaintenanceDomain router(paths,worker,admission);
-        LocalHttpSessions sessions([&](auto input){return router.dispatch(std::move(input));},[]{return !stopping;});
-        auto options=maintenance_control_options();const auto boot=WtpPiBootIdentity{}.new_boot_id();
+        const auto stop_now=[&]{return stopping||(stop_requested&&stop_requested());};
+        LocalHttpSessions sessions([&](auto input){return router.dispatch(std::move(input));},[&]{return !stop_now();});
+        const auto boot=WtpPiBootIdentity{}.new_boot_id();
+        auto options=maintenance_control_options(MaintenancePeer::BackendSessionIssuer);
         LocalControlServer control(options,boot,[&](LocalPeer peer,const LocalRequest &request){
             require(peer==LocalPeer::Administrator&&request.operation==LocalOperation::RecoverySessionIssue&&request.arguments.is_object()&&request.arguments.size()==2&&
                 request.arguments.contains("host")&&request.arguments["host"].is_string()&&request.arguments.contains("secure")&&request.arguments["secure"].is_boolean());
             return admission.issue(request.arguments["host"].get<std::string>(),request.arguments["secure"].get<bool>());
         });
+        options=maintenance_control_options();
         options.channel=LocalChannel::Recovery;
         LocalControlServer administrator(options,boot,[&](LocalPeer peer,const LocalRequest &request){
             require(peer==LocalPeer::Administrator&&request.operation==LocalOperation::RecoveryCommand);
@@ -127,8 +140,10 @@ std::optional<int> maintenance_service_main(int argc,char *argv[]){
         stopping=0;const auto previous_term=std::signal(SIGTERM,stop),previous_int=std::signal(SIGINT,stop);
         struct RestoreSignals {decltype(previous_term) term,interrupt;~RestoreSignals(){std::signal(SIGTERM,term);std::signal(SIGINT,interrupt);}}restore{previous_term,previous_int};
 #endif
+        if(stop_now())return 0;
         control.start();administrator.start();http.start();
-        while(!stopping){
+        if(ready)ready();
+        while(!stop_now()){
             if(!worker.alive())throw LocalControlError(LocalControlError::Code::UnknownOutcome);
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }

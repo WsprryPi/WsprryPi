@@ -174,6 +174,28 @@ constexpr std::string_view to_string_view(T value) noexcept
 #define MAKE_PRJ "unknown" ///< Fallback for the project name.
 #endif
 
+#if WSPRRYPI_CONTROLLER_ONLY
+#ifndef MAKE_CONTROLLER_INPUTS
+#define MAKE_CONTROLLER_INPUTS ""
+#endif
+namespace
+{
+    static_assert(std::string_view(WSPRRYPI_COMPILED_BACKENDS).empty());
+    static_assert(!WSPRRYPI_ANCILLARY_GPIO);
+    // The offline artifact verifier reads this section without running the executable.
+#if defined(__linux__)
+    [[gnu::used, gnu::retain, gnu::section(".wsprrypi.controller")]]
+#endif
+    const char controller_artifact_identity[] =
+        "wsprrypi-controller/1 " MAKE_COMMIT " " MAKE_TAG " " MAKE_DIRTY " " MAKE_CONTROLLER_INPUTS;
+}
+
+const char *controller_build_identity() noexcept
+{
+    return controller_artifact_identity;
+}
+#endif
+
 // Compile-time string views for sanitized values
 constexpr std::string_view SANITIZED_TAG = to_string_view(MAKE_TAG); ///< Sanitized build tag.
 constexpr std::string_view SANITIZED_BRH = to_string_view(MAKE_BRH); ///< Sanitized branch name.
@@ -684,6 +706,11 @@ std::string get_raw_version_string()
 
 std::string get_os_version_name()
 {
+#if defined(__APPLE__)
+    return "macOS";
+#elif defined(_WIN32)
+    return "Windows";
+#else
     std::ifstream file("/etc/os-release");
     if (!file)
         return "Unknown OS";
@@ -711,4 +738,5 @@ std::string get_os_version_name()
     }
 
     return pretty.empty() ? "Unknown OS" : pretty;
+#endif
 }

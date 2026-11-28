@@ -27,6 +27,13 @@ async function backendPort(start) {
 
 async function main() {
     const ui = path.resolve(__dirname, "..");
+    const packagedUi = process.env.WSPRRYPI_CONTROLLER_UI_ROOT;
+    if (packagedUi) {
+        assert.ok(path.isAbsolute(packagedUi), "Package document root must be absolute");
+        for (const file of ["fetch_spots.php", "log_stream.php", "view_diag_logs.php"]) {
+            assert.equal(fs.existsSync(path.join(packagedUi, file)), false, `Controller package carries ${file}`);
+        }
+    }
     const binary = process.env.WSPRRYPI_CONTROLLER_FIXTURE;
     assert.ok(binary && path.isAbsolute(binary), "Explicit controller-profile production fixture required");
     const backend = await backendPort(39100), socket = await backendPort(backend + 1), phpPort = await freePort();
@@ -49,8 +56,11 @@ async function main() {
         assert.deepEqual(actualVersion.host_status, actualStatus);
         assert.equal(actualVersion.compiled_backends, "");
         assert.equal(actualVersion.ancillary_gpio, false);
-        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "data", "tests/browser_fixture_router.php"], {
-            cwd: ui, env: {...process.env, WSPRRYPI_UI_FIXTURE_PREFIX: "/wsprrypi"}
+        const nativeOs = {darwin: "macOS", win32: "Windows"}[process.platform];
+        if (nativeOs) assert.ok(actualVersion.wspr_version.includes(nativeOs));
+        php = spawnFixtureChild("php", ["-S", `127.0.0.1:${phpPort}`, "-t", packagedUi || "data", "tests/browser_fixture_router.php"], {
+            cwd: ui, env: {...process.env, WSPRRYPI_UI_FIXTURE_PREFIX: "/wsprrypi",
+                WSPRRYPI_TEST_UI_DOCUMENT_ROOT: packagedUi || ""}
         });
         await waitForSpawn(php);
         await waitForPhp(php, `http://127.0.0.1:${phpPort}/wsprrypi/index.php?page=config`, "controller PHP templates");

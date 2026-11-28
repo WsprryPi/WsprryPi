@@ -19,6 +19,8 @@ from application_recovery.durable import publish_record, read_record
 from application_recovery.jobs import BackendUnavailable, RecoveryBusy, RecoveryJobs, backend_command
 from application_recovery.state_owner import OwnerBusy, OwnerUnavailable
 
+NATIVE_LIFECYCLE = 'launchd' if sys.platform == 'darwin' else 'systemd'
+
 class RecoveryJobsTest(unittest.TestCase):
     def test_status_cannot_read_result_during_publication(self):
         owner = self.owner
@@ -43,7 +45,8 @@ class RecoveryJobsTest(unittest.TestCase):
                 self.assertTrue(release.wait(3), 'Result publication was not released')
             return observation
 
-        with patch('application_recovery.jobs.proxy.reconcile'), patch('application_recovery.jobs.publish_record', pause_after_result), \
+        reconcile = 'reconcile_native' if NATIVE_LIFECYCLE == 'launchd' else 'reconcile'
+        with patch('application_recovery.jobs.proxy.' + reconcile), patch('application_recovery.jobs.publish_record', pause_after_result), \
                 ThreadPoolExecutor(max_workers=1) as tasks:
             finish = tasks.submit(owner.finish_published, job_id, {'generation': '2'})
             try:
@@ -89,7 +92,7 @@ class RecoveryJobsTest(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.config = {'root': str(self.root), 'application_root': str(self.root / 'application'),
                        'backend_runtime': str(self.root / 'backend'), 'backend_command': ['/usr/bin/false'],
-                       'backend_owner': None, 'lifecycle': {'kind': 'systemd'}, 'age': '/usr/bin/false', 'identity': 'a' * 32, 'role': 'controller'}
+                       'backend_owner': None, 'lifecycle': {'kind': NATIVE_LIFECYCLE}, 'age': '/usr/bin/false', 'identity': 'a' * 32, 'role': 'controller'}
         self.owner = RecoveryJobs(self.config)
         self.sequence = 0
 

@@ -12,10 +12,14 @@ template<class F>void refuses(F action){bool refused=false;try{action();}catch(c
 int main(){try{
     const std::wstring nonce(32,L'a');
     assert(service::invocation(std::array<std::wstring,1>{service::name}).mode==service::Mode::Controller);
+    assert(service::invocation(std::array<std::wstring,2>{service::name,service::initialize}).mode==service::Mode::Initialize);
+    assert(service::invocation(std::array<std::wstring,2>{service::name,service::inspect_state}).mode==service::Mode::Inspect);
     const auto helper=service::invocation(std::array<std::wstring,3>{service::name,service::helper,nonce});assert(helper.mode==service::Mode::RecoveryOwner&&helper.nonce==nonce);
     for(const auto &arguments:std::vector<std::vector<std::wstring>>{{},{L"OtherService"},{service::name,service::helper},
         {service::name,service::helper,L""},{service::name,service::helper,std::wstring(32,L'A')},
-        {service::name,L"--command",nonce},{service::name,service::helper,nonce,L"extra"}})refuses([&]{(void)service::invocation(arguments);});
+        {service::name,L"--command",nonce},{service::name,service::helper,nonce,L"extra"},
+        {service::name,service::initialize,L"C:\\other-state"},
+        {service::name,service::inspect_state,L"C:\\other-result"}})refuses([&]{(void)service::invocation(arguments);});
     NativeWindowsFixture root;const auto program=root.root/L"Program Files"/L"wsprrypi.exe";
     const auto command=L"\""+program.native()+L"\" --native-controller-service --controller-only";
     service::definition(SERVICE_WIN32_OWN_PROCESS,service::account,command,program);
